@@ -44,6 +44,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final _btnCtlr = RoundedLoadingButtonController();
 
   bool privateEvent = false;
+  final List<String> _allCategories = ['Educational', 'Professional', 'Other'];
+  List<String> _selectedCategories = [];
 
   final TextEditingController groupNameEdtController = TextEditingController();
   final TextEditingController titleEdtController = TextEditingController();
@@ -124,6 +126,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         longitude: widget.selectedLocation.longitude,
         latitude: widget.selectedLocation.latitude,
         private: privateEvent,
+        categories: _selectedCategories,
       );
 
       Map<String, dynamic> data = newEvent.toJson();
@@ -250,6 +253,42 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 ),
               ),
               _privateEventCheckBoxView(),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Categories',
+                      style: TextStyle(
+                        color: AppThemeColor.pureBlackColor,
+                        fontWeight: FontWeight.w500,
+                        fontSize: Dimensions.fontSizeLarge,
+                      ),
+                    ),
+                    Wrap(
+                      spacing: 8.0,
+                      children: _allCategories.map((category) {
+                        final isSelected =
+                            _selectedCategories.contains(category);
+                        return FilterChip(
+                          label: Text(category),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setState(() {
+                              if (selected) {
+                                _selectedCategories.add(category);
+                              } else {
+                                _selectedCategories.remove(category);
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
               AppTextFields.TextField2(
                 hintText: 'Type here...',
                 titleText: 'Organizer',

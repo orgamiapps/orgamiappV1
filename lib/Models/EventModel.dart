@@ -13,6 +13,7 @@ class EventModel {
   String status;
 
   bool private, getLocation;
+  List<String> categories;
 
   LatLng getLatLngOfEvent() {
     return LatLng(latitude, longitude);
@@ -34,27 +35,34 @@ class EventModel {
     required this.radius,
     required this.latitude,
     required this.longitude,
+    this.categories = const [],
   });
 
-  factory EventModel.fromJson(parsedJson) {
-    print('Event Model Data:  [38;5;246m${parsedJson['imageUrl']} [0m');
+  factory EventModel.fromJson(dynamic parsedJson) {
+    // Support both DocumentSnapshot and Map
+    final data = parsedJson is Map
+        ? parsedJson
+        : (parsedJson.data() as Map<String, dynamic>);
+    print('Event Model Data:  [38;5;246m [0m');
     return EventModel(
-      id: parsedJson['id'],
-      groupName: parsedJson['groupName'],
-      title: parsedJson['title'],
-      description: parsedJson['description'],
-      location: parsedJson['location'],
-      imageUrl: parsedJson['imageUrl'],
-      customerUid: parsedJson['customerUid'],
-      status: parsedJson['status'],
-      selectedDateTime: (parsedJson['selectedDateTime'] as Timestamp).toDate(),
-      eventGenerateTime:
-          (parsedJson['eventGenerateTime'] as Timestamp).toDate(),
-      private: parsedJson['private'],
-      getLocation: parsedJson['getLocation'] ?? false,
-      latitude: parsedJson['latitude'] ?? 0.0,
-      longitude: parsedJson['longitude'] ?? 0.0,
-      radius: parsedJson['radius'] ?? 1.0,
+      id: data['id'],
+      groupName: data['groupName'],
+      title: data['title'],
+      description: data['description'],
+      location: data['location'],
+      imageUrl: data['imageUrl'],
+      customerUid: data['customerUid'],
+      status: data['status'],
+      selectedDateTime: (data['selectedDateTime'] as Timestamp).toDate(),
+      eventGenerateTime: (data['eventGenerateTime'] as Timestamp).toDate(),
+      private: data['private'],
+      getLocation: data['getLocation'] ?? false,
+      latitude: data['latitude'] ?? 0.0,
+      longitude: data['longitude'] ?? 0.0,
+      radius: data['radius'] ?? 1.0,
+      categories: (data.containsKey('categories') && data['categories'] != null)
+          ? List<String>.from(data['categories'])
+          : [],
     );
   }
 
@@ -80,6 +88,7 @@ class EventModel {
     data['radius'] = radius;
     data['longitude'] = longitude;
     data['latitude'] = latitude;
+    data['categories'] = categories;
 
     return data;
   }
