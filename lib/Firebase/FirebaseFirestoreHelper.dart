@@ -1,0 +1,401 @@
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:orgami/Controller/CustomerController.dart';
+import 'package:orgami/Models/AttendanceModel.dart';
+import 'package:orgami/Models/CommentModel.dart';
+import 'package:orgami/Models/CustomerModel.dart';
+import 'package:orgami/Models/EventModel.dart';
+import 'package:orgami/Models/EventQuestionModel.dart';
+
+class FirebaseFirestoreHelper {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  Future<CustomerModel?> getSingleCustomer({required String customerId}) async {
+    CustomerModel? customerModel;
+
+    await _firestore
+        .collection(CustomerModel.firebaseKey)
+        .doc(customerId)
+        .get()
+        .then((singleCustomerData) {
+      if (singleCustomerData.exists) {
+        customerModel = CustomerModel.fromFirestore(singleCustomerData);
+      }
+    });
+
+    return customerModel;
+  }
+
+  Future<List<AttendanceModel>> getAttendance({
+    required String eventId,
+  }) async {
+    QuerySnapshot querySnapshot = await _firestore
+        .collection(AttendanceModel.firebaseKey)
+        .where('eventId', isEqualTo: eventId)
+        .get();
+
+    List<AttendanceModel> list = querySnapshot.docs.map((doc) {
+      return AttendanceModel.fromJson(doc);
+    }).toList();
+
+    print('list Data length is ${list.length}');
+
+    return list;
+  }
+
+  Future<List<AttendanceModel>> getRegisterAttendance({
+    required String eventId,
+  }) async {
+    QuerySnapshot querySnapshot = await _firestore
+        .collection(AttendanceModel.registerFirebaseKey)
+        .where('eventId', isEqualTo: eventId)
+        .get();
+
+    List<AttendanceModel> list = querySnapshot.docs.map((doc) {
+      return AttendanceModel.fromJson(doc);
+    }).toList();
+
+    print('list Data length is ${list.length}');
+
+    return list;
+  }
+
+  Future<List<EventQuestionModel>> getEventQuestions({
+    required String eventId,
+  }) async {
+    QuerySnapshot querySnapshot = await _firestore
+        .collection(EventModel.firebaseKey)
+        .doc(eventId)
+        .collection(EventQuestionModel.firebaseKey)
+        .get();
+
+    List<EventQuestionModel> list = querySnapshot.docs.map((doc) {
+      return EventQuestionModel.fromJson(doc);
+    }).toList();
+
+    print('list Data length is ${list.length}');
+
+    return list;
+  }
+
+  Future<bool> getAttendanceExist({
+    required String eventId,
+  }) async {
+    QuerySnapshot querySnapshot = await _firestore
+        .collection(AttendanceModel.firebaseKey)
+        .where('eventId', isEqualTo: eventId)
+        .where('customerUid', isEqualTo: CustomerController.logeInCustomer!.uid)
+        .get();
+
+    List<AttendanceModel> list = querySnapshot.docs.map((doc) {
+      return AttendanceModel.fromJson(doc);
+    }).toList();
+
+    print('list Data length is ${list.length}');
+
+    return list.isNotEmpty ? true : false;
+  }
+
+  Future<bool> getRegisterAttendanceExist({
+    required String eventId,
+  }) async {
+    QuerySnapshot querySnapshot = await _firestore
+        .collection(AttendanceModel.registerFirebaseKey)
+        .where('eventId', isEqualTo: eventId)
+        .where('customerUid', isEqualTo: CustomerController.logeInCustomer!.uid)
+        .get();
+
+    List<AttendanceModel> list = querySnapshot.docs.map((doc) {
+      return AttendanceModel.fromJson(doc);
+    }).toList();
+
+    print('list Data length is ${list.length}');
+
+    return list.isNotEmpty ? true : false;
+  }
+
+  Future<EventModel?> getSingleEvent(String eventId) async {
+    EventModel? eventData;
+
+    return await _firestore
+        .collection(EventModel.firebaseKey)
+        .doc(eventId)
+        .get()
+        .then((DocumentSnapshot snap) {
+      print('Event Data is${snap.data()}');
+      if (snap.exists) {
+        eventData = EventModel.fromJson(snap);
+      }
+      return eventData;
+    });
+  }
+
+  Future<List<AttendanceModel>> getSignedInAttendance() async {
+    QuerySnapshot querySnapshot = await _firestore
+        .collection(AttendanceModel.firebaseKey)
+        .where('customerUid', isEqualTo: CustomerController.logeInCustomer!.uid)
+        .get();
+
+    List<AttendanceModel> list = querySnapshot.docs.map((doc) {
+      return AttendanceModel.fromJson(doc);
+    }).toList();
+
+    print('list Data length is ${list.length}');
+
+    return list;
+  }
+
+  Future<List<AttendanceModel>> getPreRegisteredAttendance() async {
+    QuerySnapshot querySnapshot = await _firestore
+        .collection(AttendanceModel.registerFirebaseKey)
+        .where('customerUid', isEqualTo: CustomerController.logeInCustomer!.uid)
+        .get();
+
+    List<AttendanceModel> list = querySnapshot.docs.map((doc) {
+      return AttendanceModel.fromJson(doc);
+    }).toList();
+
+    print('list Data length is ${list.length}');
+
+    return list;
+  }
+
+  Future<void> addEventToCustomersList() async {
+    _firestore.collection(CustomerModel.firebaseKey).doc();
+  }
+
+  Future<String> getEventID() async {
+    print('M Called for 1');
+    const String fieldName = 'eventId';
+    final DocumentReference ref =
+        _firestore.collection('Settings').doc('EventsSettings');
+    DocumentSnapshot snap = await ref.get();
+    if (snap.exists == true) {
+      int itemCount = snap[fieldName] ?? 0;
+      await _firestore.collection('Settings').doc('EventsSettings').update({
+        'eventId': itemCount + 1,
+      });
+      print('M Called for $itemCount');
+      return itemCount.toString();
+    } else {
+      // await ref.set({fieldName: 0});
+      return '0';
+    }
+  }
+
+  Future<int> getPreRegisterAttendanceCount({required String eventId}) async {
+    QuerySnapshot snapshot = await FirebaseFirestore.instance
+        .collection('RegisterAttendance')
+        .where('eventId', isEqualTo: eventId)
+        .get();
+    return snapshot.docs.length;
+  }
+
+  // Update customer profile information
+  Future<bool> updateCustomerProfile({
+    required String customerId,
+    String? name,
+    String? profilePictureUrl,
+    String? bio,
+  }) async {
+    try {
+      Map<String, dynamic> updateData = {};
+
+      if (name != null) {
+        updateData['name'] = name;
+      }
+
+      if (profilePictureUrl != null) {
+        updateData['profilePictureUrl'] = profilePictureUrl;
+      }
+
+      if (bio != null) {
+        updateData['bio'] = bio;
+      }
+
+      await _firestore
+          .collection(CustomerModel.firebaseKey)
+          .doc(customerId)
+          .update(updateData);
+
+      return true;
+    } catch (e) {
+      print('Error updating customer profile: $e');
+      return false;
+    }
+  }
+
+  // Get comments for an event
+  Future<List<CommentModel>> getEventComments({
+    required String eventId,
+  }) async {
+    try {
+      print('Fetching comments for event: $eventId');
+
+      QuerySnapshot querySnapshot = await _firestore
+          .collection(CommentModel.firebaseKey)
+          .where('eventId', isEqualTo: eventId)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      print('Found ${querySnapshot.docs.length} comment documents');
+
+      List<CommentModel> comments = querySnapshot.docs.map((doc) {
+        print('Processing comment doc: ${doc.id}');
+        return CommentModel.fromFirestore(doc);
+      }).toList();
+
+      print('Processed ${comments.length} comments');
+      return comments;
+    } catch (e) {
+      print('Error getting comments: $e');
+      return [];
+    }
+  }
+
+  // Add a new comment with validation, event existence check, and detailed logging
+  Future<bool> addComment({
+    required String eventId,
+    required String comment,
+    BuildContext? context,
+  }) async {
+    try {
+      // Validate comment text
+      final trimmedComment = comment.trim();
+      if (trimmedComment.isEmpty) {
+        print('Firestore add error: Comment is empty');
+        if (context != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to add comment: Comment is empty')),
+          );
+        }
+        return false;
+      }
+
+      // Validate user
+      final user = CustomerController.logeInCustomer;
+      if (user == null) {
+        print('Firestore add error: User not authenticated');
+        if (context != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Failed to add comment: User not authenticated')),
+          );
+        }
+        return false;
+      }
+
+      // Check if event exists
+      final eventDoc = await _firestore
+          .collection(EventModel.firebaseKey)
+          .doc(eventId)
+          .get();
+      if (!eventDoc.exists) {
+        print(
+            'Firestore add error: Event document does not exist for eventId: $eventId');
+        if (context != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Failed to add comment: Event does not exist')),
+          );
+        }
+        return false;
+      }
+
+      String commentId =
+          _firestore.collection(CommentModel.firebaseKey).doc().id;
+      print('Generated comment ID: $commentId');
+
+      // Prepare payload
+      final payload = {
+        'id': commentId,
+        'eventId': eventId.trim(),
+        'userId': user.uid.trim(),
+        'userName': user.name.trim(),
+        'userProfilePictureUrl': user.profilePictureUrl?.trim(),
+        'comment': trimmedComment,
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+      print('Comment payload: $payload');
+
+      await _firestore
+          .collection(CommentModel.firebaseKey)
+          .doc(commentId)
+          .set(payload);
+      print('Comment successfully saved to Firestore');
+      return true;
+    } catch (e) {
+      print('Firestore add error: $e');
+      if (context != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to add comment: ${e.toString()}')),
+        );
+      }
+      return false;
+    }
+  }
+
+  // Add a manual attendance record
+  Future<void> addAttendance(AttendanceModel attendance) async {
+    try {
+      await _firestore
+          .collection(AttendanceModel.firebaseKey)
+          .doc(attendance.id)
+          .set(attendance.toJson());
+      print('Manual attendance added: ${attendance.userName}');
+    } catch (e) {
+      print('Error adding manual attendance: $e');
+      rethrow;
+    }
+  }
+
+  // Future<void> makeEventSignIn({required String eventId}) async {
+  //   String docId = '$eventId-${CustomerController.logeInCustomer!.uid}';
+  //   AttendanceModel newAttendanceMode = AttendanceModel(
+  //     id: docId,
+  //     eventId: eventId,
+  //     userName: CustomerController.logeInCustomer!.name,
+  //     customerUid: CustomerController.logeInCustomer!.uid,
+  //     attendanceDateTime: DateTime.now(),
+  //     answers: [],
+  //   );
+  //
+  //   await FirebaseFirestore.instance
+  //       .collection(AttendanceModel.firebaseKey)
+  //       .doc(docId)
+  //       .set(newAttendanceMode.toJson())
+  //       .then((value) {
+  //     ShowToast().showNormalToast(msg: 'Signed In Successful!');
+  //   });
+  // }
+
+  // Get events created by a user
+  Future<List<EventModel>> getEventsCreatedByUser(String userId) async {
+    final query = await _firestore
+        .collection(EventModel.firebaseKey)
+        .where('customerUid', isEqualTo: userId)
+        .get();
+    return query.docs.map((doc) => EventModel.fromJson(doc.data())).toList();
+  }
+
+  // Get events attended by a user
+  Future<List<EventModel>> getEventsAttendedByUser(String userId) async {
+    final attendanceQuery = await _firestore
+        .collection(AttendanceModel.firebaseKey)
+        .where('customerUid', isEqualTo: userId)
+        .get();
+    final eventIds = attendanceQuery.docs
+        .map((doc) => doc['eventId'] as String)
+        .toSet()
+        .toList();
+    if (eventIds.isEmpty) return [];
+    final eventsQuery = await _firestore
+        .collection(EventModel.firebaseKey)
+        .where('id',
+            whereIn: eventIds.length > 10 ? eventIds.sublist(0, 10) : eventIds)
+        .get();
+    return eventsQuery.docs
+        .map((doc) => EventModel.fromJson(doc.data()))
+        .toList();
+  }
+}
