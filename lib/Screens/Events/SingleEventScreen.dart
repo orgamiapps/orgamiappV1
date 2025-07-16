@@ -332,6 +332,7 @@ class _SingleEventScreenState extends State<SingleEventScreen> {
               child: Column(
                 children: [
                   _imageView(),
+                  _categoriesView(),
                   if (eventModel.customerUid !=
                       FirebaseAuth.instance.currentUser!.uid)
                     if (signedIn != null)
@@ -666,6 +667,42 @@ class _SingleEventScreenState extends State<SingleEventScreen> {
 
   Widget _imageView() {
     return Image.network(eventModel.imageUrl);
+  }
+
+  Widget _categoriesView() {
+    if (eventModel.categories.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+      child: Wrap(
+        spacing: 8.0,
+        runSpacing: 8.0,
+        children: eventModel.categories.map((category) {
+          return Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+            decoration: BoxDecoration(
+              color: AppThemeColor.darkGreenColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20.0),
+              border: Border.all(
+                color: AppThemeColor.darkGreenColor,
+                width: 1.0,
+              ),
+            ),
+            child: Text(
+              category,
+              style: const TextStyle(
+                color: AppThemeColor.darkGreenColor,
+                fontSize: Dimensions.fontSizeDefault,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
   }
 
   static Widget _appBarViewWithQrButton(

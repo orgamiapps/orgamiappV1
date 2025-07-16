@@ -27,6 +27,10 @@ class _HomeScreenState extends State<HomeScreen> {
   late final double _screenHeight = MediaQuery.of(context).size.height;
 
   double radiusInMiles = 0;
+  List<String> selectedCategories = [];
+
+  // Available categories
+  final List<String> _allCategories = ['Educational', 'Professional', 'Other'];
 
   LatLng? currentLocation;
   Future<void> getCurrentLocation() async {
@@ -85,8 +89,20 @@ class _HomeScreenState extends State<HomeScreen> {
   List<EventModel> filterEvents(
     List<EventModel> events,
   ) {
+    List<EventModel> filteredEvents = events;
+
+    // Filter by categories if any are selected
+    if (selectedCategories.isNotEmpty) {
+      filteredEvents = filteredEvents.where((event) {
+        // Include events that match ANY selected category
+        return event.categories
+            .any((category) => selectedCategories.contains(category));
+      }).toList();
+    }
+
+    // Filter by distance if location and radius are set
     if (currentLocation != null && radiusInMiles > 0) {
-      return events
+      filteredEvents = filteredEvents
           .where(
             (event) => isInRadius(
               currentLocation!,
@@ -105,9 +121,9 @@ class _HomeScreenState extends State<HomeScreen> {
             return distanceA.compareTo(distanceB);
           }
         });
-    } else {
-      return events;
     }
+
+    return filteredEvents;
   }
 
   @override
@@ -186,6 +202,72 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(
           height: 10,
         ),
+        // Category Filter Section
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Filter by Category',
+                style: TextStyle(
+                  color: AppThemeColor.pureBlackColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: Dimensions.fontSizeDefault,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 40,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _allCategories.length,
+                  itemBuilder: (context, index) {
+                    final category = _allCategories[index];
+                    final isSelected = selectedCategories.contains(category);
+
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: FilterChip(
+                        label: Text(
+                          category,
+                          style: TextStyle(
+                            color: isSelected
+                                ? AppThemeColor.pureWhiteColor
+                                : AppThemeColor.pureBlackColor,
+                            fontSize: Dimensions.fontSizeSmall,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(() {
+                            if (selected) {
+                              selectedCategories.add(category);
+                            } else {
+                              selectedCategories.remove(category);
+                            }
+                          });
+                        },
+                        backgroundColor: AppThemeColor.pureWhiteColor,
+                        selectedColor: AppThemeColor.darkGreenColor,
+                        side: BorderSide(
+                          color: isSelected
+                              ? AppThemeColor.darkGreenColor
+                              : AppThemeColor.grayColor,
+                          width: 1,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 15),
         Text(
           'Filter Distance (${radiusInMiles > 0 ? AppConstants.getMilesSliderLabel(radiusInMiles) : 'Global'})',
           style: const TextStyle(
