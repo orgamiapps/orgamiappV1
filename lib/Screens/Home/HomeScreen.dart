@@ -29,8 +29,10 @@ class _HomeScreenState extends State<HomeScreen> {
   double radiusInMiles = 0;
   List<String> selectedCategories = [];
 
-  // Available categories
+  // Remove 'Featured' from categories
   final List<String> _allCategories = ['Educational', 'Professional', 'Other'];
+
+  bool showFeaturedFirst = true; // New boolean for featured toggle
 
   LatLng? currentLocation;
   Future<void> getCurrentLocation() async {
@@ -91,10 +93,9 @@ class _HomeScreenState extends State<HomeScreen> {
   ) {
     List<EventModel> filteredEvents = events;
 
-    // Filter by categories if any are selected
+    // Only filter by categories (not 'Featured')
     if (selectedCategories.isNotEmpty) {
       filteredEvents = filteredEvents.where((event) {
-        // Include events that match ANY selected category
         return event.categories
             .any((category) => selectedCategories.contains(category));
       }).toList();
@@ -128,6 +129,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void initState() {
+    // By default, no categories selected, featured ON
+    selectedCategories = [];
+    showFeaturedFirst = true;
     getCurrentLocation();
     super.initState();
   }
@@ -217,52 +221,92 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              SizedBox(
-                height: 40,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _allCategories.length,
-                  itemBuilder: (context, index) {
-                    final category = _allCategories[index];
-                    final isSelected = selectedCategories.contains(category);
-
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8.0),
-                      child: FilterChip(
-                        label: Text(
-                          category,
-                          style: TextStyle(
-                            color: isSelected
-                                ? AppThemeColor.pureWhiteColor
-                                : AppThemeColor.pureBlackColor,
-                            fontSize: Dimensions.fontSizeSmall,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        selected: isSelected,
-                        onSelected: (selected) {
-                          setState(() {
-                            if (selected) {
-                              selectedCategories.add(category);
-                            } else {
-                              selectedCategories.remove(category);
-                            }
-                          });
-                        },
-                        backgroundColor: AppThemeColor.pureWhiteColor,
-                        selectedColor: AppThemeColor.darkGreenColor,
-                        side: BorderSide(
-                          color: isSelected
-                              ? AppThemeColor.darkGreenColor
-                              : AppThemeColor.grayColor,
-                          width: 1,
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
+              Row(
+                children: [
+                  // Featured toggle chip (always visible, not part of categories)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: FilterChip(
+                      label: Row(
+                        children: [
+                          Icon(Icons.star,
+                              size: 16,
+                              color: showFeaturedFirst
+                                  ? AppThemeColor.pureWhiteColor
+                                  : AppThemeColor.darkGreenColor),
+                          const SizedBox(width: 4),
+                          const Text('Featured'),
+                        ],
                       ),
-                    );
-                  },
-                ),
+                      selected: showFeaturedFirst,
+                      onSelected: (selected) {
+                        setState(() {
+                          showFeaturedFirst = selected;
+                        });
+                      },
+                      backgroundColor: AppThemeColor.pureWhiteColor,
+                      selectedColor: AppThemeColor.darkGreenColor,
+                      side: BorderSide(
+                        color: showFeaturedFirst
+                            ? AppThemeColor.darkGreenColor
+                            : AppThemeColor.grayColor,
+                        width: 1,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                  // Category chips
+                  Expanded(
+                    child: SizedBox(
+                      height: 40,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _allCategories.length,
+                        itemBuilder: (context, index) {
+                          final category = _allCategories[index];
+                          final isSelected =
+                              selectedCategories.contains(category);
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: FilterChip(
+                              label: Text(
+                                category,
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? AppThemeColor.pureWhiteColor
+                                      : AppThemeColor.pureBlackColor,
+                                  fontSize: Dimensions.fontSizeSmall,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              selected: isSelected,
+                              onSelected: (selected) {
+                                setState(() {
+                                  if (selected) {
+                                    selectedCategories.add(category);
+                                  } else {
+                                    selectedCategories.remove(category);
+                                  }
+                                });
+                              },
+                              backgroundColor: AppThemeColor.pureWhiteColor,
+                              selectedColor: AppThemeColor.darkGreenColor,
+                              side: BorderSide(
+                                color: isSelected
+                                    ? AppThemeColor.darkGreenColor
+                                    : AppThemeColor.grayColor,
+                                width: 1,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -310,7 +354,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         if (snapshot.hasError) {
-          return Center(child: Text('Something Went Wrong ${snapshot.error}'));
+          return Center(child: Text('Something Went Wrong   {snapshot.error}'));
         }
 
         if (snapshot.docs.isEmpty) {
@@ -332,11 +376,33 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         }
 
+        List<EventModel> filtered = filterEvents(neededEventList);
+        List<EventModel> displayEvents;
+        if (showFeaturedFirst) {
+          List<EventModel> featuredEvents = filtered
+              .where((e) =>
+                  e.isFeatured == true &&
+                  (e.featureEndDate == null ||
+                      e.featureEndDate!.isAfter(DateTime.now())))
+              .toList()
+            ..sort((a, b) => (b.featureEndDate ?? DateTime(1970))
+                .compareTo(a.featureEndDate ?? DateTime(1970)));
+          List<EventModel> nonFeaturedEvents = filtered
+              .where((e) => !(e.isFeatured == true &&
+                  (e.featureEndDate == null ||
+                      e.featureEndDate!.isAfter(DateTime.now()))))
+              .toList();
+          displayEvents = [...featuredEvents, ...nonFeaturedEvents];
+        } else {
+          // Show all events in normal ascending order (including featured)
+          displayEvents = filtered;
+        }
+
         return ListView.builder(
-            itemCount: filterEvents(neededEventList).length,
+            itemCount: displayEvents.length,
             shrinkWrap: true,
             itemBuilder: (listContext, listIndex) {
-              final EventModel d = filterEvents(neededEventList)[listIndex];
+              final EventModel d = displayEvents[listIndex];
               return SingleEventListViewItem(eventModel: d);
             });
       }),

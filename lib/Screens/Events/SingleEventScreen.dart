@@ -27,6 +27,7 @@ import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
+import 'package:orgami/Screens/Events/FeatureEventScreen.dart';
 
 class SingleEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -333,6 +334,45 @@ class _SingleEventScreenState extends State<SingleEventScreen> {
                 children: [
                   _imageView(),
                   _categoriesView(),
+                  if (eventModel.customerUid ==
+                      FirebaseAuth.instance.currentUser!.uid)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20.0, vertical: 10),
+                      child: eventModel.isFeatured
+                          ? Container(
+                              alignment: Alignment.center,
+                              width: _screenWidth,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: AppThemeColor.orangeColor,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                'Featured',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: Dimensions.fontSizeLarge,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            )
+                          : GestureDetector(
+                              onTap: () {
+                                RouterClass.nextScreenNormal(
+                                  context,
+                                  FeatureEventScreen(eventModel: eventModel),
+                                );
+                              },
+                              child: AppButtons.button1(
+                                width: _screenWidth,
+                                height: 50,
+                                buttonLoading: false,
+                                label: 'Feature This Event',
+                                labelSize: Dimensions.fontSizeLarge,
+                              ),
+                            ),
+                    ),
                   if (eventModel.customerUid !=
                       FirebaseAuth.instance.currentUser!.uid)
                     if (signedIn != null)
@@ -582,15 +622,31 @@ class _SingleEventScreenState extends State<SingleEventScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            eventModel.title,
-            maxLines: 1,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppThemeColor.pureBlackColor,
-              fontWeight: FontWeight.w700,
-              fontSize: Dimensions.fontSizeExtraLarge,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (eventModel.isFeatured)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6.0),
+                  child: Icon(
+                    Icons.star,
+                    color: AppThemeColor.orangeColor,
+                    size: Dimensions.fontSizeExtraLarge + 4,
+                  ),
+                ),
+              Flexible(
+                child: Text(
+                  eventModel.title,
+                  maxLines: 1,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppThemeColor.pureBlackColor,
+                    fontWeight: FontWeight.w700,
+                    fontSize: Dimensions.fontSizeExtraLarge,
+                  ),
+                ),
+              ),
+            ],
           ),
           Text(
             eventModel.groupName,

@@ -18,7 +18,10 @@ class AppButtons {
         borderRadius: BorderRadius.circular(10),
       ),
       child: buttonLoading
-          ? Image.asset('images/loading.gif')
+          ? const CircularProgressIndicator(
+              color: Colors.white,
+              strokeWidth: 2,
+            )
           : Text(
               label,
               style: TextStyle(

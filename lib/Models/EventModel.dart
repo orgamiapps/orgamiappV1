@@ -14,6 +14,8 @@ class EventModel {
 
   bool private, getLocation;
   List<String> categories;
+  bool isFeatured;
+  DateTime? featureEndDate;
 
   LatLng getLatLngOfEvent() {
     return LatLng(latitude, longitude);
@@ -36,6 +38,8 @@ class EventModel {
     required this.latitude,
     required this.longitude,
     this.categories = const [],
+    this.isFeatured = false,
+    this.featureEndDate,
   });
 
   factory EventModel.fromJson(dynamic parsedJson) {
@@ -63,6 +67,12 @@ class EventModel {
       categories: (data.containsKey('categories') && data['categories'] != null)
           ? List<String>.from(data['categories'])
           : [],
+      isFeatured: data['isFeatured'] ?? false,
+      featureEndDate: data['featureEndDate'] != null
+          ? (data['featureEndDate'] is Timestamp
+              ? (data['featureEndDate'] as Timestamp).toDate()
+              : DateTime.tryParse(data['featureEndDate'].toString()))
+          : null,
     );
   }
 
@@ -89,7 +99,8 @@ class EventModel {
     data['longitude'] = longitude;
     data['latitude'] = latitude;
     data['categories'] = categories;
-
+    data['isFeatured'] = isFeatured;
+    data['featureEndDate'] = featureEndDate;
     return data;
   }
 }
