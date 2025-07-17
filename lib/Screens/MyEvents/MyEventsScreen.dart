@@ -202,6 +202,9 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
         setState(() {
           selectedTab = index;
         });
+        // Always refresh attendance and pre-registered lists when switching tabs
+        getAttendanceList();
+        getPreRegisteredAttendanceList();
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 10),
