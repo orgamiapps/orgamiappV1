@@ -26,6 +26,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
 
   final TextEditingController _codeController = TextEditingController();
+  bool _isAnonymousSignIn = false;
 
   // In order to get hot reload to work we need to pause the camera if the platform
   // is android, or resume the camera if the platform is iOS.
@@ -120,6 +121,31 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Checkbox(
+                    value: _isAnonymousSignIn,
+                    onChanged: (value) {
+                      setState(() {
+                        _isAnonymousSignIn = value ?? false;
+                      });
+                    },
+                    activeColor: AppThemeColor.darkGreenColor,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Sign In anonymously to public',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: AppThemeColor.pureWhiteColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
           _signinToEventButton(),
@@ -136,12 +162,19 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
           String docId =
               '${_codeController.text}-${CustomerController.logeInCustomer!.uid}';
           AttendanceModel newAttendanceModel = AttendanceModel(
-              id: docId,
-              eventId: _codeController.text,
-              userName: CustomerController.logeInCustomer!.name,
-              customerUid: CustomerController.logeInCustomer!.uid,
-              attendanceDateTime: DateTime.now(),
-              answers: []);
+            id: docId,
+            eventId: _codeController.text,
+            userName: _isAnonymousSignIn
+                ? 'Anonymous'
+                : CustomerController.logeInCustomer!.name,
+            customerUid: CustomerController.logeInCustomer!.uid,
+            attendanceDateTime: DateTime.now(),
+            answers: [],
+            isAnonymous: _isAnonymousSignIn,
+            realName: _isAnonymousSignIn
+                ? CustomerController.logeInCustomer!.name
+                : null,
+          );
 
           FirebaseFirestoreHelper()
               .getSingleEvent(newAttendanceModel.eventId)

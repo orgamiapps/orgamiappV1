@@ -31,6 +31,7 @@ class _QRScannerWithoutLoginScreenState
 
   final TextEditingController _codeController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
+  bool _isAnonymousSignIn = false;
 
   // In order to get hot reload to work we need to pause the camera if the platform
   // is android, or resume the camera if the platform is iOS.
@@ -79,75 +80,102 @@ class _QRScannerWithoutLoginScreenState
       width: _screenWidth,
       padding: const EdgeInsets.symmetric(horizontal: 20),
       margin: const EdgeInsets.only(top: 40),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            children: [
-              const Text(
-                'Sign In to your Event',
-                style: TextStyle(
-                  color: AppThemeColor.darkBlueColor,
-                  fontSize: Dimensions.paddingSizeLarge,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(
-                height: 20,
-              ),
-              const Text(
-                'Input Code',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppThemeColor.pureWhiteColor,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  color: AppThemeColor.pureWhiteColor,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: TextFormField(
-                  controller: _codeController,
-                  decoration: const InputDecoration(
-                    hintText: 'Input Code here...',
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    border: OutlineInputBorder(),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                const Text(
+                  'Sign In to your Event',
+                  style: TextStyle(
+                    color: AppThemeColor.darkBlueColor,
+                    fontSize: Dimensions.paddingSizeLarge,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-              ),
-              const Text(
-                'Enter Your First and Last Name',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppThemeColor.pureWhiteColor,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w400,
+                const SizedBox(
+                  height: 20,
                 ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  color: AppThemeColor.pureWhiteColor,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    hintText: 'type here....',
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    border: OutlineInputBorder(),
+                const Text(
+                  'Input Code',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppThemeColor.pureWhiteColor,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
-              ),
-            ],
-          ),
-          _signinToEventButton(),
-        ],
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppThemeColor.pureWhiteColor,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: TextFormField(
+                    controller: _codeController,
+                    decoration: const InputDecoration(
+                      hintText: 'Input Code here...',
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const Text(
+                  'Enter Your First and Last Name',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppThemeColor.pureWhiteColor,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppThemeColor.pureWhiteColor,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: TextFormField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(
+                      hintText: 'type here....',
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _isAnonymousSignIn,
+                      onChanged: (value) {
+                        setState(() {
+                          _isAnonymousSignIn = value ?? false;
+                        });
+                      },
+                      activeColor: AppThemeColor.darkGreenColor,
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Sign In anonymously to public',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: AppThemeColor.pureWhiteColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            _signinToEventButton(),
+          ],
+        ),
       ),
     );
   }
@@ -164,10 +192,12 @@ class _QRScannerWithoutLoginScreenState
           AttendanceModel newAttendanceModel = AttendanceModel(
             id: docId,
             eventId: _codeController.text,
-            userName: _nameController.text,
+            userName: _isAnonymousSignIn ? 'Anonymous' : _nameController.text,
             customerUid: 'without_login',
             attendanceDateTime: DateTime.now(),
             answers: [],
+            isAnonymous: _isAnonymousSignIn,
+            realName: _isAnonymousSignIn ? _nameController.text : null,
           );
 
           FirebaseFirestoreHelper()
@@ -181,20 +211,8 @@ class _QRScannerWithoutLoginScreenState
                   eventModel: eventExist,
                   newAttendance: newAttendanceModel,
                   nextPageRoute: 'withoutLogin',
-                  //   nextPageRoute: () => RouterClass.nextScreenAndReplacement(
-                  //       context, SingleEventScreen(eventModel: eventExist)),
                 ),
               );
-
-              // FirebaseFirestore.instance
-              //     .collection(AttendanceModel.firebaseKey)
-              //     .doc(docId)
-              //     .set(newAttendanceMode.toJson())
-              //     .then((value) {
-              //   ShowToast().showSnackBar('Signed In Successful!', context);
-              //   RouterClass.nextScreenNormal(
-              //       context, SingleEventScreen(eventModel: eventExist));
-              // });
             } else {
               ShowToast().showNormalToast(msg: 'Entered an incorrect code!');
             }

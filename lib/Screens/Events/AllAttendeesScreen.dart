@@ -117,6 +117,8 @@ class _AllAttendeesScreenState extends State<AllAttendeesScreen> {
                       ),
                     );
 
+                    final isAnon = attendee.isAnonymous;
+
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
                       elevation: 2,
@@ -127,30 +129,37 @@ class _AllAttendeesScreenState extends State<AllAttendeesScreen> {
                         leading: CircleAvatar(
                           radius: 25,
                           backgroundColor: Colors.grey[300],
-                          child: customer.profilePictureUrl != null
-                              ? ClipOval(
-                                  child: Image.network(
-                                    customer.profilePictureUrl!,
-                                    width: 50,
-                                    height: 50,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return const Icon(
-                                        Icons.person,
-                                        size: 30,
-                                        color: Colors.grey,
-                                      );
-                                    },
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.person,
+                          child: isAnon
+                              ? const Icon(
+                                  Icons.person_off,
                                   size: 30,
                                   color: Colors.grey,
-                                ),
+                                )
+                              : (customer.profilePictureUrl != null
+                                  ? ClipOval(
+                                      child: Image.network(
+                                        customer.profilePictureUrl!,
+                                        width: 50,
+                                        height: 50,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) {
+                                          return const Icon(
+                                            Icons.person,
+                                            size: 30,
+                                            color: Colors.grey,
+                                          );
+                                        },
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.person,
+                                      size: 30,
+                                      color: Colors.grey,
+                                    )),
                         ),
                         title: Text(
-                          customer.name,
+                          isAnon ? 'Anonymous' : customer.name,
                           style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: Dimensions.fontSizeLarge,
@@ -158,7 +167,7 @@ class _AllAttendeesScreenState extends State<AllAttendeesScreen> {
                           ),
                         ),
                         subtitle: Text(
-                          'Signed in at ${_formatDateTime(attendee.attendanceDateTime)}',
+                          'Signed in at 24{_formatDateTime(attendee.attendanceDateTime)}',
                           style: const TextStyle(
                             color: AppThemeColor.dullFontColor,
                             fontSize: Dimensions.fontSizeSmall,

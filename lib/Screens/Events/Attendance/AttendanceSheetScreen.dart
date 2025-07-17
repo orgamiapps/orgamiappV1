@@ -15,6 +15,7 @@ import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xcel;
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AttendanceSheetScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -476,7 +477,13 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                                   color: Colors.transparent,
                                   child: Center(
                                     child: Text(
-                                      singleAttendance.userName,
+                                      (singleAttendance.isAnonymous &&
+                                              eventModel.customerUid ==
+                                                  FirebaseAuth.instance
+                                                      .currentUser?.uid &&
+                                              singleAttendance.realName != null)
+                                          ? singleAttendance.realName!
+                                          : singleAttendance.userName,
                                       maxLines: 1,
                                       textAlign: TextAlign.center,
                                       style: const TextStyle(
@@ -887,7 +894,18 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                                             color: Colors.transparent,
                                             child: Center(
                                               child: Text(
-                                                singleAttendance.userName,
+                                                (singleAttendance.isAnonymous &&
+                                                        eventModel
+                                                                .customerUid ==
+                                                            FirebaseAuth
+                                                                .instance
+                                                                .currentUser
+                                                                ?.uid &&
+                                                        singleAttendance
+                                                                .realName !=
+                                                            null)
+                                                    ? singleAttendance.realName!
+                                                    : singleAttendance.userName,
                                                 maxLines: 1,
                                                 textAlign: TextAlign.center,
                                                 style: const TextStyle(

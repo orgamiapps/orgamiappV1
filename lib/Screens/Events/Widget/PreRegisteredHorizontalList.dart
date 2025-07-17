@@ -139,6 +139,7 @@ class _PreRegisteredHorizontalListState
                     createdAt: DateTime.now(),
                   ),
                 );
+                final isAnon = attendee.isAnonymous;
 
                 return Container(
                   margin: const EdgeInsets.only(right: 12),
@@ -156,29 +157,39 @@ class _PreRegisteredHorizontalListState
                           ),
                         ),
                         child: ClipOval(
-                          child: customer.profilePictureUrl != null
-                              ? Image.network(
-                                  customer.profilePictureUrl!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
+                          child: isAnon
+                              ? Container(
+                                  color: Colors.grey[300],
+                                  child: const Icon(
+                                    Icons.person_off,
+                                    size: 25,
+                                    color: Colors.grey,
+                                  ),
+                                )
+                              : (customer.profilePictureUrl != null
+                                  ? Image.network(
+                                      customer.profilePictureUrl!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                        return Container(
+                                          color: Colors.grey[300],
+                                          child: const Icon(
+                                            Icons.person,
+                                            size: 25,
+                                            color: Colors.grey,
+                                          ),
+                                        );
+                                      },
+                                    )
+                                  : Container(
                                       color: Colors.grey[300],
                                       child: const Icon(
                                         Icons.person,
                                         size: 25,
                                         color: Colors.grey,
                                       ),
-                                    );
-                                  },
-                                )
-                              : Container(
-                                  color: Colors.grey[300],
-                                  child: const Icon(
-                                    Icons.person,
-                                    size: 25,
-                                    color: Colors.grey,
-                                  ),
-                                ),
+                                    )),
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -186,7 +197,7 @@ class _PreRegisteredHorizontalListState
                       SizedBox(
                         width: 60,
                         child: Text(
-                          customer.name,
+                          isAnon ? 'Anonymous' : customer.name,
                           textAlign: TextAlign.center,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

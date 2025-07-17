@@ -47,6 +47,8 @@ class _SingleEventScreenState extends State<SingleEventScreen> {
   bool? signedIn;
   bool? registered;
   final _btnCtlr = RoundedLoadingButtonController();
+  bool _isAnonymousSignIn = false;
+  bool _isAnonymousPreRegister = false;
 
   double radians(double degrees) {
     return degrees * pi / 180.0;
@@ -168,14 +170,116 @@ class _SingleEventScreenState extends State<SingleEventScreen> {
       if (inRadius) {
         showDialog(
           context: context,
-          builder: (BuildContext context) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10.0),
-              ),
-              elevation: 0,
-              backgroundColor: Colors.transparent,
-              child: contentBox(context),
+          builder: (BuildContext dialogContext) {
+            return StatefulBuilder(
+              builder: (BuildContext context, StateSetter dialogSetState) {
+                return Dialog(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                  ),
+                  elevation: 0,
+                  backgroundColor: Colors.transparent,
+                  child: Stack(
+                    children: <Widget>[
+                      Container(
+                        padding: const EdgeInsets.all(20.0),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.rectangle,
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10.0),
+                        ),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              const Icon(
+                                Icons.celebration,
+                                color: AppThemeColor.darkBlueColor,
+                                size: 50.0,
+                              ),
+                              const SizedBox(height: 20),
+                              Text(
+                                "Welcome to ${eventModel.title}! Tap 'Sign In' to confirm your attendance.",
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              // Anonymous checkbox
+                              Row(
+                                children: [
+                                  Checkbox(
+                                    value: _isAnonymousSignIn,
+                                    onChanged: (value) {
+                                      dialogSetState(() {
+                                        _isAnonymousSignIn = value ?? false;
+                                      });
+                                    },
+                                    activeColor: AppThemeColor.darkGreenColor,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Expanded(
+                                    child: Text(
+                                      'Sign In anonymously to public',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceEvenly,
+                                children: <Widget>[
+                                  MaterialButton(
+                                    onPressed: () {
+                                      Navigator.of(context).pop();
+                                    },
+                                    child: const Text(
+                                      'Close',
+                                      style: TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: _screenWidth / 2.8,
+                                    child: RoundedLoadingButton(
+                                      animateOnTap: false,
+                                      borderRadius: 5,
+                                      controller: _btnCtlr,
+                                      onPressed: makeSignInToEvent,
+                                      color: AppThemeColor.darkGreenColor,
+                                      elevation: 0,
+                                      child: const Wrap(
+                                        children: [
+                                          Text(
+                                            'Sign In',
+                                            style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.white),
+                                          )
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             );
           },
         );
@@ -183,80 +287,6 @@ class _SingleEventScreenState extends State<SingleEventScreen> {
       print(
           'Current Location is  $inRadius and radius is ${widget.eventModel.radius}');
     });
-  }
-
-  contentBox(context) {
-    return Stack(
-      children: <Widget>[
-        Container(
-          padding: const EdgeInsets.all(20.0),
-          decoration: BoxDecoration(
-            shape: BoxShape.rectangle,
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10.0),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              const Icon(
-                Icons.celebration,
-                color: AppThemeColor.darkBlueColor,
-                size: 50.0,
-              ),
-              const SizedBox(height: 20),
-              Text(
-                "Welcome to ${eventModel.title}! Tap 'Sign In' to confirm your attendance.",
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: <Widget>[
-                  MaterialButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text(
-                      'Close',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: _screenWidth / 2.8,
-                    child: RoundedLoadingButton(
-                      animateOnTap: false,
-                      borderRadius: 5,
-                      controller: _btnCtlr,
-                      onPressed: makeSignInToEvent,
-                      color: AppThemeColor.darkGreenColor,
-                      elevation: 0,
-                      child: const Wrap(
-                        children: [
-                          Text(
-                            'Sign In',
-                            style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white),
-                          )
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
   }
 
   void makeSignInToEvent() async {
@@ -268,10 +298,15 @@ class _SingleEventScreenState extends State<SingleEventScreen> {
       AttendanceModel newAttendanceModel = AttendanceModel(
         id: docId,
         eventId: eventModel.id,
-        userName: CustomerController.logeInCustomer!.name,
+        userName: _isAnonymousSignIn
+            ? 'Anonymous'
+            : CustomerController.logeInCustomer!.name,
         customerUid: CustomerController.logeInCustomer!.uid,
         attendanceDateTime: DateTime.now(),
         answers: [],
+        isAnonymous: _isAnonymousSignIn,
+        realName:
+            _isAnonymousSignIn ? CustomerController.logeInCustomer!.name : null,
       );
 
       RouterClass.nextScreenAndReplacement(
@@ -444,51 +479,84 @@ class _SingleEventScreenState extends State<SingleEventScreen> {
   Widget _registerToEventButton() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
-      child: RoundedLoadingButton(
-        animateOnTap: false,
-        borderRadius: 5,
-        controller: _btnCtlr,
-        onPressed: () {
-          try {
-            _btnCtlr.start();
-            String docId = FirebaseFirestore.instance
-                .collection(AttendanceModel.registerFirebaseKey)
-                .doc()
-                .id;
-            AttendanceModel newAttendanceMode = AttendanceModel(
-              id: docId,
-              eventId: eventModel.id,
-              userName: CustomerController.logeInCustomer!.name,
-              customerUid: CustomerController.logeInCustomer!.uid,
-              attendanceDateTime: DateTime.now(),
-              answers: [],
-            );
-            FirebaseFirestore.instance
-                .collection(AttendanceModel.registerFirebaseKey)
-                .doc(docId)
-                .set(newAttendanceMode.toJson())
-                .then((value) {
-              _btnCtlr.success();
-              ShowToast().showSnackBar('Register Successful!', context);
-              Navigator.pop(context);
-            });
-          } catch (e) {
-            _btnCtlr.reset();
-          }
-        },
-        color: AppThemeColor.darkGreenColor,
-        elevation: 0,
-        child: const Wrap(
-          children: [
-            Text(
-              'Pre Register',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white),
-            )
-          ],
-        ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Checkbox(
+                value: _isAnonymousPreRegister,
+                onChanged: (value) {
+                  setState(() {
+                    _isAnonymousPreRegister = value ?? false;
+                  });
+                },
+                activeColor: AppThemeColor.darkGreenColor,
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Pre-Register anonymously to public',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          RoundedLoadingButton(
+            animateOnTap: false,
+            borderRadius: 5,
+            controller: _btnCtlr,
+            onPressed: () {
+              try {
+                _btnCtlr.start();
+                String docId = FirebaseFirestore.instance
+                    .collection(AttendanceModel.registerFirebaseKey)
+                    .doc()
+                    .id;
+                AttendanceModel newAttendanceMode = AttendanceModel(
+                  id: docId,
+                  eventId: eventModel.id,
+                  userName: _isAnonymousPreRegister
+                      ? 'Anonymous'
+                      : CustomerController.logeInCustomer!.name,
+                  customerUid: CustomerController.logeInCustomer!.uid,
+                  attendanceDateTime: DateTime.now(),
+                  answers: [],
+                  isAnonymous: _isAnonymousPreRegister,
+                  realName: _isAnonymousPreRegister
+                      ? CustomerController.logeInCustomer!.name
+                      : null,
+                );
+                FirebaseFirestore.instance
+                    .collection(AttendanceModel.registerFirebaseKey)
+                    .doc(docId)
+                    .set(newAttendanceMode.toJson())
+                    .then((value) {
+                  _btnCtlr.success();
+                  ShowToast().showSnackBar('Register Successful!', context);
+                  Navigator.pop(context);
+                });
+              } catch (e) {
+                _btnCtlr.reset();
+              }
+            },
+            color: AppThemeColor.darkGreenColor,
+            elevation: 0,
+            child: const Wrap(
+              children: [
+                Text(
+                  'Pre Register',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white),
+                )
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

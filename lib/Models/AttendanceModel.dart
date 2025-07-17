@@ -5,9 +5,11 @@ class AttendanceModel {
   static String registerFirebaseKey = 'RegisterAttendance';
 
   String id, userName, eventId, customerUid;
+  String? realName;
 
   DateTime attendanceDateTime;
   List<String> answers;
+  bool isAnonymous;
 
   AttendanceModel({
     required this.id,
@@ -16,6 +18,8 @@ class AttendanceModel {
     required this.customerUid,
     required this.attendanceDateTime,
     required this.answers,
+    this.isAnonymous = false,
+    this.realName,
   });
 
   factory AttendanceModel.fromJson(parsedJson) {
@@ -27,6 +31,8 @@ class AttendanceModel {
       attendanceDateTime:
           (parsedJson['attendanceDateTime'] as Timestamp).toDate(),
       answers: List<String>.from(parsedJson['answers']),
+      isAnonymous: parsedJson['isAnonymous'] ?? false,
+      realName: parsedJson['realName'],
     );
   }
 
@@ -39,6 +45,8 @@ class AttendanceModel {
     data['customerUid'] = customerUid;
     data['attendanceDateTime'] = attendanceDateTime;
     data['answers'] = answers;
+    data['isAnonymous'] = isAnonymous;
+    if (realName != null) data['realName'] = realName;
 
     return data;
   }
