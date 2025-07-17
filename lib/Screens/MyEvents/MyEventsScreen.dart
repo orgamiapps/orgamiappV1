@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_ui_firestore/firebase_ui_firestore.dart';
 import 'package:flutter/material.dart';
@@ -30,6 +32,11 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
   List<AttendanceModel> attendanceList = [];
   List<AttendanceModel> preRegisteredAttendanceList = [];
 
+  late StreamSubscription<QuerySnapshot<Map<String, dynamic>>>
+      _attendanceSubscription;
+  late StreamSubscription<QuerySnapshot<Map<String, dynamic>>>
+      _preRegisteredSubscription;
+
   bool signedInEvent({required String eventId}) {
     bool eventSignedIn = false;
     for (var element in attendanceList) {
@@ -52,31 +59,39 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
     return eventPreRegistered;
   }
 
-  Future<void> getAttendanceList() async {
-    await FirebaseFirestoreHelper()
-        .getSignedInAttendance()
-        .then((attendanceData) {
+  @override
+  void initState() {
+    super.initState();
+    _attendanceSubscription = _fireStore
+        .collection(AttendanceModel.firebaseKey)
+        .where('customerUid', isEqualTo: CustomerController.logeInCustomer!.uid)
+        .snapshots()
+        .listen((snapshot) {
       setState(() {
-        attendanceList = attendanceData;
+        attendanceList = snapshot.docs
+            .map((doc) => AttendanceModel.fromJson(doc.data()))
+            .toList();
       });
     });
-  }
 
-  Future<void> getPreRegisteredAttendanceList() async {
-    await FirebaseFirestoreHelper()
-        .getPreRegisteredAttendance()
-        .then((attendanceData) {
+    _preRegisteredSubscription = _fireStore
+        .collection(AttendanceModel.registerFirebaseKey)
+        .where('customerUid', isEqualTo: CustomerController.logeInCustomer!.uid)
+        .snapshots()
+        .listen((snapshot) {
       setState(() {
-        preRegisteredAttendanceList = attendanceData;
+        preRegisteredAttendanceList = snapshot.docs
+            .map((doc) => AttendanceModel.fromJson(doc.data()))
+            .toList();
       });
     });
   }
 
   @override
-  void initState() {
-    getAttendanceList();
-    getPreRegisteredAttendanceList();
-    super.initState();
+  void dispose() {
+    _attendanceSubscription.cancel();
+    _preRegisteredSubscription.cancel();
+    super.dispose();
   }
 
   @override
@@ -202,9 +217,6 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
         setState(() {
           selectedTab = index;
         });
-        // Always refresh attendance and pre-registered lists when switching tabs
-        getAttendanceList();
-        getPreRegisteredAttendanceList();
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 10),
