@@ -8,9 +8,11 @@ import 'package:orgami/Models/AttendanceModel.dart';
 import 'package:orgami/Models/EventModel.dart';
 import 'package:orgami/Models/EventQuestionModel.dart';
 import 'package:orgami/Screens/Events/Widget/AttendanceAnswersPopup.dart';
+import 'package:orgami/Screens/Events/EventAnalyticsScreen.dart';
 import 'package:orgami/StorageHelper/FileStorage.dart';
 import 'package:orgami/Utils/AppAppBarView.dart';
 import 'package:orgami/Utils/Colors.dart';
+import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:path_provider/path_provider.dart';
@@ -273,6 +275,43 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
           ),
           _tobTabBar(),
           selectedTab == 1 ? _signInDetailsView() : _registerDetailsView(),
+          // View Analytics Button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppThemeColor.darkGreenColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                onPressed: () {
+                  // Check if user is the event creator
+                  if (eventModel.customerUid ==
+                      FirebaseAuth.instance.currentUser?.uid) {
+                    RouterClass.nextScreenNormal(
+                      context,
+                      EventAnalyticsScreen(eventId: eventModel.id),
+                    );
+                  } else {
+                    ShowToast().showSnackBar(
+                        'Only event hosts can view analytics', context);
+                  }
+                },
+                child: const Text(
+                  'View Analytics',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

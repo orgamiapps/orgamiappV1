@@ -10,18 +10,35 @@ import 'package:orgami/Models/EventQuestionModel.dart';
 class FirebaseFirestoreHelper {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  /// Retrieves a single customer from Firestore
+  ///
+  /// IMPORTANT: Ensure Firestore security rules allow read access for authenticated users:
+  /// match /Customers/{customerId} {
+  ///   allow read, write: if request.auth != null && request.auth.uid == customerId;
+  /// }
+  ///
+  /// This method handles PERMISSION_DENIED errors gracefully by returning null
+  /// instead of throwing exceptions, allowing the app to continue functioning.
   Future<CustomerModel?> getSingleCustomer({required String customerId}) async {
     CustomerModel? customerModel;
 
-    await _firestore
-        .collection(CustomerModel.firebaseKey)
-        .doc(customerId)
-        .get()
-        .then((singleCustomerData) {
-      if (singleCustomerData.exists) {
-        customerModel = CustomerModel.fromFirestore(singleCustomerData);
-      }
-    });
+    try {
+      await _firestore
+          .collection(CustomerModel.firebaseKey)
+          .doc(customerId)
+          .get()
+          .then((singleCustomerData) {
+        if (singleCustomerData.exists) {
+          customerModel = CustomerModel.fromFirestore(singleCustomerData);
+        }
+      });
+    } catch (e) {
+      // Handle permission denied and other Firestore errors
+      print('Permission denied for customer: $customerId');
+      print('Error details: $e');
+      // Return null instead of throwing to allow graceful handling
+      return null;
+    }
 
     return customerModel;
   }

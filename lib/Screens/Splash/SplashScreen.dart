@@ -40,26 +40,60 @@ class _SplashScreenState extends State<SplashScreen>
     User? firebaseUser = FirebaseAuth.instance.currentUser;
 
     if (firebaseUser != null) {
-      await FirebaseFirestoreHelper()
-          .getSingleCustomer(customerId: firebaseUser.uid)
-          .then((userData) {
+      try {
+        final userData = await FirebaseFirestoreHelper()
+            .getSingleCustomer(customerId: firebaseUser.uid);
+
         if (userData != null) {
           setState(() {
             CustomerController.logeInCustomer = userData;
           });
           RouterClass().homeScreenRoute(context: context);
         } else {
-          FirebaseAuth.instance.signOut();
-          Timer(const Duration(seconds: 3), () {
-            RouterClass().secondSplashScreenRoute(context: context);
-          });
+          // Handle null case - show error dialog with retry option
+          _showErrorDialog();
         }
-      });
+      } catch (e) {
+        print('Error in _getUser: $e');
+        _showErrorDialog();
+      }
     } else {
       Timer(const Duration(seconds: 5), () {
         RouterClass().secondSplashScreenRoute(context: context);
       });
     }
+  }
+
+  void _showErrorDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Error'),
+          content: const Text('Failed to load user data. Please try again.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _getUser(); // Retry
+              },
+              child: const Text('Retry'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                FirebaseAuth.instance.signOut();
+                Timer(const Duration(seconds: 1), () {
+                  RouterClass().secondSplashScreenRoute(context: context);
+                });
+              },
+              child: const Text('Sign Out'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override

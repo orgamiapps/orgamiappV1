@@ -1,12 +1,19 @@
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_ui_firestore/firebase_ui_firestore.dart';
+
+// IMPORTANT: Ensure Firestore security rules allow authenticated users to read non-private events:
+// match /Events/{eventId} {
+//   allow read: if request.auth != null &&
+//     (resource.data.customerUid == request.auth.uid || resource.data.private == false);
+//   allow write: if request.auth != null && request.auth.uid == resource.data.customerUid;
+// }
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:orgami/Models/EventModel.dart';
 import 'package:orgami/Screens/Events/ChoseDateTimeScreen.dart';
+import 'package:orgami/Screens/Events/SingleEventScreen.dart';
 import 'package:orgami/Utils/Colors.dart';
 import 'package:orgami/Utils/Images.dart';
 import 'package:orgami/Utils/Router.dart';
@@ -543,18 +550,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _eventsView() {
-    return FirestoreQueryBuilder(
-      query: FirebaseFirestore.instance
-          .collection(EventModel.firebaseKey)
-          .orderBy('selectedDateTime', descending: false)
-          .where('private', isEqualTo: false),
-      pageSize: 500,
-      builder: ((context,
-          FirestoreQueryBuilderSnapshot<Map<String, dynamic>> snapshot, _) {
-        if (snapshot.isFetching && isLoading) {
+    // Create a stream for the Firestore query
+    Stream<QuerySnapshot> eventsStream = FirebaseFirestore.instance
+        .collection(EventModel.firebaseKey)
+        .where('private', isEqualTo: false)
+        .orderBy('selectedDateTime', descending: false)
+        .snapshots();
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: eventsStream,
+      builder: (context, snapshot) {
+        // Show loading state
+        if (snapshot.connectionState == ConnectionState.waiting && isLoading) {
           return _buildSkeletonLoading();
         }
 
+        // Show error state with retry button
         if (snapshot.hasError) {
           return Center(
             child: Column(
@@ -567,24 +578,55 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Something went wrong',
+                  'Failed to load events. Check your connection or permissions.',
                   style: TextStyle(
                     color: Colors.grey[600],
                     fontSize: 16,
                     fontFamily: 'Roboto',
                   ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    // Force rebuild to retry the stream
+                    setState(() {});
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppThemeColor.darkGreenColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Note: Ensure Firestore rules allow authenticated users to read non-private events',
+                  style: TextStyle(
+                    color: Colors.grey[500],
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
           );
         }
 
-        if (snapshot.docs.isEmpty) {
+        // Show empty state
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return _buildEmptyState();
         }
 
-        List<EventModel> eventsList =
-            snapshot.docs.map((e) => EventModel.fromJson(e)).toList();
+        // Process events data
+        List<EventModel> eventsList = snapshot.data!.docs
+            .map((e) => EventModel.fromJson(e.data() as Map<String, dynamic>))
+            .toList();
 
         List<EventModel> neededEventList = [];
 
@@ -625,7 +667,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               _buildEventsList(filtered),
           ],
         );
-      }),
+      },
     );
   }
 
@@ -683,109 +725,69 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildFeaturedCard(EventModel event) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            spreadRadius: 1,
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+        onTap: () {
+          print('Tapped featured card: ${event.id}');
+          RouterClass.nextScreenNormal(
+            context,
+            SingleEventScreen(eventModel: event),
+          );
+        },
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                spreadRadius: 1,
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Stack(
-          children: [
-            // Background Image
-            Container(
-              width: double.infinity,
-              height: 200,
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: NetworkImage(event.imageUrl),
-                  fit: BoxFit.cover,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              children: [
+                // Background Image
+                Container(
+                  width: double.infinity,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    image: DecorationImage(
+                      image: NetworkImage(event.imageUrl),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            // Gradient Overlay
-            Container(
-              width: double.infinity,
-              height: 200,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.7),
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.8),
-                  ],
+                // Gradient Overlay
+                Container(
+                  width: double.infinity,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.7),
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.8),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            // Content
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Top section with badge
-                  Row(
+                // Content
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFF9800),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.star,
-                              color: Colors.white,
-                              size: 12,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              'Featured ★',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 10,
-                                fontFamily: 'Roboto',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  // Bottom section with title, date, and button
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        event.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                          fontFamily: 'Roboto',
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
+                      // Top section with badge
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -795,56 +797,117 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF4CAF50),
-                              borderRadius: BorderRadius.circular(8),
+                              color: const Color(0xFFFF9800),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Text(
-                              DateFormat('MMM dd, KK:mm a')
-                                  .format(event.selectedDateTime),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
-                                fontFamily: 'Roboto',
-                              ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.star,
+                                  color: Colors.white,
+                                  size: 12,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Featured ★',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 10,
+                                    fontFamily: 'Roboto',
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          GestureDetector(
-                            onTap: () {
-                              // Navigate to event details
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.transparent,
-                                border: Border.all(
-                                  color: Colors.white,
-                                  width: 1,
-                                ),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Text(
-                                'Details >',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12,
-                                  fontFamily: 'Roboto',
-                                ),
-                              ),
+                        ],
+                      ),
+                      // Bottom section with title, date, and button
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            event.title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                              fontFamily: 'Roboto',
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF4CAF50),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  DateFormat('MMM dd, KK:mm a')
+                                      .format(event.selectedDateTime),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                    fontFamily: 'Roboto',
+                                  ),
+                                ),
+                              ),
+                              Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(8),
+                                  onTap: () {
+                                    print('Tapped featured event: ${event.id}');
+                                    RouterClass.nextScreenNormal(
+                                      context,
+                                      SingleEventScreen(eventModel: event),
+                                    );
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.transparent,
+                                      border: Border.all(
+                                        color: Colors.white,
+                                        width: 1,
+                                      ),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text(
+                                      'Details >',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12,
+                                        fontFamily: 'Roboto',
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -869,141 +932,159 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildEventCard(EventModel event) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            spreadRadius: 1,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+        onTap: () {
+          print('Tapped event card: ${event.id}');
+          RouterClass.nextScreenNormal(
+            context,
+            SingleEventScreen(eventModel: event),
+          );
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                spreadRadius: 1,
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (event.isFeatured)
-                  const Icon(
-                    Icons.star,
-                    color: Color(0xFFFF9800),
-                    size: 20,
-                  ),
-                if (event.isFeatured) const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    event.title,
-                    style: const TextStyle(
-                      color: AppThemeColor.pureBlackColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      fontFamily: 'Roboto',
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              event.groupName,
-              style: TextStyle(
-                color: AppThemeColor.dullFontColor,
-                fontSize: 14,
-                fontFamily: 'Roboto',
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              event.location,
-              style: TextStyle(
-                color: AppThemeColor.dullFontColor,
-                fontSize: 14,
-                fontFamily: 'Roboto',
-              ),
-            ),
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Image.network(
-                  event.imageUrl,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Container(
-                      color: Colors.grey[200],
-                      child: const Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFF4CAF50),
-                        ),
+                Row(
+                  children: [
+                    if (event.isFeatured)
+                      const Icon(
+                        Icons.star,
+                        color: Color(0xFFFF9800),
+                        size: 20,
                       ),
-                    );
-                  },
+                    if (event.isFeatured) const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        event.title,
+                        style: const TextStyle(
+                          color: AppThemeColor.pureBlackColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          fontFamily: 'Roboto',
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              event.description,
-              style: const TextStyle(
-                color: AppThemeColor.pureBlackColor,
-                fontSize: 14,
-                fontFamily: 'Roboto',
-              ),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
+                const SizedBox(height: 8),
                 Text(
-                  DateFormat('EEEE, MMMM dd yyyy\nKK:mm a')
-                      .format(event.selectedDateTime),
-                  style: const TextStyle(
-                    color: AppThemeColor.pureBlackColor,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
+                  event.groupName,
+                  style: TextStyle(
+                    color: AppThemeColor.dullFontColor,
+                    fontSize: 14,
                     fontFamily: 'Roboto',
                   ),
                 ),
-                GestureDetector(
-                  onTap: () {
-                    // Navigate to event details
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4CAF50),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      'Details >>',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                        fontFamily: 'Roboto',
-                      ),
+                const SizedBox(height: 8),
+                Text(
+                  event.location,
+                  style: TextStyle(
+                    color: AppThemeColor.dullFontColor,
+                    fontSize: 14,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: Image.network(
+                      event.imageUrl,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          color: Colors.grey[200],
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFF4CAF50),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
+                const SizedBox(height: 12),
+                Text(
+                  event.description,
+                  style: const TextStyle(
+                    color: AppThemeColor.pureBlackColor,
+                    fontSize: 14,
+                    fontFamily: 'Roboto',
+                  ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      DateFormat('EEEE, MMMM dd yyyy\nKK:mm a')
+                          .format(event.selectedDateTime),
+                      style: const TextStyle(
+                        color: AppThemeColor.pureBlackColor,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                    Material(
+                      color: const Color(0xFF4CAF50),
+                      borderRadius: BorderRadius.circular(8),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () {
+                          print('Tapped event: ${event.id}');
+                          RouterClass.nextScreenNormal(
+                            context,
+                            SingleEventScreen(eventModel: event),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          child: const Text(
+                            'Details >>',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );

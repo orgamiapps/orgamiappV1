@@ -128,7 +128,11 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
     return Container(
       child: FirestoreQueryBuilder(
         pageSize: 500,
-        query: _fireStore.collection(EventModel.firebaseKey).orderBy(
+        query: _fireStore
+            .collection(EventModel.firebaseKey)
+            .where('customerUid',
+                isEqualTo: CustomerController.logeInCustomer!.uid)
+            .orderBy(
               'selectedDateTime',
               descending: false,
             ),

@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow users to read/write their own user data
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow users to read/write their own customer data
+    // Users can only access their own customer document
+    match /Customers/{customerId} {
+      allow read, write: if request.auth != null && request.auth.uid == customerId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
+    }
+    
+    // Allow users to read/write their own events
+    // Also allow reading public events (private == false) for all authenticated users
+    match /Events/{eventId} {
+      allow read: if request.auth != null && 
+        (resource.data.customerUid == request.auth.uid || resource.data.private == false);
+      allow write: if request.auth != null && request.auth.uid == resource.data.customerUid;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.customerUid;
+    }
+    
+    // Allow event hosts to read/write their event analytics
+    match /event_analytics/{eventId} {
+      allow read, write: if request.auth != null && 
+        exists(/databases/$(database)/documents/Events/$(eventId)) &&
+        request.auth.uid == get(/databases/$(database)/documents/Events/$(eventId)).data.customerUid;
+    }
+    
+    // Allow attendance records to be created by authenticated users
+    // but only event hosts can read their event's attendance
+    match /Attendance/{attendanceId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth != null && 
+        exists(/databases/$(database)/documents/Events/$(resource.data.eventId)) &&
+        request.auth.uid == get(/databases/$(database)/documents/Events/$(resource.data.eventId)).data.customerUid;
+    }
+    
+    // Allow users to read/write their own event questions
+    match /EventQuestions/{questionId} {
+      allow read, write: if request.auth != null && 
+        exists(/databases/$(database)/documents/Events/$(resource.data.eventId)) &&
+        request.auth.uid == get(/databases/$(database)/documents/Events/$(resource.data.eventId)).data.customerUid;
+      allow create: if request.auth != null && 
+        exists(/databases/$(database)/documents/Events/$(request.resource.data.eventId)) &&
+        request.auth.uid == get(/databases/$(database)/documents/Events/$(request.resource.data.eventId)).data.customerUid;
+    }
+  }
+} 

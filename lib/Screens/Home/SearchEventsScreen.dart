@@ -1,6 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_ui_firestore/firebase_ui_firestore.dart';
 import 'package:flutter/material.dart';
+
+// IMPORTANT: Ensure Firestore security rules allow authenticated users to read non-private events:
+// match /Events/{eventId} {
+//   allow read: if request.auth != null &&
+//     (resource.data.customerUid == request.auth.uid || resource.data.private == false);
+//   allow write: if request.auth != null && request.auth.uid == resource.data.customerUid;
+// }
 import 'package:orgami/Models/EventModel.dart';
 import 'package:orgami/Screens/Events/Widget/SingleEventListViewItem.dart';
 import 'package:orgami/Utils/Colors.dart';
@@ -124,32 +131,75 @@ class _SearchEventsScreenState extends State<SearchEventsScreen> {
   }
 
   Widget _eventsListView() {
-    return FirestoreQueryBuilder(
-      query: FirebaseFirestore.instance
-          .collection(EventModel.firebaseKey)
-          .orderBy('selectedDateTime', descending: false),
-      // .where('customerUid',
-      //     isEqualTo: FirebaseAuth.instance.currentUser!.uid),
-      pageSize: 500,
-      builder: ((context,
-          FirestoreQueryBuilderSnapshot<Map<String, dynamic>> snapshot, _) {
-        if (snapshot.isFetching) {
+    // Create a stream for the Firestore query
+    Stream<QuerySnapshot> eventsStream = FirebaseFirestore.instance
+        .collection(EventModel.firebaseKey)
+        .where('private', isEqualTo: false)
+        .orderBy('selectedDateTime', descending: false)
+        .snapshots();
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: eventsStream,
+      builder: (context, snapshot) {
+        // Show loading state
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return SizedBox(
             height: _screenWidth,
             width: _screenWidth,
           );
         }
 
+        // Show error state with retry button
         if (snapshot.hasError) {
-          return Center(child: Text('Something Went Wrong ${snapshot.error}'));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 48,
+                  color: Colors.grey[400],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Failed to load events. Check your connection or permissions.',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    // Force rebuild to retry the stream
+                    setState(() {});
+                  },
+                  icon: const Icon(Icons.refresh, size: 16),
+                  label: const Text('Retry'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppThemeColor.darkGreenColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
         }
 
-        if (snapshot.docs.isEmpty) {
+        // Show empty state
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return const Center(child: Text('No Event Found!'));
         }
 
-        List<EventModel> eventsList =
-            snapshot.docs.map((e) => EventModel.fromJson(e)).toList();
+        // Process events data
+        List<EventModel> eventsList = snapshot.data!.docs
+            .map((e) => EventModel.fromJson(e.data() as Map<String, dynamic>))
+            .toList();
 
         List<EventModel> neededEventList = [];
 
@@ -176,7 +226,7 @@ class _SearchEventsScreenState extends State<SearchEventsScreen> {
                 return const SizedBox();
               }
             });
-      }),
+      },
     );
   }
 
