@@ -309,26 +309,44 @@ class _SingleEventScreenState extends State<SingleEventScreen> {
             _isAnonymousSignIn ? CustomerController.logeInCustomer!.name : null,
       );
 
-      RouterClass.nextScreenAndReplacement(
-        context,
-        AnsQuestionsToSignInEventScreen(
-          eventModel: eventModel,
-          newAttendance: newAttendanceModel,
-          // nextPageRoute: () => Navigator.pop(context),
-          nextPageRoute: 'singleEventPopup',
-        ),
-      );
-      // await FirebaseFirestoreHelper()
-      //     .makeEventSignIn(eventId: eventModel.id)
-      //     .then((value) {
-      //   _btnCtlr.success();
-      //   Timer(const Duration(seconds: 2), () {
-      //     Navigator.pop(context);
-      //   });
-      // });
+      // Check for sign-in prompts
+      final questions = await FirebaseFirestoreHelper()
+          .getEventQuestions(eventId: eventModel.id);
+      if (questions.isNotEmpty) {
+        _btnCtlr.reset(); // Reset before navigation
+        RouterClass.nextScreenAndReplacement(
+          context,
+          AnsQuestionsToSignInEventScreen(
+            eventModel: eventModel,
+            newAttendance: newAttendanceModel,
+            nextPageRoute: 'singleEventPopup',
+          ),
+        );
+      } else {
+        // No prompts, sign in directly
+        await FirebaseFirestore.instance
+            .collection(AttendanceModel.firebaseKey)
+            .doc(newAttendanceModel.id)
+            .set(newAttendanceModel.toJson());
+
+        _btnCtlr.success(); // Show success state
+        ShowToast().showNormalToast(msg: 'Signed In Successfully!');
+
+        // Navigate to event details after a short delay
+        Future.delayed(const Duration(seconds: 1), () {
+          _btnCtlr.reset();
+          // Refresh attendance status
+          getAttendance();
+          RouterClass.nextScreenAndReplacement(
+            context,
+            SingleEventScreen(eventModel: eventModel),
+          );
+        });
+      }
     } catch (e) {
-      print('Eroor is ${e.toString()}');
+      print('Error is ${e.toString()}');
       _btnCtlr.reset();
+      ShowToast().showNormalToast(msg: 'Failed to sign in. Please try again.');
     }
   }
 

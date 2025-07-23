@@ -22,17 +22,21 @@ class AttendanceModel {
     this.realName,
   });
 
-  factory AttendanceModel.fromJson(parsedJson) {
+  factory AttendanceModel.fromJson(dynamic parsedJson) {
+    // Support both DocumentSnapshot and Map
+    final data = parsedJson is Map
+        ? parsedJson
+        : (parsedJson.data() as Map<String, dynamic>);
+
     return AttendanceModel(
-      id: parsedJson['id'],
-      userName: parsedJson['userName'],
-      eventId: parsedJson['eventId'],
-      customerUid: parsedJson['customerUid'],
-      attendanceDateTime:
-          (parsedJson['attendanceDateTime'] as Timestamp).toDate(),
-      answers: List<String>.from(parsedJson['answers']),
-      isAnonymous: parsedJson['isAnonymous'] ?? false,
-      realName: parsedJson['realName'],
+      id: data['id'],
+      userName: data['userName'],
+      eventId: data['eventId'],
+      customerUid: data['customerUid'],
+      attendanceDateTime: (data['attendanceDateTime'] as Timestamp).toDate(),
+      answers: List<String>.from(data['answers']),
+      isAnonymous: data['isAnonymous'] ?? false,
+      realName: data['realName'],
     );
   }
 
@@ -43,7 +47,7 @@ class AttendanceModel {
     data['userName'] = userName;
     data['eventId'] = eventId;
     data['customerUid'] = customerUid;
-    data['attendanceDateTime'] = attendanceDateTime;
+    data['attendanceDateTime'] = Timestamp.fromDate(attendanceDateTime);
     data['answers'] = answers;
     data['isAnonymous'] = isAnonymous;
     if (realName != null) data['realName'] = realName;

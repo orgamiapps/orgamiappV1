@@ -15,6 +15,7 @@ import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
+import 'package:orgami/Screens/Events/SingleEventScreen.dart';
 
 class QRScannerWithoutLoginScreen extends StatefulWidget {
   const QRScannerWithoutLoginScreen({super.key});
@@ -32,6 +33,7 @@ class _QRScannerWithoutLoginScreenState
   final TextEditingController _codeController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   bool _isAnonymousSignIn = false;
+  bool _isLoading = false; // Add loading state
 
   // In order to get hot reload to work we need to pause the camera if the platform
   // is android, or resume the camera if the platform is iOS.
@@ -184,44 +186,91 @@ class _QRScannerWithoutLoginScreenState
     return Padding(
       padding: const EdgeInsets.all(20.0),
       child: GestureDetector(
-        onTap: () {
-          String docId = FirebaseFirestore.instance
-              .collection(AttendanceModel.firebaseKey)
-              .doc()
-              .id;
-          AttendanceModel newAttendanceModel = AttendanceModel(
-            id: docId,
-            eventId: _codeController.text,
-            userName: _isAnonymousSignIn ? 'Anonymous' : _nameController.text,
-            customerUid: 'without_login',
-            attendanceDateTime: DateTime.now(),
-            answers: [],
-            isAnonymous: _isAnonymousSignIn,
-            realName: _isAnonymousSignIn ? _nameController.text : null,
-          );
+        onTap: _isLoading
+            ? null
+            : () async {
+                if (_codeController.text.isEmpty) {
+                  ShowToast()
+                      .showNormalToast(msg: 'Please enter an event code!');
+                  return;
+                }
 
-          FirebaseFirestoreHelper()
-              .getSingleEvent(newAttendanceModel.eventId)
-              .then((eventExist) {
-            if (eventExist != null) {
-              _codeController.text = '';
-              RouterClass.nextScreenAndReplacement(
-                context,
-                AnsQuestionsToSignInEventScreen(
-                  eventModel: eventExist,
-                  newAttendance: newAttendanceModel,
-                  nextPageRoute: 'withoutLogin',
-                ),
-              );
-            } else {
-              ShowToast().showNormalToast(msg: 'Entered an incorrect code!');
-            }
-          });
-        },
+                if (_nameController.text.isEmpty && !_isAnonymousSignIn) {
+                  ShowToast().showNormalToast(msg: 'Please enter your name!');
+                  return;
+                }
+
+                setState(() {
+                  _isLoading = true;
+                });
+
+                try {
+                  String docId = FirebaseFirestore.instance
+                      .collection(AttendanceModel.firebaseKey)
+                      .doc()
+                      .id;
+                  AttendanceModel newAttendanceModel = AttendanceModel(
+                    id: docId,
+                    eventId: _codeController.text,
+                    userName:
+                        _isAnonymousSignIn ? 'Anonymous' : _nameController.text,
+                    customerUid: 'without_login',
+                    attendanceDateTime: DateTime.now(),
+                    answers: [],
+                    isAnonymous: _isAnonymousSignIn,
+                    realName: _isAnonymousSignIn ? _nameController.text : null,
+                  );
+
+                  final eventExist = await FirebaseFirestoreHelper()
+                      .getSingleEvent(newAttendanceModel.eventId);
+                  if (eventExist != null) {
+                    // Check for sign-in prompts
+                    final questions = await FirebaseFirestoreHelper()
+                        .getEventQuestions(eventId: eventExist.id);
+                    if (questions.isNotEmpty) {
+                      _codeController.text = '';
+                      RouterClass.nextScreenAndReplacement(
+                        context,
+                        AnsQuestionsToSignInEventScreen(
+                          eventModel: eventExist,
+                          newAttendance: newAttendanceModel,
+                          nextPageRoute: 'withoutLogin',
+                        ),
+                      );
+                    } else {
+                      // No prompts, sign in directly
+                      await FirebaseFirestore.instance
+                          .collection(AttendanceModel.firebaseKey)
+                          .doc(newAttendanceModel.id)
+                          .set(newAttendanceModel.toJson());
+                      ShowToast()
+                          .showNormalToast(msg: 'Signed In Successfully!');
+                      // Navigate to event details after a short delay
+                      Future.delayed(const Duration(seconds: 1), () {
+                        RouterClass.nextScreenAndReplacement(
+                          context,
+                          SingleEventScreen(eventModel: eventExist),
+                        );
+                      });
+                    }
+                  } else {
+                    ShowToast()
+                        .showNormalToast(msg: 'Entered an incorrect code!');
+                  }
+                } catch (e) {
+                  print('Error signing in: $e');
+                  ShowToast().showNormalToast(
+                      msg: 'Failed to sign in. Please try again.');
+                } finally {
+                  setState(() {
+                    _isLoading = false;
+                  });
+                }
+              },
         child: AppButtons.button1(
           width: _screenWidth,
           height: 50,
-          buttonLoading: false,
+          buttonLoading: _isLoading,
           label: 'Sign In',
           labelSize: Dimensions.fontSizeLarge,
         ),

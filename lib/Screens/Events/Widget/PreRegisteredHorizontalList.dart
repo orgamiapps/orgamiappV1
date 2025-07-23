@@ -197,7 +197,11 @@ class _PreRegisteredHorizontalListState
                       SizedBox(
                         width: 60,
                         child: Text(
-                          isAnon ? 'Anonymous' : customer.name,
+                          isAnon
+                              ? 'Anonymous'
+                              : (attendee.customerUid == 'without_login'
+                                  ? attendee.userName
+                                  : customer.name),
                           textAlign: TextAlign.center,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

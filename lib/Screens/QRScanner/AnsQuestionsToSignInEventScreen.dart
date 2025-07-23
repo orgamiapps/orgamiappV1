@@ -71,38 +71,46 @@ class _AnsQuestionsToSignInEventScreenState
           .set(newAttendance.toJson())
           .then((value) {
         ShowToast().showSnackBar('Signed In Successful!', context);
-        if (widget.nextPageRoute == 'singleEventPopup') {
-          Navigator.pop(context);
-          Navigator.pop(context);
-        } else if (widget.nextPageRoute == 'dashboardQrScanner') {
-          RouterClass.nextScreenAndReplacement(
-            context,
-            SingleEventScreen(
-              eventModel: widget.eventModel,
-            ),
-          );
-        } else if (widget.nextPageRoute == 'qrScannerForLogedIn') {
-          RouterClass.nextScreenAndReplacement(
-            context,
-            SingleEventScreen(
-              eventModel: widget.eventModel,
-            ),
-          );
-        } else if (widget.nextPageRoute == 'withoutLogin') {
-          Navigator.pop(context);
-          // RouterClass.nextScreenAndReplacement(
-          //   context,
-          //   SingleEventScreen(
-          //     eventModel: widget.eventModel,
-          //   ),
-          // );
-        }
-        // Add this block to always navigate to MyEventsScreen and refresh after sign-in
-        Future.delayed(const Duration(milliseconds: 500), () {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const MyEventsScreen()),
-            (Route<dynamic> route) => false,
-          );
+        _btnCtlr.success();
+        Future.delayed(const Duration(seconds: 1), () {
+          _btnCtlr.reset();
+          if (widget.nextPageRoute == 'singleEventPopup') {
+            // Pop current screen and navigate to fresh SingleEventScreen to refresh data
+            Navigator.pop(context);
+            RouterClass.nextScreenAndReplacement(
+              context,
+              SingleEventScreen(eventModel: widget.eventModel),
+            );
+          } else if (widget.nextPageRoute == 'dashboardQrScanner') {
+            RouterClass.nextScreenAndReplacement(
+              context,
+              SingleEventScreen(
+                eventModel: widget.eventModel,
+              ),
+            );
+          } else if (widget.nextPageRoute == 'qrScannerForLogedIn') {
+            RouterClass.nextScreenAndReplacement(
+              context,
+              SingleEventScreen(
+                eventModel: widget.eventModel,
+              ),
+            );
+          } else if (widget.nextPageRoute == 'withoutLogin') {
+            Navigator.pop(context);
+            // RouterClass.nextScreenAndReplacement(
+            //   context,
+            //   SingleEventScreen(
+            //     eventModel: widget.eventModel,
+            //   ),
+            // );
+          }
+          // Add this block to always navigate to MyEventsScreen and refresh after sign-in
+          Future.delayed(const Duration(milliseconds: 500), () {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const MyEventsScreen()),
+              (Route<dynamic> route) => false,
+            );
+          });
         });
         // RouterClass.nextScreenAndReplacementAndRemoveUntil(
         //   context: context,
@@ -114,8 +122,13 @@ class _AnsQuestionsToSignInEventScreenState
         //     eventModel: widget.eventModel,
         //   ),
         // );
+      }).catchError((error) {
+        _btnCtlr.error();
+        ShowToast().showSnackBar('Error signing in: $error', context);
+        Future.delayed(const Duration(seconds: 2), () {
+          _btnCtlr.reset();
+        });
       });
-      _btnCtlr.reset();
     } else {
       _btnCtlr.reset();
     }

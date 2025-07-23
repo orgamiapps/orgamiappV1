@@ -13,12 +13,17 @@ class EventQuestionModel {
     required this.required,
   });
 
-  factory EventQuestionModel.fromJson(parsedJson) {
+  factory EventQuestionModel.fromJson(dynamic parsedJson) {
+    // Support both DocumentSnapshot and Map
+    final data = parsedJson is Map
+        ? parsedJson
+        : (parsedJson.data() as Map<String, dynamic>);
+
     return EventQuestionModel(
-      id: parsedJson['id'],
-      questionTitle: parsedJson['questionTitle'],
-      answer: parsedJson['answer'],
-      required: parsedJson['required'],
+      id: data['id'],
+      questionTitle: data['questionTitle'],
+      answer: data['answer'],
+      required: data['required'],
     );
   }
 

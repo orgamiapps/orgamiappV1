@@ -159,7 +159,11 @@ class _AllAttendeesScreenState extends State<AllAttendeesScreen> {
                                     )),
                         ),
                         title: Text(
-                          isAnon ? 'Anonymous' : customer.name,
+                          isAnon
+                              ? 'Anonymous'
+                              : (attendee.customerUid == 'without_login'
+                                  ? attendee.userName
+                                  : customer.name),
                           style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: Dimensions.fontSizeLarge,

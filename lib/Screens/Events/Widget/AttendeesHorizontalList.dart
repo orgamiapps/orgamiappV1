@@ -43,14 +43,24 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
         eventId: widget.eventModel.id,
       );
 
-      // Get customer details for each attendee (limit to first 10 for performance)
+      print('DEBUG: Attendees fetched from Firestore:');
+      for (var attendee in attendeesList) {
+        print(
+            '  - id: ${attendee.id}, userName: ${attendee.userName}, customerUid: ${attendee.customerUid}, isAnonymous: ${attendee.isAnonymous}');
+      }
+
+      // Get customer details only for non-anonymous attendees (limit to first 10 for performance)
       List<CustomerModel> customers = [];
-      for (var attendee in attendeesList.take(10)) {
-        final customer = await FirebaseFirestoreHelper().getSingleCustomer(
-          customerId: attendee.customerUid,
-        );
-        if (customer != null) {
-          customers.add(customer);
+      int fetchedCount = 0;
+      for (var attendee in attendeesList) {
+        if (!attendee.isAnonymous && fetchedCount < 10) {
+          final customer = await FirebaseFirestoreHelper().getSingleCustomer(
+            customerId: attendee.customerUid,
+          );
+          if (customer != null) {
+            customers.add(customer);
+          }
+          fetchedCount++;
         }
       }
 
@@ -132,17 +142,21 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
               itemCount: attendees.length > 5 ? 5 : attendees.length,
               itemBuilder: (context, index) {
                 final attendee = attendees[index];
-                final customer = customerDetails.firstWhere(
-                  (c) => c.uid == attendee.customerUid,
-                  orElse: () => CustomerModel(
-                    uid: attendee.customerUid,
-                    name: attendee.userName,
-                    email: '',
-                    createdAt: DateTime.now(),
-                  ),
-                );
-
                 final isAnon = attendee.isAnonymous;
+
+                // Find customer only if not anonymous
+                CustomerModel? customer;
+                if (!isAnon) {
+                  customer = customerDetails.firstWhere(
+                    (c) => c.uid == attendee.customerUid,
+                    orElse: () => CustomerModel(
+                      uid: attendee.customerUid,
+                      name: attendee.userName,
+                      email: '',
+                      createdAt: DateTime.now(),
+                    ),
+                  );
+                }
 
                 return Container(
                   margin: const EdgeInsets.only(right: 12),
@@ -169,9 +183,9 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
                                     color: Colors.grey,
                                   ),
                                 )
-                              : (customer.profilePictureUrl != null
+                              : (customer?.profilePictureUrl != null
                                   ? Image.network(
-                                      customer.profilePictureUrl!,
+                                      customer!.profilePictureUrl!,
                                       fit: BoxFit.cover,
                                       errorBuilder:
                                           (context, error, stackTrace) {
@@ -196,11 +210,11 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      // Name
+                      // Name - Use attendee.userName for public display
                       SizedBox(
                         width: 60,
                         child: Text(
-                          isAnon ? 'Anonymous' : customer.name,
+                          attendee.userName,
                           textAlign: TextAlign.center,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
