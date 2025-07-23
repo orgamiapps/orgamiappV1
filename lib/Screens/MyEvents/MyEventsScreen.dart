@@ -150,7 +150,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
           List<EventModel> EventsList = snapshot.docs
               .map((e) => EventModel.fromJson(e))
               .toList()
-            ..sort((a, b) => b.selectedDateTime.compareTo(a.selectedDateTime));
+            ..sort((a, b) => a.selectedDateTime.compareTo(b.selectedDateTime));
 
           if (selectedTab == 1) {
             List<EventModel> neededEventsList = [];
