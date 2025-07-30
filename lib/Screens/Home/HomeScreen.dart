@@ -44,6 +44,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // Animation controllers
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
 
   // Remove 'Featured' from categories
   final List<String> _allCategories = ['Educational', 'Professional', 'Other'];
@@ -71,6 +73,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
     _pulseController.repeat(reverse: true);
 
+    // Initialize fade animation
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
+    );
+    _fadeController.forward();
+
     // Simulate loading
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
@@ -85,6 +97,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void dispose() {
     _scrollController.dispose();
     _pulseController.dispose();
+    _fadeController.dispose();
     super.dispose();
   }
 
@@ -220,74 +233,41 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppThemeColor.pureWhiteColor,
+      backgroundColor: const Color(0xFFFAFBFC),
       floatingActionButton: AnimatedOpacity(
         opacity: _fabOpacity,
         duration: const Duration(milliseconds: 300),
         child: Container(
-          width: 40,
-          height: 40,
+          width: 56,
+          height: 56,
           decoration: BoxDecoration(
-            color: const Color(0xFF4CAF50),
-            borderRadius: BorderRadius.circular(20),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF667EEA),
+                Color(0xFF764BA2),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(28),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
-                spreadRadius: 1,
-                blurRadius: 2,
-                offset: const Offset(0, 2),
+                color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+                spreadRadius: 2,
+                blurRadius: 8,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(28),
               onTap: _onFabPressed,
-              onLongPress: () {
-                // Show tooltip on long press
-                final RenderBox renderBox =
-                    context.findRenderObject() as RenderBox;
-                final Offset position = renderBox.localToGlobal(Offset.zero);
-
-                OverlayEntry? overlayEntry;
-                overlayEntry = OverlayEntry(
-                  builder: (context) => Positioned(
-                    top: position.dy - 50,
-                    left: position.dx - 60,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.black87,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'Create Event',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontFamily: 'Roboto',
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-
-                Overlay.of(context).insert(overlayEntry);
-                Future.delayed(const Duration(seconds: 2), () {
-                  if (mounted) {
-                    overlayEntry?.remove();
-                  }
-                });
-              },
               child: const Icon(
                 Icons.add,
                 color: Colors.white,
-                size: 24,
+                size: 28,
               ),
             ),
           ),
@@ -302,15 +282,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _bodyView() {
     return RefreshIndicator(
       onRefresh: _onRefresh,
+      color: const Color(0xFF667EEA),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         controller: _scrollController,
-        child: Column(
-          children: [
-            _headerView(),
-            _filterSection(),
-            _eventsView(),
-          ],
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: Column(
+            children: [
+              _headerView(),
+              _filterSection(),
+              _eventsView(),
+            ],
+          ),
         ),
       ),
     );
@@ -321,45 +305,91 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       width: double.infinity,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
           colors: [
-            Color(0xFFE8F5E8), // Light green
-            Colors.white,
+            Color(0xFF667EEA),
+            Color(0xFF764BA2),
           ],
         ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 40),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Upcoming Events',
-                style: TextStyle(
-                  color: AppThemeColor.pureBlackColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 24,
-                  fontFamily: 'Roboto',
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Discover',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w300,
+                      fontSize: 28,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                  const Text(
+                    'Amazing Events',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 32,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Discover amazing events near you',
-                style: TextStyle(
-                  color: AppThemeColor.dullFontColor,
-                  fontSize: 14,
-                  fontFamily: 'Roboto',
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(30),
+                  child: Image.asset(
+                    Images.inAppLogo,
+                    width: 50,
+                    height: 50,
+                  ),
                 ),
               ),
             ],
           ),
-          Image.asset(
-            Images.inAppLogo,
-            width: 100,
-            height: 100,
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.2),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.search,
+                  color: Colors.white.withValues(alpha: 0.8),
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Search events near you...',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    fontSize: 16,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -367,61 +397,63 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _filterSection() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            spreadRadius: 0,
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Category Filters
-          const Text(
-            'Filter by Category',
-            style: TextStyle(
-              color: AppThemeColor.pureBlackColor,
-              fontWeight: FontWeight.w600,
-              fontSize: 16,
-              fontFamily: 'Roboto',
-            ),
+          Row(
+            children: [
+              Icon(
+                Icons.filter_list,
+                color: const Color(0xFF667EEA),
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Filter Events',
+                style: TextStyle(
+                  color: Color(0xFF1A1A1A),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           SizedBox(
-            height: 40,
+            height: 44,
             child: ListView(
               scrollDirection: Axis.horizontal,
               children: [
                 // Featured toggle
                 Padding(
                   padding: const EdgeInsets.only(right: 12),
-                  child: FilterChip(
-                    label: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.star,
-                          size: 16,
-                          color: showFeaturedFirst
-                              ? Colors.white
-                              : const Color(0xFF4CAF50),
-                        ),
-                        const SizedBox(width: 4),
-                        const Text('Featured'),
-                      ],
-                    ),
-                    selected: showFeaturedFirst,
+                  child: _buildFilterChip(
+                    label: 'Featured',
+                    icon: Icons.star,
+                    isSelected: showFeaturedFirst,
                     onSelected: (selected) {
                       setState(() {
                         showFeaturedFirst = selected;
                       });
                     },
-                    backgroundColor: Colors.white,
-                    selectedColor: const Color(0xFF4CAF50),
-                    side: BorderSide(
-                      color: showFeaturedFirst
-                          ? const Color(0xFF4CAF50)
-                          : AppThemeColor.grayColor,
-                      width: 2,
-                    ),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    color: const Color(0xFFFF9800),
                   ),
                 ),
                 // Category chips
@@ -429,22 +461,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   final isSelected = selectedCategories.contains(category);
                   return Padding(
                     padding: const EdgeInsets.only(right: 12),
-                    child: FilterChip(
-                      label: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _getCategoryIcon(category),
-                            size: 16,
-                            color: isSelected
-                                ? Colors.white
-                                : const Color(0xFF4CAF50),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(category),
-                        ],
-                      ),
-                      selected: isSelected,
+                    child: _buildFilterChip(
+                      label: category,
+                      icon: _getCategoryIcon(category),
+                      isSelected: isSelected,
                       onSelected: (selected) {
                         setState(() {
                           if (selected) {
@@ -454,16 +474,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           }
                         });
                       },
-                      backgroundColor: Colors.white,
-                      selectedColor: const Color(0xFF4CAF50),
-                      side: BorderSide(
-                        color: isSelected
-                            ? const Color(0xFF4CAF50)
-                            : AppThemeColor.grayColor,
-                        width: 2,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
+                      color: const Color(0xFF667EEA),
                     ),
                   );
                 }),
@@ -471,67 +482,132 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 if (selectedCategories.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(right: 12),
-                    child: FilterChip(
-                      label: const Text('Clear Filters'),
-                      selected: false,
+                    child: _buildFilterChip(
+                      label: 'Clear All',
+                      icon: Icons.clear,
+                      isSelected: false,
                       onSelected: (selected) {
                         setState(() {
                           selectedCategories.clear();
                         });
                       },
-                      backgroundColor: Colors.white,
-                      side: const BorderSide(
-                        color: Color(0xFFFF9800),
-                        width: 2,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
+                      color: const Color(0xFFE53E3E),
                     ),
                   ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           // Distance Slider
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Distance',
-                style: TextStyle(
-                  color: AppThemeColor.pureBlackColor,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  fontFamily: 'Roboto',
-                ),
+              Row(
+                children: [
+                  Icon(
+                    Icons.location_on,
+                    color: const Color(0xFF667EEA),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Distance',
+                    style: TextStyle(
+                      color: Color(0xFF1A1A1A),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                radiusInMiles > 0
-                    ? '${radiusInMiles.toStringAsFixed(0)}mi'
-                    : 'Global',
-                style: const TextStyle(
-                  color: Color(0xFF4CAF50),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  fontFamily: 'Roboto',
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  radiusInMiles > 0
+                      ? '${radiusInMiles.toStringAsFixed(0)} mi'
+                      : 'Global',
+                  style: const TextStyle(
+                    color: Color(0xFF667EEA),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    fontFamily: 'Roboto',
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Slider(
-            min: 0,
-            max: 100,
-            value: radiusInMiles,
-            activeColor: const Color(0xFF4CAF50),
-            inactiveColor: Colors.grey[300],
-            onChanged: (value) {
-              setState(() {
-                radiusInMiles = value;
-              });
-            },
+          const SizedBox(height: 12),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: const Color(0xFF667EEA),
+              inactiveTrackColor: const Color(0xFFE1E5E9),
+              thumbColor: const Color(0xFF667EEA),
+              overlayColor: const Color(0xFF667EEA).withValues(alpha: 0.2),
+              trackHeight: 4,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+            ),
+            child: Slider(
+              min: 0,
+              max: 100,
+              value: radiusInMiles,
+              onChanged: (value) {
+                setState(() {
+                  radiusInMiles = value;
+                });
+              },
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required Function(bool) onSelected,
+    required Color color,
+  }) {
+    return FilterChip(
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: isSelected ? Colors.white : color,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : const Color(0xFF1A1A1A),
+              fontWeight: FontWeight.w500,
+              fontSize: 14,
+              fontFamily: 'Roboto',
+            ),
+          ),
+        ],
+      ),
+      selected: isSelected,
+      onSelected: onSelected,
+      backgroundColor: Colors.white,
+      selectedColor: color,
+      side: BorderSide(
+        color: isSelected ? color : const Color(0xFFE1E5E9),
+        width: 1.5,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
       ),
     );
   }
@@ -567,55 +643,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
         // Show error state with retry button
         if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: Colors.grey[400],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Failed to load events. Check your connection or permissions.',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 16,
-                    fontFamily: 'Roboto',
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    // Force rebuild to retry the stream
-                    setState(() {});
-                  },
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Retry'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppThemeColor.darkGreenColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Note: Ensure Firestore rules allow authenticated users to read non-private events',
-                  style: TextStyle(
-                    color: Colors.grey[500],
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          );
+          return _buildErrorState();
         }
 
         // Show empty state
@@ -676,7 +704,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Row(
             children: [
               AnimatedBuilder(
@@ -687,39 +715,39 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     child: const Icon(
                       Icons.star,
                       color: Color(0xFFFF9800),
-                      size: 20,
+                      size: 24,
                     ),
                   );
                 },
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
               const Text(
                 'Featured Events',
                 style: TextStyle(
-                  color: AppThemeColor.pureBlackColor,
+                  color: Color(0xFF1A1A1A),
                   fontWeight: FontWeight.bold,
-                  fontSize: 18,
+                  fontSize: 22,
                   fontFamily: 'Roboto',
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         CarouselSlider.builder(
           itemCount: featuredEvents.length,
           itemBuilder: (context, index, realIndex) {
             return _buildFeaturedCard(featuredEvents[index]);
           },
           options: CarouselOptions(
-            height: 200,
-            viewportFraction: 0.9,
+            height: 240,
+            viewportFraction: 0.85,
             enableInfiniteScroll: false,
             autoPlay: featuredEvents.length > 1,
             autoPlayInterval: const Duration(seconds: 4),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
       ],
     );
   }
@@ -728,45 +756,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         onTap: () {
-          print('Tapped featured card: ${event.id}');
           RouterClass.nextScreenNormal(
             context,
             SingleEventScreen(eventModel: event),
           );
         },
         child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 10),
+          margin: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: const Color(0xFFE65100),
-              width: 5.0,
-            ),
+            borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFFE65100).withValues(alpha: 0.5),
-                spreadRadius: 3,
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
-                spreadRadius: 5,
-                blurRadius: 25,
-                offset: const Offset(0, 10),
+                color: const Color(0xFFFF9800).withValues(alpha: 0.3),
+                spreadRadius: 0,
+                blurRadius: 20,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
             child: Stack(
               children: [
                 // Background Image
                 Container(
                   width: double.infinity,
-                  height: 200,
+                  height: 240,
                   decoration: BoxDecoration(
                     image: DecorationImage(
                       image: NetworkImage(event.imageUrl),
@@ -777,13 +794,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 // Gradient Overlay
                 Container(
                   width: double.infinity,
-                  height: 200,
+                  height: 240,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Colors.black.withValues(alpha: 0.7),
+                        Colors.black.withValues(alpha: 0.1),
                         Colors.transparent,
                         Colors.black.withValues(alpha: 0.8),
                       ],
@@ -792,7 +809,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
                 // Content
                 Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -803,12 +820,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
+                              horizontal: 12,
+                              vertical: 6,
                             ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFFF9800),
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(16),
                             ),
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
@@ -816,15 +833,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 Icon(
                                   Icons.star,
                                   color: Colors.white,
-                                  size: 12,
+                                  size: 14,
                                 ),
                                 SizedBox(width: 4),
                                 Text(
-                                  'Featured ★',
+                                  'Featured',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 10,
+                                    fontSize: 12,
                                     fontFamily: 'Roboto',
                                   ),
                                 ),
@@ -842,24 +859,37 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
-                              fontSize: 20,
+                              fontSize: 24,
                               fontFamily: 'Roboto',
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 8),
+                          Text(
+                            event.groupName,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontSize: 16,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
+                                  horizontal: 12,
+                                  vertical: 8,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF4CAF50),
-                                  borderRadius: BorderRadius.circular(8),
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.3),
+                                    width: 1,
+                                  ),
                                 ),
                                 child: Text(
                                   DateFormat('MMM dd, KK:mm a')
@@ -867,44 +897,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w600,
-                                    fontSize: 12,
+                                    fontSize: 14,
                                     fontFamily: 'Roboto',
                                   ),
                                 ),
                               ),
-                              Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(8),
-                                  onTap: () {
-                                    print('Tapped featured event: ${event.id}');
-                                    RouterClass.nextScreenNormal(
-                                      context,
-                                      SingleEventScreen(eventModel: event),
-                                    );
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.transparent,
-                                      border: Border.all(
-                                        color: Colors.white,
-                                        width: 1,
-                                      ),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Text(
-                                      'Details >',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 12,
-                                        fontFamily: 'Roboto',
-                                      ),
-                                    ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Text(
+                                  'View Details',
+                                  style: TextStyle(
+                                    color: Color(0xFF1A1A1A),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                    fontFamily: 'Roboto',
                                   ),
                                 ),
                               ),
@@ -934,7 +947,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       itemCount: events.length,
       itemBuilder: (context, index) {
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
           child: _buildEventCard(events[index]),
         );
       },
@@ -945,9 +958,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         onTap: () {
-          print('Tapped event card: ${event.id}');
           RouterClass.nextScreenNormal(
             context,
             SingleEventScreen(eventModel: event),
@@ -956,154 +968,214 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: const Color(0xFF1B5E20),
-              width: 4.0,
-            ),
+            borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF1B5E20).withValues(alpha: 0.4),
-                spreadRadius: 2,
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
-                spreadRadius: 4,
+                color: Colors.black.withValues(alpha: 0.08),
+                spreadRadius: 0,
                 blurRadius: 20,
-                offset: const Offset(0, 8),
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Image section
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+                child: Stack(
                   children: [
-                    if (event.isFeatured)
-                      const Icon(
-                        Icons.star,
-                        color: Color(0xFFFF9800),
-                        size: 20,
-                      ),
-                    if (event.isFeatured) const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        event.title,
-                        style: const TextStyle(
-                          color: AppThemeColor.pureBlackColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                          fontFamily: 'Roboto',
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  event.groupName,
-                  style: TextStyle(
-                    color: AppThemeColor.dullFontColor,
-                    fontSize: 14,
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  event.location,
-                  style: TextStyle(
-                    color: AppThemeColor.dullFontColor,
-                    fontSize: 14,
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: Image.network(
-                      event.imageUrl,
-                      fit: BoxFit.cover,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Container(
-                          color: Colors.grey[200],
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              color: Color(0xFF4CAF50),
+                    AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: Image.network(
+                        event.imageUrl,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            color: const Color(0xFFF5F7FA),
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                color: Color(0xFF667EEA),
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  event.description,
-                  style: const TextStyle(
-                    color: AppThemeColor.pureBlackColor,
-                    fontSize: 14,
-                    fontFamily: 'Roboto',
-                  ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      DateFormat('EEEE, MMMM dd yyyy\nKK:mm a')
-                          .format(event.selectedDateTime),
-                      style: const TextStyle(
-                        color: AppThemeColor.pureBlackColor,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 12,
-                        fontStyle: FontStyle.italic,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                    Material(
-                      color: const Color(0xFF4CAF50),
-                      borderRadius: BorderRadius.circular(8),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap: () {
-                          print('Tapped event: ${event.id}');
-                          RouterClass.nextScreenNormal(
-                            context,
-                            SingleEventScreen(eventModel: event),
                           );
                         },
+                      ),
+                    ),
+                    if (event.isFeatured)
+                      Positioned(
+                        top: 12,
+                        right: 12,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF9800),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.star,
+                                color: Colors.white,
+                                size: 12,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'Featured',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                  fontFamily: 'Roboto',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              // Content section
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      event.title,
+                      style: const TextStyle(
+                        color: Color(0xFF1A1A1A),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                        fontFamily: 'Roboto',
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.group,
+                          color: const Color(0xFF667EEA),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          event.groupName,
+                          style: const TextStyle(
+                            color: Color(0xFF6B7280),
+                            fontSize: 14,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          color: const Color(0xFF667EEA),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            event.location,
+                            style: const TextStyle(
+                              color: Color(0xFF6B7280),
+                              fontSize: 14,
+                              fontFamily: 'Roboto',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      event.description,
+                      style: const TextStyle(
+                        color: Color(0xFF4B5563),
+                        fontSize: 14,
+                        fontFamily: 'Roboto',
+                        height: 1.5,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF667EEA)
+                                  .withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              DateFormat('MMM dd, yyyy\nKK:mm a')
+                                  .format(event.selectedDateTime),
+                              style: const TextStyle(
+                                color: Color(0xFF667EEA),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                                fontFamily: 'Roboto',
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
                             horizontal: 16,
-                            vertical: 8,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Color(0xFF667EEA),
+                                Color(0xFF764BA2),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Text(
-                            'Details >>',
+                            'View Details',
                             style: TextStyle(
                               color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
                               fontFamily: 'Roboto',
                             ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1115,53 +1187,119 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       children: [
         // Featured skeleton
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Shimmer.fromColors(
-            baseColor: Colors.grey[300]!,
-            highlightColor: Colors.grey[100]!,
+            baseColor: const Color(0xFFE1E5E9),
+            highlightColor: Colors.white,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  height: 20,
+                  height: 24,
                   width: 150,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 Container(
-                  height: 200,
+                  height: 240,
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                 ),
               ],
             ),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         // Event cards skeleton
         ...List.generate(
             3,
             (index) => Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                   child: Shimmer.fromColors(
-                    baseColor: Colors.grey[300]!,
-                    highlightColor: Colors.grey[100]!,
+                    baseColor: const Color(0xFFE1E5E9),
+                    highlightColor: Colors.white,
                     child: Container(
-                      height: 200,
+                      height: 280,
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(20),
                       ),
                     ),
                   ),
                 )),
       ],
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(40),
+              ),
+              child: Icon(
+                Icons.error_outline,
+                size: 40,
+                color: const Color(0xFF667EEA),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Something went wrong',
+              style: TextStyle(
+                color: Color(0xFF1A1A1A),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Check your connection and try again',
+              style: TextStyle(
+                color: const Color(0xFF6B7280),
+                fontSize: 16,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: () {
+                setState(() {});
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF667EEA),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1172,20 +1310,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.event_busy,
-              size: 64,
-              color: Colors.grey[400],
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(50),
+              ),
+              child: Icon(
+                Icons.event_busy,
+                size: 50,
+                color: const Color(0xFF667EEA),
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Text(
               showFeaturedFirst
-                  ? 'No featured events—create one!'
+                  ? 'No featured events available'
                   : 'No events found',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+              style: const TextStyle(
+                color: Color(0xFF1A1A1A),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
                 fontFamily: 'Roboto',
               ),
               textAlign: TextAlign.center,
@@ -1194,37 +1340,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             Text(
               'Try adjusting your filters or create a new event',
               style: TextStyle(
-                color: Colors.grey[500],
-                fontSize: 14,
+                color: const Color(0xFF6B7280),
+                fontSize: 16,
                 fontFamily: 'Roboto',
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 24),
-            ElevatedButton(
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
               onPressed: () {
                 RouterClass.nextScreenNormal(
                   context,
                   const ChoseDateTimeScreen(),
                 );
               },
+              icon: const Icon(Icons.add),
+              label: const Text('Create Event'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4CAF50),
+                backgroundColor: const Color(0xFF667EEA),
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
                   vertical: 12,
                 ),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Create Event',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  fontFamily: 'Roboto',
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
             ),

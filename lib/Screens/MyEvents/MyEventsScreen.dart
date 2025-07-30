@@ -1,18 +1,16 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_ui_firestore/firebase_ui_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:orgami/Controller/CustomerController.dart';
 import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Models/AttendanceModel.dart';
 import 'package:orgami/Models/EventModel.dart';
-import 'package:orgami/Utils/AppAppBarView.dart';
-import 'package:orgami/Utils/AppButtons.dart';
-import 'package:orgami/Utils/Colors.dart';
-import 'package:orgami/Utils/Dimensions.dart';
-import 'package:orgami/Utils/Router.dart';
-import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Screens/Events/Widget/SingleEventListViewItem.dart';
+import 'package:orgami/Utils/AppAppBarView.dart';
+import 'package:orgami/Utils/Colors.dart';
+import 'package:orgami/Utils/dimensions.dart';
 
 class MyEventsScreen extends StatefulWidget {
   const MyEventsScreen({super.key});
