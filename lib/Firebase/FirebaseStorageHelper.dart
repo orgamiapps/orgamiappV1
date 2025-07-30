@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:orgami/Controller/CustomerController.dart';
+import 'package:orgami/Models/EventModel.dart';
 
 class FirebaseStorageHelper {
   final FirebaseStorage _storage = FirebaseStorage.instance;

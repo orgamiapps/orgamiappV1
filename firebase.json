@@ -18,5 +18,26 @@
         "npm --prefix \"$RESOURCE_DIR\" run lint"
       ]
     }
-  ]
+  ],
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "orgami-66nxok",
+          "appId": "1:951311475019:android:83ce358b010643ba89c8ce",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "orgami-66nxok",
+          "configurations": {
+            "android": "1:951311475019:android:83ce358b010643ba89c8ce",
+            "web": "1:951311475019:web:d65cfc2cbe6e987c89c8ce",
+            "windows": "1:951311475019:web:c6d429ef1386b91d89c8ce"
+          }
+        }
+      }
+    }
+  }
 }

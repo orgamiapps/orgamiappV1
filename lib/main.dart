@@ -5,20 +5,20 @@ import 'package:flutter/scheduler.dart';
 import 'package:orgami/Screens/Splash/SplashScreen.dart';
 import 'package:orgami/Utils/AppConstants.dart';
 import 'package:orgami/Utils/Colors.dart';
-import 'package:orgami/Utils/firebase_options.dart';
-
-// Global variables for error handling
-bool _isFirebaseInitialized = false;
-bool _isOfflineMode = false;
-String? _lastError;
-
-// Performance monitoring variables
-int _frameSkipCount = 0;
-int _totalFrames = 0;
-bool _performanceWarningShown = false;
+import 'package:orgami/firebase_options.dart';
 
 /// Comprehensive error handling for GoogleApiManager SecurityException and GMS issues
 class FirebaseErrorHandler {
+  // Static variables for error handling
+  static bool _isFirebaseInitialized = false;
+  static bool _isOfflineMode = false;
+  static String? _lastError;
+
+  // Performance monitoring variables
+  static int _frameSkipCount = 0;
+  static int _totalFrames = 0;
+  static bool _performanceWarningShown = false;
+
   static const String _errorMessage =
       'Firebase services failed to connect. Click to fix:';
 
@@ -337,22 +337,86 @@ class FirebaseErrorHandler {
 }
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
 
-  // Set preferred orientations
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+    // Set preferred orientations
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
 
-  // Initialize Firebase with error handling
-  bool firebaseInitialized = await FirebaseErrorHandler.initializeFirebase();
+    print('🚀 Starting app initialization...');
 
-  if (!firebaseInitialized) {
-    print('⚠️ Firebase initialization failed - will handle in app');
+    // Initialize Firebase with comprehensive error handling
+    bool firebaseInitialized = false;
+    try {
+      firebaseInitialized = await FirebaseErrorHandler.initializeFirebase();
+    } catch (e) {
+      print('❌ Firebase initialization crashed: $e');
+      // Continue without Firebase - app will run in offline mode
+    }
+
+    if (!firebaseInitialized) {
+      print('⚠️ Firebase initialization failed - running in offline mode');
+      FirebaseErrorHandler.enableOfflineMode();
+    }
+
+    print('✅ App initialization complete');
+    runApp(const MyApp());
+  } catch (e) {
+    print('💥 Critical app initialization error: $e');
+    // Show a basic error screen
+    runApp(const ErrorApp());
   }
+}
 
-  runApp(const MyApp());
+/// Error app shown when critical initialization fails
+class ErrorApp extends StatelessWidget {
+  const ErrorApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'App Error',
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: Colors.red[400],
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'App Initialization Error',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'The app failed to start properly. Please restart the app or check your device settings.',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () {
+                    // Restart the app
+                    SystemNavigator.pop();
+                  },
+                  child: const Text('Restart App'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {

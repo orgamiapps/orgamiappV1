@@ -170,6 +170,16 @@ class _QrScannerScreenForLogedInState extends State<QrScannerScreenForLogedIn> {
                 });
 
                 try {
+                  // Ensure user is properly authenticated
+                  if (CustomerController.logeInCustomer == null) {
+                    ShowToast().showNormalToast(
+                        msg: 'Please log in to sign in to events.');
+                    setState(() {
+                      _isLoading = false;
+                    });
+                    return;
+                  }
+
                   String docId =
                       '${_codeController.text}-${CustomerController.logeInCustomer!.uid}';
                   AttendanceModel newAttendanceModel = AttendanceModel(
@@ -205,19 +215,27 @@ class _QrScannerScreenForLogedInState extends State<QrScannerScreenForLogedIn> {
                       );
                     } else {
                       // No prompts, sign in directly
-                      await FirebaseFirestore.instance
-                          .collection(AttendanceModel.firebaseKey)
-                          .doc(newAttendanceModel.id)
-                          .set(newAttendanceModel.toJson());
-                      ShowToast()
-                          .showNormalToast(msg: 'Signed In Successfully!');
-                      // Navigate to event details after a short delay
-                      Future.delayed(const Duration(seconds: 1), () {
-                        RouterClass.nextScreenAndReplacement(
-                          context,
-                          SingleEventScreen(eventModel: eventExist),
-                        );
-                      });
+                      try {
+                        await FirebaseFirestore.instance
+                            .collection(AttendanceModel.firebaseKey)
+                            .doc(newAttendanceModel.id)
+                            .set(newAttendanceModel.toJson());
+                        ShowToast()
+                            .showNormalToast(msg: 'Signed In Successfully!');
+                        // Navigate to event details after a short delay
+                        Future.delayed(const Duration(seconds: 1), () {
+                          RouterClass.nextScreenAndReplacement(
+                            context,
+                            SingleEventScreen(eventModel: eventExist),
+                          );
+                        });
+                      } catch (firestoreError) {
+                        print(
+                            'Firestore error during sign-in: $firestoreError');
+                        ShowToast().showNormalToast(
+                            msg:
+                                'Failed to save attendance. Please try again.');
+                      }
                     }
                   } else {
                     ShowToast()

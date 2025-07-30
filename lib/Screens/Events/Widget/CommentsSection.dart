@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:orgami/Controller/CustomerController.dart';
 import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Models/CommentModel.dart';
 import 'package:orgami/Models/EventModel.dart';
 import 'package:orgami/Utils/Colors.dart';
-import 'package:orgami/Utils/Toast.dart';
-import 'package:orgami/Utils/dimensions.dart';
+import 'package:orgami/Utils/Dimensions.dart';
+import 'package:orgami/Utils/Router.dart';
 
 class CommentsSection extends StatefulWidget {
   final EventModel eventModel;

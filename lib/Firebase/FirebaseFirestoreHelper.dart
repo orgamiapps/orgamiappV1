@@ -36,8 +36,20 @@ class FirebaseFirestoreHelper {
       // Handle permission denied and other Firestore errors
       print('Permission denied for customer: $customerId');
       print('Error details: $e');
+
+      // For manual/without_login users, create a temporary customer model
+      if (customerId == 'manual' || customerId == 'without_login') {
+        customerModel = CustomerModel(
+          uid: customerId,
+          name: customerId == 'manual' ? 'Manual User' : 'Anonymous User',
+          email: '$customerId@orgami.app',
+          createdAt: DateTime.now(),
+        );
+        print('Created temporary customer model for: $customerId');
+      }
+
       // Return null instead of throwing to allow graceful handling
-      return null;
+      return customerModel;
     }
 
     return customerModel;
@@ -80,24 +92,32 @@ class FirebaseFirestoreHelper {
   Future<List<EventQuestionModel>> getEventQuestions({
     required String eventId,
   }) async {
-    QuerySnapshot querySnapshot = await _firestore
-        .collection(EventModel.firebaseKey)
-        .doc(eventId)
-        .collection(EventQuestionModel.firebaseKey)
-        .get();
+    List<EventQuestionModel> list = [];
 
-    List<EventQuestionModel> list = querySnapshot.docs.map((doc) {
-      return EventQuestionModel.fromJson(doc);
-    }).toList();
+    try {
+      QuerySnapshot querySnapshot = await _firestore
+          .collection(EventModel.firebaseKey)
+          .doc(eventId)
+          .collection(EventQuestionModel.firebaseKey)
+          .get();
 
-    print('list Data length is ${list.length}');
+      list = querySnapshot.docs.map((doc) {
+        return EventQuestionModel.fromJson(doc);
+      }).toList();
+
+      print('list Data length is ${list.length}');
+    } catch (e) {
+      // Handle permission denied and other Firestore errors
+      print('Error fetching event questions for event: $eventId');
+      print('Error details: $e');
+      // Return empty list instead of throwing to allow graceful handling
+      return [];
+    }
 
     return list;
   }
 
-  Future<bool> getAttendanceExist({
-    required String eventId,
-  }) async {
+  Future<bool> checkIfUserIsSignedIn(String eventId) async {
     QuerySnapshot querySnapshot = await _firestore
         .collection(AttendanceModel.firebaseKey)
         .where('eventId', isEqualTo: eventId)
@@ -113,9 +133,7 @@ class FirebaseFirestoreHelper {
     return list.isNotEmpty ? true : false;
   }
 
-  Future<bool> getRegisterAttendanceExist({
-    required String eventId,
-  }) async {
+  Future<bool> checkIfUserIsRegistered(String eventId) async {
     QuerySnapshot querySnapshot = await _firestore
         .collection(AttendanceModel.registerFirebaseKey)
         .where('eventId', isEqualTo: eventId)
@@ -134,17 +152,25 @@ class FirebaseFirestoreHelper {
   Future<EventModel?> getSingleEvent(String eventId) async {
     EventModel? eventData;
 
-    return await _firestore
-        .collection(EventModel.firebaseKey)
-        .doc(eventId)
-        .get()
-        .then((DocumentSnapshot snap) {
+    try {
+      DocumentSnapshot snap = await _firestore
+          .collection(EventModel.firebaseKey)
+          .doc(eventId)
+          .get();
+
       print('Event Data is${snap.data()}');
       if (snap.exists) {
         eventData = EventModel.fromJson(snap);
       }
-      return eventData;
-    });
+    } catch (e) {
+      // Handle permission denied and other Firestore errors
+      print('Error fetching event: $eventId');
+      print('Error details: $e');
+      // Return null instead of throwing to allow graceful handling
+      return null;
+    }
+
+    return eventData;
   }
 
   Future<List<AttendanceModel>> getSignedInAttendance() async {
@@ -186,17 +212,26 @@ class FirebaseFirestoreHelper {
     const String fieldName = 'eventId';
     final DocumentReference ref =
         _firestore.collection('Settings').doc('EventsSettings');
-    DocumentSnapshot snap = await ref.get();
-    if (snap.exists == true) {
-      int itemCount = snap[fieldName] ?? 0;
-      await _firestore.collection('Settings').doc('EventsSettings').update({
-        'eventId': itemCount + 1,
-      });
-      print('M Called for $itemCount');
-      return itemCount.toString();
-    } else {
-      // await ref.set({fieldName: 0});
-      return '0';
+
+    try {
+      DocumentSnapshot snap = await ref.get();
+      if (snap.exists == true) {
+        int itemCount = snap[fieldName] ?? 0;
+        await _firestore.collection('Settings').doc('EventsSettings').update({
+          'eventId': itemCount + 1,
+        });
+        print('M Called for $itemCount');
+        return itemCount.toString();
+      } else {
+        // Create the document if it doesn't exist
+        await ref.set({fieldName: 1});
+        print('M Created new EventsSettings document');
+        return '0';
+      }
+    } catch (e) {
+      print('Error getting event ID: $e');
+      // Fallback: use timestamp as event ID
+      return DateTime.now().millisecondsSinceEpoch.toString();
     }
   }
 
@@ -310,7 +345,7 @@ class FirebaseFirestoreHelper {
       if (!eventDoc.exists) {
         print(
             'Firestore add error: Event document does not exist for eventId: $eventId');
-        if (context != null) {
+        if (context != null && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
                 content: Text('Failed to add comment: Event does not exist')),
@@ -343,7 +378,7 @@ class FirebaseFirestoreHelper {
       return true;
     } catch (e) {
       print('Firestore add error: $e');
-      if (context != null) {
+      if (context != null && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to add comment: ${e.toString()}')),
         );

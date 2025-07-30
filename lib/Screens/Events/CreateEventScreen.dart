@@ -109,33 +109,34 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   Future uploadEvent() async {
-    await FirebaseFirestoreHelper().getEventID().then((docId) async {
-      EventModel newEvent = EventModel(
-        id: docId,
-        groupName: groupNameEdtController.text,
-        title: titleEdtController.text,
-        description: descriptionEdtController.text,
-        location: locationEdtController.text,
-        customerUid: FirebaseAuth.instance.currentUser!.uid,
-        imageUrl: thumbnailUrlCtlr.text,
-        selectedDateTime: widget.selectedDateTime,
-        eventGenerateTime: DateTime.now(),
-        status: '',
-        getLocation: true,
-        radius: widget.radios,
-        longitude: widget.selectedLocation.longitude,
-        latitude: widget.selectedLocation.latitude,
-        private: privateEvent,
-        categories: _selectedCategories,
-      );
+    try {
+      await FirebaseFirestoreHelper().getEventID().then((docId) async {
+        EventModel newEvent = EventModel(
+          id: docId,
+          groupName: groupNameEdtController.text,
+          title: titleEdtController.text,
+          description: descriptionEdtController.text,
+          location: locationEdtController.text,
+          customerUid: FirebaseAuth.instance.currentUser!.uid,
+          imageUrl: thumbnailUrlCtlr.text,
+          selectedDateTime: widget.selectedDateTime,
+          eventGenerateTime: DateTime.now(),
+          status: '',
+          getLocation: true,
+          radius: widget.radios,
+          longitude: widget.selectedLocation.longitude,
+          latitude: widget.selectedLocation.latitude,
+          private: privateEvent,
+          categories: _selectedCategories,
+        );
 
-      Map<String, dynamic> data = newEvent.toJson();
+        Map<String, dynamic> data = newEvent.toJson();
 
-      FirebaseFirestore.instance
-          .collection(EventModel.firebaseKey)
-          .doc(docId)
-          .set(data)
-          .then((value) {
+        await FirebaseFirestore.instance
+            .collection(EventModel.firebaseKey)
+            .doc(docId)
+            .set(data);
+
         debugPrint('Event Uploaded!');
         _btnCtlr.success();
         RouterClass.nextScreenAndReplacementAndRemoveUntil(
@@ -148,7 +149,17 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           // AddQuestionsToEventScreen(eventModel: newEvent),
         );
       });
-    });
+    } catch (e) {
+      debugPrint('Error uploading event: $e');
+      _btnCtlr.error();
+      // Show error message to user
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to create event: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override

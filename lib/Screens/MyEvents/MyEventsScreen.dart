@@ -1,16 +1,18 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_ui_firestore/firebase_ui_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:orgami/Controller/CustomerController.dart';
 import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Models/AttendanceModel.dart';
 import 'package:orgami/Models/EventModel.dart';
-import 'package:orgami/Screens/Events/Widget/SingleEventListViewItem.dart';
 import 'package:orgami/Utils/AppAppBarView.dart';
+import 'package:orgami/Utils/AppButtons.dart';
 import 'package:orgami/Utils/Colors.dart';
-import 'package:orgami/Utils/dimensions.dart';
+import 'package:orgami/Utils/Dimensions.dart';
+import 'package:orgami/Utils/Router.dart';
+import 'package:orgami/Utils/Toast.dart';
+import 'package:orgami/Screens/Events/Widget/SingleEventListViewItem.dart';
 
 class MyEventsScreen extends StatefulWidget {
   const MyEventsScreen({super.key});
@@ -126,20 +128,19 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
 
   Widget _eventsHistoryView() {
     return Container(
-      child: FirestoreQueryBuilder(
-        pageSize: 500,
-        query: _fireStore
+      child: StreamBuilder<QuerySnapshot>(
+        stream: _fireStore
             .collection(EventModel.firebaseKey)
             .where('customerUid',
                 isEqualTo: CustomerController.logeInCustomer!.uid)
             .orderBy(
               'selectedDateTime',
               descending: false,
-            ),
-        builder: ((context,
-            FirestoreQueryBuilderSnapshot<Map<String, dynamic>> snapshot, _) {
-          if (snapshot.isFetching) {
-            return const SizedBox();
+            )
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
           }
 
           if (snapshot.hasError) {
@@ -147,12 +148,12 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                 child: Text('Something went wrong ${snapshot.error}'));
           }
 
-          if (snapshot.docs.isEmpty) {
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
             return const Center(child: Text('No Event found!'));
           }
 
-          List<EventModel> EventsList = snapshot.docs
-              .map((e) => EventModel.fromJson(e))
+          List<EventModel> EventsList = snapshot.data!.docs
+              .map((e) => EventModel.fromJson(e.data() as Map<String, dynamic>))
               .toList()
             ..sort((a, b) => a.selectedDateTime.compareTo(b.selectedDateTime));
 
@@ -195,7 +196,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                 final EventModel d = EventsList[listIndex];
                 return SingleEventListViewItem(eventModel: d);
               });
-        }),
+        },
       ),
     );
   }

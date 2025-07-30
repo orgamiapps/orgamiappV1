@@ -25,8 +25,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   final _btnCtlr = RoundedLoadingButtonController();
   final TextEditingController _emailEdtController = TextEditingController();
   late AnimationController logoAnimation;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  late String _verificationId;
 
   @override
   void initState() {

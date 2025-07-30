@@ -1,17 +1,20 @@
-import 'package:flutter/material.dart';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:orgami/Utils/Colors.dart';
-import 'package:orgami/Utils/dimensions.dart';
-import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Models/AttendanceModel.dart';
-import 'dart:convert';
-import 'dart:io';
+import 'package:orgami/Models/EventModel.dart';
+import 'package:orgami/Utils/AppButtons.dart';
+import 'package:orgami/Utils/Colors.dart';
+import 'package:orgami/Utils/Dimensions.dart';
+import 'package:orgami/Utils/Router.dart';
+import 'package:orgami/Utils/Toast.dart';
+import 'package:orgami/Utils/WebViewPage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:csv/csv.dart';
 
 class EventAnalyticsScreen extends StatefulWidget {
   final String eventId;
@@ -1162,8 +1165,8 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
         }
       }
 
-      // Convert to CSV
-      final csvString = const ListToCsvConverter().convert(csvData);
+      // Convert to CSV format manually
+      final csvString = csvData.map((row) => row.join(',')).join('\n');
 
       // Save to temporary file
       final directory = await getTemporaryDirectory();

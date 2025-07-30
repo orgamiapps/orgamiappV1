@@ -4,28 +4,40 @@
       "collectionGroup": "Attendance",
       "queryScope": "COLLECTION",
       "fields": [
-        {
-          "fieldPath": "eventId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "attendanceDateTime",
-          "order": "ASCENDING"
-        }
+        { "fieldPath": "eventId", "order": "ASCENDING" },
+        { "fieldPath": "attendanceDateTime", "order": "ASCENDING" }
       ]
     },
     {
       "collectionGroup": "Events",
       "queryScope": "COLLECTION",
       "fields": [
-        {
-          "fieldPath": "customerUid",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "eventDateTime",
-          "order": "ASCENDING"
-        }
+        { "fieldPath": "customerUid", "order": "ASCENDING" },
+        { "fieldPath": "eventDateTime", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "Events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "private", "order": "ASCENDING" },
+        { "fieldPath": "selectedDateTime", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "Events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "customerUid", "order": "ASCENDING" },
+        { "fieldPath": "selectedDateTime", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "Comments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eventId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     }
   ],

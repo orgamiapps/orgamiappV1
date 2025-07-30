@@ -31,12 +31,22 @@ class SingleEventListViewItem extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppThemeColor.pureWhiteColor,
                 borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: const Color(0xFF1B5E20),
+                  width: 4.0,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.5),
-                    spreadRadius: 1,
-                    blurRadius: 7,
-                    offset: Offset(0, 1), // changes position of shadow
+                    color: const Color(0xFF1B5E20).withValues(alpha: 0.4),
+                    spreadRadius: 2,
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    spreadRadius: 4,
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),

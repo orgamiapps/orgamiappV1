@@ -38,10 +38,6 @@ class _SignupScreenState extends State<SignupScreen>
 
   late AnimationController logoAnimation;
 
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  late String _verificationId;
-
   void _signupCalled() async {
     try {
       String name = _userNameEdtController.text,
@@ -166,7 +162,7 @@ class _SignupScreenState extends State<SignupScreen>
         borderRadius: BorderRadius.circular(25),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.5),
+            color: Colors.grey.withValues(alpha: 0.5),
             spreadRadius: 1,
             blurRadius: 7,
             offset: const Offset(0, 7), // changes position of shadow

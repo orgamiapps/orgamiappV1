@@ -85,7 +85,7 @@ class _SingleEventScreenState extends State<SingleEventScreen> {
 
   Future<void> getAttendance() async {
     await FirebaseFirestoreHelper()
-        .getAttendanceExist(eventId: eventModel.id)
+        .checkIfUserIsSignedIn(eventModel.id)
         .then((value) {
       print('Exist value is $value');
       setState(() {
@@ -103,7 +103,7 @@ class _SingleEventScreenState extends State<SingleEventScreen> {
 
   Future<void> getRegisterAttendance() async {
     await FirebaseFirestoreHelper()
-        .getRegisterAttendanceExist(eventId: eventModel.id)
+        .checkIfUserIsRegistered(eventModel.id)
         .then((value) {
       print('Register Exist value is $value');
       setState(() {
@@ -293,6 +293,13 @@ class _SingleEventScreenState extends State<SingleEventScreen> {
     try {
       _btnCtlr.start();
 
+      // Ensure user is properly authenticated
+      if (CustomerController.logeInCustomer == null) {
+        _btnCtlr.reset();
+        ShowToast().showNormalToast(msg: 'Please log in to sign in to events.');
+        return;
+      }
+
       String docId =
           '${eventModel.id}-${CustomerController.logeInCustomer!.uid}';
       AttendanceModel newAttendanceModel = AttendanceModel(
@@ -324,24 +331,31 @@ class _SingleEventScreenState extends State<SingleEventScreen> {
         );
       } else {
         // No prompts, sign in directly
-        await FirebaseFirestore.instance
-            .collection(AttendanceModel.firebaseKey)
-            .doc(newAttendanceModel.id)
-            .set(newAttendanceModel.toJson());
+        try {
+          await FirebaseFirestore.instance
+              .collection(AttendanceModel.firebaseKey)
+              .doc(newAttendanceModel.id)
+              .set(newAttendanceModel.toJson());
 
-        _btnCtlr.success(); // Show success state
-        ShowToast().showNormalToast(msg: 'Signed In Successfully!');
+          _btnCtlr.success(); // Show success state
+          ShowToast().showNormalToast(msg: 'Signed In Successfully!');
 
-        // Navigate to event details after a short delay
-        Future.delayed(const Duration(seconds: 1), () {
+          // Navigate to event details after a short delay
+          Future.delayed(const Duration(seconds: 1), () {
+            _btnCtlr.reset();
+            // Refresh attendance status
+            getAttendance();
+            RouterClass.nextScreenAndReplacement(
+              context,
+              SingleEventScreen(eventModel: eventModel),
+            );
+          });
+        } catch (firestoreError) {
+          print('Firestore error during sign-in: $firestoreError');
           _btnCtlr.reset();
-          // Refresh attendance status
-          getAttendance();
-          RouterClass.nextScreenAndReplacement(
-            context,
-            SingleEventScreen(eventModel: eventModel),
-          );
-        });
+          ShowToast().showNormalToast(
+              msg: 'Failed to save attendance. Please try again.');
+        }
       }
     } catch (e) {
       print('Error is ${e.toString()}');
