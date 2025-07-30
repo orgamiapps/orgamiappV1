@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "951311475019",
+    "project_id": "orgami-66nxok",
+    "storage_bucket": "orgami-66nxok.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:951311475019:android:83ce358b010643ba89c8ce",
+        "android_client_info": {
+          "package_name": "com.stormdeve.orgami"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "951311475019-qnu1aci25ca8k6jnkjbrps23vbakd97j.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.stormdeve.orgami",
+            "certificate_hash": "08bfa370eedd8060da0aca73710e59efedc3d821"
+          }
+        },
+        {
+          "client_id": "951311475019-buuihoqqfqtpbpfuqpor5rmci86vottb.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAf1t5cToh1UoF7R52vTSJxMajw8CvmVUA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "951311475019-buuihoqqfqtpbpfuqpor5rmci86vottb.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "951311475019-gscq0edhrse94ptfjam7u8kel3cqnfav.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.stormdeve.orgami"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
