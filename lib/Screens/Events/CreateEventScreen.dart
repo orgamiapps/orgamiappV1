@@ -11,7 +11,6 @@ import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Models/EventModel.dart';
 import 'package:orgami/Screens/Events/SingleEventScreen.dart';
 import 'package:orgami/Screens/Home/DashboardScreen.dart';
-import 'package:orgami/Utils/AppAppBarView.dart';
 import 'package:orgami/Utils/Colors.dart';
 import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/Utils/TextFields.dart';
@@ -34,7 +33,8 @@ class CreateEventScreen extends StatefulWidget {
   State<CreateEventScreen> createState() => _CreateEventScreenState();
 }
 
-class _CreateEventScreenState extends State<CreateEventScreen> {
+class _CreateEventScreenState extends State<CreateEventScreen>
+    with TickerProviderStateMixin {
   late final double _screenWidth = MediaQuery.of(context).size.width;
   late final double _screenHeight = MediaQuery.of(context).size.height;
 
@@ -55,6 +55,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       TextEditingController();
 
   String? _selectedImagePath;
+
+  // Animation controllers
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
+  late AnimationController _slideController;
+  late Animation<Offset> _slideAnimation;
 
   Future _pickImage() async {
     final ImagePicker picker = ImagePicker();
@@ -163,228 +169,141 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          _bodyView(),
-          // successMessage
-          //     ? SuccessfulDialog(backButtonCalled: () {
-          //         setState(() {
-          //           successMessage = false;
-          //         });
-          //       })
-          //     : const SizedBox(),
-        ],
-      ),
+  void initState() {
+    super.initState();
+
+    // Initialize animations
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
     );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
+    );
+
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOut));
+
+    _fadeController.forward();
+    _slideController.forward();
   }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _slideController.dispose();
+    super.dispose();
+  }
+
+
 
   Widget _bodyView() {
     return SizedBox(
       width: _screenWidth,
       height: _screenHeight,
-      child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: AppAppBarView.appBarView(
-                context: context,
-                title: 'Event Details',
-              ),
-            ),
-            Expanded(
-              child: _detailsView(),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(left: 20, right: 20, bottom: 20),
-              child: RoundedLoadingButton(
-                animateOnTap: false,
-                borderRadius: 5,
-                width: 300,
-                controller: _btnCtlr,
-                onPressed: () => _handleSubmit(),
-                color: AppThemeColor.darkGreenColor,
-                elevation: 0,
-                child: const Wrap(
-                  children: [
-                    Text(
-                      'Add New Event',
-                      style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white),
-                    )
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+      child: Column(
+        children: [
+          _headerView(),
+          Expanded(child: _contentView()),
+        ],
       ),
     );
   }
 
-  Widget _detailsView() {
+  Widget _headerView() {
     return Container(
-      width: _screenWidth,
-      margin: const EdgeInsets.symmetric(
-        horizontal: 20,
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF667EEA),
+            Color(0xFF764BA2),
+          ],
+        ),
       ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+      child: Column(
+        children: [
+          // Back button and title
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    Icons.arrow_back_ios_new,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Text(
+                  'Event Details',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Subtitle
+          const Text(
+            'Let\'s get started by filling out the form below',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontFamily: 'Roboto',
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
-      padding: const EdgeInsets.all(15),
-      child: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
+    );
+  }
+
+  Widget _contentView() {
+    return SlideTransition(
+      position: _slideAnimation,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Form(
+          key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Let\'s get started by filling out the form below.',
-                style: TextStyle(
-                  color: AppThemeColor.pureBlackColor,
-                  fontSize: Dimensions.fontSizeLarge,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              _singleWithIconValue(
-                iconData: Icons.calendar_month_rounded,
-                value: DateFormat('EEEE dd MMMM').format(
-                  widget.selectedDateTime,
-                ),
-              ),
-              _singleWithIconValue(
-                iconData: Icons.access_time_rounded,
-                value: DateFormat('KK:mm a').format(
-                  widget.selectedDateTime,
-                ),
-              ),
-              _privateEventCheckBoxView(),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Categories',
-                      style: TextStyle(
-                        color: AppThemeColor.pureBlackColor,
-                        fontWeight: FontWeight.w500,
-                        fontSize: Dimensions.fontSizeLarge,
-                      ),
-                    ),
-                    Wrap(
-                      spacing: 8.0,
-                      children: _allCategories.map((category) {
-                        final isSelected =
-                            _selectedCategories.contains(category);
-                        return FilterChip(
-                          label: Text(category),
-                          selected: isSelected,
-                          onSelected: (selected) {
-                            setState(() {
-                              if (selected) {
-                                _selectedCategories.add(category);
-                              } else {
-                                _selectedCategories.remove(category);
-                              }
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                ),
-              ),
-              AppTextFields.TextField2(
-                hintText: 'Type here...',
-                titleText: 'Organizer',
-                width: _screenWidth,
-                controller: groupNameEdtController,
-                validator: (value) {
-                  if (value!.isEmpty) {
-                    return 'Enter Organizer first!';
-                  }
-                  return null;
-                },
-              ),
-              AppTextFields.TextField2(
-                hintText: 'Type here...',
-                titleText: 'Title',
-                width: _screenWidth,
-                controller: titleEdtController,
-                validator: (value) {
-                  if (value!.isEmpty) {
-                    return 'Enter Title first!';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(
-                height: 5,
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: AppTextFields.TextField2(
-                      hintText: 'Enter Image Url or Select Image',
-                      titleText: 'Image',
-                      width: _screenWidth,
-                      controller: thumbnailUrlCtlr,
-                      validator: (value) {
-                        if (value!.isEmpty) return 'Value is empty';
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(
-                    width: 10,
-                  ),
-                  Container(
-                    height: 50,
-                    width: 50,
-                    alignment: Alignment.center,
-                    child: DottedBorder(
-                      radius: const Radius.circular(10),
-                      color: Colors.grey,
-                      child: IconButton(
-                        tooltip: 'Select Image',
-                        icon: const Icon(Icons.image_outlined),
-                        onPressed: () => _pickImage(),
-                      ),
-                    ),
-                  )
-                ],
-              ),
-              const SizedBox(
-                height: 5,
-              ),
-              AppTextFields.TextField2(
-                hintText: 'Type here...',
-                titleText: 'Location',
-                width: _screenWidth,
-                controller: locationEdtController,
-                validator: (value) {
-                  if (value!.isEmpty) {
-                    return 'Enter Location first!';
-                  }
-                  return null;
-                },
-              ),
-              AppTextFields.TextField2(
-                controller: descriptionEdtController,
-                hintText: 'Type here...',
-                titleText: 'Description',
-                width: _screenWidth,
-                maxLines: 4,
-                validator: (value) {
-                  return null;
-                },
-              ),
+              // Date and Time Summary
+              _buildSummaryCard(),
+              const SizedBox(height: 24),
+              // Private Event Toggle
+              _buildPrivateEventToggle(),
+              const SizedBox(height: 24),
+              // Categories Section
+              _buildCategoriesSection(),
+              const SizedBox(height: 24),
+              // Form Fields
+              _buildFormFields(),
+              const SizedBox(height: 100), // Space for button
             ],
           ),
         ),
@@ -392,54 +311,542 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     );
   }
 
-  Widget _privateEventCheckBoxView() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10.0),
-      child: Row(
-        children: [
-          const Text(
-            'Private Event',
-            style: TextStyle(
-              color: AppThemeColor.pureBlackColor,
-              fontWeight: FontWeight.w500,
-              fontSize: Dimensions.fontSizeLarge,
-            ),
+  Widget _buildSummaryCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            spreadRadius: 0,
+            blurRadius: 20,
+            offset: const Offset(0, 4),
           ),
-          Checkbox(
-              value: privateEvent,
-              onChanged: (p) {
-                setState(() {
-                  privateEvent = p!;
-                });
-              })
+        ],
+      ),
+      child: Column(
+        children: [
+          _buildSummaryItem(
+            icon: Icons.calendar_month_rounded,
+            label: 'Date',
+            value: DateFormat('EEEE, MMMM dd, yyyy').format(widget.selectedDateTime),
+          ),
+          const SizedBox(height: 16),
+          _buildSummaryItem(
+            icon: Icons.access_time_rounded,
+            label: 'Time',
+            value: DateFormat('KK:mm a').format(widget.selectedDateTime),
+          ),
         ],
       ),
     );
   }
 
-  Widget _singleWithIconValue(
-      {required IconData iconData, required String value}) {
+  Widget _buildSummaryItem({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: const Color(0xFF667EEA).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            icon,
+            color: const Color(0xFF667EEA),
+            size: 20,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontSize: 12,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: Color(0xFF1A1A1A),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPrivateEventToggle() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            spreadRadius: 0,
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Row(
         children: [
-          Icon(
-            iconData,
-            size: 33,
-            color: AppThemeColor.pureBlackColor,
-          ),
-          const SizedBox(
-            width: 10,
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              color: AppThemeColor.dullFontColor,
-              fontWeight: FontWeight.w500,
-              fontSize: Dimensions.fontSizeLarge,
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFF667EEA).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
             ),
-          )
+            child: const Icon(
+              Icons.lock,
+              color: Color(0xFF667EEA),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 16),
+          const Expanded(
+            child: Text(
+              'Private Event',
+              style: TextStyle(
+                color: Color(0xFF1A1A1A),
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
+          Switch(
+            value: privateEvent,
+            onChanged: (value) {
+              setState(() {
+                privateEvent = value;
+              });
+            },
+            activeColor: const Color(0xFF667EEA),
+            activeTrackColor: const Color(0xFF667EEA).withOpacity(0.3),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCategoriesSection() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            spreadRadius: 0,
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.category,
+                  color: Color(0xFF667EEA),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Text(
+                'Categories',
+                style: TextStyle(
+                  color: Color(0xFF1A1A1A),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: _allCategories.map((category) {
+              final isSelected = _selectedCategories.contains(category);
+              return _buildCategoryChip(category, isSelected);
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryChip(String category, bool isSelected) {
+    return FilterChip(
+      label: Text(
+        category,
+        style: TextStyle(
+          color: isSelected ? Colors.white : const Color(0xFF1A1A1A),
+          fontWeight: FontWeight.w500,
+          fontSize: 14,
+          fontFamily: 'Roboto',
+        ),
+      ),
+      selected: isSelected,
+      onSelected: (selected) {
+        setState(() {
+          if (selected) {
+            _selectedCategories.add(category);
+          } else {
+            _selectedCategories.remove(category);
+          }
+        });
+      },
+      backgroundColor: Colors.grey.withOpacity(0.1),
+      selectedColor: const Color(0xFF667EEA),
+      side: BorderSide(
+        color: isSelected ? const Color(0xFF667EEA) : Colors.grey.withOpacity(0.3),
+        width: 1,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+    );
+  }
+
+  Widget _buildFormFields() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            spreadRadius: 0,
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.edit,
+                  color: Color(0xFF667EEA),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Text(
+                'Event Information',
+                style: TextStyle(
+                  color: Color(0xFF1A1A1A),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // Organizer Field
+          _buildTextField(
+            controller: groupNameEdtController,
+            label: 'Organizer',
+            hint: 'Type here...',
+            icon: Icons.person,
+            validator: (value) {
+              if (value!.isEmpty) {
+                return 'Enter Organizer first!';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          // Title Field
+          _buildTextField(
+            controller: titleEdtController,
+            label: 'Title',
+            hint: 'Type here...',
+            icon: Icons.title,
+            validator: (value) {
+              if (value!.isEmpty) {
+                return 'Enter Title first!';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          // Image Field
+          _buildImageField(),
+          const SizedBox(height: 16),
+          // Location Field
+          _buildTextField(
+            controller: locationEdtController,
+            label: 'Location',
+            hint: 'Type here...',
+            icon: Icons.location_on,
+            validator: (value) {
+              if (value!.isEmpty) {
+                return 'Enter Location first!';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          // Description Field
+          _buildTextField(
+            controller: descriptionEdtController,
+            label: 'Description',
+            hint: 'Type here...',
+            icon: Icons.description,
+            maxLines: 4,
+            validator: (value) {
+              return null;
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    int maxLines = 1,
+    String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF1A1A1A),
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+            fontFamily: 'Roboto',
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          maxLines: maxLines,
+          validator: validator,
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(
+              color: Colors.grey.withOpacity(0.6),
+              fontSize: 14,
+              fontFamily: 'Roboto',
+            ),
+            filled: true,
+            fillColor: const Color(0xFFF9FAFB),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: Color(0xFF667EEA),
+                width: 2,
+              ),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: Colors.red,
+                width: 1,
+              ),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImageField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Image',
+          style: TextStyle(
+            color: Color(0xFF1A1A1A),
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+            fontFamily: 'Roboto',
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: thumbnailUrlCtlr,
+                decoration: InputDecoration(
+                  hintText: 'Enter Image URL or Select Image',
+                  hintStyle: TextStyle(
+                    color: Colors.grey.withOpacity(0.6),
+                    fontSize: 14,
+                    fontFamily: 'Roboto',
+                  ),
+                  filled: true,
+                  fillColor: const Color(0xFFF9FAFB),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF667EEA),
+                      width: 2,
+                    ),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                ),
+                validator: (value) {
+                  if (value!.isEmpty) return 'Value is empty';
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF667EEA).withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: _pickImage,
+                  child: const Icon(
+                    Icons.image,
+                    color: Color(0xFF667EEA),
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFFAFBFC),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            _bodyView(),
+            // Continue Button (Fixed at bottom)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      spreadRadius: 0,
+                      blurRadius: 20,
+                      offset: const Offset(0, -4),
+                    ),
+                  ],
+                ),
+                child: RoundedLoadingButton(
+                  animateOnTap: false,
+                  borderRadius: 16,
+                  width: double.infinity,
+                  height: 56,
+                  controller: _btnCtlr,
+                  onPressed: () => _handleSubmit(),
+                  color: const Color(0xFF667EEA),
+                  elevation: 0,
+                  child: const Text(
+                    'Add New Event',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
