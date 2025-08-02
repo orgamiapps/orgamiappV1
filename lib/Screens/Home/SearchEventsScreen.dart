@@ -355,7 +355,7 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
 
   Widget _buildEventsList(List<EventModel> events) {
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
       itemCount: events.length,
       itemBuilder: (context, index) {
         return Padding(
