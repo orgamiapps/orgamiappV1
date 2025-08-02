@@ -16,6 +16,7 @@ import 'package:shimmer/shimmer.dart';
 
 // Enum for sort options
 enum SortOption {
+  none,
   dateAddedAsc,
   dateAddedDesc,
   titleAsc,
@@ -41,9 +42,12 @@ class _MyEventsScreenState extends State<MyEventsScreen>
   int selectedTab = 1;
   bool isLoading = true;
 
-  // Sorting state
-  SortOption currentSortOption = SortOption.eventDateDesc;
-  bool showSortModal = false;
+  // Filter/Sort state
+  SortOption currentSortOption = SortOption.none;
+  List<String> selectedCategories = [];
+
+  // Categories for filtering (tailored for each tab)
+  final List<String> _allCategories = ['Educational', 'Professional', 'Other'];
 
   List<AttendanceModel> attendanceList = [];
   List<AttendanceModel> preRegisteredAttendanceList = [];
@@ -90,6 +94,8 @@ class _MyEventsScreenState extends State<MyEventsScreen>
   // Sort events based on current sort option
   List<EventModel> _sortEvents(List<EventModel> events) {
     switch (currentSortOption) {
+      case SortOption.none:
+        break;
       case SortOption.dateAddedAsc:
         events
             .sort((a, b) => a.eventGenerateTime.compareTo(b.eventGenerateTime));
@@ -119,6 +125,8 @@ class _MyEventsScreenState extends State<MyEventsScreen>
   // Get sort option display text
   String _getSortOptionText(SortOption option) {
     switch (option) {
+      case SortOption.none:
+        return 'No Sorting';
       case SortOption.dateAddedAsc:
         return 'Date Added (Oldest First)';
       case SortOption.dateAddedDesc:
@@ -137,6 +145,8 @@ class _MyEventsScreenState extends State<MyEventsScreen>
   // Get sort option icon
   IconData _getSortOptionIcon(SortOption option) {
     switch (option) {
+      case SortOption.none:
+        return Icons.sort;
       case SortOption.dateAddedAsc:
         return Icons.schedule;
       case SortOption.dateAddedDesc:
@@ -155,6 +165,8 @@ class _MyEventsScreenState extends State<MyEventsScreen>
   // Get current sort indicator text
   String _getCurrentSortIndicator() {
     switch (currentSortOption) {
+      case SortOption.none:
+        return 'Default';
       case SortOption.dateAddedAsc:
         return 'Oldest';
       case SortOption.dateAddedDesc:
@@ -167,6 +179,19 @@ class _MyEventsScreenState extends State<MyEventsScreen>
         return 'Earliest';
       case SortOption.eventDateDesc:
         return 'Latest';
+    }
+  }
+
+  // Get current filter/sort indicator text
+  String _getCurrentFilterSortIndicator() {
+    if (selectedCategories.isNotEmpty && currentSortOption != SortOption.none) {
+      return 'Filtered & Sorted';
+    } else if (selectedCategories.isNotEmpty) {
+      return 'Filtered';
+    } else if (currentSortOption != SortOption.none) {
+      return _getCurrentSortIndicator();
+    } else {
+      return 'Filter/Sort';
     }
   }
 
@@ -271,13 +296,33 @@ class _MyEventsScreenState extends State<MyEventsScreen>
     );
   }
 
-  // Show sorting modal
-  void _showSortModal() {
+  // Show filter/sort modal
+  void _showFilterSortModal() {
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => _buildSortModal(),
+      builder: (context) => _FilterSortModal(
+        selectedCategories: selectedCategories,
+        currentSortOption: currentSortOption,
+        allCategories: _allCategories,
+        onCategoriesChanged: (categories) {
+          if (mounted) {
+            setState(() {
+              selectedCategories = categories;
+            });
+          }
+        },
+        onSortOptionChanged: (sortOption) {
+          if (mounted) {
+            setState(() {
+              currentSortOption = sortOption;
+            });
+          }
+        },
+      ),
     );
   }
 
@@ -518,28 +563,17 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                 ),
                 // Title
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'My',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w300,
-                          fontSize: 24,
-                          fontFamily: 'Roboto',
-                        ),
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 16),
+                    child: const Text(
+                      'My Events',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 28,
+                        fontFamily: 'Roboto',
                       ),
-                      const Text(
-                        'Events',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 28,
-                          fontFamily: 'Roboto',
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
                 // Sort button with indicator
@@ -549,7 +583,7 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                     children: [
                       GestureDetector(
                         onTap: () {
-                          _showSortModal();
+                          _showFilterSortModal();
                         },
                         child: Container(
                           width: 50,
@@ -558,10 +592,30 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                             color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(25),
                           ),
-                          child: const Icon(
-                            Icons.sort,
-                            color: Colors.white,
-                            size: 24,
+                          child: Stack(
+                            children: [
+                              const Center(
+                                child: Icon(
+                                  Icons.tune,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                              if (selectedCategories.isNotEmpty ||
+                                  currentSortOption != SortOption.none)
+                                Positioned(
+                                  top: 4,
+                                  right: 4,
+                                  child: Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFFF6B6B),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ),
@@ -575,7 +629,7 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            _getCurrentSortIndicator(),
+                            _getCurrentFilterSortIndicator(),
                             style: const TextStyle(
                               color: Color(0xFF667EEA),
                               fontSize: 10,
@@ -729,9 +783,7 @@ class _MyEventsScreenState extends State<MyEventsScreen>
             .map((e) => EventModel.fromJson(e.data() as Map<String, dynamic>))
             .toList();
 
-        // Apply sorting
-        EventsList = _sortEvents(EventsList);
-
+        // Filter by tab (Created, Attended, Registered)
         if (selectedTab == 1) {
           List<EventModel> neededEventsList = [];
           for (var element in EventsList) {
@@ -757,6 +809,16 @@ class _MyEventsScreenState extends State<MyEventsScreen>
           }
           EventsList = neededEventsList;
         }
+
+        // Apply category filtering
+        if (selectedCategories.isNotEmpty) {
+          EventsList = EventsList.where((event) => event.categories
+                  .any((category) => selectedCategories.contains(category)))
+              .toList();
+        }
+
+        // Apply sorting
+        EventsList = _sortEvents(EventsList);
 
         if (EventsList.isEmpty) {
           return _buildEmptyState();
@@ -1265,5 +1327,492 @@ class _MyEventsScreenState extends State<MyEventsScreen>
         ),
       ),
     );
+  }
+}
+
+// Filter/Sort Modal Widget
+class _FilterSortModal extends StatefulWidget {
+  final List<String> selectedCategories;
+  final SortOption currentSortOption;
+  final List<String> allCategories;
+  final Function(List<String>) onCategoriesChanged;
+  final Function(SortOption) onSortOptionChanged;
+
+  const _FilterSortModal({
+    required this.selectedCategories,
+    required this.currentSortOption,
+    required this.allCategories,
+    required this.onCategoriesChanged,
+    required this.onSortOptionChanged,
+  });
+
+  @override
+  State<_FilterSortModal> createState() => _FilterSortModalState();
+}
+
+class _FilterSortModalState extends State<_FilterSortModal> {
+  late List<String> _selectedCategories;
+  late SortOption _currentSortOption;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedCategories = List.from(widget.selectedCategories);
+    _currentSortOption = widget.currentSortOption;
+  }
+
+  void _updateCategories(List<String> categories) {
+    setState(() {
+      _selectedCategories = categories;
+    });
+    widget.onCategoriesChanged(categories);
+  }
+
+  void _updateSortOption(SortOption sortOption) {
+    setState(() {
+      _currentSortOption = sortOption;
+    });
+    widget.onSortOptionChanged(sortOption);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.tune,
+                  color: Color(0xFF667EEA),
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Filter/Sort Events',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.close,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Content
+          Flexible(
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              children: [
+                // Active filters summary
+                if (_selectedCategories.isNotEmpty ||
+                    _currentSortOption != SortOption.none)
+                  _buildActiveFiltersSummary(),
+                if (_selectedCategories.isNotEmpty ||
+                    _currentSortOption != SortOption.none)
+                  const SizedBox(height: 16),
+                // Categories Section
+                _buildCategoriesSection(),
+                const Divider(height: 32),
+                // Sort Section
+                _buildSortSection(),
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Build active filters summary
+  Widget _buildActiveFiltersSummary() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF667EEA).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF667EEA).withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.filter_list,
+                color: const Color(0xFF667EEA),
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Active Filters',
+                style: TextStyle(
+                  color: const Color(0xFF667EEA),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ],
+          ),
+          if (_selectedCategories.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Categories: ${_selectedCategories.join(', ')}',
+              style: TextStyle(
+                color: const Color(0xFF667EEA),
+                fontSize: 12,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ],
+          if (_currentSortOption != SortOption.none) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Sort: ${_getSortOptionText(_currentSortOption)}',
+              style: TextStyle(
+                color: const Color(0xFF667EEA),
+                fontSize: 12,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // Build categories section
+  Widget _buildCategoriesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.category,
+              color: const Color(0xFF667EEA),
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Filter by Category',
+              style: TextStyle(
+                color: Color(0xFF1A1A1A),
+                fontWeight: FontWeight.w600,
+                fontSize: 18,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            ...widget.allCategories.map((category) {
+              final isSelected = _selectedCategories.contains(category);
+              return _buildCategoryChip(
+                label: category,
+                icon: _getCategoryIcon(category),
+                isSelected: isSelected,
+                onSelected: (selected) {
+                  List<String> newCategories = List.from(_selectedCategories);
+                  if (selected) {
+                    newCategories.add(category);
+                  } else {
+                    newCategories.remove(category);
+                  }
+                  _updateCategories(newCategories);
+                },
+                color: const Color(0xFF667EEA),
+              );
+            }),
+            if (_selectedCategories.isNotEmpty)
+              _buildCategoryChip(
+                label: 'Clear All',
+                icon: Icons.clear,
+                isSelected: false,
+                onSelected: (_) {
+                  _updateCategories([]);
+                },
+                color: const Color(0xFFE53E3E),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // Build category chip
+  Widget _buildCategoryChip({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required Function(bool) onSelected,
+    required Color color,
+  }) {
+    return FilterChip(
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: isSelected ? Colors.white : color,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : const Color(0xFF1A1A1A),
+              fontWeight: FontWeight.w500,
+              fontSize: 14,
+              fontFamily: 'Roboto',
+            ),
+          ),
+        ],
+      ),
+      selected: isSelected,
+      onSelected: onSelected,
+      backgroundColor: Colors.white,
+      selectedColor: color,
+      side: BorderSide(
+        color: isSelected ? color : const Color(0xFFE1E5E9),
+        width: 1.5,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+      ),
+    );
+  }
+
+  // Build sort section
+  Widget _buildSortSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.sort,
+              color: const Color(0xFF667EEA),
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Sort by',
+              style: TextStyle(
+                color: Color(0xFF1A1A1A),
+                fontWeight: FontWeight.w600,
+                fontSize: 18,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Default (No Sorting)
+        _buildSortOptionGroup(
+          'Default',
+          [SortOption.none],
+        ),
+        const SizedBox(height: 16),
+        // Date Added section
+        _buildSortOptionGroup(
+          'Date Added',
+          [
+            SortOption.dateAddedDesc,
+            SortOption.dateAddedAsc,
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Title section
+        _buildSortOptionGroup(
+          'Title',
+          [
+            SortOption.titleAsc,
+            SortOption.titleDesc,
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Event Date section
+        _buildSortOptionGroup(
+          'Event Date',
+          [
+            SortOption.eventDateDesc,
+            SortOption.eventDateAsc,
+          ],
+        ),
+      ],
+    );
+  }
+
+  // Build sort option group
+  Widget _buildSortOptionGroup(String title, List<SortOption> options) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[600],
+              fontFamily: 'Roboto',
+            ),
+          ),
+        ),
+        ...options.map((option) {
+          bool isSelected = _currentSortOption == option;
+          return GestureDetector(
+            onTap: () {
+              _updateSortOption(option);
+            },
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? const Color(0xFF667EEA).withOpacity(0.1)
+                    : Colors.grey[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color:
+                      isSelected ? const Color(0xFF667EEA) : Colors.grey[200]!,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _getSortOptionIcon(option),
+                    color:
+                        isSelected ? const Color(0xFF667EEA) : Colors.grey[600],
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _getSortOptionText(option),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w500,
+                        color: isSelected
+                            ? const Color(0xFF1A1A1A)
+                            : Colors.grey[700],
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ),
+                  if (isSelected)
+                    const Icon(
+                      Icons.check_circle,
+                      color: Color(0xFF667EEA),
+                      size: 20,
+                    ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  IconData _getCategoryIcon(String category) {
+    switch (category) {
+      case 'Educational':
+        return Icons.school;
+      case 'Professional':
+        return Icons.work;
+      case 'Other':
+        return Icons.more_horiz;
+      default:
+        return Icons.category;
+    }
+  }
+
+  // Get sort option display text
+  String _getSortOptionText(SortOption option) {
+    switch (option) {
+      case SortOption.none:
+        return 'No Sorting';
+      case SortOption.dateAddedAsc:
+        return 'Date Added (Oldest First)';
+      case SortOption.dateAddedDesc:
+        return 'Date Added (Newest First)';
+      case SortOption.titleAsc:
+        return 'Title (A-Z)';
+      case SortOption.titleDesc:
+        return 'Title (Z-A)';
+      case SortOption.eventDateAsc:
+        return 'Event Date (Earliest First)';
+      case SortOption.eventDateDesc:
+        return 'Event Date (Latest First)';
+    }
+  }
+
+  // Get sort option icon
+  IconData _getSortOptionIcon(SortOption option) {
+    switch (option) {
+      case SortOption.none:
+        return Icons.sort;
+      case SortOption.dateAddedAsc:
+      case SortOption.dateAddedDesc:
+        return Icons.schedule;
+      case SortOption.titleAsc:
+      case SortOption.titleDesc:
+        return Icons.sort_by_alpha;
+      case SortOption.eventDateAsc:
+      case SortOption.eventDateDesc:
+        return Icons.event;
+    }
   }
 }
