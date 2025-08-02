@@ -158,7 +158,6 @@ class FirebaseFirestoreHelper {
           .doc(eventId)
           .get();
 
-      print('Event Data is${snap.data()}');
       if (snap.exists) {
         eventData = EventModel.fromJson(snap);
       }
@@ -183,8 +182,6 @@ class FirebaseFirestoreHelper {
       return AttendanceModel.fromJson(doc);
     }).toList();
 
-    print('list Data length is ${list.length}');
-
     return list;
   }
 
@@ -197,8 +194,6 @@ class FirebaseFirestoreHelper {
     List<AttendanceModel> list = querySnapshot.docs.map((doc) {
       return AttendanceModel.fromJson(doc);
     }).toList();
-
-    print('list Data length is ${list.length}');
 
     return list;
   }

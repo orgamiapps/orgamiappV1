@@ -47,7 +47,6 @@ class EventModel {
     final data = parsedJson is Map
         ? parsedJson
         : (parsedJson.data() as Map<String, dynamic>);
-    print('Event Model Data:  [38;5;246m [0m');
     return EventModel(
       id: data['id'],
       groupName: data['groupName'],
