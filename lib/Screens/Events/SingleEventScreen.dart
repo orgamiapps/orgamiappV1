@@ -21,7 +21,6 @@ import 'package:orgami/Screens/Events/Widget/DeleteEventDialouge.dart';
 import 'package:orgami/Screens/Events/Widget/QRDialouge.dart';
 import 'package:orgami/Screens/QRScanner/AnsQuestionsToSignInEventScreen.dart';
 import 'package:orgami/Screens/QRScanner/QrScannerScreenForLogedIn.dart';
-import 'package:orgami/Utils/AppButtons.dart';
 import 'package:orgami/Utils/Colors.dart';
 import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/Utils/Toast.dart';
@@ -40,8 +39,9 @@ class SingleEventScreen extends StatefulWidget {
   State<SingleEventScreen> createState() => _SingleEventScreenState();
 }
 
-class _SingleEventScreenState extends State<SingleEventScreen> {
-  late final EventModel eventModel = widget.eventModel;
+class _SingleEventScreenState extends State<SingleEventScreen>
+    with TickerProviderStateMixin {
+  late EventModel eventModel;
   late final double _screenWidth = MediaQuery.of(context).size.width;
   late final double _screenHeight = MediaQuery.of(context).size.height;
   bool? signedIn;
@@ -49,6 +49,12 @@ class _SingleEventScreenState extends State<SingleEventScreen> {
   final _btnCtlr = RoundedLoadingButtonController();
   bool _isAnonymousSignIn = false;
   bool _isAnonymousPreRegister = false;
+
+  // Animation controllers
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
+  late AnimationController _slideController;
+  late Animation<Offset> _slideAnimation;
 
   double radians(double degrees) {
     return degrees * pi / 180.0;
@@ -132,7 +138,7 @@ class _SingleEventScreenState extends State<SingleEventScreen> {
     }
 
     print(
-        'answer Is $answer  $eventIsNow || ($eventIsBefore && $eventIsAfter $nowTime -- $eventTimeHourBefore -- $eventTimeHourAfter');
+        'answer Is $answer  $eventIsNow || ($eventIsBefore && $eventIsAfter $nowTime -- $eventTimeHourBefore -- $eventTimeHourAfter)');
 
     return answer;
   }
@@ -168,125 +174,207 @@ class _SingleEventScreenState extends State<SingleEventScreen> {
       bool inRadius =
           isInRadius(eventModel.getLatLng(), eventModel.radius, newLatLng);
       if (inRadius) {
-        showDialog(
-          context: context,
-          builder: (BuildContext dialogContext) {
-            return StatefulBuilder(
-              builder: (BuildContext context, StateSetter dialogSetState) {
-                return Dialog(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10.0),
-                  ),
-                  elevation: 0,
-                  backgroundColor: Colors.transparent,
-                  child: Stack(
-                    children: <Widget>[
-                      Container(
-                        padding: const EdgeInsets.all(20.0),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.rectangle,
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10.0),
-                        ),
-                        child: SingleChildScrollView(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: <Widget>[
-                              const Icon(
-                                Icons.celebration,
-                                color: AppThemeColor.darkBlueColor,
-                                size: 50.0,
-                              ),
-                              const SizedBox(height: 20),
-                              Text(
-                                "Welcome to ${eventModel.title}! Tap 'Sign In' to confirm your attendance.",
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              // Anonymous checkbox
-                              Row(
-                                children: [
-                                  Checkbox(
-                                    value: _isAnonymousSignIn,
-                                    onChanged: (value) {
-                                      dialogSetState(() {
-                                        _isAnonymousSignIn = value ?? false;
-                                      });
-                                    },
-                                    activeColor: AppThemeColor.darkGreenColor,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Expanded(
-                                    child: Text(
-                                      'Sign In anonymously to public',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 20),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceEvenly,
-                                children: <Widget>[
-                                  MaterialButton(
-                                    onPressed: () {
-                                      Navigator.of(context).pop();
-                                    },
-                                    child: const Text(
-                                      'Close',
-                                      style: TextStyle(
-                                        color: Colors.black,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    width: _screenWidth / 2.8,
-                                    child: RoundedLoadingButton(
-                                      animateOnTap: false,
-                                      borderRadius: 5,
-                                      controller: _btnCtlr,
-                                      onPressed: makeSignInToEvent,
-                                      color: AppThemeColor.darkGreenColor,
-                                      elevation: 0,
-                                      child: const Wrap(
-                                        children: [
-                                          Text(
-                                            'Sign In',
-                                            style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.white),
-                                          )
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
-        );
+        _showSignInDialog();
       }
       print(
           'Current Location is  $inRadius and radius is ${widget.eventModel.radius}');
     });
+  }
+
+  void _showSignInDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter dialogSetState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20.0),
+              ),
+              elevation: 0,
+              backgroundColor: Colors.transparent,
+              child: Container(
+                padding: const EdgeInsets.all(24.0),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      spreadRadius: 0,
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFF667EEA),
+                            Color(0xFF764BA2),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: const Icon(
+                        Icons.celebration,
+                        color: Colors.white,
+                        size: 30.0,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      "Welcome to ${eventModel.title}!",
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Roboto',
+                        color: Color(0xFF1A1A1A),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "Tap 'Sign In' to confirm your attendance.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: const Color(0xFF6B7280),
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Anonymous checkbox
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF9FAFB),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFFE5E7EB),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Checkbox(
+                            value: _isAnonymousSignIn,
+                            onChanged: (value) {
+                              dialogSetState(() {
+                                _isAnonymousSignIn = value ?? false;
+                              });
+                            },
+                            activeColor: const Color(0xFF667EEA),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text(
+                              'Sign In anonymously to public',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                fontFamily: 'Roboto',
+                                color: Color(0xFF1A1A1A),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: () {
+                                  Navigator.of(context).pop();
+                                },
+                                child: const Center(
+                                  child: Text(
+                                    'Close',
+                                    style: TextStyle(
+                                      color: Color(0xFF6B7280),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: 'Roboto',
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Container(
+                            height: 48,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Color(0xFF667EEA),
+                                  Color(0xFF764BA2),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color:
+                                      const Color(0xFF667EEA).withOpacity(0.3),
+                                  spreadRadius: 0,
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: makeSignInToEvent,
+                                child: const Center(
+                                  child: Text(
+                                    'Sign In',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: 'Roboto',
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   void makeSignInToEvent() async {
@@ -366,17 +454,79 @@ class _SingleEventScreenState extends State<SingleEventScreen> {
 
   @override
   void initState() {
+    super.initState();
+
+    // Initialize eventModel with the widget's eventModel
+    eventModel = widget.eventModel;
+
+    // Initialize animations
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
+    );
+
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOut));
+
+    _fadeController.forward();
+    _slideController.forward();
+
     getAttendance();
     getRegisterAttendance();
     getPreRegisterCount();
-    super.initState();
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _slideController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFFAFBFC),
       body: SafeArea(
-        child: _bodyView(),
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: StreamBuilder<DocumentSnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection(EventModel.firebaseKey)
+                .doc(widget.eventModel.id)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasData && snapshot.data!.exists) {
+                // Update the eventModel with real-time data
+                final updatedEventModel = EventModel.fromJson(
+                  snapshot.data!.data() as Map<String, dynamic>,
+                );
+
+                // Update the eventModel immediately
+                eventModel = updatedEventModel;
+
+                return _bodyView();
+              } else if (snapshot.hasError) {
+                // Fallback to the original eventModel if there's an error
+                eventModel = widget.eventModel;
+                return _bodyView();
+              } else {
+                // Show loading or fallback to original eventModel
+                eventModel = widget.eventModel;
+                return _bodyView();
+              }
+            },
+          ),
+        ),
       ),
     );
   }
@@ -387,547 +537,921 @@ class _SingleEventScreenState extends State<SingleEventScreen> {
       height: _screenHeight,
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(10.0),
-            child: _appBarViewWithQrButton(
-              context: context,
-              title: eventModel.title,
-              eventModel: eventModel,
-            ),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  _imageView(),
-                  _categoriesView(),
-                  if (eventModel.customerUid ==
-                      FirebaseAuth.instance.currentUser!.uid)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20.0, vertical: 10),
-                      child: eventModel.isFeatured
-                          ? Container(
-                              alignment: Alignment.center,
-                              width: _screenWidth,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: AppThemeColor.orangeColor,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Text(
-                                'Featured',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: Dimensions.fontSizeLarge,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            )
-                          : GestureDetector(
-                              onTap: () {
-                                RouterClass.nextScreenNormal(
-                                  context,
-                                  FeatureEventScreen(eventModel: eventModel),
-                                );
-                              },
-                              child: AppButtons.button1(
-                                width: _screenWidth,
-                                height: 50,
-                                buttonLoading: false,
-                                label: 'Feature This Event',
-                                labelSize: Dimensions.fontSizeLarge,
-                              ),
-                            ),
-                    ),
-                  if (eventModel.customerUid !=
-                      FirebaseAuth.instance.currentUser!.uid)
-                    if (signedIn != null)
-                      if (!signedIn!) _signInToEventButton(),
-                  _detailsView(),
-                  // Attendees List
-                  AttendeesHorizontalList(eventModel: eventModel),
-                  // Pre-Registered List
-                  PreRegisteredHorizontalList(eventModel: eventModel),
-                  // Comments Section
-                  CommentsSection(eventModel: eventModel),
-                ],
-              ),
-            ),
-          ),
+          _headerView(),
+          Expanded(child: _contentView()),
           if (eventModel.customerUid == FirebaseAuth.instance.currentUser!.uid)
-            _attendanceEventButton(),
-          if (eventModel.customerUid == FirebaseAuth.instance.currentUser!.uid)
-            _addQuestionsButton(),
-          // if (eventModel.customerUid != FirebaseAuth.instance.currentUser!.uid)
-          //   if (signedIn != null)
-          //     if (!signedIn!) _signinToEventButton(),
-          if (eventModel.customerUid != FirebaseAuth.instance.currentUser!.uid)
-            if (registered != null)
-              if (!registered!) _registerToEventButton(),
+            _buildActionButtons(),
         ],
       ),
     );
   }
 
-  Widget _addQuestionsButton() {
-    return GestureDetector(
-      onTap: () => RouterClass.nextScreenNormal(
-        context,
-        AddQuestionsToEventScreen(eventModel: eventModel),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
-        child: AppButtons.button1(
-          width: _screenWidth,
-          height: 50,
-          buttonLoading: false,
-          label: 'Add Sign-In Prompts',
-          labelSize: Dimensions.fontSizeLarge,
+  Widget _headerView() {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF667EEA),
+            Color(0xFF764BA2),
+          ],
         ),
       ),
-    );
-  }
-
-  Widget _attendanceEventButton() {
-    return GestureDetector(
-      onTap: () => RouterClass.nextScreenNormal(
-        context,
-        AttendanceSheetScreen(eventModel: eventModel),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
-        child: AppButtons.button1(
-          width: _screenWidth,
-          height: 50,
-          buttonLoading: false,
-          label: 'View Attendance Sheet',
-          labelSize: Dimensions.fontSizeLarge,
-        ),
-      ),
-    );
-  }
-
-  Widget _registerToEventButton() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
       child: Column(
         children: [
+          // Back button, title, and action buttons
           Row(
             children: [
-              Checkbox(
-                value: _isAnonymousPreRegister,
-                onChanged: (value) {
-                  setState(() {
-                    _isAnonymousPreRegister = value ?? false;
-                  });
-                },
-                activeColor: AppThemeColor.darkGreenColor,
-              ),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  'Pre-Register anonymously to public',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
                   ),
+                  child: const Icon(
+                    Icons.arrow_back_ios_new,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  eventModel.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Roboto',
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (eventModel.customerUid ==
+                  FirebaseAuth.instance.currentUser!.uid)
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => showDialog(
+                        context: context,
+                        builder: (context) => DeleteEventDialoge(
+                          singleEvent: eventModel,
+                        ),
+                      ),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Icon(
+                          Icons.delete_forever_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: () => showDialog(
+                        context: context,
+                        builder: (context) => ShareQRDialog(
+                          singleEvent: eventModel,
+                        ),
+                      ),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Icon(
+                          Icons.qr_code_2_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Subtitle
+          Text(
+            eventModel.groupName,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontFamily: 'Roboto',
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _contentView() {
+    return SlideTransition(
+      position: _slideAnimation,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            // Event Image
+            _buildEventImage(),
+            const SizedBox(height: 24),
+            // Featured Badge
+            if (eventModel.isFeatured) _buildFeaturedBadge(),
+            const SizedBox(height: 24),
+            // Event Details Card
+            _buildEventDetailsCard(),
+            const SizedBox(height: 24),
+            // Categories
+            if (eventModel.categories.isNotEmpty) _buildCategoriesCard(),
+            const SizedBox(height: 24),
+            // Sign In Section (for non-owners)
+            if (eventModel.customerUid !=
+                FirebaseAuth.instance.currentUser!.uid)
+              if (signedIn != null)
+                if (!signedIn!) _buildSignInSection(),
+            const SizedBox(height: 24),
+            // Attendees List
+            AttendeesHorizontalList(eventModel: eventModel),
+            const SizedBox(height: 24),
+            // Pre-Registered List
+            PreRegisteredHorizontalList(eventModel: eventModel),
+            const SizedBox(height: 24),
+            // Comments Section
+            CommentsSection(eventModel: eventModel),
+            const SizedBox(height: 100), // Space for bottom buttons
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEventImage() {
+    return Container(
+      width: double.infinity,
+      height: 200,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            spreadRadius: 0,
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Image.network(
+          eventModel.imageUrl,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              color: const Color(0xFFF5F7FA),
+              child: const Center(
+                child: CircularProgressIndicator(
+                  color: Color(0xFF667EEA),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeaturedBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFFF9800),
+            Color(0xFFFF5722),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFF9800).withOpacity(0.3),
+            spreadRadius: 0,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.star,
+            color: Colors.white,
+            size: 16,
+          ),
+          SizedBox(width: 8),
+          Text(
+            'Featured Event',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              fontFamily: 'Roboto',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEventDetailsCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            spreadRadius: 0,
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Title
+          Text(
+            eventModel.title,
+            style: const TextStyle(
+              color: Color(0xFF1A1A1A),
+              fontWeight: FontWeight.bold,
+              fontSize: 24,
+              fontFamily: 'Roboto',
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Organizer
+          Text(
+            eventModel.groupName,
+            style: const TextStyle(
+              color: Color(0xFF6B7280),
+              fontSize: 16,
+              fontFamily: 'Roboto',
+            ),
+          ),
+          const SizedBox(height: 20),
+          // Event Details
+          _buildDetailItem(
+            icon: Icons.groups_rounded,
+            label: 'Pre-Registered',
+            value: '$preRegisteredCount people',
+          ),
+          const SizedBox(height: 16),
+          _buildDetailItem(
+            icon: Icons.calendar_month_rounded,
+            label: 'Date',
+            value: DateFormat('EEEE, MMMM dd, yyyy')
+                .format(eventModel.selectedDateTime),
+          ),
+          const SizedBox(height: 16),
+          _buildDetailItem(
+            icon: Icons.access_time_rounded,
+            label: 'Time',
+            value: DateFormat('KK:mm a').format(eventModel.selectedDateTime),
+          ),
+          const SizedBox(height: 16),
+          _buildDetailItem(
+            icon: Icons.location_on,
+            label: 'Location',
+            value: eventModel.location,
+          ),
+          const SizedBox(height: 20),
+          // Description
+          Text(
+            'Description',
+            style: const TextStyle(
+              color: Color(0xFF1A1A1A),
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+              fontFamily: 'Roboto',
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            eventModel.description,
+            style: const TextStyle(
+              color: Color(0xFF4B5563),
+              fontSize: 16,
+              fontFamily: 'Roboto',
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailItem({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: const Color(0xFF667EEA).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            icon,
+            color: const Color(0xFF667EEA),
+            size: 20,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontSize: 12,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: Color(0xFF1A1A1A),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  fontFamily: 'Roboto',
                 ),
               ),
             ],
           ),
-          RoundedLoadingButton(
-            animateOnTap: false,
-            borderRadius: 5,
-            controller: _btnCtlr,
-            onPressed: () {
-              try {
-                _btnCtlr.start();
-                String docId = FirebaseFirestore.instance
-                    .collection(AttendanceModel.registerFirebaseKey)
-                    .doc()
-                    .id;
-                AttendanceModel newAttendanceMode = AttendanceModel(
-                  id: docId,
-                  eventId: eventModel.id,
-                  userName: _isAnonymousPreRegister
-                      ? 'Anonymous'
-                      : CustomerController.logeInCustomer!.name,
-                  customerUid: CustomerController.logeInCustomer!.uid,
-                  attendanceDateTime: DateTime.now(),
-                  answers: [],
-                  isAnonymous: _isAnonymousPreRegister,
-                  realName: _isAnonymousPreRegister
-                      ? CustomerController.logeInCustomer!.name
-                      : null,
-                );
-                FirebaseFirestore.instance
-                    .collection(AttendanceModel.registerFirebaseKey)
-                    .doc(docId)
-                    .set(newAttendanceMode.toJson())
-                    .then((value) {
-                  _btnCtlr.success();
-                  ShowToast().showSnackBar('Register Successful!', context);
-                  Navigator.pop(context);
-                });
-              } catch (e) {
-                _btnCtlr.reset();
-              }
-            },
-            color: AppThemeColor.darkGreenColor,
-            elevation: 0,
-            child: const Wrap(
-              children: [
-                Text(
-                  'Pre Register',
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white),
-                )
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _signInToEventButton() {
-    return Column(
-      children: [
-        const SizedBox(
-          height: 10,
-        ),
-        const Text(
-          'Enable location to auto sign-in when near the event.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: AppThemeColor.dullFontColor,
-            fontSize: Dimensions.fontSizeSmall,
-          ),
-        ),
-        const SizedBox(
-          height: 10,
-        ),
-        const Text(
-          'OR',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: AppThemeColor.pureBlackColor,
-            fontSize: Dimensions.fontSizeSmall,
-          ),
-        ),
-        const SizedBox(
-          height: 5,
-        ),
-        GestureDetector(
-          onTap: () {
-            RouterClass.nextScreenAndReplacement(
-              context,
-              QrScannerScreenForLogedIn(),
-            );
-          },
-          child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 10),
-            width: 130,
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: AppThemeColor.darkGreenColor,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Row(
-              children: [
-                Icon(
-                  CupertinoIcons.qrcode_viewfinder,
-                  color: AppThemeColor.pureWhiteColor,
-                  size: 44,
-                ),
-                SizedBox(
-                  width: 10,
-                ),
-                Text(
-                  'Sign In',
-                  style: TextStyle(
-                    color: AppThemeColor.pureWhiteColor,
-                    fontSize: Dimensions.fontSizeLarge,
-                    fontWeight: FontWeight.w700,
-                  ),
-                )
-              ],
-            ),
-          ),
         ),
       ],
     );
-
-    // return Padding(
-    //   padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
-    //   child: RoundedLoadingButton(
-    //     animateOnTap: false,
-    //     borderRadius: 5,
-    //     controller: _btnCtlr,
-    //     onPressed: () {
-    //       RouterClass.nextScreenAndReplacement(
-    //         context,
-    //         QrScannerScreenForLogedIn(),
-    //       );
-    //       // try {
-    //       //   _btnCtlr.start();
-    //       //   String docId = FirebaseFirestore.instance
-    //       //       .collection(AttendanceModel.firebaseKey)
-    //       //       .doc()
-    //       //       .id;
-    //       //   AttendanceModel newAttendanceMode = AttendanceModel(
-    //       //     id: docId,
-    //       //     eventId: eventModel.id,
-    //       //     userName: CustomerController.logeInCustomer!.name,
-    //       //     customerUid: CustomerController.logeInCustomer!.uid,
-    //       //     attendanceDateTime: DateTime.now(),
-    //       //   );
-    //       //   FirebaseFirestore.instance
-    //       //       .collection(AttendanceModel.firebaseKey)
-    //       //       .doc(docId)
-    //       //       .set(newAttendanceMode.toJson())
-    //       //       .then((value) {
-    //       //     _btnCtlr.success();
-    //       //     ShowToast().showSnackBar('Signed In Successful!', context);
-    //       //     Navigator.pop(context);
-    //       //   });
-    //       // } catch (e) {
-    //       //   _btnCtlr.reset();
-    //       // }
-    //     },
-    //     color: AppThemeColor.darkGreenColor,
-    //     elevation: 0,
-    //     child: const Wrap(
-    //       children: [
-    //         Text(
-    //           'Sign In',
-    //           style: TextStyle(
-    //               fontSize: 16,
-    //               fontWeight: FontWeight.w600,
-    //               color: Colors.white),
-    //         )
-    //       ],
-    //     ),
-    //   ),
-    // );
   }
 
-  Widget _detailsView() {
+  Widget _buildCategoriesCard() {
     return Container(
-      padding: const EdgeInsets.all(20.0),
-      width: _screenWidth,
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            spreadRadius: 0,
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (eventModel.isFeatured)
-                Padding(
-                  padding: const EdgeInsets.only(right: 6.0),
-                  child: Icon(
-                    Icons.star,
-                    color: AppThemeColor.orangeColor,
-                    size: Dimensions.fontSizeExtraLarge + 4,
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.category,
+                  color: Color(0xFF667EEA),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Text(
+                'Categories',
+                style: TextStyle(
+                  color: Color(0xFF1A1A1A),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: eventModel.categories.map((category) {
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: const Color(0xFF667EEA).withOpacity(0.3),
+                    width: 1,
                   ),
                 ),
-              Flexible(
                 child: Text(
-                  eventModel.title,
-                  maxLines: 1,
-                  textAlign: TextAlign.center,
+                  category,
                   style: const TextStyle(
-                    color: AppThemeColor.pureBlackColor,
-                    fontWeight: FontWeight.w700,
-                    fontSize: Dimensions.fontSizeExtraLarge,
+                    color: Color(0xFF667EEA),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Roboto',
                   ),
                 ),
-              ),
-            ],
-          ),
-          Text(
-            eventModel.groupName,
-            maxLines: 1,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppThemeColor.dullFontColor,
-              fontWeight: FontWeight.w700,
-              fontSize: Dimensions.fontSizeLarge,
-            ),
-          ),
-          _singleWithIconValue(
-            iconData: Icons.groups_rounded,
-            value: 'Pre-Registered: $preRegisteredCount',
-          ),
-          _singleWithIconValue(
-            iconData: Icons.calendar_month_rounded,
-            value: DateFormat('EEEE, MMMM dd yyyy').format(
-              eventModel.selectedDateTime,
-            ),
-          ),
-          _singleWithIconValue(
-            iconData: Icons.access_time_rounded,
-            value: DateFormat('KK:mm a').format(
-              eventModel.selectedDateTime,
-            ),
-          ),
-          _singleWithIconValue(
-            iconData: Icons.location_on,
-            value: eventModel.location,
-          ),
-          const SizedBox(
-            height: 20,
-          ),
-          Text(
-            eventModel.description,
-            style: const TextStyle(
-              color: AppThemeColor.pureBlackColor,
-              fontWeight: FontWeight.w400,
-              fontSize: Dimensions.fontSizeLarge,
-            ),
+              );
+            }).toList(),
           ),
         ],
       ),
     );
   }
 
-  Widget _singleWithIconValue(
-      {required IconData iconData, required String value}) {
+  Widget _buildSignInSection() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            spreadRadius: 0,
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
         children: [
-          Icon(
-            iconData,
-            size: 33,
-            color: AppThemeColor.dullFontColor,
-          ),
-          const SizedBox(
-            width: 10,
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              color: AppThemeColor.pureBlackColor,
-              fontWeight: FontWeight.w500,
-              fontSize: Dimensions.fontSizeLarge,
-            ),
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _imageView() {
-    return Image.network(eventModel.imageUrl);
-  }
-
-  Widget _categoriesView() {
-    if (eventModel.categories.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-      child: Wrap(
-        spacing: 8.0,
-        runSpacing: 8.0,
-        children: eventModel.categories.map((category) {
-          return Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-            decoration: BoxDecoration(
-              color: AppThemeColor.darkGreenColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20.0),
-              border: Border.all(
-                color: AppThemeColor.darkGreenColor,
-                width: 1.0,
-              ),
-            ),
-            child: Text(
-              category,
-              style: const TextStyle(
-                color: AppThemeColor.darkGreenColor,
-                fontSize: Dimensions.fontSizeDefault,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  static Widget _appBarViewWithQrButton(
-      {required BuildContext context,
-      required String title,
-      required EventModel eventModel}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          child: Row(
-            children: [
-              InkWell(
-                onTap: () => Navigator.pop(context),
-                child: AppButtons.roundedButton(
-                  iconData: Icons.arrow_back_ios_rounded,
-                  iconColor: AppThemeColor.pureWhiteColor,
-                  backgroundColor: AppThemeColor.darkGreenColor,
-                ),
-              ),
-              const SizedBox(
-                width: 15,
-              ),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: AppThemeColor.darkBlueColor,
-                  fontSize: Dimensions.paddingSizeLarge,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (eventModel.customerUid == FirebaseAuth.instance.currentUser!.uid)
           Row(
             children: [
-              InkWell(
-                onTap: () => showDialog(
-                  context: context,
-                  builder: (context) => DeleteEventDialoge(
-                    singleEvent: eventModel,
-                  ),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: AppButtons.roundedButton(
-                  iconData: Icons.delete_forever_rounded,
-                  iconColor: Colors.red,
-                  backgroundColor: AppThemeColor.darkGreenColor,
+                child: const Icon(
+                  Icons.qr_code_scanner,
+                  color: Color(0xFF667EEA),
+                  size: 20,
                 ),
               ),
-              const SizedBox(
-                width: 10,
-              ),
-              InkWell(
-                onTap: () => showDialog(
-                  context: context,
-                  builder: (context) => ShareQRDialog(
-                    singleEvent: eventModel,
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Text(
+                  'Sign In to Event',
+                  style: TextStyle(
+                    color: Color(0xFF1A1A1A),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 18,
+                    fontFamily: 'Roboto',
                   ),
-                ),
-                child: AppButtons.roundedButton(
-                  iconData: Icons.qr_code_2_rounded,
-                  iconColor: AppThemeColor.pureWhiteColor,
-                  backgroundColor: AppThemeColor.darkGreenColor,
                 ),
               ),
             ],
           ),
-      ],
+          const SizedBox(height: 16),
+          const Text(
+            'Enable location to auto sign-in when near the event, or scan QR code.',
+            style: TextStyle(
+              color: Color(0xFF6B7280),
+              fontSize: 14,
+              fontFamily: 'Roboto',
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          Container(
+            width: double.infinity,
+            height: 56,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF667EEA),
+                  Color(0xFF764BA2),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF667EEA).withOpacity(0.3),
+                  spreadRadius: 0,
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  RouterClass.nextScreenAndReplacement(
+                    context,
+                    QrScannerScreenForLogedIn(),
+                  );
+                },
+                child: const Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        CupertinoIcons.qrcode_viewfinder,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      SizedBox(width: 12),
+                      Text(
+                        'Scan QR Code to Sign In',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            spreadRadius: 0,
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Feature Event Button (for event owners)
+          if (eventModel.customerUid == FirebaseAuth.instance.currentUser!.uid)
+            if (!eventModel.isFeatured)
+              Container(
+                width: double.infinity,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFFFF9800),
+                      Color(0xFFFF5722),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFF9800).withOpacity(0.3),
+                      spreadRadius: 0,
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () {
+                      RouterClass.nextScreenNormal(
+                        context,
+                        FeatureEventScreen(eventModel: eventModel),
+                      );
+                    },
+                    child: const Center(
+                      child: Text(
+                        'Feature This Event',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            else
+              Container(
+                width: double.infinity,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFFFF9800),
+                      Color(0xFFFF5722),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFF9800).withOpacity(0.3),
+                      spreadRadius: 0,
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.star,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Featured',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          if (eventModel.customerUid == FirebaseAuth.instance.currentUser!.uid)
+            const SizedBox(height: 12),
+          // Action Buttons Row
+          Row(
+            children: [
+              // Add Questions Button
+              if (eventModel.customerUid ==
+                  FirebaseAuth.instance.currentUser!.uid)
+                Expanded(
+                  child: Container(
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF667EEA).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFF667EEA).withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () => RouterClass.nextScreenNormal(
+                          context,
+                          AddQuestionsToEventScreen(eventModel: eventModel),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Add Prompts',
+                            style: TextStyle(
+                              color: Color(0xFF667EEA),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              if (eventModel.customerUid ==
+                  FirebaseAuth.instance.currentUser!.uid)
+                const SizedBox(width: 12),
+              // View Attendance Button
+              if (eventModel.customerUid ==
+                  FirebaseAuth.instance.currentUser!.uid)
+                Expanded(
+                  child: Container(
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color(0xFF667EEA),
+                          Color(0xFF764BA2),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF667EEA).withOpacity(0.3),
+                          spreadRadius: 0,
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () => RouterClass.nextScreenNormal(
+                          context,
+                          AttendanceSheetScreen(eventModel: eventModel),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'View Attendance',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          // Pre-Register Button (for non-owners)
+          if (eventModel.customerUid != FirebaseAuth.instance.currentUser!.uid)
+            if (registered != null)
+              if (!registered!) ...[
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF9FAFB),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFFE5E7EB),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Checkbox(
+                        value: _isAnonymousPreRegister,
+                        onChanged: (value) {
+                          setState(() {
+                            _isAnonymousPreRegister = value ?? false;
+                          });
+                        },
+                        activeColor: const Color(0xFF667EEA),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Pre-Register anonymously to public',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            fontFamily: 'Roboto',
+                            color: Color(0xFF1A1A1A),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF667EEA),
+                        Color(0xFF764BA2),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF667EEA).withOpacity(0.3),
+                        spreadRadius: 0,
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () {
+                        try {
+                          String docId = FirebaseFirestore.instance
+                              .collection(AttendanceModel.registerFirebaseKey)
+                              .doc()
+                              .id;
+                          AttendanceModel newAttendanceMode = AttendanceModel(
+                            id: docId,
+                            eventId: eventModel.id,
+                            userName: _isAnonymousPreRegister
+                                ? 'Anonymous'
+                                : CustomerController.logeInCustomer!.name,
+                            customerUid: CustomerController.logeInCustomer!.uid,
+                            attendanceDateTime: DateTime.now(),
+                            answers: [],
+                            isAnonymous: _isAnonymousPreRegister,
+                            realName: _isAnonymousPreRegister
+                                ? CustomerController.logeInCustomer!.name
+                                : null,
+                          );
+                          FirebaseFirestore.instance
+                              .collection(AttendanceModel.registerFirebaseKey)
+                              .doc(docId)
+                              .set(newAttendanceMode.toJson())
+                              .then((value) {
+                            ShowToast()
+                                .showSnackBar('Register Successful!', context);
+                            Navigator.pop(context);
+                          });
+                        } catch (e) {
+                          ShowToast().showNormalToast(
+                              msg: 'Failed to register. Please try again.');
+                        }
+                      },
+                      child: const Center(
+                        child: Text(
+                          'Pre-Register',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+        ],
+      ),
     );
   }
 }

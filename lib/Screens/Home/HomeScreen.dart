@@ -280,6 +280,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           }
         });
       }).toList();
+
+      // If we're filtering by Featured and no featured events are found, show all events instead
+      if (selectedCategories.contains('Featured') &&
+          selectedCategories.length == 1 &&
+          filteredEvents.isEmpty) {
+        filteredEvents = events;
+      }
     }
 
     // Filter by distance if location and radius are set
