@@ -14,6 +14,16 @@ import 'package:orgami/Utils/Router.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 
+// Enum for sort options
+enum SortOption {
+  dateAddedAsc,
+  dateAddedDesc,
+  titleAsc,
+  titleDesc,
+  eventDateAsc,
+  eventDateDesc,
+}
+
 class MyEventsScreen extends StatefulWidget {
   const MyEventsScreen({super.key});
 
@@ -30,6 +40,10 @@ class _MyEventsScreenState extends State<MyEventsScreen>
 
   int selectedTab = 1;
   bool isLoading = true;
+
+  // Sorting state
+  SortOption currentSortOption = SortOption.eventDateDesc;
+  bool showSortModal = false;
 
   List<AttendanceModel> attendanceList = [];
   List<AttendanceModel> preRegisteredAttendanceList = [];
@@ -71,6 +85,89 @@ class _MyEventsScreenState extends State<MyEventsScreen>
     }
 
     return eventPreRegistered;
+  }
+
+  // Sort events based on current sort option
+  List<EventModel> _sortEvents(List<EventModel> events) {
+    switch (currentSortOption) {
+      case SortOption.dateAddedAsc:
+        events
+            .sort((a, b) => a.eventGenerateTime.compareTo(b.eventGenerateTime));
+        break;
+      case SortOption.dateAddedDesc:
+        events
+            .sort((a, b) => b.eventGenerateTime.compareTo(a.eventGenerateTime));
+        break;
+      case SortOption.titleAsc:
+        events.sort(
+            (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+        break;
+      case SortOption.titleDesc:
+        events.sort(
+            (a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase()));
+        break;
+      case SortOption.eventDateAsc:
+        events.sort((a, b) => a.selectedDateTime.compareTo(b.selectedDateTime));
+        break;
+      case SortOption.eventDateDesc:
+        events.sort((a, b) => b.selectedDateTime.compareTo(a.selectedDateTime));
+        break;
+    }
+    return events;
+  }
+
+  // Get sort option display text
+  String _getSortOptionText(SortOption option) {
+    switch (option) {
+      case SortOption.dateAddedAsc:
+        return 'Date Added (Oldest First)';
+      case SortOption.dateAddedDesc:
+        return 'Date Added (Newest First)';
+      case SortOption.titleAsc:
+        return 'Title (A-Z)';
+      case SortOption.titleDesc:
+        return 'Title (Z-A)';
+      case SortOption.eventDateAsc:
+        return 'Event Date (Earliest First)';
+      case SortOption.eventDateDesc:
+        return 'Event Date (Latest First)';
+    }
+  }
+
+  // Get sort option icon
+  IconData _getSortOptionIcon(SortOption option) {
+    switch (option) {
+      case SortOption.dateAddedAsc:
+        return Icons.schedule;
+      case SortOption.dateAddedDesc:
+        return Icons.schedule;
+      case SortOption.titleAsc:
+        return Icons.sort_by_alpha;
+      case SortOption.titleDesc:
+        return Icons.sort_by_alpha;
+      case SortOption.eventDateAsc:
+        return Icons.event;
+      case SortOption.eventDateDesc:
+        return Icons.event;
+    }
+  }
+
+  // Get current sort indicator text
+  String _getCurrentSortIndicator() {
+    switch (currentSortOption) {
+      case SortOption.dateAddedAsc:
+        return 'Oldest';
+      case SortOption.dateAddedDesc:
+        return 'Newest';
+      case SortOption.titleAsc:
+        return 'A-Z';
+      case SortOption.titleDesc:
+        return 'Z-A';
+      case SortOption.eventDateAsc:
+        return 'Earliest';
+      case SortOption.eventDateDesc:
+        return 'Latest';
+    }
   }
 
   @override
@@ -174,6 +271,196 @@ class _MyEventsScreenState extends State<MyEventsScreen>
     );
   }
 
+  // Show sorting modal
+  void _showSortModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _buildSortModal(),
+    );
+  }
+
+  // Build sorting modal
+  Widget _buildSortModal() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.sort,
+                  color: Color(0xFF667EEA),
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Sort Events',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.close,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Sort options with categories
+          Flexible(
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              children: [
+                // Date Added section
+                _buildSortSection(
+                  'Date Added',
+                  [
+                    SortOption.dateAddedDesc,
+                    SortOption.dateAddedAsc,
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Title section
+                _buildSortSection(
+                  'Title',
+                  [
+                    SortOption.titleAsc,
+                    SortOption.titleDesc,
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Event Date section
+                _buildSortSection(
+                  'Event Date',
+                  [
+                    SortOption.eventDateDesc,
+                    SortOption.eventDateAsc,
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Bottom padding
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  // Build sort section with title
+  Widget _buildSortSection(String title, List<SortOption> options) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[600],
+              fontFamily: 'Roboto',
+            ),
+          ),
+        ),
+        ...options.map((option) {
+          bool isSelected = currentSortOption == option;
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                currentSortOption = option;
+              });
+              Navigator.pop(context);
+            },
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? const Color(0xFF667EEA).withValues(alpha: 0.1)
+                    : Colors.grey[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color:
+                      isSelected ? const Color(0xFF667EEA) : Colors.grey[200]!,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _getSortOptionIcon(option),
+                    color:
+                        isSelected ? const Color(0xFF667EEA) : Colors.grey[600],
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _getSortOptionText(option),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w500,
+                        color: isSelected
+                            ? const Color(0xFF1A1A1A)
+                            : Colors.grey[700],
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ),
+                  if (isSelected)
+                    const Icon(
+                      Icons.check_circle,
+                      color: Color(0xFF667EEA),
+                      size: 20,
+                    ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ],
+    );
+  }
+
   Widget _bodyView() {
     return Column(
       children: [
@@ -255,18 +542,50 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                     ],
                   ),
                 ),
-                // Calendar icon
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  child: const Icon(
-                    Icons.event,
-                    color: Colors.white,
-                    size: 24,
+                // Sort button with indicator
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  child: Column(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          _showSortModal();
+                        },
+                        child: Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          child: const Icon(
+                            Icons.sort,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                      if (_headerHeight > 100) ...[
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _getCurrentSortIndicator(),
+                            style: const TextStyle(
+                              color: Color(0xFF667EEA),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ],
@@ -283,7 +602,8 @@ class _MyEventsScreenState extends State<MyEventsScreen>
       duration: const Duration(milliseconds: 200),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        height: _tabBarOpacity > 0 ? 90 : 0, // Increased height to prevent overflow
+        height:
+            _tabBarOpacity > 0 ? 90 : 0, // Increased height to prevent overflow
         margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
         padding: const EdgeInsets.all(12), // Increased padding
         decoration: BoxDecoration(
@@ -342,14 +662,16 @@ class _MyEventsScreenState extends State<MyEventsScreen>
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           margin: const EdgeInsets.symmetric(horizontal: 2), // Reduced margin
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4), // Reduced padding
+          padding: const EdgeInsets.symmetric(
+              vertical: 8, horizontal: 4), // Reduced padding
           decoration: BoxDecoration(
             color: isSelected ? color : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center, // Center content vertically
+            mainAxisAlignment:
+                MainAxisAlignment.center, // Center content vertically
             children: [
               Icon(
                 icon,
@@ -357,7 +679,8 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                 size: 18, // Slightly smaller icon
               ),
               const SizedBox(height: 2), // Reduced spacing
-              Flexible( // Wrap text in Flexible to prevent overflow
+              Flexible(
+                // Wrap text in Flexible to prevent overflow
                 child: Text(
                   label,
                   style: TextStyle(
@@ -404,8 +727,10 @@ class _MyEventsScreenState extends State<MyEventsScreen>
 
         List<EventModel> EventsList = snapshot.data!.docs
             .map((e) => EventModel.fromJson(e.data() as Map<String, dynamic>))
-            .toList()
-          ..sort((a, b) => a.selectedDateTime.compareTo(b.selectedDateTime));
+            .toList();
+
+        // Apply sorting
+        EventsList = _sortEvents(EventsList);
 
         if (selectedTab == 1) {
           List<EventModel> neededEventsList = [];
