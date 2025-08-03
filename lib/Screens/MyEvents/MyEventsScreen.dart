@@ -26,20 +26,24 @@ enum SortOption {
 }
 
 class MyEventsScreen extends StatefulWidget {
-  const MyEventsScreen({super.key});
+  final int initialTab; // Added parameter to control initial tab
+  const MyEventsScreen({
+    super.key,
+    this.initialTab = 1,
+  }); // Default to Created tab (1)
 
   @override
   State<MyEventsScreen> createState() => _MyEventsScreenState();
 }
 
 class _MyEventsScreenState extends State<MyEventsScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late final double _screenWidth = MediaQuery.of(context).size.width;
   late final double _screenHeight = MediaQuery.of(context).size.height;
 
   final FirebaseFirestore _fireStore = FirebaseFirestore.instance;
 
-  int selectedTab = 1;
+  int selectedTab = 1; // Initialize with initialTab from widget
   bool isLoading = true;
 
   // Filter/Sort state
@@ -53,9 +57,9 @@ class _MyEventsScreenState extends State<MyEventsScreen>
   List<AttendanceModel> preRegisteredAttendanceList = [];
 
   late StreamSubscription<QuerySnapshot<Map<String, dynamic>>>
-      _attendanceSubscription;
+  _attendanceSubscription;
   late StreamSubscription<QuerySnapshot<Map<String, dynamic>>>
-      _preRegisteredSubscription;
+  _preRegisteredSubscription;
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -69,6 +73,9 @@ class _MyEventsScreenState extends State<MyEventsScreen>
   double _collapsedHeaderHeight = 70.0; // Reduced collapsed height
   bool _isScrollingDown = false;
 
+  // Future for attended events (to allow refreshing)
+  Future<List<EventModel>>? _attendedEventsFuture;
+
   bool signedInEvent({required String eventId}) {
     bool eventSignedIn = false;
     for (var element in attendanceList) {
@@ -76,7 +83,6 @@ class _MyEventsScreenState extends State<MyEventsScreen>
         eventSignedIn = true;
       }
     }
-
     return eventSignedIn;
   }
 
@@ -87,7 +93,6 @@ class _MyEventsScreenState extends State<MyEventsScreen>
         eventPreRegistered = true;
       }
     }
-
     return eventPreRegistered;
   }
 
@@ -97,20 +102,24 @@ class _MyEventsScreenState extends State<MyEventsScreen>
       case SortOption.none:
         break;
       case SortOption.dateAddedAsc:
-        events
-            .sort((a, b) => a.eventGenerateTime.compareTo(b.eventGenerateTime));
+        events.sort(
+          (a, b) => a.eventGenerateTime.compareTo(b.eventGenerateTime),
+        );
         break;
       case SortOption.dateAddedDesc:
-        events
-            .sort((a, b) => b.eventGenerateTime.compareTo(a.eventGenerateTime));
+        events.sort(
+          (a, b) => b.eventGenerateTime.compareTo(a.eventGenerateTime),
+        );
         break;
       case SortOption.titleAsc:
         events.sort(
-            (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+          (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+        );
         break;
       case SortOption.titleDesc:
         events.sort(
-            (a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase()));
+          (a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase()),
+        );
         break;
       case SortOption.eventDateAsc:
         events.sort((a, b) => a.selectedDateTime.compareTo(b.selectedDateTime));
@@ -199,18 +208,25 @@ class _MyEventsScreenState extends State<MyEventsScreen>
   void initState() {
     super.initState();
 
+    // Initialize attended events future
+    _refreshAttendedEvents();
+
     // Initialize scroll controller
     _scrollController = ScrollController();
     _scrollController.addListener(_onScroll);
+
+    // Add lifecycle listener to refresh when app resumes
+    WidgetsBinding.instance.addObserver(this);
 
     // Initialize fade animation
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
     _fadeController.forward();
 
     _attendanceSubscription = _fireStore
@@ -218,24 +234,32 @@ class _MyEventsScreenState extends State<MyEventsScreen>
         .where('customerUid', isEqualTo: CustomerController.logeInCustomer!.uid)
         .snapshots()
         .listen((snapshot) {
-      setState(() {
-        attendanceList = snapshot.docs
-            .map((doc) => AttendanceModel.fromJson(doc.data()))
-            .toList();
-      });
-    });
+          if (mounted) {
+            setState(() {
+              attendanceList = snapshot.docs
+                  .map((doc) => AttendanceModel.fromJson(doc.data()))
+                  .toList();
+            });
+            // Refresh attended events if on attended tab
+            if (selectedTab == 2) {
+              _refreshAttendedEvents();
+            }
+          }
+        });
 
     _preRegisteredSubscription = _fireStore
         .collection(AttendanceModel.registerFirebaseKey)
         .where('customerUid', isEqualTo: CustomerController.logeInCustomer!.uid)
         .snapshots()
         .listen((snapshot) {
-      setState(() {
-        preRegisteredAttendanceList = snapshot.docs
-            .map((doc) => AttendanceModel.fromJson(doc.data()))
-            .toList();
-      });
-    });
+          if (mounted) {
+            setState(() {
+              preRegisteredAttendanceList = snapshot.docs
+                  .map((doc) => AttendanceModel.fromJson(doc.data()))
+                  .toList();
+            });
+          }
+        });
 
     // Simulate loading
     Future.delayed(const Duration(seconds: 1), () {
@@ -245,6 +269,9 @@ class _MyEventsScreenState extends State<MyEventsScreen>
         });
       }
     });
+
+    // Set initial tab from widget
+    selectedTab = widget.initialTab;
   }
 
   @override
@@ -253,7 +280,25 @@ class _MyEventsScreenState extends State<MyEventsScreen>
     _preRegisteredSubscription.cancel();
     _fadeController.dispose();
     _scrollController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed && selectedTab == 2 && mounted) {
+      _refreshAttendedEvents();
+    }
+  }
+
+  void _refreshAttendedEvents() {
+    if (mounted) {
+      setState(() {
+        _attendedEventsFuture = FirebaseFirestoreHelper()
+            .getEventsAttendedByUser(CustomerController.logeInCustomer!.uid);
+      });
+    }
   }
 
   void _onScroll() {
@@ -266,10 +311,13 @@ class _MyEventsScreenState extends State<MyEventsScreen>
       setState(() {
         _isScrollingDown = true;
         // Calculate opacity based on scroll position
-        _tabBarOpacity =
-            (1.0 - (scrollOffset / maxScrollOffset)).clamp(0.0, 1.0);
+        _tabBarOpacity = (1.0 - (scrollOffset / maxScrollOffset)).clamp(
+          0.0,
+          1.0,
+        );
         // Calculate header height
-        _headerHeight = _collapsedHeaderHeight +
+        _headerHeight =
+            _collapsedHeaderHeight +
             ((120.0 - _collapsedHeaderHeight) *
                     (1.0 - (scrollOffset / maxScrollOffset)))
                 .clamp(0.0, 120.0 - _collapsedHeaderHeight);
@@ -288,10 +336,7 @@ class _MyEventsScreenState extends State<MyEventsScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFFAFBFC),
       body: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: _bodyView(),
-        ),
+        child: FadeTransition(opacity: _fadeAnimation, child: _bodyView()),
       ),
     );
   }
@@ -354,11 +399,7 @@ class _MyEventsScreenState extends State<MyEventsScreen>
             padding: const EdgeInsets.all(24),
             child: Row(
               children: [
-                const Icon(
-                  Icons.sort,
-                  color: Color(0xFF667EEA),
-                  size: 24,
-                ),
+                const Icon(Icons.sort, color: Color(0xFF667EEA), size: 24),
                 const SizedBox(width: 12),
                 const Text(
                   'Sort Events',
@@ -377,10 +418,7 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                       color: Colors.grey[100],
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(
-                      Icons.close,
-                      size: 20,
-                    ),
+                    child: const Icon(Icons.close, size: 20),
                   ),
                 ),
               ],
@@ -393,31 +431,22 @@ class _MyEventsScreenState extends State<MyEventsScreen>
               padding: const EdgeInsets.symmetric(horizontal: 24),
               children: [
                 // Date Added section
-                _buildSortSection(
-                  'Date Added',
-                  [
-                    SortOption.dateAddedDesc,
-                    SortOption.dateAddedAsc,
-                  ],
-                ),
+                _buildSortSection('Date Added', [
+                  SortOption.dateAddedDesc,
+                  SortOption.dateAddedAsc,
+                ]),
                 const SizedBox(height: 16),
                 // Title section
-                _buildSortSection(
-                  'Title',
-                  [
-                    SortOption.titleAsc,
-                    SortOption.titleDesc,
-                  ],
-                ),
+                _buildSortSection('Title', [
+                  SortOption.titleAsc,
+                  SortOption.titleDesc,
+                ]),
                 const SizedBox(height: 16),
                 // Event Date section
-                _buildSortSection(
-                  'Event Date',
-                  [
-                    SortOption.eventDateDesc,
-                    SortOption.eventDateAsc,
-                  ],
-                ),
+                _buildSortSection('Event Date', [
+                  SortOption.eventDateDesc,
+                  SortOption.eventDateAsc,
+                ]),
               ],
             ),
           ),
@@ -463,8 +492,9 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                     : Colors.grey[50],
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color:
-                      isSelected ? const Color(0xFF667EEA) : Colors.grey[200]!,
+                  color: isSelected
+                      ? const Color(0xFF667EEA)
+                      : Colors.grey[200]!,
                   width: 1,
                 ),
               ),
@@ -472,8 +502,9 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                 children: [
                   Icon(
                     _getSortOptionIcon(option),
-                    color:
-                        isSelected ? const Color(0xFF667EEA) : Colors.grey[600],
+                    color: isSelected
+                        ? const Color(0xFF667EEA)
+                        : Colors.grey[600],
                     size: 20,
                   ),
                   const SizedBox(width: 12),
@@ -482,8 +513,9 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                       _getSortOptionText(option),
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.w500,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
                         color: isSelected
                             ? const Color(0xFF1A1A1A)
                             : Colors.grey[700],
@@ -511,9 +543,7 @@ class _MyEventsScreenState extends State<MyEventsScreen>
       children: [
         _headerView(),
         _tabBarView(),
-        Expanded(
-          child: _eventsHistoryView(),
-        ),
+        Expanded(child: _eventsHistoryView()),
       ],
     );
   }
@@ -527,10 +557,7 @@ class _MyEventsScreenState extends State<MyEventsScreen>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF667EEA),
-            Color(0xFF764BA2),
-          ],
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
         ),
       ),
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
@@ -623,7 +650,9 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                         const SizedBox(height: 4),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.9),
                             borderRadius: BorderRadius.circular(8),
@@ -656,8 +685,9 @@ class _MyEventsScreenState extends State<MyEventsScreen>
       duration: const Duration(milliseconds: 200),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        height:
-            _tabBarOpacity > 0 ? 90 : 0, // Increased height to prevent overflow
+        height: _tabBarOpacity > 0
+            ? 90
+            : 0, // Increased height to prevent overflow
         margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
         padding: const EdgeInsets.all(12), // Increased padding
         decoration: BoxDecoration(
@@ -712,12 +742,19 @@ class _MyEventsScreenState extends State<MyEventsScreen>
           setState(() {
             selectedTab = index;
           });
+
+          // Refresh attended events when switching to attended tab
+          if (index == 2) {
+            _refreshAttendedEvents();
+          }
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           margin: const EdgeInsets.symmetric(horizontal: 2), // Reduced margin
           padding: const EdgeInsets.symmetric(
-              vertical: 8, horizontal: 4), // Reduced padding
+            vertical: 8,
+            horizontal: 4,
+          ), // Reduced padding
           decoration: BoxDecoration(
             color: isSelected ? color : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
@@ -756,84 +793,207 @@ class _MyEventsScreenState extends State<MyEventsScreen>
   }
 
   Widget _eventsHistoryView() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: _fireStore
-          .collection(EventModel.firebaseKey)
-          .where('customerUid',
-              isEqualTo: CustomerController.logeInCustomer!.uid)
-          .orderBy(
-            'selectedDateTime',
-            descending: false,
-          )
-          .snapshots(),
+    if (selectedTab == 2) {
+      // For attended events, use a different approach
+      return _buildAttendedEventsView();
+    } else {
+      // For created and registered events, use the original approach
+      return StreamBuilder<QuerySnapshot>(
+        stream: _fireStore
+            .collection(EventModel.firebaseKey)
+            .where(
+              'customerUid',
+              isEqualTo: CustomerController.logeInCustomer!.uid,
+            )
+            .orderBy('selectedDateTime', descending: false)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              isLoading) {
+            return _buildSkeletonLoading();
+          }
+
+          if (snapshot.hasError) {
+            return _buildErrorState();
+          }
+
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return _buildEmptyState();
+          }
+
+          List<EventModel> EventsList = snapshot.data!.docs
+              .map((e) => EventModel.fromJson(e.data() as Map<String, dynamic>))
+              .toList();
+
+          // Filter by tab (Created, Registered)
+          if (selectedTab == 1) {
+            // Created events - already filtered by customerUid
+            EventsList = EventsList;
+          } else if (selectedTab == 3) {
+            // Registered events
+            List<EventModel> neededEventsList = [];
+            for (var element in EventsList) {
+              if (preRegisteredEvent(eventId: element.id)) {
+                neededEventsList.add(element);
+              }
+            }
+            EventsList = neededEventsList;
+          }
+
+          // Apply category filtering
+          if (selectedCategories.isNotEmpty) {
+            EventsList = EventsList.where(
+              (event) => event.categories.any(
+                (category) => selectedCategories.contains(category),
+              ),
+            ).toList();
+          }
+
+          // Apply sorting
+          EventsList = _sortEvents(EventsList);
+
+          if (EventsList.isEmpty) {
+            return _buildEmptyState();
+          }
+
+          return ListView.builder(
+            controller: _scrollController,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            itemCount: EventsList.length,
+            itemBuilder: (context, index) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: _buildEventCard(EventsList[index]),
+              );
+            },
+          );
+        },
+      );
+    }
+  }
+
+  Widget _buildAttendedEventsView() {
+    // Check if user is authenticated
+    if (CustomerController.logeInCustomer == null) {
+      return const Center(child: Text('Please log in to view attended events'));
+    }
+
+    print(
+      '=== DEBUG: Building attended events view for user: ${CustomerController.logeInCustomer!.uid} ===',
+    );
+
+    return FutureBuilder<List<EventModel>>(
+      future: _attendedEventsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting && isLoading) {
           return _buildSkeletonLoading();
         }
 
         if (snapshot.hasError) {
-          return _buildErrorState();
+          print('=== ERROR in attended events: ${snapshot.error} ===');
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              const Text(
+                'Error loading attended events',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Error: ${snapshot.error}',
+                style: const TextStyle(fontSize: 14, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  _refreshAttendedEvents();
+                },
+                child: const Text('Retry'),
+              ),
+            ],
+          );
         }
 
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyState();
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          print('=== DEBUG: No attended events found ===');
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.event_busy, size: 64, color: Colors.grey),
+              const SizedBox(height: 16),
+              const Text(
+                'No attended events yet',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Events you sign into will appear here',
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          );
         }
 
-        List<EventModel> EventsList = snapshot.data!.docs
-            .map((e) => EventModel.fromJson(e.data() as Map<String, dynamic>))
-            .toList();
-
-        // Filter by tab (Created, Attended, Registered)
-        if (selectedTab == 1) {
-          List<EventModel> neededEventsList = [];
-          for (var element in EventsList) {
-            if (element.customerUid == CustomerController.logeInCustomer!.uid) {
-              neededEventsList.add(element);
-            }
-          }
-          EventsList = neededEventsList;
-        } else if (selectedTab == 3) {
-          List<EventModel> neededEventsList = [];
-          for (var element in EventsList) {
-            if (preRegisteredEvent(eventId: element.id)) {
-              neededEventsList.add(element);
-            }
-          }
-          EventsList = neededEventsList;
-        } else {
-          List<EventModel> neededEventsList = [];
-          for (var element in EventsList) {
-            if (signedInEvent(eventId: element.id)) {
-              neededEventsList.add(element);
-            }
-          }
-          EventsList = neededEventsList;
-        }
+        List<EventModel> attendedEvents = snapshot.data!;
+        print('=== DEBUG: Found ${attendedEvents.length} attended events ===');
 
         // Apply category filtering
         if (selectedCategories.isNotEmpty) {
-          EventsList = EventsList.where((event) => event.categories
-                  .any((category) => selectedCategories.contains(category)))
+          attendedEvents = attendedEvents
+              .where(
+                (event) => event.categories.any(
+                  (category) => selectedCategories.contains(category),
+                ),
+              )
               .toList();
+          print(
+            '=== DEBUG: After filtering: ${attendedEvents.length} events ===',
+          );
         }
 
         // Apply sorting
-        EventsList = _sortEvents(EventsList);
+        attendedEvents = _sortEvents(attendedEvents);
 
-        if (EventsList.isEmpty) {
-          return _buildEmptyState();
+        if (attendedEvents.isEmpty) {
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.filter_list, size: 64, color: Colors.grey),
+              const SizedBox(height: 16),
+              const Text(
+                'No events match your filters',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Try adjusting your category filters',
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          );
         }
 
-        return ListView.builder(
-          controller: _scrollController,
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          itemCount: EventsList.length,
-          itemBuilder: (context, index) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: _buildEventCard(EventsList[index]),
-            );
+        return RefreshIndicator(
+          onRefresh: () async {
+            print('=== DEBUG: Refreshing attended events ===');
+            _refreshAttendedEvents();
           },
+          child: ListView.builder(
+            controller: _scrollController,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            itemCount: attendedEvents.length,
+            itemBuilder: (context, index) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: _buildEventCard(attendedEvents[index]),
+              );
+            },
+          ),
         );
       },
     );
@@ -908,11 +1068,7 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
-                                Icons.star,
-                                color: Colors.white,
-                                size: 12,
-                              ),
+                              Icon(Icons.star, color: Colors.white, size: 12),
                               SizedBox(width: 4),
                               Text(
                                 'Featured',
@@ -927,10 +1083,47 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                           ),
                         ),
                       ),
+                    // Past event indicator for attended events
+                    if (selectedTab == 2 &&
+                        event.selectedDateTime.isBefore(DateTime.now()))
+                      Positioned(
+                        top: 12,
+                        left: 12,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[600],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.history,
+                                color: Colors.white,
+                                size: 12,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'Past',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                  fontFamily: 'Roboto',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     // Status badge based on tab
                     Positioned(
                       top: 12,
-                      left: 12,
+                      right: 12,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -1050,13 +1243,15 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                               vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF667EEA)
-                                  .withValues(alpha: 0.1),
+                              color: const Color(
+                                0xFF667EEA,
+                              ).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              DateFormat('MMM dd, yyyy\nKK:mm a')
-                                  .format(event.selectedDateTime),
+                              DateFormat(
+                                'MMM dd, yyyy\nKK:mm a',
+                              ).format(event.selectedDateTime),
                               style: const TextStyle(
                                 color: Color(0xFF667EEA),
                                 fontWeight: FontWeight.w600,
@@ -1076,10 +1271,7 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                             gradient: const LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
-                              colors: [
-                                Color(0xFF667EEA),
-                                Color(0xFF764BA2),
-                              ],
+                              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
                             ),
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -1270,11 +1462,7 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                 color: const Color(0xFF667EEA).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(50),
               ),
-              child: Icon(
-                icon,
-                size: 50,
-                color: const Color(0xFF667EEA),
-              ),
+              child: Icon(icon, size: 50, color: const Color(0xFF667EEA)),
             ),
             const SizedBox(height: 24),
             Text(
@@ -1298,30 +1486,37 @@ class _MyEventsScreenState extends State<MyEventsScreen>
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: () {
-                // Navigate to create event or explore events
-                if (selectedTab == 1) {
-                  // Navigate to create event
-                  // You can add navigation here
-                } else {
-                  // Navigate to explore events
-                  // You can add navigation here
-                }
-              },
-              icon: Icon(selectedTab == 1 ? Icons.add : Icons.explore),
-              label: Text(selectedTab == 1 ? 'Create Event' : 'Explore Events'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF667EEA),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () {
+                    // Navigate to create event or explore events
+                    if (selectedTab == 1) {
+                      // Navigate to create event
+                      // You can add navigation here
+                    } else {
+                      // Navigate to explore events
+                      // You can add navigation here
+                    }
+                  },
+                  icon: Icon(selectedTab == 1 ? Icons.add : Icons.explore),
+                  label: Text(
+                    selectedTab == 1 ? 'Create Event' : 'Explore Events',
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF667EEA),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+              ],
             ),
           ],
         ),
@@ -1403,11 +1598,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
             padding: const EdgeInsets.all(24),
             child: Row(
               children: [
-                const Icon(
-                  Icons.tune,
-                  color: Color(0xFF667EEA),
-                  size: 24,
-                ),
+                const Icon(Icons.tune, color: Color(0xFF667EEA), size: 24),
                 const SizedBox(width: 12),
                 const Text(
                   'Filter/Sort Events',
@@ -1426,10 +1617,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
                       color: Colors.grey[100],
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(
-                      Icons.close,
-                      size: 20,
-                    ),
+                    child: const Icon(Icons.close, size: 20),
                   ),
                 ),
               ],
@@ -1479,11 +1667,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.filter_list,
-                color: const Color(0xFF667EEA),
-                size: 16,
-              ),
+              Icon(Icons.filter_list, color: const Color(0xFF667EEA), size: 16),
               const SizedBox(width: 8),
               Text(
                 'Active Filters',
@@ -1530,11 +1714,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
       children: [
         Row(
           children: [
-            Icon(
-              Icons.category,
-              color: const Color(0xFF667EEA),
-              size: 20,
-            ),
+            Icon(Icons.category, color: const Color(0xFF667EEA), size: 20),
             const SizedBox(width: 8),
             const Text(
               'Filter by Category',
@@ -1598,11 +1778,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
       label: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 16,
-            color: isSelected ? Colors.white : color,
-          ),
+          Icon(icon, size: 16, color: isSelected ? Colors.white : color),
           const SizedBox(width: 6),
           Text(
             label,
@@ -1624,9 +1800,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
         width: 1.5,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(22),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
     );
   }
 
@@ -1637,11 +1811,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
       children: [
         Row(
           children: [
-            Icon(
-              Icons.sort,
-              color: const Color(0xFF667EEA),
-              size: 20,
-            ),
+            Icon(Icons.sort, color: const Color(0xFF667EEA), size: 20),
             const SizedBox(width: 8),
             const Text(
               'Sort by',
@@ -1656,37 +1826,25 @@ class _FilterSortModalState extends State<_FilterSortModal> {
         ),
         const SizedBox(height: 16),
         // Default (No Sorting)
-        _buildSortOptionGroup(
-          'Default',
-          [SortOption.none],
-        ),
+        _buildSortOptionGroup('Default', [SortOption.none]),
         const SizedBox(height: 16),
         // Date Added section
-        _buildSortOptionGroup(
-          'Date Added',
-          [
-            SortOption.dateAddedDesc,
-            SortOption.dateAddedAsc,
-          ],
-        ),
+        _buildSortOptionGroup('Date Added', [
+          SortOption.dateAddedDesc,
+          SortOption.dateAddedAsc,
+        ]),
         const SizedBox(height: 16),
         // Title section
-        _buildSortOptionGroup(
-          'Title',
-          [
-            SortOption.titleAsc,
-            SortOption.titleDesc,
-          ],
-        ),
+        _buildSortOptionGroup('Title', [
+          SortOption.titleAsc,
+          SortOption.titleDesc,
+        ]),
         const SizedBox(height: 16),
         // Event Date section
-        _buildSortOptionGroup(
-          'Event Date',
-          [
-            SortOption.eventDateDesc,
-            SortOption.eventDateAsc,
-          ],
-        ),
+        _buildSortOptionGroup('Event Date', [
+          SortOption.eventDateDesc,
+          SortOption.eventDateAsc,
+        ]),
       ],
     );
   }
@@ -1723,8 +1881,9 @@ class _FilterSortModalState extends State<_FilterSortModal> {
                     : Colors.grey[50],
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color:
-                      isSelected ? const Color(0xFF667EEA) : Colors.grey[200]!,
+                  color: isSelected
+                      ? const Color(0xFF667EEA)
+                      : Colors.grey[200]!,
                   width: 1,
                 ),
               ),
@@ -1732,8 +1891,9 @@ class _FilterSortModalState extends State<_FilterSortModal> {
                 children: [
                   Icon(
                     _getSortOptionIcon(option),
-                    color:
-                        isSelected ? const Color(0xFF667EEA) : Colors.grey[600],
+                    color: isSelected
+                        ? const Color(0xFF667EEA)
+                        : Colors.grey[600],
                     size: 20,
                   ),
                   const SizedBox(width: 12),
@@ -1742,8 +1902,9 @@ class _FilterSortModalState extends State<_FilterSortModal> {
                       _getSortOptionText(option),
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.w500,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
                         color: isSelected
                             ? const Color(0xFF1A1A1A)
                             : Colors.grey[700],

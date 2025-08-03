@@ -36,261 +36,427 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _bodyView(),
+      backgroundColor: const Color(0xFFFAFBFC),
+      body: SafeArea(
+        child: _bodyView(),
+      ),
     );
   }
 
   Widget _bodyView() {
-    return SizedBox(
-      height: MediaQuery.of(context).size.height,
-      child: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Profile Picture Section
-            Container(
-              margin: const EdgeInsets.only(
-                top: 24.0,
-                bottom: 20.0,
-              ),
-              child: Stack(
-                children: [
-                  // Profile Picture - Make entire area clickable
-                  GestureDetector(
-                    onTap: _showImagePickerDialog,
-                    child: Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppThemeColor.darkGreenColor,
-                          width: 3,
-                        ),
-                      ),
-                      child: ClipOval(
-                        child: CustomerController
-                                    .logeInCustomer?.profilePictureUrl !=
-                                null
-                            ? Image.network(
-                                CustomerController
-                                    .logeInCustomer!.profilePictureUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return _buildDefaultProfilePicture();
-                                },
-                              )
-                            : _buildDefaultProfilePicture(),
-                      ),
-                    ),
-                  ),
-                  // Loading Overlay
-                  if (_isUploading)
-                    Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.black.withOpacity(0.5),
-                      ),
-                      child: const Center(
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  // Camera Icon Button - Keep for visual indication
-                  if (!_isUploading)
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        width: 35,
-                        height: 35,
-                        decoration: BoxDecoration(
-                          color: AppThemeColor.darkGreenColor,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white,
-                            width: 2,
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.camera_alt,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            // User Name
-            Container(
-              width: _screenWidth,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                'Hi ${CustomerController.logeInCustomer != null ? CustomerController.logeInCustomer!.name : ''}',
-                style: const TextStyle(
-                  color: AppThemeColor.darkGreenColor,
-                  fontSize: Dimensions.fontSizeExtraLarge,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            // My Profile Button
-            ListTile(
-              onTap: () => RouterClass.nextScreenNormal(
-                context,
-                MyProfileScreen(),
-              ),
-              leading: const Icon(Icons.person),
-              title: const Text('My Profile'),
-              minVerticalPadding: 0,
-            ),
-            ListTile(
-              onTap: () => RouterClass.nextScreenNormal(
-                context,
-                const MyEventsScreen(),
-              ),
-              leading: const Icon(Icons.event_note_rounded),
-              title: const Text('My Events'),
-              minVerticalPadding: 0,
-            ),
-            ListTile(
-              onTap: () => {},
-              leading: const Icon(CupertinoIcons.info),
-              title: const Text('About Us'),
-              minVerticalPadding: 0,
-            ),
-            ListTile(
-              onTap: () => {},
-              leading: const Icon(Icons.help),
-              title: const Text('Help'),
-              minVerticalPadding: 0,
-            ),
-            ListTile(
-              onTap: () => RouterClass.nextScreenNormal(
-                context,
-                FeedbackScreen(),
-              ),
-              leading: const Icon(FontAwesomeIcons.feed),
-              title: const Text('Feedback'),
-              minVerticalPadding: 0,
-            ),
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          _buildProfileHeader(),
+          _buildSettingsSection(),
+          _buildSocialMediaSection(),
+        ],
+      ),
+    );
+  }
 
-            ListTile(
-              onTap: () => RouterClass.nextScreenNormal(
-                context,
-                WebViewScreen(
-                  url: AppConstants.privacyPolicyUrl,
-                  title: 'Privacy Policy',
-                ),
-              ),
-              leading: const Icon(Icons.privacy_tip),
-              title: const Text('Privacy Policy'),
-              minVerticalPadding: 0,
-            ),
-            ListTile(
-              onTap: () => RouterClass.nextScreenNormal(
-                context,
-                WebViewScreen(
-                  url: AppConstants.termsConditionsUrl,
-                  title: 'Terms & Conditions',
-                ),
-              ),
-              leading: const Icon(CupertinoIcons.question_diamond),
-              title: const Text('Terms & Conditions'),
-              minVerticalPadding: 0,
-            ),
-
-            ListTile(
-              onTap: () {
-                FirebaseAuth.instance.signOut().then((value) {
-                  setState(() {
-                    CustomerController.logeInCustomer = null;
-                  });
-                  RouterClass().appRest(context: context);
-                });
-              },
-              leading: Icon(Icons.logout),
-              title: const Text('Logout'),
-              minVerticalPadding: 0,
-            ),
-
-            const Text(
-              'Follow Us On',
-              maxLines: 1,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppThemeColor.dullFontColor,
-                fontWeight: FontWeight.w400,
-                fontSize: Dimensions.fontSizeSmall,
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.all(20.0),
-              child: Row(
-                children: [
-                  Icon(
-                    FontAwesomeIcons.youtube,
-                    color: AppThemeColor.darkBlueColor,
-                    size: 33,
-                  ),
-                  SizedBox(
-                    width: 10,
-                  ),
-                  Icon(
-                    FontAwesomeIcons.instagram,
-                    color: AppThemeColor.darkBlueColor,
-                    size: 33,
-                  ),
-                  SizedBox(
-                    width: 10,
-                  ),
-                  Icon(
-                    FontAwesomeIcons.facebookF,
-                    color: AppThemeColor.darkBlueColor,
-                    size: 33,
-                  ),
-                  SizedBox(
-                    width: 10,
-                  ),
-                  Icon(
-                    FontAwesomeIcons.linkedinIn,
-                    color: AppThemeColor.darkBlueColor,
-                    size: 33,
-                  ),
-                  SizedBox(
-                    width: 10,
-                  ),
-                ],
-              ),
-            ),
-            // DefaultTextStyle(
-            //   style: TextStyle(
-            //     fontSize: 12,
-            //     color: Colors.white54,
-            //   ),
-            //   child: Container(
-            //     margin: const EdgeInsets.symmetric(
-            //       vertical: 16.0,
-            //     ),
-            //     child: Text('Terms of Service | Privacy Policy'),
-            //   ),
-            // ),
+  Widget _buildProfileHeader() {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF667EEA),
+            Color(0xFF764BA2),
           ],
         ),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 40),
+      child: Column(
+        children: [
+          // Profile Picture Section
+          Container(
+            margin: const EdgeInsets.only(bottom: 24),
+            child: Stack(
+              children: [
+                GestureDetector(
+                  onTap: _showImagePickerDialog,
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white,
+                        width: 4,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.2),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: CustomerController
+                                  .logeInCustomer?.profilePictureUrl !=
+                              null
+                          ? Image.network(
+                              CustomerController
+                                  .logeInCustomer!.profilePictureUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return _buildDefaultProfilePicture();
+                              },
+                            )
+                          : _buildDefaultProfilePicture(),
+                    ),
+                  ),
+                ),
+                // Loading Overlay
+                if (_isUploading)
+                  Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.black.withValues(alpha: 0.5),
+                    ),
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                // Camera Icon Button
+                if (!_isUploading)
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        color: Color(0xFF667EEA),
+                        size: 18,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // User Name
+          Text(
+            'Hi ${CustomerController.logeInCustomer != null ? CustomerController.logeInCustomer!.name : 'User'}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 24,
+              fontFamily: 'Roboto',
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Manage your account settings',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.8),
+              fontWeight: FontWeight.w400,
+              fontSize: 16,
+              fontFamily: 'Roboto',
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildDefaultProfilePicture() {
     return Container(
-      color: Colors.grey[300],
+      color: const Color(0xFFE1E5E9),
       child: const Icon(
         Icons.person,
         size: 60,
-        color: Colors.grey,
+        color: Color(0xFF9CA3AF),
+      ),
+    );
+  }
+
+  Widget _buildSettingsSection() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            spreadRadius: 0,
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _buildSettingsHeader(),
+          _buildSettingsItem(
+            icon: Icons.person,
+            title: 'My Profile',
+            subtitle: 'View and edit your profile',
+            onTap: () => RouterClass.nextScreenNormal(
+              context,
+              MyProfileScreen(),
+            ),
+          ),
+          _buildDivider(),
+          _buildSettingsItem(
+            icon: Icons.event_note_rounded,
+            title: 'My Events',
+            subtitle: 'Manage your created events',
+            onTap: () => RouterClass.nextScreenNormal(
+              context,
+              const MyEventsScreen(),
+            ),
+          ),
+          _buildDivider(),
+          _buildSettingsItem(
+            icon: CupertinoIcons.info,
+            title: 'About Us',
+            subtitle: 'Learn more about our app',
+            onTap: () => {},
+          ),
+          _buildDivider(),
+          _buildSettingsItem(
+            icon: Icons.help,
+            title: 'Help',
+            subtitle: 'Get help and support',
+            onTap: () => {},
+          ),
+          _buildDivider(),
+          _buildSettingsItem(
+            icon: FontAwesomeIcons.feed,
+            title: 'Feedback',
+            subtitle: 'Share your thoughts with us',
+            onTap: () => RouterClass.nextScreenNormal(
+              context,
+              FeedbackScreen(),
+            ),
+          ),
+          _buildDivider(),
+          _buildSettingsItem(
+            icon: Icons.privacy_tip,
+            title: 'Privacy Policy',
+            subtitle: 'Read our privacy policy',
+            onTap: () => RouterClass.nextScreenNormal(
+              context,
+              WebViewScreen(
+                url: AppConstants.privacyPolicyUrl,
+                title: 'Privacy Policy',
+              ),
+            ),
+          ),
+          _buildDivider(),
+          _buildSettingsItem(
+            icon: CupertinoIcons.question_diamond,
+            title: 'Terms & Conditions',
+            subtitle: 'Read our terms of service',
+            onTap: () => RouterClass.nextScreenNormal(
+              context,
+              WebViewScreen(
+                url: AppConstants.termsConditionsUrl,
+                title: 'Terms & Conditions',
+              ),
+            ),
+          ),
+          _buildDivider(),
+          _buildSettingsItem(
+            icon: Icons.logout,
+            title: 'Logout',
+            subtitle: 'Sign out of your account',
+            onTap: () {
+              FirebaseAuth.instance.signOut().then((value) {
+                setState(() {
+                  CustomerController.logeInCustomer = null;
+                });
+                RouterClass().appRest(context: context);
+              });
+            },
+            isDestructive: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingsHeader() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      child: Row(
+        children: [
+          Icon(
+            Icons.settings,
+            color: const Color(0xFF667EEA),
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          const Text(
+            'Settings',
+            style: TextStyle(
+              color: Color(0xFF1A1A1A),
+              fontWeight: FontWeight.w600,
+              fontSize: 18,
+              fontFamily: 'Roboto',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingsItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    bool isDestructive = false,
+  }) {
+    return ListTile(
+      onTap: onTap,
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: isDestructive
+              ? const Color(0xFFEF4444).withValues(alpha: 0.1)
+              : const Color(0xFF667EEA).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(
+          icon,
+          color:
+              isDestructive ? const Color(0xFFEF4444) : const Color(0xFF667EEA),
+          size: 20,
+        ),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          color:
+              isDestructive ? const Color(0xFFEF4444) : const Color(0xFF1A1A1A),
+          fontWeight: FontWeight.w600,
+          fontSize: 16,
+          fontFamily: 'Roboto',
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(
+          color: Color(0xFF9CA3AF),
+          fontSize: 14,
+          fontFamily: 'Roboto',
+        ),
+      ),
+      trailing: Icon(
+        Icons.arrow_forward_ios,
+        color: const Color(0xFF9CA3AF),
+        size: 16,
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+    );
+  }
+
+  Widget _buildDivider() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      height: 1,
+      color: const Color(0xFFE1E5E9),
+    );
+  }
+
+  Widget _buildSocialMediaSection() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            spreadRadius: 0,
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.share,
+                color: const Color(0xFF667EEA),
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Follow Us On',
+                style: TextStyle(
+                  color: Color(0xFF1A1A1A),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildSocialMediaIcon(
+                  FontAwesomeIcons.youtube, const Color(0xFFFF0000)),
+              _buildSocialMediaIcon(
+                  FontAwesomeIcons.instagram, const Color(0xFFE4405F)),
+              _buildSocialMediaIcon(
+                  FontAwesomeIcons.facebookF, const Color(0xFF1877F2)),
+              _buildSocialMediaIcon(
+                  FontAwesomeIcons.linkedinIn, const Color(0xFF0A66C2)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSocialMediaIcon(IconData icon, Color color) {
+    return GestureDetector(
+      onTap: () {
+        // TODO: Add social media links
+      },
+      child: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(
+          icon,
+          color: color,
+          size: 24,
+        ),
       ),
     );
   }

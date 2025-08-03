@@ -26,14 +26,12 @@ import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
+import 'package:orgami/Screens/MyEvents/MyEventsScreen.dart';
 import 'package:orgami/Screens/Events/FeatureEventScreen.dart';
 
 class SingleEventScreen extends StatefulWidget {
   final EventModel eventModel;
-  const SingleEventScreen({
-    super.key,
-    required this.eventModel,
-  });
+  const SingleEventScreen({super.key, required this.eventModel});
 
   @override
   State<SingleEventScreen> createState() => _SingleEventScreenState();
@@ -66,19 +64,20 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     await FirebaseFirestoreHelper()
         .getPreRegisterAttendanceCount(eventId: eventModel.id)
         .then((countValue) {
-      setState(() {
-        preRegisteredCount = countValue;
-      });
-    });
+          setState(() {
+            preRegisteredCount = countValue;
+          });
+        });
   }
 
-  bool isInRadius(LatLng center, double radiusInFeet, LatLng point) {
+  bool isInInRadius(LatLng center, double radiusInFeet, LatLng point) {
     double radiusInMeters = radiusInFeet * 0.3048; // Convert feet to meters
     double earthRadius = 6378137; // Earth's radius in meters
 
     double dLat = radians(point.latitude - center.latitude);
     double dLng = radians(point.longitude - center.longitude);
-    double a = sin(dLat / 2) * sin(dLat / 2) +
+    double a =
+        sin(dLat / 2) * sin(dLat / 2) +
         cos(radians(center.latitude)) *
             cos(radians(point.latitude)) *
             sin(dLng / 2) *
@@ -90,9 +89,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   }
 
   Future<void> getAttendance() async {
-    await FirebaseFirestoreHelper()
-        .checkIfUserIsSignedIn(eventModel.id)
-        .then((value) {
+    await FirebaseFirestoreHelper().checkIfUserIsSignedIn(eventModel.id).then((
+      value,
+    ) {
       print('Exist value is $value');
       setState(() {
         signedIn = value;
@@ -101,24 +100,24 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       if (!signedIn! &&
           eventModel.getLocation &&
           eventModel.customerUid != CustomerController.logeInCustomer!.uid &&
-          isEventInTime()) {
+          isInEventInTime()) {
         _getCurrentLocation();
       }
     });
   }
 
   Future<void> getRegisterAttendance() async {
-    await FirebaseFirestoreHelper()
-        .checkIfUserIsRegistered(eventModel.id)
-        .then((value) {
-      print('Register Exist value is $value');
-      setState(() {
-        registered = value;
-      });
-    });
+    await FirebaseFirestoreHelper().checkIfUserIsRegistered(eventModel.id).then(
+      (value) {
+        print('Register Exist value is $value');
+        setState(() {
+          registered = value;
+        });
+      },
+    );
   }
 
-  bool isEventInTime() {
+  bool isInEventInTime() {
     DateTime eventTime = eventModel.selectedDateTime;
     DateTime eventTimeHourBefore = eventTime.subtract(const Duration(hours: 1));
     DateTime eventTimeHourAfter = eventTime.add(const Duration(hours: 1));
@@ -138,7 +137,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     }
 
     print(
-        'answer Is $answer  $eventIsNow || ($eventIsBefore && $eventIsAfter $nowTime -- $eventTimeHourBefore -- $eventTimeHourAfter)');
+      'answer Is $answer  $eventIsNow || ($eventIsBefore && $eventIsAfter $nowTime -- $eventTimeHourBefore -- $eventTimeHourAfter)',
+    );
 
     return answer;
   }
@@ -163,21 +163,23 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     if (permission == LocationPermission.deniedForever) {
       // Permissions are denied forever, handle appropriately.
       return Future.error(
-          'Location permissions are permanently denied, we cannot request permissions.');
+        'Location permissions are permanently denied, we cannot request permissions.',
+      );
     }
 
     await Geolocator.getCurrentPosition().then((value) {
-      LatLng newLatLng = LatLng(
-        value.latitude,
-        value.longitude,
+      LatLng newLatLng = LatLng(value.latitude, value.longitude);
+      bool inRadius = isInInRadius(
+        eventModel.getLatLng(),
+        eventModel.radius,
+        newLatLng,
       );
-      bool inRadius =
-          isInRadius(eventModel.getLatLng(), eventModel.radius, newLatLng);
       if (inRadius) {
         _showSignInDialog();
       }
       print(
-          'Current Location is  $inRadius and radius is ${widget.eventModel.radius}');
+        'Current Location is  $inRadius and radius is ${widget.eventModel.radius}',
+      );
     });
   }
 
@@ -217,10 +219,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                         gradient: const LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [
-                            Color(0xFF667EEA),
-                            Color(0xFF764BA2),
-                          ],
+                          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
                         ),
                         borderRadius: BorderRadius.circular(30),
                       ),
@@ -329,16 +328,14 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                               gradient: const LinearGradient(
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
-                                colors: [
-                                  Color(0xFF667EEA),
-                                  Color(0xFF764BA2),
-                                ],
+                                colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
                               ),
                               borderRadius: BorderRadius.circular(12),
                               boxShadow: [
                                 BoxShadow(
-                                  color:
-                                      const Color(0xFF667EEA).withOpacity(0.3),
+                                  color: const Color(
+                                    0xFF667EEA,
+                                  ).withOpacity(0.3),
                                   spreadRadius: 0,
                                   blurRadius: 8,
                                   offset: const Offset(0, 2),
@@ -390,6 +387,12 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
       String docId =
           '${eventModel.id}-${CustomerController.logeInCustomer!.uid}';
+
+      print('=== SIGN-IN DEBUG ===');
+      print('Event ID: ${eventModel.id}');
+      print('User ID: ${CustomerController.logeInCustomer!.uid}');
+      print('Document ID: $docId');
+
       AttendanceModel newAttendanceModel = AttendanceModel(
         id: docId,
         eventId: eventModel.id,
@@ -400,13 +403,17 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         attendanceDateTime: DateTime.now(),
         answers: [],
         isAnonymous: _isAnonymousSignIn,
-        realName:
-            _isAnonymousSignIn ? CustomerController.logeInCustomer!.name : null,
+        realName: _isAnonymousSignIn
+            ? CustomerController.logeInCustomer!.name
+            : null,
       );
 
+      print('Attendance model created: ${newAttendanceModel.toJson()}');
+
       // Check for sign-in prompts
-      final questions = await FirebaseFirestoreHelper()
-          .getEventQuestions(eventId: eventModel.id);
+      final questions = await FirebaseFirestoreHelper().getEventQuestions(
+        eventId: eventModel.id,
+      );
       if (questions.isNotEmpty) {
         _btnCtlr.reset(); // Reset before navigation
         RouterClass.nextScreenAndReplacement(
@@ -420,11 +427,17 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       } else {
         // No prompts, sign in directly
         try {
+          print('Saving attendance to Firestore...');
+          print('Collection: ${AttendanceModel.firebaseKey}');
+          print('Document ID: ${newAttendanceModel.id}');
+          print('Data: ${newAttendanceModel.toJson()}');
+
           await FirebaseFirestore.instance
               .collection(AttendanceModel.firebaseKey)
               .doc(newAttendanceModel.id)
               .set(newAttendanceModel.toJson());
 
+          print('Attendance saved successfully!');
           _btnCtlr.success(); // Show success state
           ShowToast().showNormalToast(msg: 'Signed In Successfully!');
 
@@ -438,17 +451,31 @@ class _SingleEventScreenState extends State<SingleEventScreen>
               SingleEventScreen(eventModel: eventModel),
             );
           });
+
+          // Also navigate to MyEventsScreen to show the attended event
+          Future.delayed(const Duration(milliseconds: 1500), () {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const MyEventsScreen()),
+              (Route<dynamic> route) => false,
+            );
+          });
         } catch (firestoreError) {
           print('Firestore error during sign-in: $firestoreError');
-          _btnCtlr.reset();
+          _btnCtlr.error();
           ShowToast().showNormalToast(
-              msg: 'Failed to save attendance. Please try again.');
+            msg:
+                'Failed to save attendance: $firestoreError. Please try again.',
+          );
+          Future.delayed(const Duration(seconds: 2), () => _btnCtlr.reset());
         }
       }
     } catch (e) {
       print('Error is ${e.toString()}');
-      _btnCtlr.reset();
-      ShowToast().showNormalToast(msg: 'Failed to sign in. Please try again.');
+      _btnCtlr.error();
+      ShowToast().showNormalToast(
+        msg: 'Failed to sign in: $e. Please try again.',
+      );
+      Future.delayed(const Duration(seconds: 2), () => _btnCtlr.reset());
     }
   }
 
@@ -464,9 +491,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
 
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 600),
@@ -553,10 +581,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF667EEA),
-            Color(0xFF764BA2),
-          ],
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
         ),
       ),
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
@@ -602,9 +627,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                     GestureDetector(
                       onTap: () => showDialog(
                         context: context,
-                        builder: (context) => DeleteEventDialoge(
-                          singleEvent: eventModel,
-                        ),
+                        builder: (context) =>
+                            DeleteEventDialoge(singleEvent: eventModel),
                       ),
                       child: Container(
                         width: 40,
@@ -624,9 +648,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                     GestureDetector(
                       onTap: () => showDialog(
                         context: context,
-                        builder: (context) => ShareQRDialog(
-                          singleEvent: eventModel,
-                        ),
+                        builder: (context) =>
+                            ShareQRDialog(singleEvent: eventModel),
                       ),
                       child: Container(
                         width: 40,
@@ -728,9 +751,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
             return Container(
               color: const Color(0xFFF5F7FA),
               child: const Center(
-                child: CircularProgressIndicator(
-                  color: Color(0xFF667EEA),
-                ),
+                child: CircularProgressIndicator(color: Color(0xFF667EEA)),
               ),
             );
           },
@@ -746,10 +767,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFFF9800),
-            Color(0xFFFF5722),
-          ],
+          colors: [Color(0xFFFF9800), Color(0xFFFF5722)],
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
@@ -764,11 +782,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.star,
-            color: Colors.white,
-            size: 16,
-          ),
+          Icon(Icons.star, color: Colors.white, size: 16),
           SizedBox(width: 8),
           Text(
             'Featured Event',
@@ -834,8 +848,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
           _buildDetailItem(
             icon: Icons.calendar_month_rounded,
             label: 'Date',
-            value: DateFormat('EEEE, MMMM dd, yyyy')
-                .format(eventModel.selectedDateTime),
+            value: DateFormat(
+              'EEEE, MMMM dd, yyyy',
+            ).format(eventModel.selectedDateTime),
           ),
           const SizedBox(height: 16),
           _buildDetailItem(
@@ -889,11 +904,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
             color: const Color(0xFF667EEA).withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(
-            icon,
-            color: const Color(0xFF667EEA),
-            size: 20,
-          ),
+          child: Icon(icon, color: const Color(0xFF667EEA), size: 20),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -977,8 +988,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
             runSpacing: 12,
             children: eventModel.categories.map((category) {
               return Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
@@ -1070,10 +1083,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF667EEA),
-                  Color(0xFF764BA2),
-                ],
+                colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
               ),
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
@@ -1152,10 +1162,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFFFF9800),
-                      Color(0xFFFF5722),
-                    ],
+                    colors: [Color(0xFFFF9800), Color(0xFFFF5722)],
                   ),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
@@ -1199,10 +1206,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFFFF9800),
-                      Color(0xFFFF5722),
-                    ],
+                    colors: [Color(0xFFFF9800), Color(0xFFFF5722)],
                   ),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
@@ -1218,11 +1222,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.star,
-                        color: Colors.white,
-                        size: 20,
-                      ),
+                      Icon(Icons.star, color: Colors.white, size: 20),
                       SizedBox(width: 8),
                       Text(
                         'Featured',
@@ -1292,10 +1292,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                       gradient: const LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [
-                          Color(0xFF667EEA),
-                          Color(0xFF764BA2),
-                        ],
+                        colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
                       ),
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
@@ -1382,10 +1379,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFF667EEA),
-                        Color(0xFF764BA2),
-                      ],
+                      colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
                     ),
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
@@ -1426,13 +1420,16 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                               .doc(docId)
                               .set(newAttendanceMode.toJson())
                               .then((value) {
-                            ShowToast()
-                                .showSnackBar('Register Successful!', context);
-                            Navigator.pop(context);
-                          });
+                                ShowToast().showSnackBar(
+                                  'Register Successful!',
+                                  context,
+                                );
+                                Navigator.pop(context);
+                              });
                         } catch (e) {
                           ShowToast().showNormalToast(
-                              msg: 'Failed to register. Please try again.');
+                            msg: 'Failed to register. Please try again.',
+                          );
                         }
                       },
                       child: const Center(

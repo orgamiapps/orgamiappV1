@@ -16,6 +16,7 @@ import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
 import 'package:orgami/Screens/Events/SingleEventScreen.dart';
+import 'package:orgami/Screens/MyEvents/MyEventsScreen.dart';
 
 class QRScannerWithoutLoginScreen extends StatefulWidget {
   const QRScannerWithoutLoginScreen({super.key});
@@ -250,6 +251,15 @@ class _QRScannerWithoutLoginScreenState
                         RouterClass.nextScreenAndReplacement(
                           context,
                           SingleEventScreen(eventModel: eventExist),
+                        );
+                      });
+
+                      // Also navigate to MyEventsScreen to show the attended event
+                      Future.delayed(const Duration(milliseconds: 1500), () {
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(
+                              builder: (context) => const MyEventsScreen()),
+                          (Route<dynamic> route) => false,
                         );
                       });
                     }

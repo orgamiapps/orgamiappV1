@@ -52,8 +52,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             title: 'Sign In',
           ),
           _singleBottomBarItemView(
-            iconData: Icons.person,
-            title: 'Profile',
+            iconData: Icons.settings,
+            title: 'Settings',
           ),
         ],
       ),

@@ -65,11 +65,16 @@ class _AnsQuestionsToSignInEventScreenState
             .add('${element.questionTitle}--ans--${element.answer}');
       }
 
+      print(
+          'Recording attendance with questions for event: ${newAttendance.eventId}');
+      print('Attendance data: ${newAttendance.toJson()}');
+
       FirebaseFirestore.instance
           .collection(AttendanceModel.firebaseKey)
           .doc(newAttendance.id)
           .set(newAttendance.toJson())
           .then((value) {
+        print('Attendance with questions recorded successfully');
         ShowToast().showSnackBar('Signed In Successful!', context);
         _btnCtlr.success();
         Future.delayed(const Duration(seconds: 1), () {

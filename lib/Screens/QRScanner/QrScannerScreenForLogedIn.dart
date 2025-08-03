@@ -15,6 +15,7 @@ import 'package:orgami/Utils/dimensions.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/Screens/Events/SingleEventScreen.dart';
+import 'package:orgami/Screens/MyEvents/MyEventsScreen.dart';
 
 class QrScannerScreenForLogedIn extends StatefulWidget {
   const QrScannerScreenForLogedIn({super.key});
@@ -180,8 +181,14 @@ class _QrScannerScreenForLogedInState extends State<QrScannerScreenForLogedIn> {
                     return;
                   }
 
+                  print('=== QR Code Debug ===');
+                  print('QR Code text: ${_codeController.text}');
+                  print('User ID: ${CustomerController.logeInCustomer!.uid}');
+
                   String docId =
                       '${_codeController.text}-${CustomerController.logeInCustomer!.uid}';
+                  print('Document ID: $docId');
+
                   AttendanceModel newAttendanceModel = AttendanceModel(
                     id: docId,
                     eventId: _codeController.text,
@@ -216,10 +223,17 @@ class _QrScannerScreenForLogedInState extends State<QrScannerScreenForLogedIn> {
                     } else {
                       // No prompts, sign in directly
                       try {
+                        print(
+                            'Recording attendance for event: ${newAttendanceModel.eventId}');
+                        print(
+                            'Attendance data: ${newAttendanceModel.toJson()}');
+
                         await FirebaseFirestore.instance
                             .collection(AttendanceModel.firebaseKey)
                             .doc(newAttendanceModel.id)
                             .set(newAttendanceModel.toJson());
+
+                        print('Attendance recorded successfully');
                         ShowToast()
                             .showNormalToast(msg: 'Signed In Successfully!');
                         // Navigate to event details after a short delay
@@ -227,6 +241,15 @@ class _QrScannerScreenForLogedInState extends State<QrScannerScreenForLogedIn> {
                           RouterClass.nextScreenAndReplacement(
                             context,
                             SingleEventScreen(eventModel: eventExist),
+                          );
+                        });
+
+                        // Also navigate to MyEventsScreen to show the attended event
+                        Future.delayed(const Duration(milliseconds: 1500), () {
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(
+                                builder: (context) => const MyEventsScreen()),
+                            (Route<dynamic> route) => false,
                           );
                         });
                       } catch (firestoreError) {

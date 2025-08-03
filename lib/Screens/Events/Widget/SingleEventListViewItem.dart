@@ -13,11 +13,10 @@ class SingleEventListViewItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    double? screenWidth = MediaQuery.of(context).size.width;
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(20),
         onTap: () {
           print('Tapped event: ${eventModel.id}');
           RouterClass.nextScreenNormal(
@@ -25,239 +24,230 @@ class SingleEventListViewItem extends StatelessWidget {
             SingleEventScreen(eventModel: eventModel),
           );
         },
-        child: Stack(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                color: AppThemeColor.pureWhiteColor,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: const Color(0xFF1B5E20),
-                  width: 4.0,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                spreadRadius: 0,
+                blurRadius: 20,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Image section
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF1B5E20).withValues(alpha: 0.4),
-                    spreadRadius: 2,
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.25),
-                    spreadRadius: 4,
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              width: screenWidth,
-              // height: tabHeight,
-              padding: const EdgeInsets.all(7),
-
-              margin: const EdgeInsets.only(
-                top: 8,
-                bottom: 8,
-                right: 20,
-                left: 20,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      if (eventModel.isFeatured)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 4.0),
-                          child: Icon(
-                            Icons.star,
-                            color: AppThemeColor.orangeColor,
-                            size: Dimensions.fontSizeLarge + 4,
+                child: Stack(
+                  children: [
+                    AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: Image.network(
+                        eventModel.imageUrl,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            color: const Color(0xFFF5F7FA),
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                color: Color(0xFF667EEA),
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: const Color(0xFFF5F7FA),
+                            child: const Center(
+                              child: Icon(
+                                Icons.image_not_supported,
+                                color: Color(0xFF9CA3AF),
+                                size: 48,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    if (eventModel.isFeatured)
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
                           ),
-                        ),
-                      Expanded(
-                        child: Text(
-                          eventModel.title,
-                          maxLines: 1,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: AppThemeColor.pureBlackColor,
-                            fontWeight: FontWeight.w700,
-                            fontSize: Dimensions.fontSizeLarge,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF9800),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(
-                    width: screenWidth,
-                    child: Text(
-                      eventModel.groupName,
-                      maxLines: 1,
-                      style: const TextStyle(
-                        color: AppThemeColor.dullFontColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: Dimensions.fontSizeSmall,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(
-                    height: 7,
-                  ),
-                  SizedBox(
-                    width: screenWidth,
-                    child: Text(
-                      eventModel.location,
-                      style: const TextStyle(
-                        color: AppThemeColor.dullFontColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: Dimensions.fontSizeSmall,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(
-                    height: 7,
-                  ),
-                  SizedBox(
-                    height: screenWidth / 2,
-                    child: CustomCacheImage(
-                      imageUrl: eventModel.imageUrl,
-                      radius: 0,
-                    ),
-                  ),
-                  const SizedBox(
-                    height: 10,
-                  ),
-                  SizedBox(
-                    width: screenWidth,
-                    child: Text(
-                      eventModel.description,
-                      style: const TextStyle(
-                        color: AppThemeColor.pureBlackColor,
-                        fontWeight: FontWeight.w400,
-                        fontSize: Dimensions.fontSizeSmall,
-                      ),
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
+                              Icon(
+                                Icons.star,
+                                color: Colors.white,
+                                size: 12,
+                              ),
+                              SizedBox(width: 4),
                               Text(
-                                '${DateFormat('EEEE, MMMM dd yyyy').format(
-                                  eventModel.selectedDateTime,
-                                )}\n${DateFormat('KK:mm a').format(
-                                  eventModel.selectedDateTime,
-                                )}',
-                                textAlign: TextAlign.start,
-                                style: const TextStyle(
-                                  color: AppThemeColor.pureBlackColor,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: Dimensions.fontSizeDefault,
+                                'Featured',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                  fontFamily: 'Roboto',
                                 ),
                               ),
                             ],
                           ),
-                          GestureDetector(
-                            onTap: () async {
-                              RouterClass.nextScreenNormal(
-                                context,
-                                SingleEventScreen(eventModel: eventModel),
-                              );
-                            },
-                            child: Container(
-                              width: 120,
-                              decoration: BoxDecoration(
-                                color: AppThemeColor.darkGreenColor,
-                                borderRadius: BorderRadius.circular(7),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 6),
-                              child: const Center(
-                                child: Text(
-                                  'Details >>',
-                                  style: TextStyle(
-                                    color: AppThemeColor.pureWhiteColor,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: Dimensions.fontSizeSmall,
-                                  ),
-                                ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              // Content section
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      eventModel.title,
+                      style: const TextStyle(
+                        color: Color(0xFF1A1A1A),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                        fontFamily: 'Roboto',
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.group,
+                          color: const Color(0xFF667EEA),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          eventModel.groupName,
+                          style: const TextStyle(
+                            color: Color(0xFF6B7280),
+                            fontSize: 14,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          color: const Color(0xFF667EEA),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            eventModel.location,
+                            style: const TextStyle(
+                              color: Color(0xFF6B7280),
+                              fontSize: 14,
+                              fontFamily: 'Roboto',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      eventModel.description,
+                      style: const TextStyle(
+                        color: Color(0xFF4B5563),
+                        fontSize: 14,
+                        fontFamily: 'Roboto',
+                        height: 1.5,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF667EEA)
+                                  .withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              DateFormat('MMM dd, yyyy\nKK:mm a')
+                                  .format(eventModel.selectedDateTime),
+                              style: const TextStyle(
+                                color: Color(0xFF667EEA),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                                fontFamily: 'Roboto',
                               ),
                             ),
                           ),
-                        ],
-                      )
-                    ],
-                  ),
-                  const SizedBox(
-                    height: 5,
-                  ),
-                  // GestureDetector(
-                  //   onTap: () async {
-                  //     await showModalBottomSheet(
-                  //       context: context,
-                  //       builder: (context) {
-                  //         return SelectProductPackage(
-                  //           currentProduct: d,
-                  //         );
-                  //       },
-                  //     ).then((value) {});
-                  //   },
-                  //   child: Container(
-                  //     // width: categoryImageWidth,
-                  //     decoration: BoxDecoration(
-                  //       color: AppThemeColor.darkGreenColor,
-                  //       borderRadius: BorderRadius.circular(7),
-                  //     ),
-                  //     padding: const EdgeInsets.symmetric(vertical: 6),
-                  //     child: Center(
-                  //       child: Text(
-                  //         AppLocale.addToCart.getString(context),
-                  //         style: const TextStyle(
-                  //           color: AppThemeColor.pureWhiteColor,
-                  //           fontWeight: FontWeight.w700,
-                  //           fontSize: Dimensions.fontSizeSmall,
-                  //         ),
-                  //       ),
-                  //     ),
-                  //   ),
-                  // ),
-                  // Expanded(
-                  //   child: _singleProductCartController(d: d),
-                  // ),
-                ],
-              ),
-            ),
-            if (eventModel.isFeatured)
-              Positioned(
-                top: 0,
-                right: 0,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppThemeColor.orangeColor,
-                    borderRadius: const BorderRadius.only(
-                      topRight: Radius.circular(10),
-                      bottomLeft: Radius.circular(10),
+                        ),
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Color(0xFF667EEA),
+                                Color(0xFF764BA2),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'View Details',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  child: const Text(
-                    'FEATURED',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: Dimensions.fontSizeSmall,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
+                  ],
                 ),
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );

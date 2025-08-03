@@ -23,10 +23,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
@@ -61,6 +58,15 @@ class DefaultFirebaseOptions {
     messagingSenderId: '951311475019',
     projectId: 'orgami-66nxok',
     storageBucket: 'orgami-66nxok.appspot.com',
+  );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyCD0XNVuDDTljnD9R7n8TCr_9Ze21PA0VU',
+    appId: '1:951311475019:ios:5adde68ce6b5846289c8ce',
+    messagingSenderId: '951311475019',
+    projectId: 'orgami-66nxok',
+    storageBucket: 'orgami-66nxok.appspot.com',
+    iosBundleId: 'com.stormdeve.orgami',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

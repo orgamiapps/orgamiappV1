@@ -14,7 +14,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.6.1
+  sdk: '>=3.8.1 <4.0.0'
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -31,7 +31,7 @@ dependencies:
   firebase_auth: ^5.4.2
   google_sign_in: ^6.2.2
   cloud_firestore: ^5.6.3
-  intl:
+  intl: ^0.20.2
   rounded_loading_button_plus: ^3.0.1
   fluttertoast: ^8.2.4
   font_awesome_flutter: ^10.7.0
@@ -47,7 +47,7 @@ dependencies:
   path_provider: ^2.1.2
   excel: ^4.0.3
   syncfusion_flutter_xlsio: ^29.1.38
-  google_maps_flutter:
+  google_maps_flutter: ^2.10.0
   geolocator: ^11.0.0
   permission_handler: ^12.0.0+1
   webview_flutter: ^4.7.0
