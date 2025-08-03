@@ -101,20 +101,36 @@ class _MyEventsScreenState extends State<MyEventsScreen>
     return eventPreRegistered;
   }
 
-  // Sort events based on current sort option
+  // Sort events based on current sort option and tab context
   List<EventModel> _sortEvents(List<EventModel> events) {
     switch (currentSortOption) {
       case SortOption.none:
-        // Default sorting: by event date ascending, then by creation date ascending
-        events.sort((a, b) {
-          // First sort by event date (ascending - most upcoming first)
-          int dateComparison = a.selectedDateTime.compareTo(b.selectedDateTime);
-          if (dateComparison != 0) {
-            return dateComparison;
-          }
-          // If dates are the same, sort by creation date (ascending - oldest created first)
-          return a.eventGenerateTime.compareTo(b.eventGenerateTime);
-        });
+        // Default sorting based on tab context
+        switch (selectedTab) {
+          case 1: // Created events - sort by creation date (most recent first)
+            events.sort(
+              (a, b) => b.eventGenerateTime.compareTo(a.eventGenerateTime),
+            );
+            break;
+          case 2: // Attended events - sort by attendance date (most recent first)
+            // For attended events, we'll sort by event date (most recent first) as a proxy
+            // since we don't have direct attendance timestamps in the current data structure
+            events.sort(
+              (a, b) => b.selectedDateTime.compareTo(a.selectedDateTime),
+            );
+            break;
+          case 3: // Registered events - sort by registration date (most recent first)
+            // For registered events, we'll sort by event date (most recent first) as a proxy
+            events.sort(
+              (a, b) => b.selectedDateTime.compareTo(a.selectedDateTime),
+            );
+            break;
+          default:
+            // Fallback to event date ascending
+            events.sort(
+              (a, b) => a.selectedDateTime.compareTo(b.selectedDateTime),
+            );
+        }
         break;
       case SortOption.dateAddedAsc:
         events.sort(
@@ -150,7 +166,16 @@ class _MyEventsScreenState extends State<MyEventsScreen>
   String _getSortOptionText(SortOption option) {
     switch (option) {
       case SortOption.none:
-        return 'Default (Event Date Ascending)';
+        switch (selectedTab) {
+          case 1:
+            return 'Default (Most Recent Created)';
+          case 2:
+            return 'Default (Most Recent Attended)';
+          case 3:
+            return 'Default (Most Recent Registered)';
+          default:
+            return 'Default (Most Recent)';
+        }
       case SortOption.dateAddedAsc:
         return 'Date Added (Oldest First)';
       case SortOption.dateAddedDesc:
@@ -190,7 +215,16 @@ class _MyEventsScreenState extends State<MyEventsScreen>
   String _getCurrentSortIndicator() {
     switch (currentSortOption) {
       case SortOption.none:
-        return 'Default';
+        switch (selectedTab) {
+          case 1:
+            return 'Recent Created';
+          case 2:
+            return 'Recent Attended';
+          case 3:
+            return 'Recent Registered';
+          default:
+            return 'Recent';
+        }
       case SortOption.dateAddedAsc:
         return 'Oldest';
       case SortOption.dateAddedDesc:
@@ -427,6 +461,7 @@ class _MyEventsScreenState extends State<MyEventsScreen>
         selectedCategories: selectedCategories,
         currentSortOption: currentSortOption,
         allCategories: _allCategories,
+        selectedTab: selectedTab,
         onCategoriesChanged: (categories) {
           if (mounted && !_isDisposed) {
             setState(() {
@@ -1632,6 +1667,7 @@ class _FilterSortModal extends StatefulWidget {
   final List<String> allCategories;
   final Function(List<String>) onCategoriesChanged;
   final Function(SortOption) onSortOptionChanged;
+  final int selectedTab;
 
   const _FilterSortModal({
     required this.selectedCategories,
@@ -1639,6 +1675,7 @@ class _FilterSortModal extends StatefulWidget {
     required this.allCategories,
     required this.onCategoriesChanged,
     required this.onSortOptionChanged,
+    required this.selectedTab,
   });
 
   @override
@@ -2044,7 +2081,16 @@ class _FilterSortModalState extends State<_FilterSortModal> {
   String _getSortOptionText(SortOption option) {
     switch (option) {
       case SortOption.none:
-        return 'No Sorting';
+        switch (widget.selectedTab) {
+          case 1:
+            return 'Most Recent Created';
+          case 2:
+            return 'Most Recent Attended';
+          case 3:
+            return 'Most Recent Registered';
+          default:
+            return 'Most Recent';
+        }
       case SortOption.dateAddedAsc:
         return 'Date Added (Oldest First)';
       case SortOption.dateAddedDesc:

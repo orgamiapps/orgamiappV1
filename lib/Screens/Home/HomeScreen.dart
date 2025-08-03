@@ -679,6 +679,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         // Apply sorting
         filtered = _sortEvents(filtered);
 
+        // Separate featured and non-featured events for carousel display
         List<EventModel> featuredEvents =
             filtered
                 .where(
@@ -703,6 +704,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             )
             .toList();
 
+        // Create a combined list that maintains chronological order
+        // Featured events will still be visually distinguished in the UI
+        List<EventModel> allEventsInChronologicalOrder = [...filtered];
+
         return Column(
           children: [
             // Featured Events Carousel - only show if Featured filter is selected
@@ -710,8 +715,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 featuredEvents.isNotEmpty)
               _buildFeaturedCarousel(featuredEvents),
 
-            // All Events List - always show all events (both featured and non-featured)
-            _buildEventsList([...featuredEvents, ...nonFeaturedEvents]),
+            // All Events List - show events in chronological order
+            _buildEventsList(allEventsInChronologicalOrder),
           ],
         );
       },

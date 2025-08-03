@@ -869,19 +869,29 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     print('Attended events: ${attendedEvents.length}');
     print('Current events to show: ${events.length}');
 
+    // Sort events by most recent activity
+    final sortedEvents = List<EventModel>.from(events);
+    if (selectedTab == 1) {
+      // Created events - sort by creation date (most recent first)
+      sortedEvents.sort((a, b) => b.eventGenerateTime.compareTo(a.eventGenerateTime));
+    } else {
+      // Attended events - sort by event date (most recent first) as a proxy for attendance
+      sortedEvents.sort((a, b) => b.selectedDateTime.compareTo(a.selectedDateTime));
+    }
+
     return Container(
       margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-      child: events.isEmpty
+      child: sortedEvents.isEmpty
           ? _buildEmptyState(emptyMessage, emptyIcon)
           : ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: events.length,
+              itemCount: sortedEvents.length,
               itemBuilder: (context, index) {
                 print('Building event item at index: $index');
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
-                  child: SingleEventListViewItem(eventModel: events[index]),
+                  child: SingleEventListViewItem(eventModel: sortedEvents[index]),
                 );
               },
             ),
