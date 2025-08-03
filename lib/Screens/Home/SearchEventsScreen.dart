@@ -8,6 +8,7 @@ import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -58,9 +59,10 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
     _fadeController.forward();
 
     // Simulate loading
@@ -87,20 +89,24 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
       case SortOption.none:
         break;
       case SortOption.dateAddedAsc:
-        events
-            .sort((a, b) => a.eventGenerateTime.compareTo(b.eventGenerateTime));
+        events.sort(
+          (a, b) => a.eventGenerateTime.compareTo(b.eventGenerateTime),
+        );
         break;
       case SortOption.dateAddedDesc:
-        events
-            .sort((a, b) => b.eventGenerateTime.compareTo(a.eventGenerateTime));
+        events.sort(
+          (a, b) => b.eventGenerateTime.compareTo(a.eventGenerateTime),
+        );
         break;
       case SortOption.titleAsc:
         events.sort(
-            (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+          (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+        );
         break;
       case SortOption.titleDesc:
         events.sort(
-            (a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase()));
+          (a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase()),
+        );
         break;
       case SortOption.eventDateAsc:
         events.sort((a, b) => a.selectedDateTime.compareTo(b.selectedDateTime));
@@ -147,10 +153,7 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFFAFBFC),
       body: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: _bodyView(),
-        ),
+        child: FadeTransition(opacity: _fadeAnimation, child: _bodyView()),
       ),
     );
   }
@@ -175,10 +178,7 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF667EEA),
-            Color(0xFF764BA2),
-          ],
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
         ),
       ),
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
@@ -322,24 +322,30 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
             .toList();
 
         List<EventModel> neededEventList = eventsList
-            .where((element) => element.selectedDateTime
-                .add(const Duration(hours: 3))
-                .isAfter(DateTime.now()))
+            .where(
+              (element) => element.selectedDateTime
+                  .add(const Duration(hours: 3))
+                  .isAfter(DateTime.now()),
+            )
             .toList();
 
         List<EventModel> searchFilteredList = _searchValue.isNotEmpty
             ? neededEventList
-                .where((element) => element.title
-                    .toLowerCase()
-                    .contains(_searchValue.toLowerCase()))
-                .toList()
+                  .where(
+                    (element) => element.title.toLowerCase().contains(
+                      _searchValue.toLowerCase(),
+                    ),
+                  )
+                  .toList()
             : neededEventList;
 
         List<EventModel> categoryFilteredList = selectedCategories.isNotEmpty
             ? searchFilteredList
-                .where((event) =>
-                    event.categories.any(selectedCategories.contains))
-                .toList()
+                  .where(
+                    (event) =>
+                        event.categories.any(selectedCategories.contains),
+                  )
+                  .toList()
             : searchFilteredList;
 
         if (categoryFilteredList.isEmpty) {
@@ -402,20 +408,41 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
                   children: [
                     AspectRatio(
                       aspectRatio: 16 / 9,
-                      child: Image.network(
-                        event.imageUrl,
+                      child: CachedNetworkImage(
+                        imageUrl: event.imageUrl,
                         fit: BoxFit.cover,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            color: const Color(0xFFF5F7FA),
-                            child: const Center(
-                              child: CircularProgressIndicator(
-                                color: Color(0xFF667EEA),
-                              ),
+                        placeholder: (context, url) => Container(
+                          color: const Color(0xFFF5F7FA),
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFF667EEA),
                             ),
-                          );
-                        },
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: const Color(0xFFF5F7FA),
+                          child: const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.image_not_supported,
+                                  color: Color(0xFF667EEA),
+                                  size: 32,
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Image not available',
+                                  style: TextStyle(
+                                    color: Color(0xFF667EEA),
+                                    fontSize: 12,
+                                    fontFamily: 'Roboto',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                     if (event.isFeatured)
@@ -424,7 +451,9 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
                         right: 12,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFF9800),
                             borderRadius: BorderRadius.circular(12),
@@ -432,11 +461,7 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
-                                Icons.star,
-                                color: Colors.white,
-                                size: 12,
-                              ),
+                              Icon(Icons.star, color: Colors.white, size: 12),
                               SizedBox(width: 4),
                               Text(
                                 'Featured',
@@ -539,8 +564,9 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              DateFormat('MMM dd, yyyy\nKK:mm a')
-                                  .format(event.selectedDateTime),
+                              DateFormat(
+                                'MMM dd, yyyy\nKK:mm a',
+                              ).format(event.selectedDateTime),
                               style: const TextStyle(
                                 color: Color(0xFF667EEA),
                                 fontWeight: FontWeight.w600,
@@ -560,10 +586,7 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
                             gradient: const LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
-                              colors: [
-                                Color(0xFF667EEA),
-                                Color(0xFF764BA2),
-                              ],
+                              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
                             ),
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -663,8 +686,10 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF667EEA),
                 foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -781,8 +806,10 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF667EEA),
                 foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -868,11 +895,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
             padding: const EdgeInsets.all(24),
             child: Row(
               children: [
-                const Icon(
-                  Icons.tune,
-                  color: Color(0xFF667EEA),
-                  size: 24,
-                ),
+                const Icon(Icons.tune, color: Color(0xFF667EEA), size: 24),
                 const SizedBox(width: 12),
                 const Text(
                   'Filter/Sort Events',
@@ -891,10 +914,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
                       color: Colors.grey[100],
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(
-                      Icons.close,
-                      size: 20,
-                    ),
+                    child: const Icon(Icons.close, size: 20),
                   ),
                 ),
               ],
@@ -944,11 +964,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.filter_list,
-                color: const Color(0xFF667EEA),
-                size: 16,
-              ),
+              Icon(Icons.filter_list, color: const Color(0xFF667EEA), size: 16),
               const SizedBox(width: 8),
               Text(
                 'Active Filters',
@@ -995,11 +1011,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
       children: [
         Row(
           children: [
-            Icon(
-              Icons.category,
-              color: const Color(0xFF667EEA),
-              size: 20,
-            ),
+            Icon(Icons.category, color: const Color(0xFF667EEA), size: 20),
             const SizedBox(width: 8),
             const Text(
               'Filter by Category',
@@ -1063,11 +1075,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
       label: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 16,
-            color: isSelected ? Colors.white : color,
-          ),
+          Icon(icon, size: 16, color: isSelected ? Colors.white : color),
           const SizedBox(width: 6),
           Text(
             label,
@@ -1089,9 +1097,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
         width: 1.5,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(22),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
     );
   }
 
@@ -1102,11 +1108,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
       children: [
         Row(
           children: [
-            Icon(
-              Icons.sort,
-              color: const Color(0xFF667EEA),
-              size: 20,
-            ),
+            Icon(Icons.sort, color: const Color(0xFF667EEA), size: 20),
             const SizedBox(width: 8),
             const Text(
               'Sort by',
@@ -1121,37 +1123,25 @@ class _FilterSortModalState extends State<_FilterSortModal> {
         ),
         const SizedBox(height: 16),
         // Default (No Sorting)
-        _buildSortOptionGroup(
-          'Default',
-          [SortOption.none],
-        ),
+        _buildSortOptionGroup('Default', [SortOption.none]),
         const SizedBox(height: 16),
         // Date Added section
-        _buildSortOptionGroup(
-          'Date Added',
-          [
-            SortOption.dateAddedDesc,
-            SortOption.dateAddedAsc,
-          ],
-        ),
+        _buildSortOptionGroup('Date Added', [
+          SortOption.dateAddedDesc,
+          SortOption.dateAddedAsc,
+        ]),
         const SizedBox(height: 16),
         // Title section
-        _buildSortOptionGroup(
-          'Title',
-          [
-            SortOption.titleAsc,
-            SortOption.titleDesc,
-          ],
-        ),
+        _buildSortOptionGroup('Title', [
+          SortOption.titleAsc,
+          SortOption.titleDesc,
+        ]),
         const SizedBox(height: 16),
         // Event Date section
-        _buildSortOptionGroup(
-          'Event Date',
-          [
-            SortOption.eventDateDesc,
-            SortOption.eventDateAsc,
-          ],
-        ),
+        _buildSortOptionGroup('Event Date', [
+          SortOption.eventDateDesc,
+          SortOption.eventDateAsc,
+        ]),
       ],
     );
   }
@@ -1188,8 +1178,9 @@ class _FilterSortModalState extends State<_FilterSortModal> {
                     : Colors.grey[50],
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color:
-                      isSelected ? const Color(0xFF667EEA) : Colors.grey[200]!,
+                  color: isSelected
+                      ? const Color(0xFF667EEA)
+                      : Colors.grey[200]!,
                   width: 1,
                 ),
               ),
@@ -1197,8 +1188,9 @@ class _FilterSortModalState extends State<_FilterSortModal> {
                 children: [
                   Icon(
                     _getSortOptionIcon(option),
-                    color:
-                        isSelected ? const Color(0xFF667EEA) : Colors.grey[600],
+                    color: isSelected
+                        ? const Color(0xFF667EEA)
+                        : Colors.grey[600],
                     size: 20,
                   ),
                   const SizedBox(width: 12),
@@ -1207,8 +1199,9 @@ class _FilterSortModalState extends State<_FilterSortModal> {
                       _getSortOptionText(option),
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.w500,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
                         color: isSelected
                             ? const Color(0xFF1A1A1A)
                             : Colors.grey[700],

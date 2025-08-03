@@ -6,6 +6,7 @@ import 'package:orgami/Utils/Colors.dart';
 import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/Utils/cached_image.dart';
 import 'package:orgami/Utils/dimensions.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class SingleEventListViewItem extends StatelessWidget {
   final EventModel eventModel;
@@ -50,32 +51,41 @@ class SingleEventListViewItem extends StatelessWidget {
                   children: [
                     AspectRatio(
                       aspectRatio: 16 / 9,
-                      child: Image.network(
-                        eventModel.imageUrl,
+                      child: CachedNetworkImage(
+                        imageUrl: eventModel.imageUrl,
                         fit: BoxFit.cover,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            color: const Color(0xFFF5F7FA),
-                            child: const Center(
-                              child: CircularProgressIndicator(
-                                color: Color(0xFF667EEA),
-                              ),
+                        placeholder: (context, url) => Container(
+                          color: const Color(0xFFF5F7FA),
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFF667EEA),
                             ),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: const Color(0xFFF5F7FA),
-                            child: const Center(
-                              child: Icon(
-                                Icons.image_not_supported,
-                                color: Color(0xFF9CA3AF),
-                                size: 48,
-                              ),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: const Color(0xFFF5F7FA),
+                          child: const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.image_not_supported,
+                                  color: Color(0xFF667EEA),
+                                  size: 32,
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Image not available',
+                                  style: TextStyle(
+                                    color: Color(0xFF667EEA),
+                                    fontSize: 12,
+                                    fontFamily: 'Roboto',
+                                  ),
+                                ),
+                              ],
                             ),
-                          );
-                        },
+                          ),
+                        ),
                       ),
                     ),
                     if (eventModel.isFeatured)
@@ -94,11 +104,7 @@ class SingleEventListViewItem extends StatelessWidget {
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
-                                Icons.star,
-                                color: Colors.white,
-                                size: 12,
-                              ),
+                              Icon(Icons.star, color: Colors.white, size: 12),
                               SizedBox(width: 4),
                               Text(
                                 'Featured',
@@ -198,13 +204,15 @@ class SingleEventListViewItem extends StatelessWidget {
                               vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF667EEA)
-                                  .withValues(alpha: 0.1),
+                              color: const Color(
+                                0xFF667EEA,
+                              ).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              DateFormat('MMM dd, yyyy\nKK:mm a')
-                                  .format(eventModel.selectedDateTime),
+                              DateFormat(
+                                'MMM dd, yyyy\nKK:mm a',
+                              ).format(eventModel.selectedDateTime),
                               style: const TextStyle(
                                 color: Color(0xFF667EEA),
                                 fontWeight: FontWeight.w600,
@@ -224,10 +232,7 @@ class SingleEventListViewItem extends StatelessWidget {
                             gradient: const LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
-                              colors: [
-                                Color(0xFF667EEA),
-                                Color(0xFF764BA2),
-                              ],
+                              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
                             ),
                             borderRadius: BorderRadius.circular(12),
                           ),

@@ -28,6 +28,7 @@ import 'package:orgami/Utils/dimensions.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 import 'package:orgami/Screens/MyEvents/MyEventsScreen.dart';
 import 'package:orgami/Screens/Events/FeatureEventScreen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class SingleEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -743,18 +744,39 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
-        child: Image.network(
-          eventModel.imageUrl,
+        child: CachedNetworkImage(
+          imageUrl: eventModel.imageUrl,
           fit: BoxFit.cover,
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return Container(
-              color: const Color(0xFFF5F7FA),
-              child: const Center(
-                child: CircularProgressIndicator(color: Color(0xFF667EEA)),
+          placeholder: (context, url) => Container(
+            color: const Color(0xFFF5F7FA),
+            child: const Center(
+              child: CircularProgressIndicator(color: Color(0xFF667EEA)),
+            ),
+          ),
+          errorWidget: (context, url, error) => Container(
+            color: const Color(0xFFF5F7FA),
+            child: const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.image_not_supported,
+                    color: Color(0xFF667EEA),
+                    size: 48,
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Image not available',
+                    style: TextStyle(
+                      color: Color(0xFF667EEA),
+                      fontSize: 14,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                ],
               ),
-            );
-          },
+            ),
+          ),
         ),
       ),
     );

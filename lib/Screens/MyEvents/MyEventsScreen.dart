@@ -13,6 +13,7 @@ import 'package:orgami/Utils/dimensions.dart';
 import 'package:orgami/Utils/Router.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -1036,20 +1037,41 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                   children: [
                     AspectRatio(
                       aspectRatio: 16 / 9,
-                      child: Image.network(
-                        event.imageUrl,
+                      child: CachedNetworkImage(
+                        imageUrl: event.imageUrl,
                         fit: BoxFit.cover,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            color: const Color(0xFFF5F7FA),
-                            child: const Center(
-                              child: CircularProgressIndicator(
-                                color: Color(0xFF667EEA),
-                              ),
+                        placeholder: (context, url) => Container(
+                          color: const Color(0xFFF5F7FA),
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFF667EEA),
                             ),
-                          );
-                        },
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: const Color(0xFFF5F7FA),
+                          child: const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.image_not_supported,
+                                  color: Color(0xFF667EEA),
+                                  size: 32,
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Image not available',
+                                  style: TextStyle(
+                                    color: Color(0xFF667EEA),
+                                    fontSize: 12,
+                                    fontFamily: 'Roboto',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                     if (event.isFeatured)

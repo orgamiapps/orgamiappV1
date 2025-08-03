@@ -20,6 +20,7 @@ import 'package:orgami/Utils/Router.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -66,7 +67,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     'Featured',
     'Educational',
     'Professional',
-    'Other'
+    'Other',
   ];
 
   LatLng? currentLocation;
@@ -107,20 +108,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       case SortOption.none:
         break;
       case SortOption.dateAddedAsc:
-        events
-            .sort((a, b) => a.eventGenerateTime.compareTo(b.eventGenerateTime));
+        events.sort(
+          (a, b) => a.eventGenerateTime.compareTo(b.eventGenerateTime),
+        );
         break;
       case SortOption.dateAddedDesc:
-        events
-            .sort((a, b) => b.eventGenerateTime.compareTo(a.eventGenerateTime));
+        events.sort(
+          (a, b) => b.eventGenerateTime.compareTo(a.eventGenerateTime),
+        );
         break;
       case SortOption.titleAsc:
         events.sort(
-            (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+          (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+        );
         break;
       case SortOption.titleDesc:
         events.sort(
-            (a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase()));
+          (a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase()),
+        );
         break;
       case SortOption.eventDateAsc:
         events.sort((a, b) => a.selectedDateTime.compareTo(b.selectedDateTime));
@@ -158,9 +163,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
     _fadeController.forward();
 
     // Simulate loading
@@ -202,19 +208,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _onFabPressed() {
-    RouterClass.nextScreenNormal(
-      context,
-      const ChoseDateTimeScreen(),
-    );
+    RouterClass.nextScreenNormal(context, const ChoseDateTimeScreen());
   }
 
   Future<void> getCurrentLocation() async {
     try {
       await Geolocator.getCurrentPosition().then((value) {
-        LatLng newLatLng = LatLng(
-          value.latitude,
-          value.longitude,
-        );
+        LatLng newLatLng = LatLng(value.latitude, value.longitude);
         setState(() {
           currentLocation = newLatLng;
         });
@@ -230,7 +230,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     double dLat = radians(point.latitude - center.latitude);
     double dLng = radians(point.longitude - center.longitude);
-    double a = sin(dLat / 2) * sin(dLat / 2) +
+    double a =
+        sin(dLat / 2) * sin(dLat / 2) +
         cos(radians(center.latitude)) *
             cos(radians(point.latitude)) *
             sin(dLng / 2) *
@@ -250,7 +251,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     double dLat = radians(end.latitude - start.latitude);
     double dLng = radians(end.longitude - start.longitude);
-    double a = sin(dLat / 2) * sin(dLat / 2) +
+    double a =
+        sin(dLat / 2) * sin(dLat / 2) +
         cos(radians(start.latitude)) *
             cos(radians(end.latitude)) *
             sin(dLng / 2) *
@@ -291,25 +293,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     // Filter by distance if location and radius are set
     if (currentLocation != null && radiusInMiles > 0) {
-      filteredEvents = filteredEvents
-          .where(
-            (event) => isInRadius(
-              currentLocation!,
-              radiusInMiles,
-              event.getLatLng(),
-            ),
-          )
-          .toList()
-        ..sort((a, b) {
-          double distanceA = calculateDistance(currentLocation!, a.getLatLng());
-          double distanceB = calculateDistance(currentLocation!, b.getLatLng());
+      filteredEvents =
+          filteredEvents
+              .where(
+                (event) => isInRadius(
+                  currentLocation!,
+                  radiusInMiles,
+                  event.getLatLng(),
+                ),
+              )
+              .toList()
+            ..sort((a, b) {
+              double distanceA = calculateDistance(
+                currentLocation!,
+                a.getLatLng(),
+              );
+              double distanceB = calculateDistance(
+                currentLocation!,
+                b.getLatLng(),
+              );
 
-          if (distanceA == distanceB) {
-            return a.selectedDateTime.compareTo(b.selectedDateTime);
-          } else {
-            return distanceA.compareTo(distanceB);
-          }
-        });
+              if (distanceA == distanceB) {
+                return a.selectedDateTime.compareTo(b.selectedDateTime);
+              } else {
+                return distanceA.compareTo(distanceB);
+              }
+            });
     }
 
     return filteredEvents;
@@ -341,10 +350,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF667EEA),
-                Color(0xFF764BA2),
-              ],
+              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
             ),
             borderRadius: BorderRadius.circular(28),
             boxShadow: [
@@ -361,18 +367,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             child: InkWell(
               borderRadius: BorderRadius.circular(28),
               onTap: _onFabPressed,
-              child: const Icon(
-                Icons.add,
-                color: Colors.white,
-                size: 28,
-              ),
+              child: const Icon(Icons.add, color: Colors.white, size: 28),
             ),
           ),
         ),
       ),
-      body: SafeArea(
-        child: _bodyView(),
-      ),
+      body: SafeArea(child: _bodyView()),
     );
   }
 
@@ -386,11 +386,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         child: FadeTransition(
           opacity: _fadeAnimation,
           child: Column(
-            children: [
-              _headerView(),
-              _filterSection(),
-              _eventsView(),
-            ],
+            children: [_headerView(), _filterSection(), _eventsView()],
           ),
         ),
       ),
@@ -404,10 +400,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF667EEA),
-            Color(0xFF764BA2),
-          ],
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
         ),
       ),
       padding: const EdgeInsets.fromLTRB(24, 32, 24, 40),
@@ -449,11 +442,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(30),
-                  child: Image.asset(
-                    Images.inAppLogo,
-                    width: 50,
-                    height: 50,
-                  ),
+                  child: Image.asset(Images.inAppLogo, width: 50, height: 50),
                 ),
               ),
             ],
@@ -505,8 +494,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                   const SizedBox(width: 12),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF667EEA).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
@@ -603,11 +594,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       label: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 16,
-            color: isSelected ? Colors.white : color,
-          ),
+          Icon(icon, size: 16, color: isSelected ? Colors.white : color),
           const SizedBox(width: 6),
           Text(
             label,
@@ -629,9 +616,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         width: 1.5,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(22),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
     );
   }
 
@@ -696,19 +681,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         // Apply sorting
         filtered = _sortEvents(filtered);
 
-        List<EventModel> featuredEvents = filtered
-            .where((e) =>
-                e.isFeatured == true &&
-                (e.featureEndDate == null ||
-                    e.featureEndDate!.isAfter(DateTime.now())))
-            .toList()
-          ..sort((a, b) => (b.featureEndDate ?? DateTime(1970))
-              .compareTo(a.featureEndDate ?? DateTime(1970)));
+        List<EventModel> featuredEvents =
+            filtered
+                .where(
+                  (e) =>
+                      e.isFeatured == true &&
+                      (e.featureEndDate == null ||
+                          e.featureEndDate!.isAfter(DateTime.now())),
+                )
+                .toList()
+              ..sort(
+                (a, b) => (b.featureEndDate ?? DateTime(1970)).compareTo(
+                  a.featureEndDate ?? DateTime(1970),
+                ),
+              );
 
         List<EventModel> nonFeaturedEvents = filtered
-            .where((e) => !(e.isFeatured == true &&
-                (e.featureEndDate == null ||
-                    e.featureEndDate!.isAfter(DateTime.now()))))
+            .where(
+              (e) =>
+                  !(e.isFeatured == true &&
+                      (e.featureEndDate == null ||
+                          e.featureEndDate!.isAfter(DateTime.now()))),
+            )
             .toList();
 
         return Column(
@@ -813,10 +807,45 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 Container(
                   width: double.infinity,
                   height: 240,
-                  decoration: BoxDecoration(
-                    image: DecorationImage(
-                      image: NetworkImage(event.imageUrl),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: CachedNetworkImage(
+                      imageUrl: event.imageUrl,
                       fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: 240,
+                      placeholder: (context, url) => Container(
+                        color: const Color(0xFFF5F7FA),
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF667EEA),
+                          ),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: const Color(0xFFF5F7FA),
+                        child: const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.image_not_supported,
+                                color: Color(0xFF667EEA),
+                                size: 48,
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'Image not available',
+                                style: TextStyle(
+                                  color: Color(0xFF667EEA),
+                                  fontSize: 14,
+                                  fontFamily: 'Roboto',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -859,11 +888,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
-                                  Icons.star,
-                                  color: Colors.white,
-                                  size: 14,
-                                ),
+                                Icon(Icons.star, color: Colors.white, size: 14),
                                 SizedBox(width: 4),
                                 Text(
                                   'Featured',
@@ -921,8 +946,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   ),
                                 ),
                                 child: Text(
-                                  DateFormat('MMM dd, KK:mm a')
-                                      .format(event.selectedDateTime),
+                                  DateFormat(
+                                    'MMM dd, KK:mm a',
+                                  ).format(event.selectedDateTime),
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w600,
@@ -1020,20 +1046,41 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   children: [
                     AspectRatio(
                       aspectRatio: 16 / 9,
-                      child: Image.network(
-                        event.imageUrl,
+                      child: CachedNetworkImage(
+                        imageUrl: event.imageUrl,
                         fit: BoxFit.cover,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            color: const Color(0xFFF5F7FA),
-                            child: const Center(
-                              child: CircularProgressIndicator(
-                                color: Color(0xFF667EEA),
-                              ),
+                        placeholder: (context, url) => Container(
+                          color: const Color(0xFFF5F7FA),
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFF667EEA),
                             ),
-                          );
-                        },
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: const Color(0xFFF5F7FA),
+                          child: const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.image_not_supported,
+                                  color: Color(0xFF667EEA),
+                                  size: 32,
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Image not available',
+                                  style: TextStyle(
+                                    color: Color(0xFF667EEA),
+                                    fontSize: 12,
+                                    fontFamily: 'Roboto',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                     if (event.isFeatured)
@@ -1052,11 +1099,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
-                                Icons.star,
-                                color: Colors.white,
-                                size: 12,
-                              ),
+                              Icon(Icons.star, color: Colors.white, size: 12),
                               SizedBox(width: 4),
                               Text(
                                 'Featured',
@@ -1156,13 +1199,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF667EEA)
-                                  .withValues(alpha: 0.1),
+                              color: const Color(
+                                0xFF667EEA,
+                              ).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              DateFormat('MMM dd, yyyy\nKK:mm a')
-                                  .format(event.selectedDateTime),
+                              DateFormat(
+                                'MMM dd, yyyy\nKK:mm a',
+                              ).format(event.selectedDateTime),
                               style: const TextStyle(
                                 color: Color(0xFF667EEA),
                                 fontWeight: FontWeight.w600,
@@ -1182,10 +1227,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             gradient: const LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
-                              colors: [
-                                Color(0xFF667EEA),
-                                Color(0xFF764BA2),
-                              ],
+                              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
                             ),
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -1246,22 +1288,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         const SizedBox(height: 24),
         // Event cards skeleton
         ...List.generate(
-            3,
-            (index) => Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                  child: Shimmer.fromColors(
-                    baseColor: const Color(0xFFE1E5E9),
-                    highlightColor: Colors.white,
-                    child: Container(
-                      height: 280,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                  ),
-                )),
+          3,
+          (index) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            child: Shimmer.fromColors(
+              baseColor: const Color(0xFFE1E5E9),
+              highlightColor: Colors.white,
+              child: Container(
+                height: 280,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -1477,11 +1519,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
             padding: const EdgeInsets.all(24),
             child: Row(
               children: [
-                const Icon(
-                  Icons.tune,
-                  color: Color(0xFF667EEA),
-                  size: 24,
-                ),
+                const Icon(Icons.tune, color: Color(0xFF667EEA), size: 24),
                 const SizedBox(width: 12),
                 const Text(
                   'Filter/Sort Events',
@@ -1500,10 +1538,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
                       color: Colors.grey[100],
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(
-                      Icons.close,
-                      size: 20,
-                    ),
+                    child: const Icon(Icons.close, size: 20),
                   ),
                 ),
               ],
@@ -1553,11 +1588,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.filter_list,
-                color: const Color(0xFF667EEA),
-                size: 16,
-              ),
+              Icon(Icons.filter_list, color: const Color(0xFF667EEA), size: 16),
               const SizedBox(width: 8),
               Text(
                 'Active Filters',
@@ -1604,11 +1635,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
       children: [
         Row(
           children: [
-            Icon(
-              Icons.category,
-              color: const Color(0xFF667EEA),
-              size: 20,
-            ),
+            Icon(Icons.category, color: const Color(0xFF667EEA), size: 20),
             const SizedBox(width: 8),
             const Text(
               'Filter by Category',
@@ -1672,11 +1699,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
       label: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 16,
-            color: isSelected ? Colors.white : color,
-          ),
+          Icon(icon, size: 16, color: isSelected ? Colors.white : color),
           const SizedBox(width: 6),
           Text(
             label,
@@ -1698,9 +1721,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
         width: 1.5,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(22),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
     );
   }
 
@@ -1711,11 +1732,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
       children: [
         Row(
           children: [
-            Icon(
-              Icons.sort,
-              color: const Color(0xFF667EEA),
-              size: 20,
-            ),
+            Icon(Icons.sort, color: const Color(0xFF667EEA), size: 20),
             const SizedBox(width: 8),
             const Text(
               'Sort by',
@@ -1730,37 +1747,25 @@ class _FilterSortModalState extends State<_FilterSortModal> {
         ),
         const SizedBox(height: 16),
         // Default (No Sorting)
-        _buildSortOptionGroup(
-          'Default',
-          [SortOption.none],
-        ),
+        _buildSortOptionGroup('Default', [SortOption.none]),
         const SizedBox(height: 16),
         // Date Added section
-        _buildSortOptionGroup(
-          'Date Added',
-          [
-            SortOption.dateAddedDesc,
-            SortOption.dateAddedAsc,
-          ],
-        ),
+        _buildSortOptionGroup('Date Added', [
+          SortOption.dateAddedDesc,
+          SortOption.dateAddedAsc,
+        ]),
         const SizedBox(height: 16),
         // Title section
-        _buildSortOptionGroup(
-          'Title',
-          [
-            SortOption.titleAsc,
-            SortOption.titleDesc,
-          ],
-        ),
+        _buildSortOptionGroup('Title', [
+          SortOption.titleAsc,
+          SortOption.titleDesc,
+        ]),
         const SizedBox(height: 16),
         // Event Date section
-        _buildSortOptionGroup(
-          'Event Date',
-          [
-            SortOption.eventDateDesc,
-            SortOption.eventDateAsc,
-          ],
-        ),
+        _buildSortOptionGroup('Event Date', [
+          SortOption.eventDateDesc,
+          SortOption.eventDateAsc,
+        ]),
       ],
     );
   }
@@ -1797,8 +1802,9 @@ class _FilterSortModalState extends State<_FilterSortModal> {
                     : Colors.grey[50],
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color:
-                      isSelected ? const Color(0xFF667EEA) : Colors.grey[200]!,
+                  color: isSelected
+                      ? const Color(0xFF667EEA)
+                      : Colors.grey[200]!,
                   width: 1,
                 ),
               ),
@@ -1806,8 +1812,9 @@ class _FilterSortModalState extends State<_FilterSortModal> {
                 children: [
                   Icon(
                     _getSortOptionIcon(option),
-                    color:
-                        isSelected ? const Color(0xFF667EEA) : Colors.grey[600],
+                    color: isSelected
+                        ? const Color(0xFF667EEA)
+                        : Colors.grey[600],
                     size: 20,
                   ),
                   const SizedBox(width: 12),
@@ -1816,8 +1823,9 @@ class _FilterSortModalState extends State<_FilterSortModal> {
                       _getSortOptionText(option),
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.w500,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
                         color: isSelected
                             ? const Color(0xFF1A1A1A)
                             : Colors.grey[700],
