@@ -11,10 +11,7 @@ import 'package:orgami/Utils/dimensions.dart';
 class AttendeesHorizontalList extends StatefulWidget {
   final EventModel eventModel;
 
-  const AttendeesHorizontalList({
-    super.key,
-    required this.eventModel,
-  });
+  const AttendeesHorizontalList({super.key, required this.eventModel});
 
   @override
   State<AttendeesHorizontalList> createState() =>
@@ -46,7 +43,8 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
       print('DEBUG: Attendees fetched from Firestore:');
       for (var attendee in attendeesList) {
         print(
-            '  - id: ${attendee.id}, userName: ${attendee.userName}, customerUid: ${attendee.customerUid}, isAnonymous: ${attendee.isAnonymous}');
+          '  - id: ${attendee.id}, userName: ${attendee.userName}, customerUid: ${attendee.customerUid}, isAnonymous: ${attendee.isAnonymous}',
+        );
       }
 
       // Get customer details only for non-anonymous attendees (limit to first 10 for performance)
@@ -100,17 +98,59 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+          // Modern Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  spreadRadius: 0,
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Attendees (${attendees.length})',
-                  style: const TextStyle(
-                    color: AppThemeColor.pureBlackColor,
-                    fontSize: Dimensions.fontSizeLarge,
-                    fontWeight: FontWeight.w600,
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.people,
+                    color: Color(0xFF10B981),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Attendees',
+                        style: const TextStyle(
+                          color: Color(0xFF1A1A1A),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                      Text(
+                        '${attendees.length} people signed in',
+                        style: const TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontSize: 14,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 if (attendees.length > 5)
@@ -121,24 +161,40 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
                         AllAttendeesScreen(eventModel: widget.eventModel),
                       );
                     },
-                    child: Text(
-                      'See all',
-                      style: const TextStyle(
-                        color: AppThemeColor.darkGreenColor,
-                        fontSize: Dimensions.fontSizeDefault,
-                        fontWeight: FontWeight.w500,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFF10B981),
+                          width: 1,
+                        ),
+                      ),
+                      child: const Text(
+                        'View All',
+                        style: TextStyle(
+                          color: Color(0xFF10B981),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Roboto',
+                        ),
                       ),
                     ),
                   ),
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
+          // Modern Attendees List
           SizedBox(
-            height: 80,
+            height: 100,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               itemCount: attendees.length > 5 ? 5 : attendees.length,
               itemBuilder: (context, index) {
                 final attendee = attendees[index];
@@ -159,69 +215,95 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
                 }
 
                 return Container(
-                  margin: const EdgeInsets.only(right: 12),
+                  margin: const EdgeInsets.only(right: 16),
                   child: Column(
                     children: [
-                      // Profile Picture
+                      // Modern Profile Picture
                       Container(
-                        width: 50,
-                        height: 50,
+                        width: 56,
+                        height: 56,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppThemeColor.darkGreenColor,
-                            width: 2,
-                          ),
+                          gradient: isAnon
+                              ? const LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    Color(0xFF6B7280),
+                                    Color(0xFF9CA3AF),
+                                  ],
+                                )
+                              : const LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    Color(0xFF10B981),
+                                    Color(0xFF059669),
+                                  ],
+                                ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: isAnon
+                                  ? const Color(0xFF6B7280).withOpacity(0.3)
+                                  : const Color(0xFF10B981).withOpacity(0.3),
+                              spreadRadius: 0,
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
                         child: ClipOval(
                           child: isAnon
                               ? Container(
-                                  color: Colors.grey[300],
+                                  color: Colors.transparent,
                                   child: const Icon(
                                     Icons.person_off,
-                                    size: 25,
-                                    color: Colors.grey,
+                                    size: 28,
+                                    color: Colors.white,
                                   ),
                                 )
                               : (customer?.profilePictureUrl != null
-                                  ? Image.network(
-                                      customer!.profilePictureUrl!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                        return Container(
-                                          color: Colors.grey[300],
-                                          child: const Icon(
-                                            Icons.person,
-                                            size: 25,
-                                            color: Colors.grey,
-                                          ),
-                                        );
-                                      },
-                                    )
-                                  : Container(
-                                      color: Colors.grey[300],
-                                      child: const Icon(
-                                        Icons.person,
-                                        size: 25,
-                                        color: Colors.grey,
-                                      ),
-                                    )),
+                                    ? Image.network(
+                                        customer!.profilePictureUrl!,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) {
+                                              return Container(
+                                                color: Colors.transparent,
+                                                child: const Icon(
+                                                  Icons.person,
+                                                  size: 28,
+                                                  color: Colors.white,
+                                                ),
+                                              );
+                                            },
+                                      )
+                                    : Container(
+                                        color: Colors.transparent,
+                                        child: const Icon(
+                                          Icons.person,
+                                          size: 28,
+                                          color: Colors.white,
+                                        ),
+                                      )),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      // Name - Use attendee.userName for public display
+                      const SizedBox(height: 8),
+                      // Name with better styling
                       SizedBox(
-                        width: 60,
+                        width: 70,
                         child: Text(
                           attendee.userName,
                           textAlign: TextAlign.center,
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppThemeColor.pureBlackColor,
-                            fontSize: Dimensions.fontSizeSmall,
+                          style: TextStyle(
+                            color: isAnon
+                                ? const Color(0xFF6B7280)
+                                : const Color(0xFF1A1A1A),
+                            fontSize: 12,
                             fontWeight: FontWeight.w500,
+                            fontFamily: 'Roboto',
                           ),
                         ),
                       ),

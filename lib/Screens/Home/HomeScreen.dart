@@ -43,12 +43,12 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   double radiusInMiles = 0;
   List<String> selectedCategories = [];
-  bool showFeaturedFirst = true;
   bool isLoading = true;
   bool isRefreshing = false;
 
   // Sorting state
-  SortOption currentSortOption = SortOption.none;
+  SortOption currentSortOption =
+      SortOption.none; // Default to none which will use our custom sorting
 
   // Scroll controller and animation
   late ScrollController _scrollController;
@@ -106,6 +106,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   List<EventModel> _sortEvents(List<EventModel> events) {
     switch (currentSortOption) {
       case SortOption.none:
+        // Default sorting: by event date ascending, then by creation date ascending
+        events.sort((a, b) {
+          // First sort by event date (ascending - most upcoming first)
+          int dateComparison = a.selectedDateTime.compareTo(b.selectedDateTime);
+          if (dateComparison != 0) {
+            return dateComparison;
+          }
+          // If dates are the same, sort by creation date (ascending - oldest created first)
+          return a.eventGenerateTime.compareTo(b.eventGenerateTime);
+        });
         break;
       case SortOption.dateAddedAsc:
         events.sort(
@@ -141,7 +151,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     selectedCategories = ['Featured']; // Default to showing featured events
-    showFeaturedFirst = true;
     getCurrentLocation();
 
     // Initialize scroll controller
@@ -266,29 +275,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   List<EventModel> filterEvents(List<EventModel> events) {
     List<EventModel> filteredEvents = events;
 
-    // Filter by categories including Featured
-    if (selectedCategories.isNotEmpty) {
+    // Filter by categories (excluding Featured - Featured filter only controls carousel visibility)
+    List<String> nonFeaturedCategories = selectedCategories
+        .where((category) => category != 'Featured')
+        .toList();
+
+    if (nonFeaturedCategories.isNotEmpty) {
       filteredEvents = filteredEvents.where((event) {
         // Check if any selected category matches the event
-        return selectedCategories.any((category) {
-          if (category == 'Featured') {
-            // For Featured category, check if the event is featured and still valid
-            return event.isFeatured == true &&
-                (event.featureEndDate == null ||
-                    event.featureEndDate!.isAfter(DateTime.now()));
-          } else {
-            // For other categories, check if the event has that category
-            return event.categories.contains(category);
-          }
+        return nonFeaturedCategories.any((category) {
+          return event.categories.contains(category);
         });
       }).toList();
-
-      // If we're filtering by Featured and no featured events are found, show all events instead
-      if (selectedCategories.contains('Featured') &&
-          selectedCategories.length == 1 &&
-          filteredEvents.isEmpty) {
-        filteredEvents = events;
-      }
     }
 
     // Filter by distance if location and radius are set
@@ -707,15 +705,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
         return Column(
           children: [
-            // Featured Events Carousel
-            if (showFeaturedFirst && featuredEvents.isNotEmpty)
+            // Featured Events Carousel - only show if Featured filter is selected
+            if (selectedCategories.contains('Featured') &&
+                featuredEvents.isNotEmpty)
               _buildFeaturedCarousel(featuredEvents),
 
-            // All Events List
-            if (showFeaturedFirst)
-              _buildEventsList([...featuredEvents, ...nonFeaturedEvents])
-            else
-              _buildEventsList(filtered),
+            // All Events List - always show all events (both featured and non-featured)
+            _buildEventsList([...featuredEvents, ...nonFeaturedEvents]),
           ],
         );
       },
@@ -1396,9 +1392,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
             const SizedBox(height: 24),
             Text(
-              showFeaturedFirst
-                  ? 'No featured events available'
-                  : 'No events found',
+              'No events found',
               style: const TextStyle(
                 color: Color(0xFF1A1A1A),
                 fontSize: 20,
@@ -1746,7 +1740,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
           ],
         ),
         const SizedBox(height: 16),
-        // Default (No Sorting)
+        // Default (Event Date Ascending)
         _buildSortOptionGroup('Default', [SortOption.none]),
         const SizedBox(height: 16),
         // Date Added section
@@ -1867,7 +1861,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
   String _getSortOptionText(SortOption option) {
     switch (option) {
       case SortOption.none:
-        return 'No Sorting';
+        return 'Default (Event Date Ascending)';
       case SortOption.dateAddedAsc:
         return 'Date Added (Oldest First)';
       case SortOption.dateAddedDesc:

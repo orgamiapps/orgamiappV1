@@ -3,17 +3,11 @@ import 'package:orgami/Controller/CustomerController.dart';
 import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Models/CommentModel.dart';
 import 'package:orgami/Models/EventModel.dart';
-import 'package:orgami/Utils/Colors.dart';
-import 'package:orgami/Utils/Dimensions.dart';
-import 'package:orgami/Utils/Router.dart';
 
 class CommentsSection extends StatefulWidget {
   final EventModel eventModel;
 
-  const CommentsSection({
-    super.key,
-    required this.eventModel,
-  });
+  const CommentsSection({super.key, required this.eventModel});
 
   @override
   State<CommentsSection> createState() => _CommentsSectionState();
@@ -69,9 +63,9 @@ class _CommentsSectionState extends State<CommentsSection> {
   Future<void> _addComment() async {
     final trimmedComment = _commentController.text.trim();
     if (trimmedComment.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a comment')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please enter a comment')));
       return;
     }
 
@@ -114,30 +108,72 @@ class _CommentsSectionState extends State<CommentsSection> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Comments Header
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  spreadRadius: 0,
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Comments (${comments.length})',
-                  style: const TextStyle(
-                    color: AppThemeColor.pureBlackColor,
-                    fontSize: Dimensions.fontSizeLarge,
-                    fontWeight: FontWeight.w600,
-                  ),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.chat_bubble_outline,
+                      color: Color(0xFF667EEA),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Comments',
+                      style: const TextStyle(
+                        color: Color(0xFF1A1A1A),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF667EEA).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${comments.length}',
+                        style: const TextStyle(
+                          color: Color(0xFF667EEA),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 GestureDetector(
                   onTap: _loadComments,
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: AppThemeColor.darkGreenColor,
+                      color: const Color(0xFF667EEA).withOpacity(0.1),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
                       Icons.refresh,
-                      color: Colors.white,
+                      color: Color(0xFF667EEA),
                       size: 16,
                     ),
                   ),
@@ -147,7 +183,7 @@ class _CommentsSectionState extends State<CommentsSection> {
           ),
           const SizedBox(height: 12),
 
-          // Add Comment Section
+          // Add Comment Section (unchanged)
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
             padding: const EdgeInsets.all(16),
@@ -161,12 +197,14 @@ class _CommentsSectionState extends State<CommentsSection> {
                 CircleAvatar(
                   radius: 18,
                   backgroundColor: Colors.grey[300],
-                  child: CustomerController.logeInCustomer?.profilePictureUrl !=
+                  child:
+                      CustomerController.logeInCustomer?.profilePictureUrl !=
                           null
                       ? ClipOval(
                           child: Image.network(
                             CustomerController
-                                .logeInCustomer!.profilePictureUrl!,
+                                .logeInCustomer!
+                                .profilePictureUrl!,
                             width: 36,
                             height: 36,
                             fit: BoxFit.cover,
@@ -179,14 +217,9 @@ class _CommentsSectionState extends State<CommentsSection> {
                             },
                           ),
                         )
-                      : const Icon(
-                          Icons.person,
-                          size: 20,
-                          color: Colors.grey,
-                        ),
+                      : const Icon(Icons.person, size: 20, color: Colors.grey),
                 ),
                 const SizedBox(width: 12),
-
                 // Comment Input
                 Expanded(
                   child: TextField(
@@ -201,125 +234,94 @@ class _CommentsSectionState extends State<CommentsSection> {
                       fillColor: Colors.white,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
-                        vertical: 12,
+                        vertical: 0,
                       ),
                     ),
-                    maxLines: null,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _addComment(),
+                    minLines: 1,
+                    maxLines: 3,
                   ),
                 ),
-
                 const SizedBox(width: 8),
-
-                // Send Button
-                GestureDetector(
-                  onTap: isAddingComment ? null : _addComment,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: isAddingComment
-                          ? Colors.grey
-                          : AppThemeColor.darkGreenColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: isAddingComment
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Icon(
-                            Icons.send,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                  ),
-                ),
+                isAddingComment
+                    ? const SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFF667EEA),
+                        ),
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.send, color: Color(0xFF667EEA)),
+                        onPressed: _addComment,
+                      ),
               ],
             ),
           ),
-
           const SizedBox(height: 16),
 
-          // Comments List
+          // Modern Comments List
           if (isLoading)
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: Center(
-                child: Column(
-                  children: [
-                    CircularProgressIndicator(
-                      color: AppThemeColor.darkGreenColor,
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Loading comments...',
-                      style: TextStyle(
-                        color: AppThemeColor.dullFontColor,
-                        fontSize: Dimensions.fontSizeSmall,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            const Center(
+              child: CircularProgressIndicator(color: Color(0xFF667EEA)),
             )
           else if (comments.isEmpty)
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.symmetric(vertical: 24),
               child: Center(
-                child: Column(
-                  children: [
-                    const Text(
-                      'No comments yet. Be the first to comment!',
-                      style: TextStyle(
-                        color: AppThemeColor.dullFontColor,
-                        fontSize: Dimensions.fontSizeDefault,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Event ID: ${widget.eventModel.id}',
-                      style: const TextStyle(
-                        color: AppThemeColor.dullFontColor,
-                        fontSize: Dimensions.fontSizeSmall,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  'No comments yet. Be the first to comment!',
+                  style: TextStyle(
+                    color: Colors.grey[500],
+                    fontSize: 16,
+                    fontFamily: 'Roboto',
+                  ),
                 ),
               ),
             )
           else
-            ListView.builder(
+            ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 20),
               itemCount: comments.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final comment = comments[index];
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 16),
+                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        spreadRadius: 0,
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // User Profile Picture
+                      // Avatar
                       CircleAvatar(
-                        radius: 18,
-                        backgroundColor: Colors.grey[300],
-                        child: comment.userProfilePictureUrl != null
+                        radius: 20,
+                        backgroundColor: Colors.grey[200],
+                        child:
+                            comment.userProfilePictureUrl != null &&
+                                comment.userProfilePictureUrl!.isNotEmpty
                             ? ClipOval(
                                 child: Image.network(
                                   comment.userProfilePictureUrl!,
-                                  width: 36,
-                                  height: 36,
+                                  width: 40,
+                                  height: 40,
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) {
                                     return const Icon(
                                       Icons.person,
-                                      size: 20,
+                                      size: 22,
                                       color: Colors.grey,
                                     );
                                   },
@@ -327,34 +329,36 @@ class _CommentsSectionState extends State<CommentsSection> {
                               )
                             : const Icon(
                                 Icons.person,
-                                size: 20,
+                                size: 22,
                                 color: Colors.grey,
                               ),
                       ),
-
-                      const SizedBox(width: 12),
-
-                      // Comment Content
+                      const SizedBox(width: 14),
+                      // Name, timestamp, and comment
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
-                                Text(
-                                  comment.userName,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: Dimensions.fontSizeDefault,
-                                    color: AppThemeColor.pureBlackColor,
+                                Expanded(
+                                  child: Text(
+                                    comment.userName,
+                                    style: const TextStyle(
+                                      color: Color(0xFF1A1A1A),
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 15,
+                                      fontFamily: 'Roboto',
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  _formatDateTime(comment.createdAt),
+                                  _formatTimestamp(comment.createdAt),
                                   style: const TextStyle(
-                                    color: AppThemeColor.dullFontColor,
-                                    fontSize: Dimensions.fontSizeSmall,
+                                    color: Color(0xFF6B7280),
+                                    fontSize: 12,
+                                    fontFamily: 'Roboto',
                                   ),
                                 ),
                               ],
@@ -363,8 +367,9 @@ class _CommentsSectionState extends State<CommentsSection> {
                             Text(
                               comment.comment,
                               style: const TextStyle(
-                                fontSize: Dimensions.fontSizeDefault,
-                                color: AppThemeColor.pureBlackColor,
+                                color: Color(0xFF4B5563),
+                                fontSize: 15,
+                                fontFamily: 'Roboto',
                               ),
                             ),
                           ],
@@ -380,18 +385,14 @@ class _CommentsSectionState extends State<CommentsSection> {
     );
   }
 
-  String _formatDateTime(DateTime dateTime) {
+  String _formatTimestamp(DateTime? timestamp) {
+    if (timestamp == null) return '';
     final now = DateTime.now();
-    final difference = now.difference(dateTime);
-
-    if (difference.inDays > 0) {
-      return '${difference.inDays}d ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m ago';
-    } else {
-      return 'Just now';
-    }
+    final diff = now.difference(timestamp);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${timestamp.year}/${timestamp.month.toString().padLeft(2, '0')}/${timestamp.day.toString().padLeft(2, '0')}';
   }
 }

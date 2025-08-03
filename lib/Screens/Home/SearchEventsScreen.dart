@@ -87,6 +87,16 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
   List<EventModel> _sortEvents(List<EventModel> events) {
     switch (currentSortOption) {
       case SortOption.none:
+        // Default sorting: by event date ascending, then by creation date ascending
+        events.sort((a, b) {
+          // First sort by event date (ascending - most upcoming first)
+          int dateComparison = a.selectedDateTime.compareTo(b.selectedDateTime);
+          if (dateComparison != 0) {
+            return dateComparison;
+          }
+          // If dates are the same, sort by creation date (ascending - oldest created first)
+          return a.eventGenerateTime.compareTo(b.eventGenerateTime);
+        });
         break;
       case SortOption.dateAddedAsc:
         events.sort(
@@ -1241,7 +1251,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
   String _getSortOptionText(SortOption option) {
     switch (option) {
       case SortOption.none:
-        return 'No Sorting';
+        return 'Default (Event Date Ascending)';
       case SortOption.dateAddedAsc:
         return 'Date Added (Oldest First)';
       case SortOption.dateAddedDesc:
