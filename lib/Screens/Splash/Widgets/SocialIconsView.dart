@@ -21,88 +21,112 @@ class SocialLoginView extends StatefulWidget {
 
 class _SocialLoginViewState extends State<SocialLoginView> {
   bool _googleBtnLoading = false;
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          GestureDetector(
-            onTap: () async {
-              try {
-                if (!_googleBtnLoading) {
-                  setState(() {
-                    _googleBtnLoading = true;
-                  });
-                  await FirebaseGoogleAuthHelper()
-                      .loginWithGoogle()
-                      .then((googleFirebaseUser) async {
-                    if (googleFirebaseUser != null) {
-                      await FirebaseFirestoreHelper()
-                          .getSingleCustomer(customerId: googleFirebaseUser.uid)
-                          .then((userData) {
-                        if (userData != null) {
-                          setState(() {
-                            CustomerController.logeInCustomer = userData;
-                            _googleBtnLoading = false;
-                          });
-                          RouterClass().homeScreenRoute(context: context);
-                        } else {
-                          CustomerModel newCustomerModel = CustomerModel(
-                            uid: googleFirebaseUser.uid,
-                            name: googleFirebaseUser.displayName ?? '',
-                            email: googleFirebaseUser.email!,
-                            createdAt: DateTime.now(),
-                          );
-                          _createNewUser(
-                            newCustomerModel: newCustomerModel,
-                            loading: _googleBtnLoading,
-                          );
-                        }
-                      });
-                    } else {
-                      setState(() {
-                        _googleBtnLoading = false;
-                      });
-                    }
-                  });
-                }
-              } catch (e) {
+    return GestureDetector(
+      onTap: () async {
+        try {
+          if (!_googleBtnLoading) {
+            setState(() {
+              _googleBtnLoading = true;
+            });
+            await FirebaseGoogleAuthHelper().loginWithGoogle().then((
+              googleFirebaseUser,
+            ) async {
+              if (googleFirebaseUser != null) {
+                await FirebaseFirestoreHelper()
+                    .getSingleCustomer(customerId: googleFirebaseUser.uid)
+                    .then((userData) {
+                      if (userData != null) {
+                        setState(() {
+                          CustomerController.logeInCustomer = userData;
+                          _googleBtnLoading = false;
+                        });
+                        RouterClass().homeScreenRoute(context: context);
+                      } else {
+                        CustomerModel newCustomerModel = CustomerModel(
+                          uid: googleFirebaseUser.uid,
+                          name: googleFirebaseUser.displayName ?? '',
+                          email: googleFirebaseUser.email!,
+                          createdAt: DateTime.now(),
+                        );
+                        _createNewUser(
+                          newCustomerModel: newCustomerModel,
+                          loading: _googleBtnLoading,
+                        );
+                      }
+                    });
+              } else {
                 setState(() {
                   _googleBtnLoading = false;
                 });
               }
-            },
-            child: AppButtons.roundedButton(
-              iconData: _googleBtnLoading
-                  ? FontAwesomeIcons.arrowsRotate
-                  : FontAwesomeIcons.google,
-              iconColor: AppThemeColor.pureWhiteColor,
-              backgroundColor: AppThemeColor.darkBlueColor,
+            });
+          }
+        } catch (e) {
+          setState(() {
+            _googleBtnLoading = false;
+          });
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppThemeColor.darkBlueColor, Color(0xFF1E4A8C)],
+          ),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: AppThemeColor.darkBlueColor.withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
             ),
-          )
-        ],
+          ],
+        ),
+        child: Center(
+          child: _googleBtnLoading
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppThemeColor.pureWhiteColor,
+                    ),
+                  ),
+                )
+              : Icon(
+                  FontAwesomeIcons.google,
+                  color: AppThemeColor.pureWhiteColor,
+                  size: 20,
+                ),
+        ),
       ),
     );
   }
 
-  Future<void> _createNewUser(
-      {required CustomerModel newCustomerModel, required bool loading}) async {
+  Future<void> _createNewUser({
+    required CustomerModel newCustomerModel,
+    required bool loading,
+  }) async {
     await FirebaseFirestore.instance
         .collection(CustomerModel.firebaseKey)
         .doc(newCustomerModel.uid)
-        .set(
-          CustomerModel.getMap(newCustomerModel),
-        )
+        .set(CustomerModel.getMap(newCustomerModel))
         .then((value) {
-      ShowToast().showNormalToast(msg: 'Welcome to ${AppConstants.appName}');
+          ShowToast().showNormalToast(
+            msg: 'Welcome to ${AppConstants.appName}',
+          );
 
-      setState(() {
-        CustomerController.logeInCustomer = newCustomerModel;
-        loading = false;
-      });
-      RouterClass().homeScreenRoute(context: context);
-    });
+          setState(() {
+            CustomerController.logeInCustomer = newCustomerModel;
+            loading = false;
+          });
+          RouterClass().homeScreenRoute(context: context);
+        });
   }
 }

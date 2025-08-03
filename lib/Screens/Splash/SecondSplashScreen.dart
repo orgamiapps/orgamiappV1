@@ -16,159 +16,354 @@ class SecondSplashScreen extends StatefulWidget {
 }
 
 class _SecondSplashScreenState extends State<SecondSplashScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final double _screenWidth = MediaQuery.of(context).size.width;
   late final double _screenHeight = MediaQuery.of(context).size.height;
 
-  late AnimationController logoAnimation;
+  late AnimationController _logoAnimation;
+  late AnimationController _fadeAnimation;
+  late AnimationController _slideAnimation;
+  late AnimationController _buttonAnimation;
 
-  _handleAnimation() {
-    logoAnimation = AnimationController(
-      upperBound: 250,
-      duration: const Duration(milliseconds: 1500),
+  late Animation<double> _logoScaleAnimation;
+  late Animation<double> _fadeInAnimation;
+  late Animation<Offset> _slideUpAnimation;
+  late Animation<double> _buttonScaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeAnimations();
+  }
+
+  void _initializeAnimations() {
+    // Logo animation
+    _logoAnimation = AnimationController(
+      duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
-    logoAnimation.forward();
-    logoAnimation.addListener(() {
-      setState(() {});
+    _logoScaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _logoAnimation, curve: Curves.elasticOut),
+    );
+
+    // Fade animation
+    _fadeAnimation = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _fadeInAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _fadeAnimation, curve: Curves.easeInOut));
+
+    // Slide animation
+    _slideAnimation = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    _slideUpAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(parent: _slideAnimation, curve: Curves.easeOutCubic),
+        );
+
+    // Button animation
+    _buttonAnimation = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _buttonScaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _buttonAnimation, curve: Curves.elasticOut),
+    );
+
+    // Start animations in sequence
+    _logoAnimation.forward();
+    Future.delayed(const Duration(milliseconds: 300), () {
+      _fadeAnimation.forward();
+    });
+    Future.delayed(const Duration(milliseconds: 600), () {
+      _slideAnimation.forward();
+    });
+    Future.delayed(const Duration(milliseconds: 900), () {
+      _buttonAnimation.forward();
     });
   }
 
   @override
-  void initState() {
-    _handleAnimation();
-
-    super.initState();
-  }
-
-  @override
   void dispose() {
-    logoAnimation.dispose();
+    _logoAnimation.dispose();
+    _fadeAnimation.dispose();
+    _slideAnimation.dispose();
+    _buttonAnimation.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _bodyView(),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFF8FAFF), Color(0xFFFFFFFF)],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight:
+                      MediaQuery.of(context).size.height -
+                      MediaQuery.of(context).padding.top -
+                      MediaQuery.of(context).padding.bottom,
+                ),
+                child: IntrinsicHeight(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 30),
+                      _buildLogoSection(),
+                      const SizedBox(height: 25),
+                      _buildWelcomeSection(),
+                      const SizedBox(height: 30),
+                      _buildQRCodeSection(),
+                      const Spacer(),
+                      _buildActionButtons(),
+                      const SizedBox(height: 30),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
-  Widget _bodyView() {
-    return Container(
-      width: _screenWidth,
-      height: _screenHeight,
-      decoration: const BoxDecoration(
-        color: AppThemeColor.pureWhiteColor,
+  Widget _buildLogoSection() {
+    return ScaleTransition(
+      scale: _logoScaleAnimation,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppThemeColor.darkBlueColor.withOpacity(0.1),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Image.asset(Images.inAppLogo, height: 50),
       ),
-      padding: const EdgeInsets.all(25),
+    );
+  }
+
+  Widget _buildWelcomeSection() {
+    return FadeTransition(
+      opacity: _fadeInAnimation,
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const SizedBox(),
-          Image.asset(
-            Images.inAppLogo,
-            width: logoAnimation.value,
+          Text(
+            'Welcome!',
+            style: TextStyle(
+              color: AppThemeColor.darkBlueColor,
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+            ),
           ),
-          _labelView(),
-          _centerImageView(),
-          const SizedBox(),
-          _buttonsView(),
+          const SizedBox(height: 10),
+          Text(
+            'Thanks for joining! Access or create your account below, and get started on your journey!',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppThemeColor.dullFontColor,
+              fontSize: 16,
+              fontWeight: FontWeight.w400,
+              height: 1.4,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _centerImageView() {
+  Widget _buildQRCodeSection() {
+    return SlideTransition(
+      position: _slideUpAnimation,
+      child: GestureDetector(
+        onTap: () => RouterClass.nextScreenNormal(
+          context,
+          QRScannerWithoutLoginScreen(),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [AppThemeColor.lightBlueColor, Colors.white],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppThemeColor.darkBlueColor.withOpacity(0.08),
+                blurRadius: 20,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppThemeColor.darkBlueColor.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Image.asset(Images.qrCode, height: 220),
+              ),
+              const SizedBox(height: 18),
+              RichText(
+                textAlign: TextAlign.center,
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'Alternatively, ',
+                      style: TextStyle(
+                        color: AppThemeColor.dullFontColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    TextSpan(
+                      text: 'Tap Here',
+                      style: TextStyle(
+                        color: AppThemeColor.darkGreenColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    TextSpan(
+                      text:
+                          ' to scan a QR CODE or input Event Code to sign in!',
+                      style: TextStyle(
+                        color: AppThemeColor.dullFontColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return ScaleTransition(
+      scale: _buttonScaleAnimation,
+      child: Column(
+        children: [
+          _buildPrimaryButton(
+            label: 'Sign Up',
+            onTap: () =>
+                RouterClass.nextScreenNormal(context, const SignupScreen()),
+            isPrimary: true,
+          ),
+          const SizedBox(height: 12),
+          _buildPrimaryButton(
+            label: 'Login',
+            onTap: () =>
+                RouterClass.nextScreenNormal(context, const LoginScreen()),
+            isPrimary: false,
+          ),
+          const SizedBox(height: 18),
+          _buildSocialLoginSection(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPrimaryButton({
+    required String label,
+    required VoidCallback onTap,
+    required bool isPrimary,
+  }) {
     return GestureDetector(
-      onTap: () => RouterClass.nextScreenNormal(
-        context,
-        QRScannerWithoutLoginScreen(),
-      ),
-      child: Image.asset(
-        Images.qrCode,
-        height: _screenHeight / 3.5,
-      ),
-    );
-  }
-
-  Widget _buttonsView() {
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: () => RouterClass.nextScreenNormal(
-            context,
-            const SignupScreen(),
-          ),
-          child: _singleButtonView(label: 'Sign Up'),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: double.infinity,
+        height: 48,
+        decoration: BoxDecoration(
+          gradient: isPrimary
+              ? const LinearGradient(
+                  colors: [AppThemeColor.darkBlueColor, Color(0xFF1E4A8C)],
+                )
+              : null,
+          color: isPrimary ? null : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: isPrimary
+              ? null
+              : Border.all(
+                  color: AppThemeColor.darkBlueColor.withOpacity(0.2),
+                  width: 1.5,
+                ),
+          boxShadow: [
+            BoxShadow(
+              color: isPrimary
+                  ? AppThemeColor.darkBlueColor.withOpacity(0.25)
+                  : Colors.transparent,
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-        GestureDetector(
-          onTap: () => RouterClass.nextScreenNormal(
-            context,
-            const LoginScreen(),
-          ),
-          child: _singleButtonView(label: 'Login'),
-        ),
-        const SizedBox(
-          height: 20,
-        ),
-        const Text(
-          'Continue With',
-          style: TextStyle(
-            color: AppThemeColor.pureBlackColor,
-            fontSize: Dimensions.fontSizeExtraSmall,
-          ),
-        ),
-        const SocialLoginView(),
-      ],
-    );
-  }
-
-  Widget _singleButtonView({required String label}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppThemeColor.darkBlueColor,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      width: 200,
-      height: 40,
-      margin: const EdgeInsets.only(bottom: 15),
-      child: Center(
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: AppThemeColor.pureWhiteColor,
-            fontSize: Dimensions.fontSizeLarge,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _labelView() {
-    return const Column(
-      children: [
-        Text(
-          'Welcome!',
-          style: TextStyle(
-            color: AppThemeColor.darkBlueColor,
-            fontSize: 34,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 15.0),
+        child: Center(
           child: Text(
-            'Thanks for joining! Access or create your account below, and get started on your journey!',
-            textAlign: TextAlign.center,
+            label,
             style: TextStyle(
-              color: AppThemeColor.dullFontColor,
-              fontSize: Dimensions.fontSizeLarge,
-              fontWeight: FontWeight.w500,
+              color: isPrimary
+                  ? AppThemeColor.pureWhiteColor
+                  : AppThemeColor.darkBlueColor,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSocialLoginSection() {
+    return Column(
+      children: [
+        Text(
+          'Continue With',
+          style: TextStyle(
+            color: AppThemeColor.dullFontColor,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 10),
+        const SocialLoginView(),
       ],
     );
   }
