@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/Controller/CustomerController.dart';
@@ -174,28 +175,127 @@ class FirebaseFirestoreHelper {
   }
 
   Future<String> getEventID() async {
-    print('M Called for 1');
-    const String fieldName = 'eventId';
-    final DocumentReference ref = _firestore
-        .collection('Settings')
-        .doc('EventsSettings');
+    print('Generating random event ID...');
+
+    // Curated list of positive, memorable words
+    const List<String> positiveWords = [
+      'SUNNY', 'HAPPY', 'BRIGHT', 'SHINE', 'SPARK', 'GLOW', 'BEAM', 'RISE',
+      'PEACE', 'JOY', 'HOPE', 'DREAM', 'STAR', 'MOON', 'SKY', 'OCEAN',
+      'MOUNTAIN', 'RIVER', 'FOREST', 'GARDEN', 'FLOWER', 'TREE', 'BIRD',
+      'DOLPHIN', 'EAGLE', 'LION', 'TIGER', 'BEAR', 'WOLF', 'FOX', 'DEER',
+      'MUSIC', 'DANCE', 'SING', 'PLAY', 'LAUGH', 'SMILE', 'FRIEND', 'LOVE',
+      'HEART', 'SOUL', 'MIND', 'SPIRIT', 'WISDOM', 'POWER', 'STRENGTH',
+      'BRAVE', 'BOLD', 'SWIFT', 'QUICK', 'FAST', 'SLOW', 'GENTLE', 'KIND',
+      'WARM', 'COOL', 'FRESH', 'NEW', 'OLD', 'YOUNG', 'WISE', 'CLEVER',
+      'SMART', 'BRIGHT', 'SHARP', 'FOCUS', 'AIM', 'GOAL', 'DREAM', 'PLAN',
+      'BUILD', 'CREATE', 'MAKE', 'DO', 'GO', 'COME', 'STAY', 'WAIT',
+      'WATCH', 'SEE', 'LOOK', 'FIND', 'SEEK', 'SEARCH', 'EXPLORE', 'DISCOVER'
+    ];
+
+    // Generate a word-based ID (Word-Number format)
+    String generateWordBasedId() {
+      final random = Random();
+      final word = positiveWords[random.nextInt(positiveWords.length)];
+      final number = random.nextInt(999) + 1; // 1-999
+      return '$word-$number';
+    }
+
+    // Generate a random alphanumeric ID
+    String generateRandomId() {
+      final random = Random();
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      // Generate a 6-character alphanumeric ID
+      return String.fromCharCodes(
+        Iterable.generate(
+          6,
+          (_) => chars.codeUnitAt(random.nextInt(chars.length)),
+        ),
+      );
+    }
+
+    // Generate a random numeric ID (easier to share verbally)
+    String generateNumericId() {
+      final random = Random();
+      // Generate a 6-digit number (100000 to 999999)
+      int randomNumber = random.nextInt(900000) + 100000;
+      return randomNumber.toString();
+    }
+
     try {
-      DocumentSnapshot snap = await ref.get();
-      if (snap.exists == true) {
-        int itemCount = snap[fieldName] ?? 0;
-        await _firestore.collection('Settings').doc('EventsSettings').update({
-          'eventId': itemCount + 1,
-        });
-        print('M Called for $itemCount');
-        return itemCount.toString();
-      } else {
-        // Create the document if it doesn't exist
-        await ref.set({fieldName: 1});
-        print('M Created new EventsSettings document');
-        return '0';
+      // Priority 1: Word-based IDs (most user-friendly)
+      String randomId = generateWordBasedId();
+      int attempts = 0;
+      const maxAttempts = 20; // More attempts for word-based IDs
+
+      // Check if the ID already exists
+      while (attempts < maxAttempts) {
+        DocumentSnapshot eventDoc = await _firestore
+            .collection(EventModel.firebaseKey)
+            .doc(randomId)
+            .get();
+
+        if (!eventDoc.exists) {
+          // ID is unique, return it
+          print('Generated unique word-based event ID: $randomId');
+          return randomId;
+        }
+
+        // ID exists, generate a new one
+        randomId = generateWordBasedId();
+        attempts++;
       }
+
+      // Priority 2: Numeric IDs (fallback for high volume)
+      print('Could not generate unique word-based ID, trying numeric...');
+      randomId = generateNumericId();
+      attempts = 0;
+
+      while (attempts < maxAttempts) {
+        DocumentSnapshot eventDoc = await _firestore
+            .collection(EventModel.firebaseKey)
+            .doc(randomId)
+            .get();
+
+        if (!eventDoc.exists) {
+          // ID is unique, return it
+          print('Generated unique numeric event ID: $randomId');
+          return randomId;
+        }
+
+        // ID exists, generate a new one
+        randomId = generateNumericId();
+        attempts++;
+      }
+
+      // Priority 3: Alphanumeric IDs
+      print('Could not generate unique numeric ID, trying alphanumeric...');
+      randomId = generateRandomId();
+      attempts = 0;
+
+      while (attempts < maxAttempts) {
+        DocumentSnapshot eventDoc = await _firestore
+            .collection(EventModel.firebaseKey)
+            .doc(randomId)
+            .get();
+
+        if (!eventDoc.exists) {
+          // ID is unique, return it
+          print('Generated unique alphanumeric event ID: $randomId');
+          return randomId;
+        }
+
+        // ID exists, generate a new one
+        randomId = generateRandomId();
+        attempts++;
+      }
+
+      // Final fallback: use timestamp-based ID
+      print(
+        'Could not generate unique ID after multiple attempts, using timestamp',
+      );
+      return DateTime.now().millisecondsSinceEpoch.toString();
     } catch (e) {
-      print('Error getting event ID: $e');
+      print('Error generating event ID: $e');
       // Fallback: use timestamp as event ID
       return DateTime.now().millisecondsSinceEpoch.toString();
     }

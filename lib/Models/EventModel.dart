@@ -79,6 +79,27 @@ class EventModel {
     return LatLng(latitude, longitude);
   }
 
+  /// Returns a formatted display ID for the event
+  String get displayId {
+    // For word-based IDs (e.g., "SUNNY-42"), return as is
+    if (id.contains('-') && id.split('-').length == 2) {
+      return id;
+    }
+    // If the ID is numeric, format it with dashes for better readability
+    if (id.length == 6 && int.tryParse(id) != null) {
+      return '${id.substring(0, 3)}-${id.substring(3)}';
+    }
+    // For alphanumeric IDs, format as XXX-XXX
+    if (id.length == 6) {
+      return '${id.substring(0, 3)}-${id.substring(3)}';
+    }
+    // For timestamp-based IDs, return as is
+    return id;
+  }
+
+  /// Returns the raw ID without formatting
+  String get rawId => id;
+
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
 

@@ -16,6 +16,7 @@ import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/Screens/Events/SingleEventScreen.dart';
 import 'package:orgami/Screens/MyEvents/MyEventsScreen.dart';
+import 'package:orgami/Screens/QRScanner/QRScannerFlowScreen.dart';
 
 class QrScannerScreenForLogedIn extends StatefulWidget {
   const QrScannerScreenForLogedIn({super.key});
@@ -53,22 +54,17 @@ class _QrScannerScreenForLogedInState extends State<QrScannerScreenForLogedIn> {
 
   @override
   Widget build(BuildContext context) {
-    _screenWidth = MediaQuery.of(context).size.width;
-    _screenHeight = MediaQuery.of(context).size.height;
+    // Redirect to the new modern QR scanner flow
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const QRScannerFlowScreen()),
+      );
+    });
+
     return Scaffold(
-      body: SafeArea(
-        child: Stack(
-          children: [
-            SizedBox(
-              height: _screenHeight - 110,
-              width: _screenWidth,
-              child: _buildQrView(context),
-            ),
-            _bodyView(),
-            _fieldsView(),
-            AppAppBarView.appBarWithOnlyBackButton(context: context),
-          ],
-        ),
+      backgroundColor: AppThemeColor.pureBlackColor,
+      body: const Center(
+        child: CircularProgressIndicator(color: AppThemeColor.darkBlueColor),
       ),
     );
   }
@@ -93,9 +89,7 @@ class _QrScannerScreenForLogedInState extends State<QrScannerScreenForLogedIn> {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(
-                height: 20,
-              ),
+              const SizedBox(height: 20),
               const Text(
                 'Input Code',
                 textAlign: TextAlign.center,
@@ -114,8 +108,10 @@ class _QrScannerScreenForLogedInState extends State<QrScannerScreenForLogedIn> {
                   controller: _codeController,
                   decoration: const InputDecoration(
                     hintText: 'Input Code here...',
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -161,8 +157,9 @@ class _QrScannerScreenForLogedInState extends State<QrScannerScreenForLogedIn> {
             ? null
             : () async {
                 if (_codeController.text.isEmpty) {
-                  ShowToast()
-                      .showNormalToast(msg: 'Please enter an event code!');
+                  ShowToast().showNormalToast(
+                    msg: 'Please enter an event code!',
+                  );
                   return;
                 }
 
@@ -174,7 +171,8 @@ class _QrScannerScreenForLogedInState extends State<QrScannerScreenForLogedIn> {
                   // Ensure user is properly authenticated
                   if (CustomerController.logeInCustomer == null) {
                     ShowToast().showNormalToast(
-                        msg: 'Please log in to sign in to events.');
+                      msg: 'Please log in to sign in to events.',
+                    );
                     setState(() {
                       _isLoading = false;
                     });
@@ -224,9 +222,11 @@ class _QrScannerScreenForLogedInState extends State<QrScannerScreenForLogedIn> {
                       // No prompts, sign in directly
                       try {
                         print(
-                            'Recording attendance for event: ${newAttendanceModel.eventId}');
+                          'Recording attendance for event: ${newAttendanceModel.eventId}',
+                        );
                         print(
-                            'Attendance data: ${newAttendanceModel.toJson()}');
+                          'Attendance data: ${newAttendanceModel.toJson()}',
+                        );
 
                         await FirebaseFirestore.instance
                             .collection(AttendanceModel.firebaseKey)
@@ -234,8 +234,9 @@ class _QrScannerScreenForLogedInState extends State<QrScannerScreenForLogedIn> {
                             .set(newAttendanceModel.toJson());
 
                         print('Attendance recorded successfully');
-                        ShowToast()
-                            .showNormalToast(msg: 'Signed In Successfully!');
+                        ShowToast().showNormalToast(
+                          msg: 'Signed In Successfully!',
+                        );
                         // Navigate to event details after a short delay
                         Future.delayed(const Duration(seconds: 1), () {
                           RouterClass.nextScreenAndReplacement(
@@ -248,26 +249,30 @@ class _QrScannerScreenForLogedInState extends State<QrScannerScreenForLogedIn> {
                         Future.delayed(const Duration(milliseconds: 1500), () {
                           Navigator.of(context).pushAndRemoveUntil(
                             MaterialPageRoute(
-                                builder: (context) => const MyEventsScreen()),
+                              builder: (context) => const MyEventsScreen(),
+                            ),
                             (Route<dynamic> route) => false,
                           );
                         });
                       } catch (firestoreError) {
                         print(
-                            'Firestore error during sign-in: $firestoreError');
+                          'Firestore error during sign-in: $firestoreError',
+                        );
                         ShowToast().showNormalToast(
-                            msg:
-                                'Failed to save attendance. Please try again.');
+                          msg: 'Failed to save attendance. Please try again.',
+                        );
                       }
                     }
                   } else {
-                    ShowToast()
-                        .showNormalToast(msg: 'Entered an incorrect code!');
+                    ShowToast().showNormalToast(
+                      msg: 'Entered an incorrect code!',
+                    );
                   }
                 } catch (e) {
                   print('Error signing in: $e');
                   ShowToast().showNormalToast(
-                      msg: 'Failed to sign in. Please try again.');
+                    msg: 'Failed to sign in. Please try again.',
+                  );
                 } finally {
                   setState(() {
                     _isLoading = false;
@@ -303,7 +308,8 @@ class _QrScannerScreenForLogedInState extends State<QrScannerScreenForLogedIn> {
 
   Widget _buildQrView(BuildContext context) {
     // For this example we check how width or tall the device is and change the scanArea and overlay accordingly.
-    var scanArea = (MediaQuery.of(context).size.width < 400 ||
+    var scanArea =
+        (MediaQuery.of(context).size.width < 400 ||
             MediaQuery.of(context).size.height < 400)
         ? 150.0
         : 300.0;
@@ -313,11 +319,12 @@ class _QrScannerScreenForLogedInState extends State<QrScannerScreenForLogedIn> {
       key: qrKey,
       onQRViewCreated: _onQRViewCreated,
       overlay: QrScannerOverlayShape(
-          borderColor: Colors.red,
-          borderRadius: 10,
-          borderLength: 30,
-          borderWidth: 10,
-          cutOutSize: scanArea),
+        borderColor: Colors.red,
+        borderRadius: 10,
+        borderLength: 30,
+        borderWidth: 10,
+        cutOutSize: scanArea,
+      ),
       // onPermissionSet: (ctrl, p) => _onPermissionSet(context, ctrl, p),
     );
   }

@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
@@ -29,6 +30,7 @@ import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 import 'package:orgami/Screens/MyEvents/MyEventsScreen.dart';
 import 'package:orgami/Screens/Events/FeatureEventScreen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:share_plus/share_plus.dart';
 
 class SingleEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -646,23 +648,26 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                       ),
                     ),
                     const SizedBox(width: 12),
-                    GestureDetector(
-                      onTap: () => showDialog(
-                        context: context,
-                        builder: (context) =>
-                            ShareQRDialog(singleEvent: eventModel),
-                      ),
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Icon(
-                          Icons.qr_code_2_rounded,
-                          color: Colors.white,
-                          size: 20,
+                    Tooltip(
+                      message: 'Share QR Code & Event ID',
+                      child: GestureDetector(
+                        onTap: () => _showQuickShareOptions(),
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.qr_code_2_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                         ),
                       ),
                     ),
@@ -1472,5 +1477,181 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         ],
       ),
     );
+  }
+
+  void _showQuickShareOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Title
+              const Text(
+                'Share Event',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppThemeColor.darkBlueColor,
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Share options
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  children: [
+                    _buildShareOption(
+                      icon: Icons.qr_code_2_rounded,
+                      title: 'Share QR Code & Event ID',
+                      subtitle: 'Generate QR code with event identifier',
+                      onTap: () {
+                        Navigator.pop(context);
+                        showDialog(
+                          context: context,
+                          barrierDismissible: true,
+                          builder: (context) =>
+                              ShareQRDialog(singleEvent: eventModel),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    _buildShareOption(
+                      icon: Icons.share_rounded,
+                      title: 'Share Event Details',
+                      subtitle: 'Share event information',
+                      onTap: () {
+                        Navigator.pop(context);
+                        _shareEventDetails();
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    _buildShareOption(
+                      icon: Icons.copy_rounded,
+                      title: 'Copy Event ID',
+                      subtitle: 'Copy event identifier to clipboard',
+                      onTap: () {
+                        Navigator.pop(context);
+                        _copyEventId();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShareOption({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey[200]!),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppThemeColor.darkGreenColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: AppThemeColor.darkGreenColor, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppThemeColor.darkBlueColor,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppThemeColor.dullFontColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              color: AppThemeColor.dullFontColor,
+              size: 16,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _shareEventDetails() {
+    HapticFeedback.lightImpact();
+    final eventDetails =
+        '''
+🎉 Join my event!
+
+📅 Event: ${eventModel.title}
+📍 Location: ${eventModel.location}
+🆔 Event ID: ${eventModel.rawId}
+📝 Description: ${eventModel.description}
+
+Join us for an amazing time!
+    '''
+            .trim();
+
+    Share.share(
+      eventDetails,
+      subject: 'Event Invitation - ${eventModel.title}',
+    );
+  }
+
+  void _copyEventId() {
+    HapticFeedback.lightImpact();
+    Clipboard.setData(ClipboardData(text: eventModel.rawId));
+    ShowToast().showSnackBar('Event ID copied to clipboard', context);
   }
 }

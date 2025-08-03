@@ -17,7 +17,7 @@ class FeatureEventScreen extends StatefulWidget {
 
 class _FeatureEventScreenState extends State<FeatureEventScreen>
     with TickerProviderStateMixin {
-  int _selectedDays = 7;
+  int? _selectedDays;
   bool _loading = false;
   final List<int> _tiers = [3, 7, 14];
 
@@ -403,7 +403,8 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
               child: GestureDetector(
                 onTap: () {
                   setState(() {
-                    _selectedDays = days;
+                    // Toggle selection: if already selected, unselect; otherwise select
+                    _selectedDays = (_selectedDays == days) ? null : days;
                   });
                 },
                 child: Container(
@@ -476,26 +477,41 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
         width: double.infinity,
         height: 56,
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFFF9800), Color(0xFFFF5722)],
-          ),
+          gradient: _selectedDays != null
+              ? const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFFFF9800), Color(0xFFFF5722)],
+                )
+              : const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFFF3F4F6), Color(0xFFE5E7EB)],
+                ),
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFFF9800).withOpacity(0.3),
-              spreadRadius: 0,
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          boxShadow: _selectedDays != null
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFFFF9800).withOpacity(0.3),
+                    spreadRadius: 0,
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    spreadRadius: 0,
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
-            onTap: _loading ? null : _featureEvent,
+            onTap: (_loading || _selectedDays == null) ? null : _featureEvent,
             child: Center(
               child: _loading
                   ? const SizedBox(
@@ -506,10 +522,14 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
                         strokeWidth: 2,
                       ),
                     )
-                  : const Text(
-                      'Feature Now',
+                  : Text(
+                      _selectedDays != null
+                          ? 'Feature Now'
+                          : 'Select Duration to Feature',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: _selectedDays != null
+                            ? Colors.white
+                            : const Color(0xFF6B7280),
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                         fontFamily: 'Roboto',
@@ -523,8 +543,10 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
   }
 
   Future<void> _featureEvent() async {
+    if (_selectedDays == null) return;
+
     setState(() => _loading = true);
-    final endDate = DateTime.now().add(Duration(days: _selectedDays));
+    final endDate = DateTime.now().add(Duration(days: _selectedDays!));
     await FirebaseFirestore.instance
         .collection(EventModel.firebaseKey)
         .doc(widget.eventModel.id)
