@@ -7,7 +7,7 @@ import 'package:orgami/Controller/CustomerController.dart';
 import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Firebase/FirebaseStorageHelper.dart';
 import 'package:orgami/Screens/Feedback/FeedbackScreen.dart';
-import 'package:orgami/Screens/MyEvents/MyEventsScreen.dart';
+
 import 'package:orgami/Screens/Home/AnalyticsDashboardScreen.dart';
 import 'package:orgami/Utils/AppConstants.dart';
 import 'package:orgami/Utils/Colors.dart';
@@ -206,14 +206,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: 'View and edit your profile',
             onTap: () =>
                 RouterClass.nextScreenNormal(context, MyProfileScreen()),
-          ),
-          _buildDivider(),
-          _buildSettingsItem(
-            icon: Icons.event_note_rounded,
-            title: 'My Events',
-            subtitle: 'Manage your created events',
-            onTap: () =>
-                RouterClass.nextScreenNormal(context, const MyEventsScreen()),
           ),
           _buildDivider(),
           _buildSettingsItem(

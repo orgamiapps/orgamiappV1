@@ -11,7 +11,6 @@ import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
-import 'package:orgami/Screens/MyEvents/MyEventsScreen.dart';
 
 class AnsQuestionsToSignInEventScreen extends StatefulWidget {
   final EventModel eventModel;

@@ -34,7 +34,7 @@ import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:orgami/Models/TicketModel.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
-import 'package:orgami/Screens/MyEvents/MyEventsScreen.dart';
+
 import 'package:orgami/Screens/Events/FeatureEventScreen.dart';
 import 'package:orgami/Screens/Events/EditEventScreen.dart';
 import 'package:cached_network_image/cached_network_image.dart';

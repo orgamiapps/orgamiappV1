@@ -14,7 +14,7 @@ import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/Screens/Events/SingleEventScreen.dart';
-import 'package:orgami/Screens/MyEvents/MyEventsScreen.dart';
+
 
 class QRScannerFlowScreen extends StatefulWidget {
   const QRScannerFlowScreen({super.key});

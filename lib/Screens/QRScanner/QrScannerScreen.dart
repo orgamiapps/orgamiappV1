@@ -14,7 +14,7 @@ import 'package:orgami/Utils/dimensions.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/Screens/Events/SingleEventScreen.dart';
-import 'package:orgami/Screens/MyEvents/MyEventsScreen.dart';
+
 import 'package:orgami/Screens/QRScanner/QRScannerFlowScreen.dart';
 
 class QRScannerScreen extends StatefulWidget {

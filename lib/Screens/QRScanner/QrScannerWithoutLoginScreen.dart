@@ -16,7 +16,7 @@ import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
 import 'package:orgami/Screens/Events/SingleEventScreen.dart';
-import 'package:orgami/Screens/MyEvents/MyEventsScreen.dart';
+
 import 'package:orgami/Screens/QRScanner/QRScannerFlowScreen.dart';
 
 class QRScannerWithoutLoginScreen extends StatefulWidget {
