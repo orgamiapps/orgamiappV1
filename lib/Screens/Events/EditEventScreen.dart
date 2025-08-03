@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Models/EventModel.dart';
 import 'package:orgami/Screens/Events/SingleEventScreen.dart';
+import 'package:orgami/Screens/Events/Widget/DeleteEventDialouge.dart';
 import 'package:orgami/Utils/Colors.dart';
 import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/Utils/TextFields.dart';
@@ -309,6 +310,10 @@ class _EditEventScreenState extends State<EditEventScreen>
 
           // Submit Button
           _buildSubmitButton(),
+          const SizedBox(height: 16),
+
+          // Delete Event Button
+          _buildDeleteButton(),
         ],
       ),
     );
@@ -763,6 +768,55 @@ class _EditEventScreenState extends State<EditEventScreen>
                   fontFamily: 'Roboto',
                 ),
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeleteButton() {
+    return Container(
+      width: double.infinity,
+      height: 56,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFF5722), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFF5722).withOpacity(0.1),
+            spreadRadius: 0,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => showDialog(
+            context: context,
+            builder: (context) =>
+                DeleteEventDialoge(singleEvent: widget.eventModel),
+          ),
+          child: const Center(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.delete_forever, color: Color(0xFFFF5722), size: 20),
+                SizedBox(width: 8),
+                Text(
+                  'Delete Event',
+                  style: TextStyle(
+                    color: Color(0xFFFF5722),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ],
             ),
           ),
         ),

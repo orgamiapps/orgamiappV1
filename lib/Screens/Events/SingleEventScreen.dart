@@ -18,7 +18,7 @@ import 'package:orgami/Screens/Events/Attendance/AttendanceSheetScreen.dart';
 import 'package:orgami/Screens/Events/Widget/AttendeesHorizontalList.dart';
 import 'package:orgami/Screens/Events/Widget/PreRegisteredHorizontalList.dart';
 import 'package:orgami/Screens/Events/Widget/CommentsSection.dart';
-import 'package:orgami/Screens/Events/Widget/DeleteEventDialouge.dart';
+// DeleteEventDialouge import removed - no longer needed in SingleEventScreen
 import 'package:orgami/Screens/Events/Widget/QRDialouge.dart';
 import 'package:orgami/Screens/Events/TicketManagementScreen.dart';
 import 'package:orgami/Screens/Events/EventAnalyticsScreen.dart';
@@ -1138,48 +1138,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () => showDialog(
-                        context: context,
-                        builder: (context) =>
-                            DeleteEventDialoge(singleEvent: eventModel),
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFF5722).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: const Color(0xFFFF5722),
-                            width: 1,
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.delete,
-                              color: Color(0xFFFF5722),
-                              size: 16,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              'Delete',
-                              style: TextStyle(
-                                color: Color(0xFFFF5722),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                fontFamily: 'Roboto',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                    // Delete button moved to EditEventScreen
                   ],
                 ),
             ],
