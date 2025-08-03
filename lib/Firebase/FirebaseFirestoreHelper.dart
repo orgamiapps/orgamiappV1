@@ -537,6 +537,28 @@ class FirebaseFirestoreHelper {
     }
   }
 
+  // Get attendance by user and event
+  Future<AttendanceModel?> getAttendanceByUserAndEvent({
+    required String customerUid,
+    required String eventId,
+  }) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection(AttendanceModel.firebaseKey)
+          .where('customerUid', isEqualTo: customerUid)
+          .where('eventId', isEqualTo: eventId)
+          .get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        return AttendanceModel.fromJson(querySnapshot.docs.first);
+      }
+      return null;
+    } catch (e) {
+      print('Error getting attendance by user and event: $e');
+      return null;
+    }
+  }
+
   // Get events created by a user
   Future<List<EventModel>> getEventsCreatedByUser(String userId) async {
     try {

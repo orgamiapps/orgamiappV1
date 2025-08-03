@@ -22,6 +22,7 @@ import 'package:orgami/Screens/Events/Widget/CommentsSection.dart';
 // DeleteEventDialouge import removed - no longer needed in SingleEventScreen
 import 'package:orgami/Screens/Events/Widget/QRDialouge.dart';
 import 'package:orgami/Screens/Events/TicketManagementScreen.dart';
+import 'package:orgami/Screens/Events/TicketScannerScreen.dart';
 import 'package:orgami/Screens/Events/EventAnalyticsScreen.dart';
 import 'package:orgami/Screens/MyProfile/MyTicketsScreen.dart';
 import 'package:orgami/Screens/QRScanner/AnsQuestionsToSignInEventScreen.dart';
@@ -2181,6 +2182,35 @@ class _SingleEventScreenState extends State<SingleEventScreen>
           ),
           isFullWidth: true,
         ),
+        const SizedBox(height: 12),
+
+        // Scan Tickets Button (Full Width)
+        if (eventModel.ticketsEnabled && eventModel.issuedTickets > 0)
+          _buildActionCard(
+            icon: Icons.qr_code_scanner,
+            title: 'Scan Tickets',
+            subtitle: 'Scan attendee QR codes to validate tickets',
+            color: const Color(0xFF10B981),
+            onTap: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TicketScannerScreen(
+                    eventId: eventModel.id,
+                    eventTitle: eventModel.title,
+                  ),
+                ),
+              );
+
+              // Show success message if ticket was validated
+              if (result == true) {
+                ShowToast().showNormalToast(
+                  msg: 'Ticket validated successfully!',
+                );
+              }
+            },
+            isFullWidth: true,
+          ),
       ],
     );
   }
@@ -2390,6 +2420,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                   context,
                                   AddQuestionsToEventScreen(
                                     eventModel: eventModel,
+                                    onBackPressed: () => _showEventManagementModal(),
                                   ),
                                 );
                               },
@@ -2403,7 +2434,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                 Navigator.pop(context);
                                 RouterClass.nextScreenNormal(
                                   context,
-                                  AttendanceSheetScreen(eventModel: eventModel),
+                                  AttendanceSheetScreen(
+                                    eventModel: eventModel,
+                                    onBackPressed: () => _showEventManagementModal(),
+                                  ),
                                 );
                               },
                             ),
@@ -2418,6 +2452,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                   context,
                                   TicketManagementScreen(
                                     eventModel: eventModel,
+                                    onBackPressed: () =>
+                                        _showEventManagementModal(),
                                   ),
                                 );
                               },
@@ -2434,14 +2470,27 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                           children: [
                             _buildManagementOption(
                               icon: Icons.qr_code_scanner,
-                              title: 'Scan QR Codes',
-                              subtitle: 'Scan attendee QR codes for check-in',
-                              onTap: () {
+                              title: 'Scan Tickets',
+                              subtitle:
+                                  'Scan attendee ticket QR codes for validation',
+                              onTap: () async {
                                 Navigator.pop(context);
-                                RouterClass.nextScreenNormal(
+                                final result = await Navigator.push(
                                   context,
-                                  QrScannerScreenForLogedIn(),
+                                  MaterialPageRoute(
+                                    builder: (context) => TicketScannerScreen(
+                                      eventId: eventModel.id,
+                                      eventTitle: eventModel.title,
+                                    ),
+                                  ),
                                 );
+
+                                // Show success message if ticket was validated
+                                if (result == true) {
+                                  ShowToast().showNormalToast(
+                                    msg: 'Ticket validated successfully!',
+                                  );
+                                }
                               },
                             ),
                             const SizedBox(height: 12),
@@ -3141,8 +3190,8 @@ Join us for an amazing time!
         // Description
         Text(
           _hasTicket
-              ? 'You have a ticket for this event. Show the ticket code to the event host when you arrive.'
-              : 'Get a free ticket for this event. Show the ticket code to the event host when you arrive.',
+              ? 'You have a ticket for this event. Show the QR code to the event host when you arrive.'
+              : 'Get a free ticket for this event. You\'ll receive a QR code to show the event host when you arrive.',
           style: const TextStyle(
             color: Color(0xFF6B7280),
             fontSize: 14,

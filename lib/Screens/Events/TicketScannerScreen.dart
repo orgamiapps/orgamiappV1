@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Models/TicketModel.dart';
+import 'package:orgami/Models/AttendanceModel.dart';
 import 'package:orgami/Utils/Colors.dart';
 import 'package:orgami/Utils/Toast.dart';
 import 'package:intl/intl.dart';
+import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
 
 class TicketScannerScreen extends StatefulWidget {
   final String eventId;
@@ -24,10 +26,26 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
   final TextEditingController _ticketCodeController = TextEditingController();
   bool isLoading = false;
   TicketModel? scannedTicket;
+  QRViewController? qrController;
+  bool isScanning = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticketCodeController.addListener(_onTicketCodeChanged);
+  }
+
+  void _onTicketCodeChanged() {
+    setState(() {
+      // This will trigger a rebuild when the text changes
+    });
+  }
 
   @override
   void dispose() {
+    _ticketCodeController.removeListener(_onTicketCodeChanged);
     _ticketCodeController.dispose();
+    qrController?.dispose();
     super.dispose();
   }
 
@@ -38,6 +56,10 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
       return;
     }
 
+    await _processTicketCode(ticketCode);
+  }
+
+  Future<void> _processTicketCode(String ticketCode) async {
     setState(() {
       isLoading = true;
     });
@@ -73,6 +95,28 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
         ShowToast().showNormalToast(msg: 'Error scanning ticket: $e');
       }
     }
+  }
+
+  void _onQRViewCreated(QRViewController controller) {
+    setState(() {
+      qrController = controller;
+    });
+
+    controller.scannedDataStream.listen((scanData) async {
+      if (scanData.code != null) {
+        // Parse QR code data
+        final qrData = TicketModel.parseQRCodeData(scanData.code!);
+        if (qrData != null) {
+          // Extract ticket code from QR data
+          final ticketCode = qrData['ticketCode'];
+          if (ticketCode != null) {
+            await _processTicketCode(ticketCode);
+          }
+        } else {
+          ShowToast().showNormalToast(msg: 'Invalid QR code format');
+        }
+      }
+    });
   }
 
   void _showTicketValidationDialog(TicketModel ticket) {
@@ -167,20 +211,51 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
     });
 
     try {
+      // First, check if user is already signed in to attendance
+      final existingAttendance = await FirebaseFirestoreHelper()
+          .getAttendanceByUserAndEvent(
+            customerUid: ticket.customerUid,
+            eventId: ticket.eventId,
+          );
+
+      // Validate the ticket
       await FirebaseFirestoreHelper().useTicket(
         ticketId: ticket.id,
         usedBy: 'Event Host',
       );
 
+      // If user is not already signed in to attendance, add them
+      if (existingAttendance == null) {
+        final attendanceId = '${ticket.eventId}-${ticket.customerUid}';
+        final attendanceModel = AttendanceModel(
+          id: attendanceId,
+          eventId: ticket.eventId,
+          userName: ticket.customerName,
+          customerUid: ticket.customerUid,
+          attendanceDateTime: DateTime.now(),
+          answers: [],
+        );
+
+        await FirebaseFirestoreHelper().addAttendance(attendanceModel);
+      }
+
       if (mounted) {
         setState(() {
           isLoading = false;
         });
-        ShowToast().showNormalToast(msg: 'Ticket validated successfully!');
+
+        final message = existingAttendance == null
+            ? 'Ticket validated and attendee signed in successfully!'
+            : 'Ticket validated successfully!';
+        ShowToast().showNormalToast(msg: message);
+
         _ticketCodeController.clear();
         setState(() {
           scannedTicket = null;
         });
+
+        // Return to previous screen with success result
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
@@ -190,6 +265,12 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
         ShowToast().showNormalToast(msg: 'Failed to validate ticket: $e');
       }
     }
+  }
+
+  void _toggleScanning() {
+    setState(() {
+      isScanning = !isScanning;
+    });
   }
 
   @override
@@ -323,7 +404,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
               ),
               const SizedBox(width: 16),
               const Text(
-                'Scan Ticket',
+                'Manual Entry',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -335,7 +416,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Enter the ticket code or scan the QR code to validate tickets.',
+            'Scan the QR code or enter the ticket code manually to validate tickets.',
             style: TextStyle(
               fontSize: 14,
               color: Color(0xFF6B7280),
@@ -343,6 +424,88 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
             ),
           ),
           const SizedBox(height: 20),
+
+          // QR Scanner Section
+          if (isScanning) ...[
+            Container(
+              height: 300,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF667EEA)),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: QRView(
+                  key: GlobalKey(debugLabel: 'QR'),
+                  onQRViewCreated: _onQRViewCreated,
+                  overlay: QrScannerOverlayShape(
+                    borderColor: const Color(0xFF667EEA),
+                    borderRadius: 10,
+                    borderLength: 30,
+                    borderWidth: 3,
+                    cutOutSize: 250,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _toggleScanning,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEF4444),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Stop Scanning',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ),
+            ),
+          ] else ...[
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _toggleScanning,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF667EEA),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
+                label: const Text(
+                  'Start QR Scanner',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Or enter ticket code manually:',
+              style: TextStyle(
+                fontSize: 14,
+                color: Color(0xFF6B7280),
+                fontFamily: 'Roboto',
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          // Manual Entry Section
           TextField(
             controller: _ticketCodeController,
             decoration: InputDecoration(
@@ -376,9 +539,13 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
             width: double.infinity,
             height: 56,
             child: ElevatedButton(
-              onPressed: isLoading ? null : _scanTicket,
+              onPressed: isLoading || _ticketCodeController.text.trim().isEmpty
+                  ? null
+                  : _scanTicket,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF9800),
+                backgroundColor: _ticketCodeController.text.trim().isEmpty
+                    ? const Color(0xFFE5E7EB)
+                    : const Color(0xFFFF9800),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -395,14 +562,10 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                   : const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.qr_code_scanner,
-                          color: Colors.white,
-                          size: 24,
-                        ),
+                        Icon(Icons.check_circle, color: Colors.white, size: 24),
                         SizedBox(width: 12),
                         Text(
-                          'Scan Ticket',
+                          'Validate Ticket',
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,

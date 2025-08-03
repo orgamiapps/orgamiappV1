@@ -10,7 +10,12 @@ import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
 class AddQuestionsToEventScreen extends StatefulWidget {
   final EventModel eventModel;
-  const AddQuestionsToEventScreen({super.key, required this.eventModel});
+  final VoidCallback? onBackPressed;
+  const AddQuestionsToEventScreen({
+    super.key,
+    required this.eventModel,
+    this.onBackPressed,
+  });
 
   @override
   State<AddQuestionsToEventScreen> createState() =>
@@ -276,7 +281,15 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
           Row(
             children: [
               GestureDetector(
-                onTap: () => Navigator.pop(context),
+                onTap: () {
+                  Navigator.pop(context);
+                  // Call the callback to show Event Management popup again
+                  if (widget.onBackPressed != null) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      widget.onBackPressed!();
+                    });
+                  }
+                },
                 child: Container(
                   width: 40,
                   height: 40,

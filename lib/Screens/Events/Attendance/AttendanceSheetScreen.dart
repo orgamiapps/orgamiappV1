@@ -23,7 +23,12 @@ import 'package:cross_file/cross_file.dart';
 
 class AttendanceSheetScreen extends StatefulWidget {
   final EventModel eventModel;
-  const AttendanceSheetScreen({super.key, required this.eventModel});
+  final VoidCallback? onBackPressed;
+  const AttendanceSheetScreen({
+    super.key,
+    required this.eventModel,
+    this.onBackPressed,
+  });
 
   @override
   State<AttendanceSheetScreen> createState() => _AttendanceSheetScreenState();
@@ -456,7 +461,15 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
           child: Row(
             children: [
               InkWell(
-                onTap: () => Navigator.pop(context),
+                onTap: () {
+                  Navigator.pop(context);
+                  // Call the callback to show Event Management popup again
+                  if (widget.onBackPressed != null) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      widget.onBackPressed!();
+                    });
+                  }
+                },
                 child: AppButtons.roundedButton(
                   iconData: Icons.arrow_back_ios_rounded,
                   iconColor: AppThemeColor.pureWhiteColor,

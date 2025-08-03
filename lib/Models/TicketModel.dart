@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:math';
 
 class TicketModel {
   static String firebaseKey = 'Tickets';
@@ -37,7 +38,7 @@ class TicketModel {
     final data = parsedJson is Map
         ? parsedJson
         : (parsedJson.data() as Map<String, dynamic>);
-    
+
     return TicketModel(
       id: data['id'],
       eventId: data['eventId'],
@@ -75,16 +76,40 @@ class TicketModel {
     };
   }
 
-  // Generate a unique ticket code
+  // Generate a unique ticket code with better randomization
   static String generateTicketCode() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    final random = DateTime.now().millisecondsSinceEpoch;
+    final random = Random.secure(); // Use secure random for better uniqueness
     final code = StringBuffer();
     
+    // Generate 8-character code with better randomization
     for (int i = 0; i < 8; i++) {
-      code.write(chars[random % chars.length]);
+      code.write(chars[random.nextInt(chars.length)]);
     }
     
     return code.toString();
   }
-} 
+
+  // Generate QR code data for this ticket
+  String get qrCodeData {
+    // Include ticket ID, event ID, and ticket code for validation
+    return 'orgami_ticket_${id}_${eventId}_${ticketCode}';
+  }
+
+  // Parse QR code data to extract ticket information
+  static Map<String, String>? parseQRCodeData(String qrData) {
+    if (!qrData.startsWith('orgami_ticket_')) {
+      return null;
+    }
+
+    final parts = qrData.split('_');
+    if (parts.length >= 4) {
+      return {
+        'ticketId': parts[2],
+        'eventId': parts[3],
+        'ticketCode': parts[4],
+      };
+    }
+    return null;
+  }
+}
