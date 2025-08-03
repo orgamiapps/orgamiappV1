@@ -217,19 +217,19 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // Modern App Bar
+            // Enhanced App Bar with better spacing
             Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: Dimensions.paddingSizeLarge,
-                vertical: Dimensions.paddingSizeDefault,
+                vertical: Dimensions.paddingSizeLarge,
               ),
               decoration: BoxDecoration(
                 color: AppThemeColor.pureWhiteColor,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 15,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
@@ -251,7 +251,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                       ),
                     ),
                   ),
-                  const SizedBox(width: Dimensions.spaceSizedDefault),
+                  const SizedBox(width: Dimensions.spaceSizedLarge),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -264,6 +264,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                             color: AppThemeColor.darkBlueColor,
                           ),
                         ),
+                        const SizedBox(height: 4),
                         Text(
                           'Comprehensive insights & AI analysis',
                           style: TextStyle(
@@ -295,85 +296,112 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
               ),
             ),
 
-            // Modern Date Filter Chips
+            // Enhanced Date Filter Chips with better spacing
             Container(
               margin: const EdgeInsets.symmetric(
                 horizontal: Dimensions.paddingSizeLarge,
-                vertical: Dimensions.paddingSizeDefault,
+                vertical: Dimensions.paddingSizeLarge,
               ),
-              child: Wrap(
-                spacing: Dimensions.spaceSizeSmall,
-                runSpacing: Dimensions.spaceSizeSmall,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildFilterChip('All Time', 'all'),
-                  _buildFilterChip('Last Week', 'week'),
-                  _buildFilterChip('Last Month', 'month'),
+                  Text(
+                    'Time Period',
+                    style: TextStyle(
+                      fontSize: Dimensions.fontSizeDefault,
+                      fontWeight: FontWeight.w600,
+                      color: AppThemeColor.darkBlueColor,
+                    ),
+                  ),
+                  const SizedBox(height: Dimensions.spaceSizeSmall),
+                  Wrap(
+                    spacing: Dimensions.spaceSizeSmall,
+                    runSpacing: Dimensions.spaceSizeSmall,
+                    children: [
+                      _buildFilterChip('All Time', 'all'),
+                      _buildFilterChip('Last Week', 'week'),
+                      _buildFilterChip('Last Month', 'month'),
+                    ],
+                  ),
                 ],
               ),
             ),
 
             // Modern Tab Bar
+            // Enhanced Tab Bar with better spacing and design
             Container(
               margin: const EdgeInsets.symmetric(
                 horizontal: Dimensions.paddingSizeLarge,
+                vertical: Dimensions.paddingSizeDefault,
               ),
               decoration: BoxDecoration(
                 color: AppThemeColor.lightBlueColor,
                 borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 5,
-                    offset: const Offset(0, 2),
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
-              child: TabBar(
-                controller: _tabController,
-                indicator: BoxDecoration(
-                  borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-                  color: AppThemeColor.darkBlueColor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppThemeColor.darkBlueColor.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+              child: Padding(
+                padding: const EdgeInsets.all(6.0),
+                child: TabBar(
+                  controller: _tabController,
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  indicator: BoxDecoration(
+                    borderRadius: BorderRadius.circular(
+                      Dimensions.radiusDefault,
                     ),
+                    color: AppThemeColor.darkBlueColor,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppThemeColor.darkBlueColor.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  labelColor: AppThemeColor.pureWhiteColor,
+                  unselectedLabelColor: AppThemeColor.darkBlueColor,
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: Dimensions.fontSizeDefault,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: Dimensions.fontSizeDefault,
+                  ),
+                  tabs: [
+                    Tab(child: _buildTabText('Overview')),
+                    Tab(child: _buildAITabText()),
+                    Tab(child: _buildTabText('Trends')),
+                    Tab(child: _buildTabText('Users')),
                   ],
                 ),
-                labelColor: AppThemeColor.pureWhiteColor,
-                unselectedLabelColor: AppThemeColor.darkBlueColor,
-                labelStyle: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: Dimensions.fontSizeDefault,
-                ),
-                unselectedLabelStyle: const TextStyle(
-                  fontWeight: FontWeight.w500,
-                  fontSize: Dimensions.fontSizeDefault,
-                ),
-                tabs: const [
-                  Tab(text: 'Overview'),
-                  Tab(text: 'AI Insights'),
-                  Tab(text: 'Trends'),
-                  Tab(text: 'Users'),
-                ],
               ),
             ),
 
-            // Tab Bar View
+            // Enhanced Tab Bar View with better spacing
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _overviewTab(),
-                  _aiInsightsTab(),
-                  _trendsTab(),
-                  _usersTab(),
-                ],
+              child: Container(
+                margin: const EdgeInsets.symmetric(
+                  horizontal: Dimensions.paddingSizeLarge,
+                ),
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _overviewTab(),
+                    _aiInsightsTab(),
+                    _trendsTab(),
+                    _usersTab(),
+                  ],
+                ),
               ),
             ),
 
-            // Modern Compliance Notice
+            // Enhanced Compliance Notice with better spacing
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
@@ -382,6 +410,13 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                 color: AppThemeColor.lightBlueColor,
                 borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
                 border: Border.all(color: AppThemeColor.borderColor),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Row(
                 children: [
@@ -395,11 +430,11 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                     ),
                     child: Icon(
                       Icons.security_rounded,
-                      size: 16,
+                      size: 18,
                       color: AppThemeColor.darkBlueColor,
                     ),
                   ),
-                  const SizedBox(width: Dimensions.spaceSizeSmall),
+                  const SizedBox(width: Dimensions.spaceSizedDefault),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -412,12 +447,13 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                             color: AppThemeColor.darkBlueColor,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Text(
                           'Data is aggregated without personal identifiers. Analytics are anonymized for privacy compliance.',
                           style: TextStyle(
                             fontSize: Dimensions.fontSizeSmall,
                             color: AppThemeColor.dullFontColor,
+                            height: 1.4,
                           ),
                         ),
                       ],
@@ -442,6 +478,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
               ? AppThemeColor.pureWhiteColor
               : AppThemeColor.darkBlueColor,
           fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+          fontSize: Dimensions.fontSizeSmall,
         ),
       ),
       selected: isSelected,
@@ -457,12 +494,54 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
         color: isSelected
             ? AppThemeColor.darkBlueColor
             : AppThemeColor.borderColor,
-        width: 1,
+        width: 1.5,
       ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
       ),
-      elevation: isSelected ? 4 : 0,
+      elevation: isSelected ? 6 : 1,
+      pressElevation: 8,
+      padding: const EdgeInsets.symmetric(
+        horizontal: Dimensions.paddingSizeDefault,
+        vertical: Dimensions.paddingSizeSmall,
+      ),
+    );
+  }
+
+  Widget _buildTabText(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontWeight: FontWeight.w600,
+        fontSize: Dimensions.fontSizeDefault,
+      ),
+      textAlign: TextAlign.center,
+      overflow: TextOverflow.visible,
+    );
+  }
+
+  Widget _buildAITabText() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'AI',
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: Dimensions.fontSizeSmall,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Insights',
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: Dimensions.fontSizeSmall,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 
@@ -528,35 +607,86 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
 
         if (!snapshot.hasData || !snapshot.data!.exists) {
           return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.analytics_outlined,
-                  size: 64,
-                  color: Colors.grey[400],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No analytics data available',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[600],
-                    fontFamily: 'Roboto',
+            child: Padding(
+              padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+                    decoration: BoxDecoration(
+                      color: AppThemeColor.lightBlueColor,
+                      borderRadius: BorderRadius.circular(
+                        Dimensions.radiusLarge,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.analytics_outlined,
+                      size: 64,
+                      color: AppThemeColor.dullIconColor,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Analytics will appear once attendees start signing in',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[500],
-                    fontFamily: 'Roboto',
+                  const SizedBox(height: Dimensions.spaceSizedLarge),
+                  Text(
+                    'No Analytics Data Available',
+                    style: TextStyle(
+                      fontSize: Dimensions.fontSizeExtraLarge,
+                      fontWeight: FontWeight.w600,
+                      color: AppThemeColor.darkBlueColor,
+                      fontFamily: 'Roboto',
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+                  const SizedBox(height: Dimensions.spaceSizeSmall),
+                  Text(
+                    'Analytics will appear once attendees start signing in to your event',
+                    style: TextStyle(
+                      fontSize: Dimensions.fontSizeDefault,
+                      color: AppThemeColor.dullFontColor,
+                      fontFamily: 'Roboto',
+                      height: 1.4,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: Dimensions.spaceSizedLarge),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(
+                      Dimensions.paddingSizeDefault,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppThemeColor.darkBlueColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(
+                        Dimensions.radiusDefault,
+                      ),
+                      border: Border.all(
+                        color: AppThemeColor.darkBlueColor.withOpacity(0.2),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          size: 20,
+                          color: AppThemeColor.darkBlueColor,
+                        ),
+                        const SizedBox(width: Dimensions.spaceSizeSmall),
+                        Expanded(
+                          child: Text(
+                            'Share your event QR code to start collecting data',
+                            style: TextStyle(
+                              fontSize: Dimensions.fontSizeSmall,
+                              color: AppThemeColor.darkBlueColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.left,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }

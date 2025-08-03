@@ -8,6 +8,7 @@ import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Firebase/FirebaseStorageHelper.dart';
 import 'package:orgami/Screens/Feedback/FeedbackScreen.dart';
 import 'package:orgami/Screens/MyEvents/MyEventsScreen.dart';
+import 'package:orgami/Screens/Home/AnalyticsDashboardScreen.dart';
 import 'package:orgami/Utils/AppConstants.dart';
 import 'package:orgami/Utils/Colors.dart';
 import 'package:orgami/Utils/Images.dart';
@@ -37,9 +38,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFAFBFC),
-      body: SafeArea(
-        child: _bodyView(),
-      ),
+      body: SafeArea(child: _bodyView()),
     );
   }
 
@@ -62,10 +61,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF667EEA),
-            Color(0xFF764BA2),
-          ],
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
         ),
       ),
       padding: const EdgeInsets.fromLTRB(24, 32, 24, 40),
@@ -83,10 +79,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     height: 120,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white,
-                        width: 4,
-                      ),
+                      border: Border.all(color: Colors.white, width: 4),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.2),
@@ -96,12 +89,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ],
                     ),
                     child: ClipOval(
-                      child: CustomerController
-                                  .logeInCustomer?.profilePictureUrl !=
+                      child:
+                          CustomerController
+                                  .logeInCustomer
+                                  ?.profilePictureUrl !=
                               null
                           ? Image.network(
                               CustomerController
-                                  .logeInCustomer!.profilePictureUrl!,
+                                  .logeInCustomer!
+                                  .profilePictureUrl!,
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
                                 return _buildDefaultProfilePicture();
@@ -121,9 +117,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       color: Colors.black.withValues(alpha: 0.5),
                     ),
                     child: const Center(
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                      ),
+                      child: CircularProgressIndicator(color: Colors.white),
                     ),
                   ),
                 // Camera Icon Button
@@ -184,11 +178,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildDefaultProfilePicture() {
     return Container(
       color: const Color(0xFFE1E5E9),
-      child: const Icon(
-        Icons.person,
-        size: 60,
-        color: Color(0xFF9CA3AF),
-      ),
+      child: const Icon(Icons.person, size: 60, color: Color(0xFF9CA3AF)),
     );
   }
 
@@ -214,19 +204,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.person,
             title: 'My Profile',
             subtitle: 'View and edit your profile',
-            onTap: () => RouterClass.nextScreenNormal(
-              context,
-              MyProfileScreen(),
-            ),
+            onTap: () =>
+                RouterClass.nextScreenNormal(context, MyProfileScreen()),
           ),
           _buildDivider(),
           _buildSettingsItem(
             icon: Icons.event_note_rounded,
             title: 'My Events',
             subtitle: 'Manage your created events',
+            onTap: () =>
+                RouterClass.nextScreenNormal(context, const MyEventsScreen()),
+          ),
+          _buildDivider(),
+          _buildSettingsItem(
+            icon: Icons.analytics_rounded,
+            title: 'Analytics Dashboard',
+            subtitle: 'Comprehensive insights across all events',
             onTap: () => RouterClass.nextScreenNormal(
               context,
-              const MyEventsScreen(),
+              const AnalyticsDashboardScreen(),
             ),
           ),
           _buildDivider(),
@@ -248,10 +244,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: FontAwesomeIcons.feed,
             title: 'Feedback',
             subtitle: 'Share your thoughts with us',
-            onTap: () => RouterClass.nextScreenNormal(
-              context,
-              FeedbackScreen(),
-            ),
+            onTap: () =>
+                RouterClass.nextScreenNormal(context, FeedbackScreen()),
           ),
           _buildDivider(),
           _buildSettingsItem(
@@ -304,11 +298,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       padding: const EdgeInsets.all(24),
       child: Row(
         children: [
-          Icon(
-            Icons.settings,
-            color: const Color(0xFF667EEA),
-            size: 20,
-          ),
+          Icon(Icons.settings, color: const Color(0xFF667EEA), size: 20),
           const SizedBox(width: 12),
           const Text(
             'Settings',
@@ -344,16 +334,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         child: Icon(
           icon,
-          color:
-              isDestructive ? const Color(0xFFEF4444) : const Color(0xFF667EEA),
+          color: isDestructive
+              ? const Color(0xFFEF4444)
+              : const Color(0xFF667EEA),
           size: 20,
         ),
       ),
       title: Text(
         title,
         style: TextStyle(
-          color:
-              isDestructive ? const Color(0xFFEF4444) : const Color(0xFF1A1A1A),
+          color: isDestructive
+              ? const Color(0xFFEF4444)
+              : const Color(0xFF1A1A1A),
           fontWeight: FontWeight.w600,
           fontSize: 16,
           fontFamily: 'Roboto',
@@ -404,11 +396,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.share,
-                color: const Color(0xFF667EEA),
-                size: 18,
-              ),
+              Icon(Icons.share, color: const Color(0xFF667EEA), size: 18),
               const SizedBox(width: 8),
               const Text(
                 'Follow Us On',
@@ -426,13 +414,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               _buildSocialMediaIcon(
-                  FontAwesomeIcons.youtube, const Color(0xFFFF0000)),
+                FontAwesomeIcons.youtube,
+                const Color(0xFFFF0000),
+              ),
               _buildSocialMediaIcon(
-                  FontAwesomeIcons.instagram, const Color(0xFFE4405F)),
+                FontAwesomeIcons.instagram,
+                const Color(0xFFE4405F),
+              ),
               _buildSocialMediaIcon(
-                  FontAwesomeIcons.facebookF, const Color(0xFF1877F2)),
+                FontAwesomeIcons.facebookF,
+                const Color(0xFF1877F2),
+              ),
               _buildSocialMediaIcon(
-                  FontAwesomeIcons.linkedinIn, const Color(0xFF0A66C2)),
+                FontAwesomeIcons.linkedinIn,
+                const Color(0xFF0A66C2),
+              ),
             ],
           ),
         ],
@@ -452,11 +448,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(
-          icon,
-          color: color,
-          size: 24,
-        ),
+        child: Icon(icon, color: color, size: 24),
       ),
     );
   }
@@ -491,8 +483,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     null)
                   ListTile(
                     leading: const Icon(Icons.delete, color: Colors.red),
-                    title: const Text('Remove Profile Picture',
-                        style: TextStyle(color: Colors.red)),
+                    title: const Text(
+                      'Remove Profile Picture',
+                      style: TextStyle(color: Colors.red),
+                    ),
                     onTap: () {
                       Navigator.of(context).pop();
                       _removeProfilePicture();
@@ -508,8 +502,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _pickImageFromGallery() async {
     try {
-      final pickedFile =
-          await _imagePicker.pickImage(source: ImageSource.gallery);
+      final pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+      );
       if (pickedFile != null) {
         setState(() {
           _isUploading = true;
@@ -523,8 +518,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _pickImageFromCamera() async {
     try {
-      final pickedFile =
-          await _imagePicker.pickImage(source: ImageSource.camera);
+      final pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+      );
       if (pickedFile != null) {
         setState(() {
           _isUploading = true;
@@ -540,7 +536,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final file = File(filePath);
       final url = await _storageHelper.uploadProfilePicture(
-          file, CustomerController.logeInCustomer!.uid);
+        file,
+        CustomerController.logeInCustomer!.uid,
+      );
       if (url != null) {
         await _firestoreHelper.updateCustomerProfile(
           customerId: CustomerController.logeInCustomer!.uid,
@@ -551,8 +549,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         setState(() {
           _isUploading = false;
         });
-        ShowToast()
-            .showNormalToast(msg: 'Profile picture updated successfully!');
+        ShowToast().showNormalToast(
+          msg: 'Profile picture updated successfully!',
+        );
       } else {
         setState(() {
           _isUploading = false;
@@ -574,8 +573,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
 
       // Delete from Firebase Storage
-      await _storageHelper
-          .deleteProfilePicture(CustomerController.logeInCustomer!.uid);
+      await _storageHelper.deleteProfilePicture(
+        CustomerController.logeInCustomer!.uid,
+      );
 
       // Update Firestore
       await _firestoreHelper.updateCustomerProfile(
@@ -596,7 +596,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _isUploading = false;
       });
       ShowToast().showNormalToast(
-          msg: 'Failed to remove profile picture: ${e.toString()}');
+        msg: 'Failed to remove profile picture: ${e.toString()}',
+      );
     }
   }
 }

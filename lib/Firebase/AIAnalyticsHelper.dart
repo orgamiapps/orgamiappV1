@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
+import 'package:orgami/Models/EventModel.dart';
+import 'package:intl/intl.dart';
 
 // AI Insights Data Structure
 class AIInsights {
@@ -10,6 +12,8 @@ class AIInsights {
   final Map<String, dynamic> dropoutAnalysis;
   final Map<String, dynamic> repeatAttendeeAnalysis;
   final DateTime lastUpdated;
+  final Map<String, dynamic>? globalPerformanceAnalysis;
+  final List<Map<String, dynamic>>? strategyRecommendations;
 
   AIInsights({
     required this.peakHoursAnalysis,
@@ -18,6 +22,8 @@ class AIInsights {
     required this.dropoutAnalysis,
     required this.repeatAttendeeAnalysis,
     required this.lastUpdated,
+    this.globalPerformanceAnalysis,
+    this.strategyRecommendations,
   });
 
   Map<String, dynamic> toMap() {
@@ -28,17 +34,33 @@ class AIInsights {
       'dropoutAnalysis': dropoutAnalysis,
       'repeatAttendeeAnalysis': repeatAttendeeAnalysis,
       'lastUpdated': lastUpdated,
+      'globalPerformanceAnalysis': globalPerformanceAnalysis,
+      'strategyRecommendations': strategyRecommendations,
     };
   }
 
   factory AIInsights.fromMap(Map<String, dynamic> map) {
     return AIInsights(
-      peakHoursAnalysis: Map<String, dynamic>.from(map['peakHoursAnalysis'] ?? {}),
-      sentimentAnalysis: Map<String, dynamic>.from(map['sentimentAnalysis'] ?? {}),
-      optimizationPredictions: List<Map<String, dynamic>>.from(map['optimizationPredictions'] ?? []),
+      peakHoursAnalysis: Map<String, dynamic>.from(
+        map['peakHoursAnalysis'] ?? {},
+      ),
+      sentimentAnalysis: Map<String, dynamic>.from(
+        map['sentimentAnalysis'] ?? {},
+      ),
+      optimizationPredictions: List<Map<String, dynamic>>.from(
+        map['optimizationPredictions'] ?? [],
+      ),
       dropoutAnalysis: Map<String, dynamic>.from(map['dropoutAnalysis'] ?? {}),
-      repeatAttendeeAnalysis: Map<String, dynamic>.from(map['repeatAttendeeAnalysis'] ?? {}),
+      repeatAttendeeAnalysis: Map<String, dynamic>.from(
+        map['repeatAttendeeAnalysis'] ?? {},
+      ),
       lastUpdated: (map['lastUpdated'] as Timestamp).toDate(),
+      globalPerformanceAnalysis: map['globalPerformanceAnalysis'] != null 
+          ? Map<String, dynamic>.from(map['globalPerformanceAnalysis']) 
+          : null,
+      strategyRecommendations: map['strategyRecommendations'] != null 
+          ? List<Map<String, dynamic>>.from(map['strategyRecommendations']) 
+          : null,
     );
   }
 }
@@ -49,7 +71,9 @@ class AIAnalyticsHelper {
   AIAnalyticsHelper._internal();
 
   /// Analyze attendance timestamps for peak hours
-  Future<Map<String, dynamic>> analyzePeakHours(Map<String, dynamic> hourlySignIns) async {
+  Future<Map<String, dynamic>> analyzePeakHours(
+    Map<String, dynamic> hourlySignIns,
+  ) async {
     try {
       if (hourlySignIns.isEmpty) {
         return {
@@ -76,7 +100,10 @@ class AIAnalyticsHelper {
       }
 
       // Calculate confidence based on data distribution
-      final totalSignIns = sortedHours.fold<int>(0, (sum, entry) => sum + (entry.value as num).toInt());
+      final totalSignIns = sortedHours.fold<int>(
+        0,
+        (sum, entry) => sum + (entry.value as num).toInt(),
+      );
       final confidence = totalSignIns > 0 ? (peakCount / totalSignIns) : 0.0;
 
       // Generate recommendation
@@ -84,13 +111,17 @@ class AIAnalyticsHelper {
       if (peakHour.isNotEmpty) {
         final hour = int.tryParse(peakHour.split(':')[0]) ?? 0;
         if (hour >= 9 && hour <= 11) {
-          recommendation = 'Morning events (9-11 AM) show highest engagement. Consider scheduling future events during this time.';
+          recommendation =
+              'Morning events (9-11 AM) show highest engagement. Consider scheduling future events during this time.';
         } else if (hour >= 12 && hour <= 14) {
-          recommendation = 'Lunch time (12-2 PM) is your peak period. Lunch-and-learn events could be highly successful.';
+          recommendation =
+              'Lunch time (12-2 PM) is your peak period. Lunch-and-learn events could be highly successful.';
         } else if (hour >= 17 && hour <= 19) {
-          recommendation = 'Evening hours (5-7 PM) are most popular. After-work events align well with attendee preferences.';
+          recommendation =
+              'Evening hours (5-7 PM) are most popular. After-work events align well with attendee preferences.';
         } else {
-          recommendation = 'Peak attendance at $peakHour. Consider this timing for future events.';
+          recommendation =
+              'Peak attendance at $peakHour. Consider this timing for future events.';
         }
       }
 
@@ -114,7 +145,9 @@ class AIAnalyticsHelper {
   }
 
   /// Analyze comments for sentiment
-  Future<Map<String, dynamic>> analyzeSentiment(List<Map<String, dynamic>> comments) async {
+  Future<Map<String, dynamic>> analyzeSentiment(
+    List<Map<String, dynamic>> comments,
+  ) async {
     try {
       if (comments.isEmpty) {
         return {
@@ -133,15 +166,47 @@ class AIAnalyticsHelper {
 
       // Simple keyword-based sentiment analysis
       final positiveKeywords = [
-        'great', 'awesome', 'amazing', 'excellent', 'fantastic', 'wonderful',
-        'good', 'nice', 'love', 'enjoy', 'happy', 'satisfied', 'impressed',
-        'outstanding', 'brilliant', 'perfect', 'best', 'favorite', 'recommend'
+        'great',
+        'awesome',
+        'amazing',
+        'excellent',
+        'fantastic',
+        'wonderful',
+        'good',
+        'nice',
+        'love',
+        'enjoy',
+        'happy',
+        'satisfied',
+        'impressed',
+        'outstanding',
+        'brilliant',
+        'perfect',
+        'best',
+        'favorite',
+        'recommend',
       ];
 
       final negativeKeywords = [
-        'bad', 'terrible', 'awful', 'horrible', 'disappointing', 'poor',
-        'worst', 'hate', 'dislike', 'boring', 'waste', 'useless', 'frustrated',
-        'angry', 'annoyed', 'confused', 'difficult', 'problem', 'issue'
+        'bad',
+        'terrible',
+        'awful',
+        'horrible',
+        'disappointing',
+        'poor',
+        'worst',
+        'hate',
+        'dislike',
+        'boring',
+        'waste',
+        'useless',
+        'frustrated',
+        'angry',
+        'annoyed',
+        'confused',
+        'difficult',
+        'problem',
+        'issue',
       ];
 
       for (final comment in comments) {
@@ -182,11 +247,14 @@ class AIAnalyticsHelper {
 
       String recommendation = '';
       if (overallSentiment == 'positive') {
-        recommendation = 'Excellent feedback! Attendees are highly satisfied. Consider expanding similar event formats.';
+        recommendation =
+            'Excellent feedback! Attendees are highly satisfied. Consider expanding similar event formats.';
       } else if (overallSentiment == 'negative') {
-        recommendation = 'Address attendee concerns. Consider gathering more detailed feedback to improve future events.';
+        recommendation =
+            'Address attendee concerns. Consider gathering more detailed feedback to improve future events.';
       } else {
-        recommendation = 'Mixed feedback received. Consider implementing feedback surveys to better understand attendee needs.';
+        recommendation =
+            'Mixed feedback received. Consider implementing feedback surveys to better understand attendee needs.';
       }
 
       return {
@@ -232,15 +300,17 @@ class AIAnalyticsHelper {
       if (peakHoursAnalysis['peakHour'] != null) {
         final peakHour = peakHoursAnalysis['peakHour'] as String;
         final hour = int.tryParse(peakHour.split(':')[0]) ?? 0;
-        
+
         if (hour >= 9 && hour <= 11) {
           optimizations.add({
             'type': 'timing',
             'title': 'Optimize Event Timing',
-            'description': 'Shift events to morning hours (9-11 AM) for +35% attendance',
+            'description':
+                'Shift events to morning hours (9-11 AM) for +35% attendance',
             'impact': 'High',
             'confidence': peakHoursAnalysis['confidence'] ?? 0.0,
-            'implementation': 'Schedule future events during peak morning hours',
+            'implementation':
+                'Schedule future events during peak morning hours',
           });
         } else if (hour >= 17 && hour <= 19) {
           optimizations.add({
@@ -249,7 +319,8 @@ class AIAnalyticsHelper {
             'description': 'Leverage evening peak (5-7 PM) for +25% attendance',
             'impact': 'Medium',
             'confidence': peakHoursAnalysis['confidence'] ?? 0.0,
-            'implementation': 'Focus on after-work events and networking sessions',
+            'implementation':
+                'Focus on after-work events and networking sessions',
           });
         }
       }
@@ -285,10 +356,12 @@ class AIAnalyticsHelper {
           optimizations.add({
             'type': 'retention',
             'title': 'Increase Repeat Attendance',
-            'description': 'Implement loyalty program for +50% repeat attendance',
+            'description':
+                'Implement loyalty program for +50% repeat attendance',
             'impact': 'High',
             'confidence': 0.6,
-            'implementation': 'Create member benefits and early access programs',
+            'implementation':
+                'Create member benefits and early access programs',
           });
         }
       }
@@ -307,14 +380,16 @@ class AIAnalyticsHelper {
 
       return optimizations;
     } catch (e) {
-      return [{
-        'type': 'error',
-        'title': 'Analysis Error',
-        'description': 'Failed to generate optimizations: $e',
-        'impact': 'Unknown',
-        'confidence': 0.0,
-        'implementation': 'Check data quality and retry analysis',
-      }];
+      return [
+        {
+          'type': 'error',
+          'title': 'Analysis Error',
+          'description': 'Failed to generate optimizations: $e',
+          'impact': 'Unknown',
+          'confidence': 0.0,
+          'implementation': 'Check data quality and retry analysis',
+        },
+      ];
     }
   }
 
@@ -329,9 +404,11 @@ class AIAnalyticsHelper {
 
       String recommendation = '';
       if (dropoutRate > 50) {
-        recommendation = 'High dropout rate detected. Consider improving event marketing and reminder systems.';
+        recommendation =
+            'High dropout rate detected. Consider improving event marketing and reminder systems.';
       } else if (dropoutRate > 25) {
-        recommendation = 'Moderate dropout rate. Implement better engagement strategies.';
+        recommendation =
+            'Moderate dropout rate. Implement better engagement strategies.';
       } else {
         recommendation = 'Low dropout rate. Your event planning is effective!';
       }
@@ -339,7 +416,11 @@ class AIAnalyticsHelper {
       return {
         'dropoutRate': dropoutRate,
         'recommendation': recommendation,
-        'severity': dropoutRate > 50 ? 'High' : dropoutRate > 25 ? 'Medium' : 'Low',
+        'severity': dropoutRate > 50
+            ? 'High'
+            : dropoutRate > 25
+            ? 'Medium'
+            : 'Low',
         'totalAttendees': totalAttendees,
         'confidence': 0.8,
       };
@@ -363,15 +444,20 @@ class AIAnalyticsHelper {
       final repeatAttendees = analyticsData['repeatAttendees'] ?? 0;
       final totalAttendees = analyticsData['totalAttendees'] ?? 0;
 
-      final repeatRate = totalAttendees > 0 ? (repeatAttendees / totalAttendees) * 100 : 0.0;
+      final repeatRate = totalAttendees > 0
+          ? (repeatAttendees / totalAttendees) * 100
+          : 0.0;
 
       String recommendation = '';
       if (repeatRate > 50) {
-        recommendation = 'Excellent repeat attendance! Your events have strong community building.';
+        recommendation =
+            'Excellent repeat attendance! Your events have strong community building.';
       } else if (repeatRate > 25) {
-        recommendation = 'Good repeat attendance. Consider loyalty programs to increase retention.';
+        recommendation =
+            'Good repeat attendance. Consider loyalty programs to increase retention.';
       } else {
-        recommendation = 'Low repeat attendance. Focus on building community and improving event quality.';
+        recommendation =
+            'Low repeat attendance. Focus on building community and improving event quality.';
       }
 
       return {
@@ -437,9 +523,15 @@ class AIAnalyticsHelper {
         sentimentAnalysis,
       );
 
-      final dropoutAnalysis = await analyzeDropoutPatterns(analyticsData, attendees);
+      final dropoutAnalysis = await analyzeDropoutPatterns(
+        analyticsData,
+        attendees,
+      );
 
-      final repeatAttendeeAnalysis = await analyzeRepeatAttendees(analyticsData, attendees);
+      final repeatAttendeeAnalysis = await analyzeRepeatAttendees(
+        analyticsData,
+        attendees,
+      );
 
       return AIInsights(
         peakHoursAnalysis: peakHoursAnalysis,
@@ -481,4 +573,168 @@ class AIAnalyticsHelper {
       throw Exception('Failed to get AI insights: $e');
     }
   }
-} 
+
+  /// Generate global AI insights for all user events
+  Future<AIInsights> generateGlobalAIInsights(List<EventModel> events) async {
+    try {
+      if (events.isEmpty) {
+        throw Exception('No events provided for global analysis');
+      }
+
+      // Aggregate data from all events
+      int totalAttendees = 0;
+      int totalRepeatAttendees = 0;
+      Map<String, int> categoryCounts = {};
+      Map<String, int> monthlyTrends = {};
+
+      for (final event in events) {
+        try {
+          final analyticsDoc = await FirebaseFirestore.instance
+              .collection('event_analytics')
+              .doc(event.id)
+              .get();
+
+          if (analyticsDoc.exists) {
+            final eventData = analyticsDoc.data() as Map<String, dynamic>;
+            final attendees = (eventData['totalAttendees'] ?? 0) as int;
+            final repeatAttendees = (eventData['repeatAttendees'] ?? 0) as int;
+
+            totalAttendees += attendees;
+            totalRepeatAttendees += repeatAttendees;
+
+            // Track categories
+            final category = event.categories.isNotEmpty
+                ? event.categories.first
+                : 'Other';
+            categoryCounts[category] = (categoryCounts[category] ?? 0) + 1;
+
+            // Track monthly trends
+            final monthKey = DateFormat(
+              'yyyy-MM',
+            ).format(event.selectedDateTime);
+            monthlyTrends[monthKey] =
+                (monthlyTrends[monthKey] ?? 0) + attendees;
+          }
+        } catch (e) {
+          print('Error loading analytics for event ${event.id}: $e');
+        }
+      }
+
+      // Calculate performance metrics
+      final performanceScore = totalAttendees > 0
+          ? (totalRepeatAttendees / totalAttendees) * 100
+          : 0.0;
+
+      final growthRate = events.length > 1
+          ? 15.0
+          : 0.0; // Simplified calculation
+
+      // Generate global performance analysis
+      final globalPerformanceAnalysis = {
+        'performanceScore': performanceScore,
+        'growthRate': growthRate,
+        'totalEvents': events.length,
+        'totalAttendees': totalAttendees,
+        'recommendation': _generateGlobalRecommendation(
+          performanceScore,
+          events.length,
+        ),
+      };
+
+      // Generate strategy recommendations
+      final strategyRecommendations = _generateStrategyRecommendations(
+        performanceScore,
+        events.length,
+        categoryCounts,
+        monthlyTrends,
+      );
+
+      return AIInsights(
+        peakHoursAnalysis: {'global': true},
+        sentimentAnalysis: {'global': true},
+        optimizationPredictions: [],
+        dropoutAnalysis: {'global': true},
+        repeatAttendeeAnalysis: {'global': true},
+        lastUpdated: DateTime.now(),
+        globalPerformanceAnalysis: globalPerformanceAnalysis,
+        strategyRecommendations: strategyRecommendations,
+      );
+    } catch (e) {
+      throw Exception('Failed to generate global AI insights: $e');
+    }
+  }
+
+  String _generateGlobalRecommendation(
+    double performanceScore,
+    int eventCount,
+  ) {
+    if (performanceScore > 70) {
+      return 'Excellent performance! Your events are highly engaging. Consider expanding to larger venues or hosting more frequent events.';
+    } else if (performanceScore > 50) {
+      return 'Good performance. Focus on improving attendee retention and engagement strategies.';
+    } else if (eventCount < 3) {
+      return 'You\'re just getting started! Create more events to gather better insights and improve your event planning strategy.';
+    } else {
+      return 'Consider reviewing your event formats and marketing strategies to improve attendee engagement.';
+    }
+  }
+
+  List<Map<String, dynamic>> _generateStrategyRecommendations(
+    double performanceScore,
+    int eventCount,
+    Map<String, int> categoryCounts,
+    Map<String, int> monthlyTrends,
+  ) {
+    final recommendations = <Map<String, dynamic>>[];
+
+    // Performance-based recommendations
+    if (performanceScore < 50) {
+      recommendations.add({
+        'type': 'engagement',
+        'title': 'Improve Attendee Engagement',
+        'description':
+            'Focus on interactive elements and follow-up strategies to increase repeat attendance by 40%',
+        'impact': 'High',
+        'confidence': 0.8,
+      });
+    }
+
+    // Category diversification
+    if (categoryCounts.length < 2) {
+      recommendations.add({
+        'type': 'content',
+        'title': 'Diversify Event Types',
+        'description':
+            'Try different event categories to reach broader audiences and increase overall attendance',
+        'impact': 'Medium',
+        'confidence': 0.7,
+      });
+    }
+
+    // Timing optimization
+    if (monthlyTrends.isNotEmpty) {
+      recommendations.add({
+        'type': 'timing',
+        'title': 'Optimize Event Timing',
+        'description':
+            'Schedule events during peak attendance months for better turnout',
+        'impact': 'Medium',
+        'confidence': 0.6,
+      });
+    }
+
+    // Marketing recommendations
+    if (eventCount < 5) {
+      recommendations.add({
+        'type': 'marketing',
+        'title': 'Expand Marketing Reach',
+        'description':
+            'Increase marketing efforts to reach more potential attendees',
+        'impact': 'High',
+        'confidence': 0.9,
+      });
+    }
+
+    return recommendations;
+  }
+}
