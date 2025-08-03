@@ -40,52 +40,65 @@ class _AnsQuestionsToSignInEventScreenState
   final _btnCtlr = RoundedLoadingButtonController();
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final List<TextEditingController> _textControllers = [];
 
   List<EventQuestionModel> questionsList = [];
+  bool isLoading = true;
 
   Future<void> _getQuestions() async {
-    await FirebaseFirestoreHelper()
-        .getEventQuestions(eventId: widget.eventModel.id)
-        .then((value) {
-          setState(() {
-            questionsList = value;
-          });
-        });
+    try {
+      final questions = await FirebaseFirestoreHelper().getEventQuestions(
+        eventId: widget.eventModel.id,
+      );
+
+      setState(() {
+        questionsList = questions;
+        isLoading = false;
+        // Initialize text controllers for each question
+        _textControllers.clear();
+        for (int i = 0; i < questions.length; i++) {
+          _textControllers.add(TextEditingController());
+        }
+      });
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      ShowToast().showSnackBar('Error loading questions: $e', context);
+    }
   }
 
   void _makeSingIn() {
-    print('M called');
-
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
-      print('M called 1');
 
-      for (var element in questionsList) {
-        newAttendance.answers.add(
-          '${element.questionTitle}--ans--${element.answer}',
-        );
+      // Collect answers from text controllers
+      for (int i = 0; i < questionsList.length; i++) {
+        final answer = _textControllers[i].text.trim();
+        if (answer.isNotEmpty) {
+          newAttendance.answers.add(
+            '${questionsList[i].questionTitle}--ans--$answer',
+          );
+        }
       }
-
-      print(
-        'Recording attendance with questions for event: ${newAttendance.eventId}',
-      );
-      print('Attendance data: ${newAttendance.toJson()}');
 
       FirebaseFirestore.instance
           .collection(AttendanceModel.firebaseKey)
           .doc(newAttendance.id)
           .set(newAttendance.toJson())
           .then((value) {
-            print('Attendance with questions recorded successfully');
-            ShowToast().showSnackBar('Signed In Successful!', context);
+            ShowToast().showSnackBar('Signed In Successfully!', context);
             _btnCtlr.success();
             Future.delayed(const Duration(seconds: 1), () {
               _btnCtlr.reset();
               if (widget.nextPageRoute == 'singleEventPopup') {
-                // Pop current screen and navigate back to SingleEventScreen to refresh data
-                Navigator.pop(context);
-                // Navigate back to the SingleEventScreen that was already open
-                Navigator.pop(context);
+                // Navigate back to SingleEventScreen and refresh it
+                Navigator.pop(context); // Close the questions screen
+                // Navigate to SingleEventScreen to refresh the attendance status
+                RouterClass.nextScreenAndReplacement(
+                  context,
+                  SingleEventScreen(eventModel: widget.eventModel),
+                );
               } else if (widget.nextPageRoute == 'dashboardQrScanner') {
                 RouterClass.nextScreenAndReplacement(
                   context,
@@ -98,24 +111,8 @@ class _AnsQuestionsToSignInEventScreenState
                 );
               } else if (widget.nextPageRoute == 'withoutLogin') {
                 Navigator.pop(context);
-                // RouterClass.nextScreenAndReplacement(
-                //   context,
-                //   SingleEventScreen(
-                //     eventModel: widget.eventModel,
-                //   ),
-                // );
               }
             });
-            // RouterClass.nextScreenAndReplacementAndRemoveUntil(
-            //   context: context,
-            //   page: const DashboardScreen(),
-            // );
-            // RouterClass.nextScreenNormal(
-            //   context,
-            //   SingleEventScreen(
-            //     eventModel: widget.eventModel,
-            //   ),
-            // );
           })
           .catchError((error) {
             _btnCtlr.error();
@@ -136,30 +133,49 @@ class _AnsQuestionsToSignInEventScreenState
   }
 
   @override
+  void dispose() {
+    for (var controller in _textControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppThemeColor.lightBlueColor,
       body: SafeArea(child: _bodyView()),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
-        child: RoundedLoadingButton(
-          animateOnTap: true,
-          borderRadius: 13,
-          width: _screenWidth,
-          controller: _btnCtlr,
-          onPressed: _makeSingIn,
-          color: AppThemeColor.darkGreenColor,
-          elevation: 0,
-          child: const Wrap(
-            children: [
-              Text(
-                'Sign In',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              spreadRadius: 0,
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: RoundedLoadingButton(
+            animateOnTap: true,
+            borderRadius: 12,
+            width: double.infinity,
+            controller: _btnCtlr,
+            onPressed: _makeSingIn,
+            color: AppThemeColor.darkBlueColor,
+            elevation: 0,
+            child: const Text(
+              'Sign In',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+                fontFamily: 'Roboto',
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -167,119 +183,330 @@ class _AnsQuestionsToSignInEventScreenState
   }
 
   Widget _bodyView() {
-    return Container(
-      width: _screenWidth,
-      height: _screenHeight,
-      decoration: const BoxDecoration(),
+    return Column(
+      children: [
+        // Modern Header
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                spreadRadius: 0,
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: AppAppBarView.appBarView(
+            context: context,
+            title: 'Event Sign-In',
+          ),
+        ),
+
+        // Content Area
+        Expanded(
+          child: isLoading
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: AppThemeColor.darkBlueColor,
+                  ),
+                )
+              : questionsList.isEmpty
+              ? _buildEmptyState()
+              : _buildQuestionsForm(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
-            child: AppAppBarView.appBarView(
-              context: context,
-              title: 'Question for Event',
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: AppThemeColor.lightGrayColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(40),
+            ),
+            child: const Icon(
+              Icons.question_answer_outlined,
+              size: 40,
+              color: AppThemeColor.lightGrayColor,
             ),
           ),
-          Expanded(child: _questionsView()),
-        ],
-      ),
-    );
-  }
-
-  Widget _questionsView() {
-    return Form(
-      key: _formKey,
-      child: ListView.builder(
-        itemCount: questionsList.length,
-        itemBuilder: (listContext, index) {
-          return _singleQuestion(index: index);
-        },
-      ),
-    );
-  }
-
-  Widget _singleQuestion({required int index}) {
-    EventQuestionModel singleQuestion = questionsList[index];
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppThemeColor.pureWhiteColor,
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.5),
-            spreadRadius: 5,
-            blurRadius: 7,
-            offset: const Offset(0, 3), // changes position of shadow
+          const SizedBox(height: 16),
+          Text(
+            'No questions to answer',
+            style: TextStyle(
+              color: AppThemeColor.dullFontColor,
+              fontSize: 16,
+              fontFamily: 'Roboto',
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'You can proceed with sign-in',
+            style: TextStyle(
+              color: AppThemeColor.dullFontColor,
+              fontSize: 14,
+              fontFamily: 'Roboto',
+            ),
           ),
         ],
       ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
+    );
+  }
+
+  Widget _buildQuestionsForm() {
+    return Container(
+      margin: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            spreadRadius: 0,
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppThemeColor.lightBlueColor.withOpacity(0.1),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+              ),
+              child: Row(
                 children: [
                   Container(
-                    height: 40,
-                    width: 40,
+                    width: 48,
+                    height: 48,
                     decoration: BoxDecoration(
-                      color: AppThemeColor.darkGreenColor,
-                      borderRadius: BorderRadius.circular(20),
+                      color: AppThemeColor.darkBlueColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Center(
-                      child: Text(
-                        '${index + 1}',
-                        style: const TextStyle(
-                          color: AppThemeColor.pureWhiteColor,
-                          fontSize: Dimensions.fontSizeDefault,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                    child: const Icon(
+                      Icons.question_answer,
+                      color: AppThemeColor.darkBlueColor,
+                      size: 24,
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    singleQuestion.questionTitle,
-                    style: const TextStyle(
-                      color: AppThemeColor.darkBlueColor,
-                      fontWeight: FontWeight.w500,
-                      fontSize: Dimensions.fontSizeLarge,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Event Questions',
+                          style: const TextStyle(
+                            color: AppThemeColor.pureBlackColor,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                        Text(
+                          'Please answer the following questions to complete your sign-in',
+                          style: const TextStyle(
+                            color: AppThemeColor.dullFontColor,
+                            fontSize: 14,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-              Text(
-                singleQuestion.required ? '(required)' : '(not-required)',
-                style: const TextStyle(
-                  color: AppThemeColor.dullFontColor,
-                  fontWeight: FontWeight.w500,
-                  fontSize: Dimensions.fontSizeLarge,
+            ),
+
+            // Questions List
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(20),
+                itemCount: questionsList.length,
+                itemBuilder: (context, index) {
+                  return _buildQuestionCard(index);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuestionCard(int index) {
+    final question = questionsList[index];
+    final isRequired = question.required;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppThemeColor.borderColor, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            spreadRadius: 0,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Question Header
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppThemeColor.darkBlueColor,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Center(
+                  child: Text(
+                    '${index + 1}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
                 ),
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  question.questionTitle,
+                  style: const TextStyle(
+                    color: AppThemeColor.pureBlackColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ),
+              if (isRequired)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppThemeColor.orangeColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Required',
+                    style: TextStyle(
+                      color: AppThemeColor.orangeColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppThemeColor.dullFontColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Optional',
+                    style: TextStyle(
+                      color: AppThemeColor.dullFontColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                ),
             ],
           ),
-          const SizedBox(height: 10),
-          TextFormField(
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              hintText: 'Type here....',
-            ),
-            onSaved: (val) {
-              questionsList[index].answer = val;
-            },
-            validator: (value) {
-              if (singleQuestion.required) {
-                print('validate callde');
-                if (value!.isEmpty) {
-                  return 'Enter ${singleQuestion.questionTitle} first!';
-                }
-              }
 
+          const SizedBox(height: 16),
+
+          // Answer Input
+          TextFormField(
+            controller: _textControllers[index],
+            decoration: InputDecoration(
+              hintText: 'Type your answer here...',
+              hintStyle: TextStyle(
+                color: AppThemeColor.dullFontColor.withOpacity(0.6),
+                fontFamily: 'Roboto',
+              ),
+              filled: true,
+              fillColor: AppThemeColor.lightBlueColor.withOpacity(0.1),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: AppThemeColor.borderColor,
+                  width: 1,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: AppThemeColor.borderColor,
+                  width: 1,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: AppThemeColor.darkBlueColor,
+                  width: 2,
+                ),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: AppThemeColor.orangeColor,
+                  width: 1,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+            ),
+            maxLines: 3,
+            validator: (value) {
+              if (isRequired && (value == null || value.trim().isEmpty)) {
+                return 'This question is required';
+              }
               return null;
+            },
+            onSaved: (value) {
+              questionsList[index].answer = value?.trim() ?? '';
             },
           ),
         ],

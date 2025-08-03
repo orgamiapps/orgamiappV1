@@ -1,16 +1,16 @@
 import 'dart:io';
 
-import 'package:excel/excel.dart';
+import 'package:excel/excel.dart' as excel;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Models/AttendanceModel.dart';
 import 'package:orgami/Models/EventModel.dart';
 import 'package:orgami/Models/EventQuestionModel.dart';
-import 'package:orgami/Screens/Events/Widget/AttendanceAnswersPopup.dart';
 import 'package:orgami/Screens/Events/EventAnalyticsScreen.dart';
 import 'package:orgami/StorageHelper/FileStorage.dart';
 import 'package:orgami/Utils/AppAppBarView.dart';
+import 'package:orgami/Utils/AppButtons.dart';
 import 'package:orgami/Utils/Colors.dart';
 import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/Utils/Toast.dart';
@@ -18,6 +18,8 @@ import 'package:orgami/Utils/dimensions.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xcel;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:cross_file/cross_file.dart';
 
 class AttendanceSheetScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -41,9 +43,9 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
   List<EventQuestionModel> questionsList = [];
 
   Future<void> getAttendanceList() async {
-    await FirebaseFirestoreHelper()
-        .getAttendance(eventId: eventModel.id)
-        .then((attendanceData) {
+    await FirebaseFirestoreHelper().getAttendance(eventId: eventModel.id).then((
+      attendanceData,
+    ) {
       setState(() {
         attendanceList = attendanceData;
       });
@@ -54,20 +56,20 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
     await FirebaseFirestoreHelper()
         .getRegisterAttendance(eventId: eventModel.id)
         .then((attendanceData) {
-      setState(() {
-        registerAttendanceList = attendanceData;
-      });
-    });
+          setState(() {
+            registerAttendanceList = attendanceData;
+          });
+        });
   }
 
   Future<void> _getQuestions() async {
     await FirebaseFirestoreHelper()
         .getEventQuestions(eventId: eventModel.id)
         .then((value) {
-      setState(() {
-        questionsList = value;
-      });
-    });
+          setState(() {
+            questionsList = value;
+          });
+        });
   }
 
   List<String> titlesOfSheet = [];
@@ -86,7 +88,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
 
   void makeExcelFileForSignIn() {
     titlesOfSheet = [];
-    titlesOfSheet = ['Index', 'Name', 'Date', 'Time'];
+    titlesOfSheet = ['#', 'Name', 'Date', 'Time'];
 
     final xcel.Workbook workbook = xcel.Workbook();
     final xcel.Worksheet sheet = workbook.worksheets[0];
@@ -100,28 +102,21 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
       index++;
     }
 
-    // sheet.getRangeByIndex(1, 1).setText("Index");
-    // sheet.getRangeByIndex(1, 2).setText("Name");
-    // sheet.getRangeByIndex(1, 3).setText("Date");
-    // sheet.getRangeByIndex(1, 4).setText("Time");
-
     for (var i = 0; i < attendanceList.length; i++) {
       final item = attendanceList[i];
       sheet.getRangeByIndex(i + 2, 1).setText((i + 1).toString());
       sheet.getRangeByIndex(i + 2, 2).setText(item.userName);
-      sheet.getRangeByIndex(i + 2, 3).setText(DateFormat('EEE dd MMM').format(
-            item.attendanceDateTime,
-          ));
-      sheet.getRangeByIndex(i + 2, 4).setText(DateFormat('KK:mm a').format(
-            item.attendanceDateTime,
-          ));
+      sheet
+          .getRangeByIndex(i + 2, 3)
+          .setText(DateFormat('MMM dd, yyyy').format(item.attendanceDateTime));
+      sheet
+          .getRangeByIndex(i + 2, 4)
+          .setText(DateFormat('KK:mm a').format(item.attendanceDateTime));
       for (var element in item.answers) {
         String title = element.split('--ans--').first;
         String answer = element.split('--ans--').last;
         int? indexIs = getTitleIndex(title: title);
-        print('index -- $indexIs');
         if (indexIs != null) {
-          print('index is $indexIs');
           sheet.getRangeByIndex(i + 2, indexIs).setText(answer);
         }
       }
@@ -133,7 +128,8 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
       "${eventModel.title} Attendance Sheet.xlsx",
     ).then((value) {
       ShowToast().showNormalToast(
-          msg: '${eventModel.title} Attendance Sheet.xlsx Saved!');
+        msg: '${eventModel.title} Attendance Sheet.xlsx Saved!',
+      );
     });
 
     workbook.dispose();
@@ -141,45 +137,27 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
 
   void makeExcelFileForRegister() {
     titlesOfSheet = [];
-    titlesOfSheet = ['Index', 'Name', 'Date', 'Time'];
+    titlesOfSheet = ['#', 'Name', 'Date', 'Time'];
 
     final xcel.Workbook workbook = xcel.Workbook();
     final xcel.Worksheet sheet = workbook.worksheets[0];
     int index = 1;
-    // for (var element in questionsList) {
-    //   titlesOfSheet.add(element.questionTitle);
-    // }
-    //
+
     for (var element in titlesOfSheet) {
       sheet.getRangeByIndex(1, index).setText(element);
       index++;
     }
 
-    // sheet.getRangeByIndex(1, 1).setText("Index");
-    // sheet.getRangeByIndex(1, 2).setText("Name");
-    // sheet.getRangeByIndex(1, 3).setText("Date");
-    // sheet.getRangeByIndex(1, 4).setText("Time");
-
     for (var i = 0; i < registerAttendanceList.length; i++) {
       final item = registerAttendanceList[i];
       sheet.getRangeByIndex(i + 2, 1).setText((i + 1).toString());
       sheet.getRangeByIndex(i + 2, 2).setText(item.userName);
-      sheet.getRangeByIndex(i + 2, 3).setText(DateFormat('EEE dd MMM').format(
-            item.attendanceDateTime,
-          ));
-      sheet.getRangeByIndex(i + 2, 4).setText(DateFormat('KK:mm a').format(
-            item.attendanceDateTime,
-          ));
-      // for (var element in item.answers) {
-      //   String title = element.split('--ans--').first;
-      //   String answer = element.split('--ans--').last;
-      //   int? indexIs = getTitleIndex(title: title);
-      //   print('index -- $indexIs');
-      //   if (indexIs != null) {
-      //     print('index is $indexIs');
-      //     sheet.getRangeByIndex(i + 2, indexIs).setText(answer);
-      //   }
-      // }
+      sheet
+          .getRangeByIndex(i + 2, 3)
+          .setText(DateFormat('MMM dd, yyyy').format(item.attendanceDateTime));
+      sheet
+          .getRangeByIndex(i + 2, 4)
+          .setText(DateFormat('KK:mm a').format(item.attendanceDateTime));
     }
 
     final List<int> bytes = workbook.saveAsStream();
@@ -188,10 +166,209 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
       "${eventModel.title} ${selectedTab == 1 ? '' : 'Pre Registered'} Attendance Sheet.xlsx",
     ).then((value) {
       ShowToast().showNormalToast(
-          msg: '${eventModel.title} Attendance Sheet.xlsx Saved!');
+        msg: '${eventModel.title} Attendance Sheet.xlsx Saved!',
+      );
     });
 
     workbook.dispose();
+  }
+
+  void _showExportOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle bar
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppThemeColor.dullFontColor.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+
+            // Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppThemeColor.darkBlueColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.file_download,
+                      color: AppThemeColor.darkBlueColor,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Export Attendance Sheet',
+                          style: const TextStyle(
+                            color: AppThemeColor.pureBlackColor,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                        Text(
+                          'Choose how you want to export the attendance data',
+                          style: const TextStyle(
+                            color: AppThemeColor.dullFontColor,
+                            fontSize: 14,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(
+                      Icons.close,
+                      color: AppThemeColor.dullFontColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Options
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: [
+                  // Save Option
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppThemeColor.darkGreenColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.save_rounded, color: Colors.white),
+                      label: const Text(
+                        'Save to Device',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        if (selectedTab == 1) {
+                          makeExcelFileForSignIn();
+                        } else {
+                          makeExcelFileForRegister();
+                        }
+                      },
+                    ),
+                  ),
+
+                  // Share Option
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppThemeColor.darkBlueColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(
+                        Icons.share_rounded,
+                        color: Colors.white,
+                      ),
+                      label: const Text(
+                        'Share via Email/Message',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _shareAttendanceSheet();
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _shareAttendanceSheet() async {
+    try {
+      // Create the Excel file first
+      if (selectedTab == 1) {
+        makeExcelFileForSignIn();
+      } else {
+        makeExcelFileForRegister();
+      }
+
+      // Wait a moment for the file to be created
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Get the file path
+      final fileName =
+          "${eventModel.title} ${selectedTab == 1 ? '' : 'Pre Registered'} Attendance Sheet.xlsx";
+      final directory = await getApplicationDocumentsDirectory();
+      final filePath = '${directory.path}/$fileName';
+
+      // Check if file exists
+      final file = File(filePath);
+      if (await file.exists()) {
+        // Share the file
+        await Share.shareXFiles(
+          [XFile(filePath)],
+          text: 'Attendance Sheet for ${eventModel.title}',
+          subject: 'Event Attendance Sheet',
+        );
+      } else {
+        ShowToast().showSnackBar(
+          'File not found. Please try saving first.',
+          context,
+        );
+      }
+    } catch (e) {
+      ShowToast().showSnackBar('Error sharing file: $e', context);
+    }
   }
 
   @override
@@ -205,895 +382,884 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: _bodyView(),
+      backgroundColor: AppThemeColor.lightBlueColor,
+      body: SafeArea(child: _bodyView()),
+    );
+  }
+
+  Widget _modernTabBar() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: AppThemeColor.pureWhiteColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            spreadRadius: 0,
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppThemeColor.darkGreenColor,
-        onPressed: selectedTab == 1
-            ? makeExcelFileForSignIn
-            : makeExcelFileForRegister,
-        child: const Icon(
-          Icons.ios_share_rounded,
-          color: AppThemeColor.pureWhiteColor,
+      child: Row(
+        children: [
+          _modernTabView(label: 'Sign In', index: 1),
+          _modernTabView(label: 'Pre Registered', index: 2),
+        ],
+      ),
+    );
+  }
+
+  Widget _modernTabView({required String label, required int index}) {
+    bool selectedOne = selectedTab == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            selectedTab = index;
+          });
+        },
+        child: Container(
+          margin: const EdgeInsets.all(4),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: selectedOne
+                ? AppThemeColor.darkBlueColor
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: selectedOne
+                    ? AppThemeColor.pureWhiteColor
+                    : AppThemeColor.dullFontColor,
+                fontSize: Dimensions.fontSizeDefault,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _tobTabBar() {
-    return Row(
+  Widget _bodyView() {
+    return Column(
       children: [
-        _singleTabBarView(label: 'Sign In', index: 1),
-        _singleTabBarView(label: 'Pre Registered', index: 2),
+        // Modern Header with Export Button
+        Container(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              InkWell(
+                onTap: () => Navigator.pop(context),
+                child: AppButtons.roundedButton(
+                  iconData: Icons.arrow_back_ios_rounded,
+                  iconColor: AppThemeColor.pureWhiteColor,
+                  backgroundColor: AppThemeColor.darkBlueColor,
+                ),
+              ),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Text(
+                  'Attendance Sheet',
+                  style: const TextStyle(
+                    color: AppThemeColor.darkBlueColor,
+                    fontSize: Dimensions.paddingSizeLarge,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              // Export Button
+              Container(
+                decoration: BoxDecoration(
+                  color: AppThemeColor.darkBlueColor,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppThemeColor.darkBlueColor.withOpacity(0.3),
+                      spreadRadius: 0,
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  onPressed: () => _showExportOptions(),
+                  icon: const Icon(
+                    Icons.more_vert,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Modern Tab Bar
+        _modernTabBar(),
+
+        // Content Area
+        Expanded(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            decoration: BoxDecoration(
+              color: AppThemeColor.pureWhiteColor,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  spreadRadius: 0,
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: selectedTab == 1
+                ? _modernSignInDetailsView()
+                : _modernRegisterDetailsView(),
+          ),
+        ),
+
+        // View Analytics Button
+        Container(
+          margin: const EdgeInsets.all(20),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppThemeColor.darkBlueColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                elevation: 0,
+              ),
+              onPressed: () {
+                if (eventModel.customerUid ==
+                    FirebaseAuth.instance.currentUser?.uid) {
+                  RouterClass.nextScreenNormal(
+                    context,
+                    EventAnalyticsScreen(eventId: eventModel.id),
+                  );
+                } else {
+                  ShowToast().showSnackBar(
+                    'Only event hosts can view analytics',
+                    context,
+                  );
+                }
+              },
+              child: const Text(
+                'View Analytics',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _singleTabBarView({required String label, required int index}) {
-    bool selectedOne = selectedTab == index;
-    return Expanded(
-        child: GestureDetector(
-      onTap: () {
-        setState(() {
-          selectedTab = index;
-        });
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 10),
-        padding: const EdgeInsets.symmetric(vertical: 7),
-        decoration: BoxDecoration(
-          color: selectedOne
-              ? AppThemeColor.darkBlueColor
-              : AppThemeColor.darkGreenColor,
-        ),
-        child: Center(
-            child: Text(
-          label,
-          style: const TextStyle(
-            color: AppThemeColor.pureWhiteColor,
-            fontSize: Dimensions.fontSizeDefault,
-            fontWeight: FontWeight.w600,
-          ),
-        )),
-      ),
-    ));
-  }
-
-  Widget _bodyView() {
-    return SizedBox(
-      height: _screenHeight,
-      width: _screenWidth,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: AppAppBarView.appBarView(
-              context: context,
-              title: 'Attendance Sheet',
+  Widget _modernRegisterDetailsView() {
+    return Column(
+      children: [
+        // Header with stats
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppThemeColor.lightBlueColor.withOpacity(0.1),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(16),
+              topRight: Radius.circular(16),
             ),
           ),
-          _tobTabBar(),
-          selectedTab == 1 ? _signInDetailsView() : _registerDetailsView(),
-          // View Analytics Button
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppThemeColor.darkGreenColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                onPressed: () {
-                  // Check if user is the event creator
-                  if (eventModel.customerUid ==
-                      FirebaseAuth.instance.currentUser?.uid) {
-                    RouterClass.nextScreenNormal(
-                      context,
-                      EventAnalyticsScreen(eventId: eventModel.id),
-                    );
-                  } else {
-                    ShowToast().showSnackBar(
-                        'Only event hosts can view analytics', context);
-                  }
-                },
-                child: const Text(
-                  'View Analytics',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _registerDetailsView() {
-    return Expanded(
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10.0),
-          width: 435,
-          child: Column(
+          child: Row(
             children: [
-              const Divider(
-                height: 1,
-                thickness: 0.5,
-                color: AppThemeColor.pureBlackColor,
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppThemeColor.darkBlueColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.how_to_reg,
+                  color: AppThemeColor.darkBlueColor,
+                  size: 24,
+                ),
               ),
-              const Row(
-                children: [
-                  SizedBox(
-                    height: 25,
-                    child: VerticalDivider(
-                      width: 1,
-                      thickness: 0.5,
-                      color: AppThemeColor.pureBlackColor,
-                    ),
-                  ),
-                  SizedBox(
-                    width: 30,
-                    child: Center(
-                      child: Text(
-                        '#',
-                        style: TextStyle(
-                          color: AppThemeColor.pureBlackColor,
-                          fontWeight: FontWeight.w700,
-                          fontSize: Dimensions.fontSizeLarge,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 25,
-                    child: VerticalDivider(
-                      width: 1,
-                      thickness: 0.5,
-                      color: AppThemeColor.pureBlackColor,
-                    ),
-                  ),
-                  SizedBox(
-                    width: 200,
-                    child: Center(
-                      child: Text(
-                        'Name',
-                        style: TextStyle(
-                          color: AppThemeColor.pureBlackColor,
-                          fontWeight: FontWeight.w700,
-                          fontSize: Dimensions.fontSizeLarge,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 25,
-                    child: VerticalDivider(
-                      width: 1,
-                      thickness: 0.5,
-                      color: AppThemeColor.pureBlackColor,
-                    ),
-                  ),
-                  SizedBox(
-                    width: 90,
-                    child: Center(
-                      child: Text(
-                        'Date',
-                        style: TextStyle(
-                          color: AppThemeColor.pureBlackColor,
-                          fontWeight: FontWeight.w700,
-                          fontSize: Dimensions.fontSizeLarge,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 25,
-                    child: VerticalDivider(
-                      width: 1,
-                      thickness: 0.5,
-                      color: AppThemeColor.pureBlackColor,
-                    ),
-                  ),
-                  SizedBox(
-                    width: 90,
-                    child: Center(
-                      child: Text(
-                        'Time',
-                        style: TextStyle(
-                          color: AppThemeColor.pureBlackColor,
-                          fontWeight: FontWeight.w700,
-                          fontSize: Dimensions.fontSizeLarge,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 25,
-                    child: VerticalDivider(
-                      width: 1,
-                      thickness: 0.5,
-                      color: AppThemeColor.pureBlackColor,
-                    ),
-                  ),
-                  // SizedBox(
-                  //   width: (201 * questionsList.length).toDouble(),
-                  //   height: 25,
-                  //   child: ListView.builder(
-                  //       itemCount: questionsList.length,
-                  //       physics: const NeverScrollableScrollPhysics(),
-                  //       scrollDirection: Axis.horizontal,
-                  //       itemBuilder: (listContext, index) {
-                  //         EventQuestionModel singleQuestion =
-                  //             questionsList[index];
-                  //         return Row(
-                  //           children: [
-                  //             SizedBox(
-                  //               width: 200,
-                  //               child: Center(
-                  //                 child: Text(
-                  //                   singleQuestion.questionTitle,
-                  //                   style: const TextStyle(
-                  //                     color: AppThemeColor.pureBlackColor,
-                  //                     fontWeight: FontWeight.w700,
-                  //                     fontSize: Dimensions.fontSizeLarge,
-                  //                   ),
-                  //                 ),
-                  //               ),
-                  //             ),
-                  //             const SizedBox(
-                  //               height: 25,
-                  //               child: VerticalDivider(
-                  //                 width: 1,
-                  //                 thickness: 0.5,
-                  //                 color: AppThemeColor.pureBlackColor,
-                  //               ),
-                  //             ),
-                  //           ],
-                  //         );
-                  //       }),
-                  // ),
-                ],
-              ),
-              const Divider(
-                height: 1,
-                thickness: 0.5,
-                color: AppThemeColor.pureBlackColor,
-              ),
+              const SizedBox(width: 16),
               Expanded(
-                  child: SizedBox(
-                width: 435,
-                child: ListView.builder(
-                    itemCount: registerAttendanceList.length,
-                    itemBuilder: (listContext, index) {
-                      AttendanceModel singleAttendance =
-                          registerAttendanceList[index];
-                      return Column(
-                        children: [
-                          Row(
-                            children: [
-                              const SizedBox(
-                                height: 25,
-                                child: VerticalDivider(
-                                  width: 1,
-                                  thickness: 0.5,
-                                  color: AppThemeColor.pureBlackColor,
-                                ),
-                              ),
-                              SizedBox(
-                                width: 30,
-                                child: Center(
-                                  child: Text(
-                                    '${index + 1}',
-                                    style: const TextStyle(
-                                      color: AppThemeColor.dullFontColor,
-                                      fontWeight: FontWeight.w400,
-                                      fontSize: Dimensions.fontSizeLarge,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(
-                                height: 25,
-                                child: VerticalDivider(
-                                  width: 1,
-                                  thickness: 0.5,
-                                  color: AppThemeColor.pureBlackColor,
-                                ),
-                              ),
-                              SizedBox(
-                                width: 200,
-                                child: Container(
-                                  color: Colors.transparent,
-                                  child: Center(
-                                    child: Text(
-                                      (singleAttendance.isAnonymous &&
-                                              eventModel.customerUid ==
-                                                  FirebaseAuth.instance
-                                                      .currentUser?.uid &&
-                                              singleAttendance.realName != null)
-                                          ? singleAttendance.realName!
-                                          : singleAttendance.userName,
-                                      maxLines: 1,
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        color: AppThemeColor.dullFontColor,
-                                        fontWeight: FontWeight.w400,
-                                        fontSize: Dimensions.fontSizeLarge,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(
-                                height: 25,
-                                child: VerticalDivider(
-                                  width: 1,
-                                  thickness: 0.5,
-                                  color: AppThemeColor.pureBlackColor,
-                                ),
-                              ),
-                              SizedBox(
-                                width: 90,
-                                child: Center(
-                                  child: Text(
-                                    DateFormat('MM/dd/yy').format(
-                                      singleAttendance.attendanceDateTime,
-                                    ),
-                                    style: const TextStyle(
-                                      color: AppThemeColor.dullFontColor,
-                                      fontWeight: FontWeight.w400,
-                                      fontSize: Dimensions.fontSizeSmall,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(
-                                height: 25,
-                                child: VerticalDivider(
-                                  width: 1,
-                                  thickness: 0.5,
-                                  color: AppThemeColor.pureBlackColor,
-                                ),
-                              ),
-                              SizedBox(
-                                width: 90,
-                                child: Center(
-                                  child: Text(
-                                    DateFormat('KK:mm a').format(
-                                      singleAttendance.attendanceDateTime,
-                                    ),
-                                    style: const TextStyle(
-                                      color: AppThemeColor.dullFontColor,
-                                      fontWeight: FontWeight.w400,
-                                      fontSize: Dimensions.fontSizeSmall,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(
-                                height: 25,
-                                child: VerticalDivider(
-                                  width: 1,
-                                  thickness: 0.5,
-                                  color: AppThemeColor.pureBlackColor,
-                                ),
-                              ),
-                              // SizedBox(
-                              //   width: (201 * questionsList.length).toDouble(),
-                              //   height: 25,
-                              //   child: ListView.builder(
-                              //       itemCount: questionsList.length,
-                              //       physics:
-                              //           const NeverScrollableScrollPhysics(),
-                              //       scrollDirection: Axis.horizontal,
-                              //       itemBuilder: (listContext, index) {
-                              //         EventQuestionModel singleQuestion =
-                              //             questionsList[index];
-                              //         return Row(
-                              //           children: [
-                              //             SizedBox(
-                              //               width: 200,
-                              //               child: Center(
-                              //                 child: Text(
-                              //                   getSingleQuestionAnswer(
-                              //                     questionTitle: singleQuestion
-                              //                         .questionTitle,
-                              //                     answers:
-                              //                         singleAttendance.answers,
-                              //                   ),
-                              //                   style: const TextStyle(
-                              //                     color: AppThemeColor
-                              //                         .dullFontColor,
-                              //                     fontWeight: FontWeight.w400,
-                              //                     fontSize:
-                              //                         Dimensions.fontSizeSmall,
-                              //                   ),
-                              //                 ),
-                              //               ),
-                              //             ),
-                              //             const SizedBox(
-                              //               height: 25,
-                              //               child: VerticalDivider(
-                              //                 width: 1,
-                              //                 thickness: 0.5,
-                              //                 color:
-                              //                     AppThemeColor.pureBlackColor,
-                              //               ),
-                              //             ),
-                              //           ],
-                              //         );
-                              //       }),
-                              // ),
-                            ],
-                          ),
-                          const Divider(
-                            height: 1,
-                            thickness: 0.5,
-                            color: AppThemeColor.pureBlackColor,
-                          ),
-                        ],
-                      );
-                    }),
-              ))
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Pre-Registered Attendees',
+                      style: const TextStyle(
+                        color: AppThemeColor.pureBlackColor,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                    Text(
+                      '${registerAttendanceList.length} people registered',
+                      style: const TextStyle(
+                        color: AppThemeColor.dullFontColor,
+                        fontSize: 14,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
-      ),
-    );
-  }
 
-  Widget _signInDetailsView() {
-    return Expanded(
-      child: Column(
-        children: [
-          // Add Name Button
-          Padding(
-            padding:
-                const EdgeInsets.only(left: 20, right: 20, top: 10, bottom: 0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppThemeColor.darkGreenColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                  icon: const Icon(Icons.add, color: Colors.white),
-                  label: const Text('Add Name',
-                      style: TextStyle(color: Colors.white)),
-                  onPressed: () async {
-                    final name = await showDialog<String>(
-                      context: context,
-                      builder: (context) {
-                        String inputName = '';
-                        return AlertDialog(
-                          title: const Text('Add Name to Attendance'),
-                          content: TextField(
-                            autofocus: true,
-                            decoration:
-                                const InputDecoration(hintText: 'Enter name'),
-                            onChanged: (value) => inputName = value,
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('Cancel'),
-                            ),
-                            ElevatedButton(
-                              onPressed: () {
-                                if (inputName.trim().isNotEmpty) {
-                                  Navigator.pop(context, inputName.trim());
-                                }
-                              },
-                              child: const Text('Add'),
-                            ),
-                          ],
-                        );
-                      },
-                    );
-                    if (name != null && name.isNotEmpty) {
-                      await _addManualAttendance(name);
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Scrollbar(
-              controller: _scrollController,
-              thumbVisibility: true,
-              interactive: true,
-              trackVisibility: true,
-              thickness: 5,
-              scrollbarOrientation: ScrollbarOrientation.top,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                controller: _scrollController,
-                child: SizedBox(
-                  width: 415 + (questionsList.length * 211),
+        // Attendees List
+        Expanded(
+          child: registerAttendanceList.isEmpty
+              ? Center(
                   child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const SizedBox(height: 6),
-                      const Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        color: AppThemeColor.pureBlackColor,
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: AppThemeColor.lightGrayColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(40),
+                        ),
+                        child: const Icon(
+                          Icons.people_outline,
+                          size: 40,
+                          color: AppThemeColor.lightGrayColor,
+                        ),
                       ),
-                      Row(
-                        children: [
-                          const SizedBox(
-                            height: 25,
-                            child: VerticalDivider(
-                              width: 1,
-                              thickness: 0.5,
-                              color: AppThemeColor.pureBlackColor,
-                            ),
-                          ),
-                          const SizedBox(
-                            width: 30,
-                            child: Center(
-                              child: Text(
-                                '#',
-                                style: TextStyle(
-                                  color: AppThemeColor.pureBlackColor,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: Dimensions.fontSizeLarge,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(
-                            height: 25,
-                            child: VerticalDivider(
-                              width: 1,
-                              thickness: 0.5,
-                              color: AppThemeColor.pureBlackColor,
-                            ),
-                          ),
-                          const SizedBox(
-                            width: 200,
-                            child: Center(
-                              child: Text(
-                                'Name',
-                                style: TextStyle(
-                                  color: AppThemeColor.pureBlackColor,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: Dimensions.fontSizeLarge,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(
-                            height: 25,
-                            child: VerticalDivider(
-                              width: 1,
-                              thickness: 0.5,
-                              color: AppThemeColor.pureBlackColor,
-                            ),
-                          ),
-                          const SizedBox(
-                            width: 90,
-                            child: Center(
-                              child: Text(
-                                'Date',
-                                style: TextStyle(
-                                  color: AppThemeColor.pureBlackColor,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: Dimensions.fontSizeLarge,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(
-                            height: 25,
-                            child: VerticalDivider(
-                              width: 1,
-                              thickness: 0.5,
-                              color: AppThemeColor.pureBlackColor,
-                            ),
-                          ),
-                          const SizedBox(
-                            width: 90,
-                            child: Center(
-                              child: Text(
-                                'Time',
-                                style: TextStyle(
-                                  color: AppThemeColor.pureBlackColor,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: Dimensions.fontSizeLarge,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(
-                            height: 25,
-                            child: VerticalDivider(
-                              width: 1,
-                              thickness: 0.5,
-                              color: AppThemeColor.pureBlackColor,
-                            ),
-                          ),
-                          SizedBox(
-                            width: (201 * questionsList.length).toDouble(),
-                            height: 25,
-                            child: ListView.builder(
-                                itemCount: questionsList.length,
-                                physics: const NeverScrollableScrollPhysics(),
-                                scrollDirection: Axis.horizontal,
-                                itemBuilder: (listContext, index) {
-                                  EventQuestionModel singleQuestion =
-                                      questionsList[index];
-                                  return Row(
-                                    children: [
-                                      SizedBox(
-                                        width: 200,
-                                        child: Center(
-                                          child: Text(
-                                            singleQuestion.questionTitle,
-                                            style: const TextStyle(
-                                              color:
-                                                  AppThemeColor.pureBlackColor,
-                                              fontWeight: FontWeight.w700,
-                                              fontSize:
-                                                  Dimensions.fontSizeLarge,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(
-                                        height: 25,
-                                        child: VerticalDivider(
-                                          width: 1,
-                                          thickness: 0.5,
-                                          color: AppThemeColor.pureBlackColor,
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                }),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No pre-registered attendees yet',
+                        style: TextStyle(
+                          color: AppThemeColor.dullFontColor,
+                          fontSize: 16,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(20),
+                  itemCount: registerAttendanceList.length,
+                  itemBuilder: (context, index) {
+                    final attendee = registerAttendanceList[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppThemeColor.borderColor,
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.02),
+                            spreadRadius: 0,
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
                           ),
                         ],
                       ),
-                      const Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        color: AppThemeColor.pureBlackColor,
-                      ),
-                      Expanded(
-                          child: SizedBox(
-                        width: 415 + (questionsList.length * 208),
-                        child: ListView.builder(
-                            itemCount: attendanceList.length,
-                            itemBuilder: (listContext, index) {
-                              AttendanceModel singleAttendance =
-                                  attendanceList[index];
-                              return Column(
-                                children: [
-                                  Row(
-                                    children: [
-                                      const SizedBox(
-                                        height: 25,
-                                        child: VerticalDivider(
-                                          width: 1,
-                                          thickness: 0.5,
-                                          color: AppThemeColor.pureBlackColor,
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: 30,
-                                        child: Center(
-                                          child: Text(
-                                            '${index + 1}',
-                                            style: const TextStyle(
-                                              color:
-                                                  AppThemeColor.dullFontColor,
-                                              fontWeight: FontWeight.w400,
-                                              fontSize:
-                                                  Dimensions.fontSizeLarge,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(
-                                        height: 25,
-                                        child: VerticalDivider(
-                                          width: 1,
-                                          thickness: 0.5,
-                                          color: AppThemeColor.pureBlackColor,
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: 200,
-                                        child: GestureDetector(
-                                          onTap: () {
-                                            showDialog(
-                                              context: context,
-                                              builder: (BuildContext context) {
-                                                return AttendanceAnswersPopup(
-                                                  attendance: singleAttendance,
-                                                  eventModel: widget.eventModel,
-                                                );
-                                              },
-                                            );
-                                          },
-                                          child: Container(
-                                            color: Colors.transparent,
-                                            child: Center(
-                                              child: Text(
-                                                (singleAttendance.isAnonymous &&
-                                                        eventModel
-                                                                .customerUid ==
-                                                            FirebaseAuth
-                                                                .instance
-                                                                .currentUser
-                                                                ?.uid &&
-                                                        singleAttendance
-                                                                .realName !=
-                                                            null)
-                                                    ? singleAttendance.realName!
-                                                    : singleAttendance.userName,
-                                                maxLines: 1,
-                                                textAlign: TextAlign.center,
-                                                style: const TextStyle(
-                                                  color: AppThemeColor
-                                                      .dullFontColor,
-                                                  fontWeight: FontWeight.w400,
-                                                  fontSize:
-                                                      Dimensions.fontSizeLarge,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(
-                                        height: 25,
-                                        child: VerticalDivider(
-                                          width: 1,
-                                          thickness: 0.5,
-                                          color: AppThemeColor.pureBlackColor,
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: 90,
-                                        child: Center(
-                                          child: Text(
-                                            DateFormat('MM/dd/yy').format(
-                                              singleAttendance
-                                                  .attendanceDateTime,
-                                            ),
-                                            style: const TextStyle(
-                                              color:
-                                                  AppThemeColor.dullFontColor,
-                                              fontWeight: FontWeight.w400,
-                                              fontSize:
-                                                  Dimensions.fontSizeSmall,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(
-                                        height: 25,
-                                        child: VerticalDivider(
-                                          width: 1,
-                                          thickness: 0.5,
-                                          color: AppThemeColor.pureBlackColor,
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: 90,
-                                        child: Center(
-                                          child: Text(
-                                            DateFormat('KK:mm a').format(
-                                              singleAttendance
-                                                  .attendanceDateTime,
-                                            ),
-                                            style: const TextStyle(
-                                              color:
-                                                  AppThemeColor.dullFontColor,
-                                              fontWeight: FontWeight.w400,
-                                              fontSize:
-                                                  Dimensions.fontSizeSmall,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(
-                                        height: 25,
-                                        child: VerticalDivider(
-                                          width: 1,
-                                          thickness: 0.5,
-                                          color: AppThemeColor.pureBlackColor,
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: (201 * questionsList.length)
-                                            .toDouble(),
-                                        height: 25,
-                                        child: ListView.builder(
-                                            itemCount: questionsList.length,
-                                            physics:
-                                                const NeverScrollableScrollPhysics(),
-                                            scrollDirection: Axis.horizontal,
-                                            itemBuilder: (listContext, index) {
-                                              EventQuestionModel
-                                                  singleQuestion =
-                                                  questionsList[index];
-                                              return Row(
-                                                children: [
-                                                  SizedBox(
-                                                    width: 200,
-                                                    child: Center(
-                                                      child: Text(
-                                                        getSingleQuestionAnswer(
-                                                          questionTitle:
-                                                              singleQuestion
-                                                                  .questionTitle,
-                                                          answers:
-                                                              singleAttendance
-                                                                  .answers,
-                                                        ),
-                                                        style: const TextStyle(
-                                                          color: AppThemeColor
-                                                              .dullFontColor,
-                                                          fontWeight:
-                                                              FontWeight.w400,
-                                                          fontSize: Dimensions
-                                                              .fontSizeSmall,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  const SizedBox(
-                                                    height: 25,
-                                                    child: VerticalDivider(
-                                                      width: 1,
-                                                      thickness: 0.5,
-                                                      color: AppThemeColor
-                                                          .pureBlackColor,
-                                                    ),
-                                                  ),
-                                                ],
-                                              );
-                                            }),
-                                      ),
-                                    ],
-                                  ),
-                                  const Divider(
-                                    height: 1,
-                                    thickness: 0.5,
+                      child: Row(
+                        children: [
+                          // Sequential number (more subtle)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppThemeColor.lightBlueColor.withOpacity(
+                                0.3,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: AppThemeColor.darkBlueColor.withOpacity(
+                                  0.2,
+                                ),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              '${index + 1}',
+                              style: const TextStyle(
+                                color: AppThemeColor.darkBlueColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Roboto',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+
+                          // Details
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  attendee.userName,
+                                  style: const TextStyle(
                                     color: AppThemeColor.pureBlackColor,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'Roboto',
                                   ),
-                                ],
-                              );
-                            }),
-                      ))
-                    ],
-                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Registered on ${DateFormat('MMM dd, yyyy').format(attendee.attendanceDateTime)} at ${DateFormat('KK:mm a').format(attendee.attendanceDateTime)}',
+                                  style: const TextStyle(
+                                    color: AppThemeColor.dullFontColor,
+                                    fontSize: 14,
+                                    fontFamily: 'Roboto',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Status badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppThemeColor.darkBlueColor.withOpacity(
+                                0.1,
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Registered',
+                              style: TextStyle(
+                                color: AppThemeColor.darkBlueColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Roboto',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  String getSingleQuestionAnswer(
-      {required String questionTitle, required List<String> answers}) {
+  Widget _modernSignInDetailsView() {
+    return Column(
+      children: [
+        // Header with stats and add button
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppThemeColor.lightBlueColor.withOpacity(0.1),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(16),
+              topRight: Radius.circular(16),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppThemeColor.darkBlueColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.check_circle_outline,
+                  color: AppThemeColor.darkBlueColor,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Sign-In Attendees',
+                      style: const TextStyle(
+                        color: AppThemeColor.pureBlackColor,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                    Text(
+                      '${attendanceList.length} people signed in',
+                      style: const TextStyle(
+                        color: AppThemeColor.dullFontColor,
+                        fontSize: 14,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Add Name Button
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppThemeColor.darkBlueColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  elevation: 0,
+                ),
+                icon: const Icon(Icons.add, color: Colors.white, size: 18),
+                label: const Text(
+                  'Add Name',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+                onPressed: () async {
+                  final name = await _showAddNameDialog();
+                  if (name != null && name.isNotEmpty) {
+                    await _addManualAttendance(name);
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+
+        // Attendees List
+        Expanded(
+          child: attendanceList.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: AppThemeColor.lightGrayColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(40),
+                        ),
+                        child: const Icon(
+                          Icons.check_circle_outline,
+                          size: 40,
+                          color: AppThemeColor.lightGrayColor,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No sign-ins yet',
+                        style: TextStyle(
+                          color: AppThemeColor.dullFontColor,
+                          fontSize: 16,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(20),
+                  itemCount: attendanceList.length,
+                  itemBuilder: (context, index) {
+                    final attendee = attendanceList[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppThemeColor.borderColor,
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.02),
+                            spreadRadius: 0,
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Header with number and basic info
+                          Row(
+                            children: [
+                              // Sequential number (more subtle)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppThemeColor.lightBlueColor
+                                      .withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: AppThemeColor.darkBlueColor
+                                        .withOpacity(0.2),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  '${index + 1}',
+                                  style: const TextStyle(
+                                    color: AppThemeColor.darkBlueColor,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'Roboto',
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+
+                              // Name and time
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      (attendee.isAnonymous &&
+                                              eventModel.customerUid ==
+                                                  FirebaseAuth
+                                                      .instance
+                                                      .currentUser
+                                                      ?.uid &&
+                                              attendee.realName != null)
+                                          ? attendee.realName!
+                                          : attendee.userName,
+                                      style: const TextStyle(
+                                        color: AppThemeColor.pureBlackColor,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        fontFamily: 'Roboto',
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${DateFormat('MMM dd, yyyy').format(attendee.attendanceDateTime)} at ${DateFormat('KK:mm a').format(attendee.attendanceDateTime)}',
+                                      style: const TextStyle(
+                                        color: AppThemeColor.dullFontColor,
+                                        fontSize: 14,
+                                        fontFamily: 'Roboto',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              // Status badge
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppThemeColor.darkBlueColor
+                                      .withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text(
+                                  'Signed In',
+                                  style: TextStyle(
+                                    color: AppThemeColor.darkBlueColor,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'Roboto',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          // Question answers section
+                          if (attendee.answers.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: AppThemeColor.lightBlueColor.withOpacity(
+                                  0.1,
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: AppThemeColor.borderColor,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.question_answer,
+                                        size: 16,
+                                        color: AppThemeColor.darkBlueColor,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Question Responses (${attendee.answers.length})',
+                                        style: const TextStyle(
+                                          color: AppThemeColor.darkBlueColor,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          fontFamily: 'Roboto',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  ...attendee.answers.map((answer) {
+                                    final parts = answer.split('--ans--');
+                                    if (parts.length == 2) {
+                                      final question = parts[0];
+                                      final response = parts[1];
+                                      return Container(
+                                        margin: const EdgeInsets.only(
+                                          bottom: 8,
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              question,
+                                              style: const TextStyle(
+                                                color: AppThemeColor
+                                                    .pureBlackColor,
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w500,
+                                                fontFamily: 'Roboto',
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Container(
+                                              padding: const EdgeInsets.all(8),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                                border: Border.all(
+                                                  color:
+                                                      AppThemeColor.borderColor,
+                                                  width: 1,
+                                                ),
+                                              ),
+                                              child: Text(
+                                                response,
+                                                style: const TextStyle(
+                                                  color: AppThemeColor
+                                                      .dullFontColor,
+                                                  fontSize: 13,
+                                                  fontFamily: 'Roboto',
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }
+                                    return const SizedBox.shrink();
+                                  }).toList(),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Future<String?> _showAddNameDialog() async {
+    return await showDialog<String>(
+      context: context,
+      builder: (context) {
+        String inputName = '';
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          backgroundColor: Colors.white,
+          elevation: 8,
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppThemeColor.darkBlueColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.person_add,
+                  color: AppThemeColor.darkBlueColor,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  'Add Name to Attendance',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontWeight: FontWeight.w600,
+                    fontSize: 18,
+                    color: AppThemeColor.pureBlackColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 8),
+              Text(
+                'Enter the name of the person you want to add to the attendance list.',
+                style: TextStyle(
+                  color: AppThemeColor.dullFontColor,
+                  fontSize: 14,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Enter name',
+                  hintStyle: TextStyle(
+                    color: AppThemeColor.dullFontColor.withOpacity(0.6),
+                    fontFamily: 'Roboto',
+                  ),
+                  filled: true,
+                  fillColor: AppThemeColor.lightBlueColor.withOpacity(0.05),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: AppThemeColor.borderColor,
+                      width: 1,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: AppThemeColor.borderColor,
+                      width: 1,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: AppThemeColor.darkBlueColor,
+                      width: 2,
+                    ),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                ),
+                style: const TextStyle(fontFamily: 'Roboto', fontSize: 16),
+                onChanged: (value) => inputName = value,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: AppThemeColor.dullFontColor,
+                  fontFamily: 'Roboto',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppThemeColor.darkBlueColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                elevation: 2,
+              ),
+              onPressed: () {
+                if (inputName.trim().isNotEmpty) {
+                  Navigator.pop(context, inputName.trim());
+                }
+              },
+              child: const Text(
+                'Add Name',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'Roboto',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String getSingleQuestionAnswer({
+    required String questionTitle,
+    required List<String> answers,
+  }) {
     String answer = '';
 
     for (var element in answers) {
@@ -1126,75 +1292,53 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
   }
 
   Future<void> exportToExcel(List<List<String>> data) async {
-    final excel = Excel.createExcel();
-    Sheet sheetObject = excel['Sheet1'];
+    final excelDoc = excel.Excel.createExcel();
+    excel.Sheet sheetObject = excelDoc['Sheet1'];
 
-    CellStyle cellStyle = CellStyle(
-        backgroundColorHex: ExcelColor.black,
-        fontFamily: getFontFamily(FontFamily.Calibri));
-
-    cellStyle.underline = Underline.Single; // or Underline.Double
-
-    var cell = sheetObject.cell(CellIndex.indexByString('A1'));
-    cell.value = null; // removing any value
-    cell.value = TextCellValue('Some Text');
-    cell.value = IntCellValue(8);
-    cell.value = BoolCellValue(true);
-    cell.value = DoubleCellValue(13.37);
-    cell.value = DateCellValue(year: 2023, month: 4, day: 20);
-    cell.value = TimeCellValue(hour: 20, minute: 15, second: 5, millisecond: 0);
-    cell.value =
-        DateTimeCellValue(year: 2023, month: 4, day: 20, hour: 15, minute: 1);
-    cell.cellStyle = cellStyle;
-
-// setting the number style
-    cell.cellStyle = (cell.cellStyle ?? CellStyle()).copyWith(
-      /// for IntCellValue, DoubleCellValue and BoolCellValue use;
-      numberFormat: CustomNumericNumFormat(formatCode: '#,##0.00 \\m\\²'),
-
-      // The numberFormat changes automatially if you set a CellValue that
-      // does not work with the numberFormat set previously. So in case you
-      // want to set a new value, e.g. from a date to a decimal number,
-      // make sure you set the new value first and then your custom
-      // numberFormat).
+    excel.CellStyle cellStyle = excel.CellStyle(
+      backgroundColorHex: excel.ExcelColor.black,
+      fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
     );
 
-// printing cell-type
-//     print('CellType: ' + switch(cell.value) {
-//       null => 'empty cell',
-//       TextCellValue() => 'text',
-//       FormulaCellValue() => 'formula',
-//       IntCellValue() => 'int',
-//       BoolCellValue() => 'bool',
-//       DoubleCellValue() => 'double',
-//       DateCellValue() => 'date',
-//       TimeCellValue => 'time',
-//       DateTimeCellValue => 'date with time',
-//     });
+    cellStyle.underline = excel.Underline.Single;
 
-    ///
-    /// Inserting and removing column and rows
+    var cell = sheetObject.cell(excel.CellIndex.indexByString('A1'));
+    cell.value = null;
+    cell.value = excel.TextCellValue('Some Text');
+    cell.value = excel.IntCellValue(8);
+    cell.value = excel.BoolCellValue(true);
+    cell.value = excel.DoubleCellValue(13.37);
+    cell.value = excel.DateCellValue(year: 2023, month: 4, day: 20);
+    cell.value = excel.TimeCellValue(
+      hour: 20,
+      minute: 15,
+      second: 5,
+      millisecond: 0,
+    );
+    cell.value = excel.DateTimeCellValue(
+      year: 2023,
+      month: 4,
+      day: 20,
+      hour: 15,
+      minute: 1,
+    );
+    cell.cellStyle = cellStyle;
 
-// insert column at index = 8
+    cell.cellStyle = (cell.cellStyle ?? excel.CellStyle()).copyWith(
+      numberFormat: excel.CustomNumericNumFormat(formatCode: '#,##0.00 \\m\\²'),
+    );
+
     sheetObject.insertColumn(8);
-
-// remove column at index = 18
     sheetObject.removeColumn(18);
-
-// insert row at index = 82
     sheetObject.insertRow(82);
-
-// remove row at index = 80
     sheetObject.removeRow(80);
 
-    // Save the file
     Directory appDocumentsDirectory = await getApplicationDocumentsDirectory();
     String appDocumentsPath = appDocumentsDirectory.path;
     String filePath = '$appDocumentsPath/example.xlsx';
 
-    excel.save(fileName: eventModel.title);
+    excelDoc.save(fileName: eventModel.title);
 
-    // Open the file
     ProcessResult result = await Process.run('open', [filePath]);
     print(result.stdout);
   }

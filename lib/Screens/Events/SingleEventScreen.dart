@@ -13,6 +13,7 @@ import 'package:orgami/Controller/CustomerController.dart';
 import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Models/AttendanceModel.dart';
 import 'package:orgami/Models/EventModel.dart';
+import 'package:orgami/Models/EventQuestionModel.dart';
 import 'package:orgami/Screens/Events/AddQuestionsToEventScreen.dart';
 import 'package:orgami/Screens/Events/Attendance/AttendanceSheetScreen.dart';
 import 'package:orgami/Screens/Events/Widget/AttendeesHorizontalList.dart';
@@ -59,6 +60,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   bool _isGettingTicket = false;
   bool _hasTicket = false;
   bool _isCheckingTicket = false;
+  bool _justSignedIn =
+      false; // Flag to prevent showing sign-in dialog immediately after sign-in
   int _selectedTabIndex = 0;
   final TextEditingController _codeController = TextEditingController();
   // _isLoading removed - no longer needed after removing manual code input
@@ -112,7 +115,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         signedIn = value;
       });
 
+      // Only show sign-in dialog if user is not signed in and meets all conditions
+      // and hasn't just signed in (to prevent showing dialog immediately after sign-in)
       if (!signedIn! &&
+          !_justSignedIn &&
           eventModel.getLocation &&
           eventModel.customerUid != CustomerController.logeInCustomer!.uid &&
           isInEventInTime()) {
@@ -430,51 +436,11 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         eventId: eventModel.id,
       );
       if (questions.isNotEmpty) {
-        _btnCtlr.reset(); // Reset before navigation
-        RouterClass.nextScreenAndReplacement(
-          context,
-          AnsQuestionsToSignInEventScreen(
-            eventModel: eventModel,
-            newAttendance: newAttendanceModel,
-            nextPageRoute: 'singleEventPopup',
-          ),
-        );
+        _btnCtlr.reset(); // Reset before showing modal
+        _showSignInQuestionsModal(newAttendanceModel, questions);
       } else {
         // No prompts, sign in directly
-        try {
-          print('Saving attendance to Firestore...');
-          print('Collection: ${AttendanceModel.firebaseKey}');
-          print('Document ID: ${newAttendanceModel.id}');
-          print('Data: ${newAttendanceModel.toJson()}');
-
-          await FirebaseFirestore.instance
-              .collection(AttendanceModel.firebaseKey)
-              .doc(newAttendanceModel.id)
-              .set(newAttendanceModel.toJson());
-
-          print('Attendance saved successfully!');
-          _btnCtlr.success(); // Show success state
-          ShowToast().showNormalToast(msg: 'Signed In Successfully!');
-
-          // Refresh attendance status and stay on the same screen
-          Future.delayed(const Duration(seconds: 1), () {
-            _btnCtlr.reset();
-            // Refresh attendance status
-            getAttendance();
-            // Refresh the current screen to show updated sign-in status
-            setState(() {
-              // Trigger a rebuild to show the updated UI
-            });
-          });
-        } catch (firestoreError) {
-          print('Firestore error during sign-in: $firestoreError');
-          _btnCtlr.error();
-          ShowToast().showNormalToast(
-            msg:
-                'Failed to save attendance: $firestoreError. Please try again.',
-          );
-          Future.delayed(const Duration(seconds: 2), () => _btnCtlr.reset());
-        }
+        await _performSignIn(newAttendanceModel);
       }
     } catch (e) {
       print('Error is ${e.toString()}');
@@ -484,6 +450,386 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       );
       Future.delayed(const Duration(seconds: 2), () => _btnCtlr.reset());
     }
+  }
+
+  Future<void> _performSignIn(AttendanceModel attendanceModel) async {
+    try {
+      print('Saving attendance to Firestore...');
+      print('Collection: ${AttendanceModel.firebaseKey}');
+      print('Document ID: ${attendanceModel.id}');
+      print('Data: ${attendanceModel.toJson()}');
+
+      await FirebaseFirestore.instance
+          .collection(AttendanceModel.firebaseKey)
+          .doc(attendanceModel.id)
+          .set(attendanceModel.toJson());
+
+      print('Attendance saved successfully!');
+      _btnCtlr.success(); // Show success state
+      ShowToast().showNormalToast(msg: 'Signed In Successfully!');
+
+      // Set flag to prevent showing sign-in dialog immediately after sign-in
+      setState(() {
+        _justSignedIn = true;
+      });
+
+      // Refresh attendance status and stay on the same screen
+      Future.delayed(const Duration(seconds: 2), () {
+        _btnCtlr.reset();
+        // Refresh attendance status with a longer delay to ensure Firestore write is committed
+        getAttendance();
+        // Reset the flag after a delay
+        Future.delayed(const Duration(seconds: 3), () {
+          setState(() {
+            _justSignedIn = false;
+          });
+        });
+        // Refresh the current screen to show updated sign-in status
+        setState(() {
+          // Trigger a rebuild to show the updated UI
+        });
+      });
+    } catch (firestoreError) {
+      print('Firestore error during sign-in: $firestoreError');
+      _btnCtlr.error();
+      ShowToast().showNormalToast(
+        msg: 'Failed to save attendance: $firestoreError. Please try again.',
+      );
+      Future.delayed(const Duration(seconds: 2), () => _btnCtlr.reset());
+    }
+  }
+
+  void _showSignInQuestionsModal(
+    AttendanceModel attendanceModel,
+    List<EventQuestionModel> questions,
+  ) {
+    final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+    final List<TextEditingController> textControllers = [];
+    final RoundedLoadingButtonController modalBtnController =
+        RoundedLoadingButtonController();
+
+    // Initialize text controllers
+    for (int i = 0; i < questions.length; i++) {
+      textControllers.add(TextEditingController());
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.85,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          children: [
+            // Handle bar
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppThemeColor.dullBlueColor.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+
+            // Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppThemeColor.darkBlueColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.question_answer,
+                      color: AppThemeColor.darkBlueColor,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Event Questions',
+                          style: const TextStyle(
+                            color: AppThemeColor.pureBlackColor,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                        Text(
+                          'Please answer the following questions to complete your sign-in',
+                          style: const TextStyle(
+                            color: AppThemeColor.dullFontColor,
+                            fontSize: 14,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(
+                      Icons.close,
+                      color: AppThemeColor.dullFontColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Questions Form
+            Expanded(
+              child: Form(
+                key: formKey,
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: questions.length,
+                  itemBuilder: (context, index) {
+                    final question = questions[index];
+                    final isRequired = question.required;
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppThemeColor.borderColor,
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.02),
+                            spreadRadius: 0,
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Question Header
+                          Row(
+                            children: [
+                              Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: AppThemeColor.darkBlueColor,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '${index + 1}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: 'Roboto',
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  question.questionTitle,
+                                  style: const TextStyle(
+                                    color: AppThemeColor.pureBlackColor,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'Roboto',
+                                  ),
+                                ),
+                              ),
+                              if (isRequired)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppThemeColor.orangeColor
+                                        .withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text(
+                                    'Required',
+                                    style: TextStyle(
+                                      color: AppThemeColor.orangeColor,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: 'Roboto',
+                                    ),
+                                  ),
+                                )
+                              else
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppThemeColor.dullFontColor
+                                        .withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text(
+                                    'Optional',
+                                    style: TextStyle(
+                                      color: AppThemeColor.dullFontColor,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: 'Roboto',
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // Answer Input
+                          TextFormField(
+                            controller: textControllers[index],
+                            decoration: InputDecoration(
+                              hintText: 'Type your answer here...',
+                              hintStyle: TextStyle(
+                                color: AppThemeColor.dullFontColor.withOpacity(
+                                  0.6,
+                                ),
+                                fontFamily: 'Roboto',
+                              ),
+                              filled: true,
+                              fillColor: AppThemeColor.lightBlueColor
+                                  .withOpacity(0.1),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: AppThemeColor.borderColor,
+                                  width: 1,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: AppThemeColor.borderColor,
+                                  width: 1,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: AppThemeColor.darkBlueColor,
+                                  width: 2,
+                                ),
+                              ),
+                              errorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: AppThemeColor.orangeColor,
+                                  width: 1,
+                                ),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 16,
+                              ),
+                            ),
+                            maxLines: 3,
+                            validator: (value) {
+                              if (isRequired &&
+                                  (value == null || value.trim().isEmpty)) {
+                                return 'This question is required';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+
+            // Sign In Button
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    spreadRadius: 0,
+                    blurRadius: 10,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                child: RoundedLoadingButton(
+                  animateOnTap: true,
+                  borderRadius: 12,
+                  width: double.infinity,
+                  controller: modalBtnController,
+                  onPressed: () async {
+                    if (formKey.currentState!.validate()) {
+                      formKey.currentState!.save();
+
+                      // Collect answers
+                      for (int i = 0; i < questions.length; i++) {
+                        final answer = textControllers[i].text.trim();
+                        if (answer.isNotEmpty) {
+                          attendanceModel.answers.add(
+                            '${questions[i].questionTitle}--ans--$answer',
+                          );
+                        }
+                      }
+
+                      // Close modal and perform sign-in
+                      Navigator.pop(context);
+                      await _performSignIn(attendanceModel);
+                    } else {
+                      modalBtnController.reset();
+                    }
+                  },
+                  color: AppThemeColor.darkBlueColor,
+                  elevation: 0,
+                  child: const Text(
+                    'Sign In',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -1940,8 +2286,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         ),
         child: SafeArea(
           child: DraggableScrollableSheet(
-            initialChildSize: 0.7,
-            minChildSize: 0.5,
+            initialChildSize: 0.85,
+            minChildSize: 0.6,
             maxChildSize: 0.95,
             builder: (context, scrollController) => Column(
               children: [
@@ -1951,23 +2297,45 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                    color: AppThemeColor.dullBlueColor.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(height: 24),
-                // Title
-                const Text(
-                  'Event Management',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A1A),
-                    fontFamily: 'Roboto',
+                const SizedBox(height: 16),
+                // Header with title and icon
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppThemeColor.darkBlueColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.dashboard,
+                          color: AppThemeColor.darkBlueColor,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
+                          'Event Management',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: AppThemeColor.pureBlackColor,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 24),
-                // Management options
+                // Management options - moved to top
                 Expanded(
                   child: SingleChildScrollView(
                     controller: scrollController,
