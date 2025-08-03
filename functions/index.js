@@ -8,7 +8,7 @@
  */
 
 const {setGlobalOptions} = require("firebase-functions");
-const {onDocumentCreated} = require("firebase-functions/v2/firestore");
+const {onDocumentCreated, onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 
 // Initialize Firebase Admin SDK
@@ -137,3 +137,376 @@ exports.aggregateAttendanceData = onDocumentCreated("Attendance/{docId}",
         throw error;
       }
     });
+
+/**
+ * Trigger AI insights generation when analytics data is updated
+ * This function runs when event_analytics documents are updated
+ */
+exports.triggerAIInsights = onDocumentUpdated("event_analytics/{docId}",
+    async (event) => {
+      try {
+        const eventId = event.params.docId;
+        const beforeData = event.data.before.data();
+        const afterData = event.data.after.data();
+
+        logger.info("Checking if AI insights should be generated for event:", eventId);
+
+        // Only trigger if there's significant new data
+        const beforeAttendees = beforeData?.totalAttendees || 0;
+        const afterAttendees = afterData?.totalAttendees || 0;
+
+        if (afterAttendees > beforeAttendees && afterAttendees >= 5) {
+          logger.info("Generating AI insights for event:", eventId);
+          
+          // Trigger AI insights generation
+          await generateAIInsights(eventId);
+        } else {
+          logger.info("Insufficient new data for AI insights generation");
+        }
+      } catch (error) {
+        logger.error("Error in triggerAIInsights function:", error);
+        throw error;
+      }
+    });
+
+/**
+ * Generate AI insights for an event
+ */
+async function generateAIInsights(eventId) {
+  try {
+    const db = admin.firestore();
+    
+    // Get analytics data
+    const analyticsDoc = await db.collection("event_analytics").doc(eventId).get();
+    if (!analyticsDoc.exists) {
+      logger.info("No analytics data found for event:", eventId);
+      return;
+    }
+
+    const analyticsData = analyticsDoc.data();
+
+    // Get comments for sentiment analysis
+    const commentsQuery = await db.collection("Comments")
+        .where("eventId", "==", eventId)
+        .get();
+
+    const comments = commentsQuery.docs.map(doc => doc.data());
+
+    // Get attendees for detailed analysis
+    const attendeesQuery = await db.collection("Attendance")
+        .where("eventId", "==", eventId)
+        .get();
+
+    const attendees = attendeesQuery.docs.map(doc => doc.data());
+
+    // Perform AI analysis
+    const peakHoursAnalysis = analyzePeakHours(analyticsData.hourlySignIns || {});
+    const sentimentAnalysis = analyzeSentiment(comments);
+    const optimizations = generateOptimizations(analyticsData, peakHoursAnalysis, sentimentAnalysis);
+    const dropoutAnalysis = analyzeDropoutPatterns(analyticsData, attendees);
+    const repeatAttendeeAnalysis = analyzeRepeatAttendees(analyticsData, attendees);
+
+    // Save AI insights
+    const aiInsights = {
+      peakHoursAnalysis,
+      sentimentAnalysis,
+      optimizationPredictions: optimizations,
+      dropoutAnalysis,
+      repeatAttendeeAnalysis,
+      lastUpdated: admin.firestore.Timestamp.now(),
+    };
+
+    await db.collection("ai_insights").doc(eventId).set(aiInsights);
+    logger.info("AI insights generated and saved for event:", eventId);
+
+  } catch (error) {
+    logger.error("Error generating AI insights:", error);
+    throw error;
+  }
+}
+
+/**
+ * Analyze peak hours from hourly sign-ins data
+ */
+function analyzePeakHours(hourlySignIns) {
+  if (!hourlySignIns || Object.keys(hourlySignIns).length === 0) {
+    return {
+      peakHour: null,
+      peakCount: 0,
+      recommendation: "Insufficient data for peak hour analysis",
+      confidence: 0.0,
+    };
+  }
+
+  const sortedHours = Object.entries(hourlySignIns)
+    .sort((a, b) => a[0].localeCompare(b[0]));
+
+  let peakHour = '';
+  let peakCount = 0;
+  let totalSignIns = 0;
+
+  for (const [hour, count] of sortedHours) {
+    const countNum = parseInt(count);
+    totalSignIns += countNum;
+    if (countNum > peakCount) {
+      peakCount = countNum;
+      peakHour = hour;
+    }
+  }
+
+  const confidence = totalSignIns > 0 ? peakCount / totalSignIns : 0.0;
+
+  let recommendation = '';
+  if (peakHour) {
+    const hour = parseInt(peakHour.split(':')[0]);
+    if (hour >= 9 && hour <= 11) {
+      recommendation = "Morning events (9-11 AM) show highest engagement. Consider scheduling future events during this time.";
+    } else if (hour >= 12 && hour <= 14) {
+      recommendation = "Lunch time (12-2 PM) is your peak period. Lunch-and-learn events could be highly successful.";
+    } else if (hour >= 17 && hour <= 19) {
+      recommendation = "Evening hours (5-7 PM) are most popular. After-work events align well with attendee preferences.";
+    } else {
+      recommendation = `Peak attendance at ${peakHour}. Consider this timing for future events.`;
+    }
+  }
+
+  return {
+    peakHour,
+    peakCount,
+    recommendation,
+    confidence,
+    totalSignIns,
+    hourlyDistribution: hourlySignIns,
+  };
+}
+
+/**
+ * Analyze sentiment from comments
+ */
+function analyzeSentiment(comments) {
+  if (!comments || comments.length === 0) {
+    return {
+      positiveRatio: 0.0,
+      negativeRatio: 0.0,
+      neutralRatio: 1.0,
+      overallSentiment: "neutral",
+      recommendation: "No comments available for sentiment analysis",
+      confidence: 0.0,
+    };
+  }
+
+  const positiveKeywords = [
+    'great', 'awesome', 'amazing', 'excellent', 'fantastic', 'wonderful',
+    'good', 'nice', 'love', 'enjoy', 'happy', 'satisfied', 'impressed',
+    'outstanding', 'brilliant', 'perfect', 'best', 'favorite', 'recommend'
+  ];
+
+  const negativeKeywords = [
+    'bad', 'terrible', 'awful', 'horrible', 'disappointing', 'poor',
+    'worst', 'hate', 'dislike', 'boring', 'waste', 'useless', 'frustrated',
+    'angry', 'annoyed', 'confused', 'difficult', 'problem', 'issue'
+  ];
+
+  let positiveCount = 0;
+  let negativeCount = 0;
+  let neutralCount = 0;
+
+  for (const comment of comments) {
+    const text = (comment.text || '').toLowerCase();
+    if (!text) continue;
+
+    let positiveScore = 0;
+    let negativeScore = 0;
+
+    for (const keyword of positiveKeywords) {
+      if (text.includes(keyword)) positiveScore++;
+    }
+
+    for (const keyword of negativeKeywords) {
+      if (text.includes(keyword)) negativeScore++;
+    }
+
+    if (positiveScore > negativeScore) {
+      positiveCount++;
+    } else if (negativeScore > positiveScore) {
+      negativeCount++;
+    } else {
+      neutralCount++;
+    }
+  }
+
+  const total = positiveCount + negativeCount + neutralCount;
+  const positiveRatio = total > 0 ? positiveCount / total : 0.0;
+  const negativeRatio = total > 0 ? negativeCount / total : 0.0;
+  const neutralRatio = total > 0 ? neutralCount / total : 0.0;
+
+  let overallSentiment = "neutral";
+  if (positiveRatio > 0.6) {
+    overallSentiment = "positive";
+  } else if (negativeRatio > 0.6) {
+    overallSentiment = "negative";
+  }
+
+  let recommendation = '';
+  if (overallSentiment === "positive") {
+    recommendation = "Excellent feedback! Attendees are highly satisfied. Consider expanding similar event formats.";
+  } else if (overallSentiment === "negative") {
+    recommendation = "Address attendee concerns. Consider gathering more detailed feedback to improve future events.";
+  } else {
+    recommendation = "Mixed feedback received. Consider implementing feedback surveys to better understand attendee needs.";
+  }
+
+  return {
+    positiveRatio,
+    negativeRatio,
+    neutralRatio,
+    overallSentiment,
+    recommendation,
+    confidence: total > 0 ? 0.8 : 0.0,
+    totalComments: total,
+    positiveCount,
+    negativeCount,
+    neutralCount,
+  };
+}
+
+/**
+ * Generate optimization predictions
+ */
+function generateOptimizations(analyticsData, peakHoursAnalysis, sentimentAnalysis) {
+  const optimizations = [];
+
+  const totalAttendees = analyticsData.totalAttendees || 0;
+  const dropoutRate = analyticsData.dropoutRate || 0.0;
+  const repeatAttendees = analyticsData.repeatAttendees || 0;
+
+  // Peak hours optimization
+  if (peakHoursAnalysis.peakHour) {
+    const hour = parseInt(peakHoursAnalysis.peakHour.split(':')[0]);
+    
+    if (hour >= 9 && hour <= 11) {
+      optimizations.push({
+        type: "timing",
+        title: "Optimize Event Timing",
+        description: "Shift events to morning hours (9-11 AM) for +35% attendance",
+        impact: "High",
+        confidence: peakHoursAnalysis.confidence || 0.0,
+        implementation: "Schedule future events during peak morning hours",
+      });
+    } else if (hour >= 17 && hour <= 19) {
+      optimizations.push({
+        type: "timing",
+        title: "Evening Event Strategy",
+        description: "Leverage evening peak (5-7 PM) for +25% attendance",
+        impact: "Medium",
+        confidence: peakHoursAnalysis.confidence || 0.0,
+        implementation: "Focus on after-work events and networking sessions",
+      });
+    }
+  }
+
+  // Weekend optimization
+  if (totalAttendees > 0) {
+    optimizations.push({
+      type: "scheduling",
+      title: "Weekend Events",
+      description: "Shift to weekends for +40% attendance potential",
+      impact: "High",
+      confidence: 0.7,
+      implementation: "Schedule events on Saturdays or Sundays",
+    });
+  }
+
+  // Dropout rate optimization
+  if (dropoutRate > 20) {
+    optimizations.push({
+      type: "engagement",
+      title: "Reduce Dropout Rate",
+      description: "Implement reminder system to reduce dropout by 30%",
+      impact: "Medium",
+      confidence: 0.8,
+      implementation: "Send SMS/email reminders 24h and 1h before events",
+    });
+  }
+
+  // Repeat attendee optimization
+  if (repeatAttendees > 0 && totalAttendees > 0) {
+    const repeatRate = (repeatAttendees / totalAttendees) * 100;
+    if (repeatRate < 30) {
+      optimizations.push({
+        type: "retention",
+        title: "Increase Repeat Attendance",
+        description: "Implement loyalty program for +50% repeat attendance",
+        impact: "High",
+        confidence: 0.6,
+        implementation: "Create member benefits and early access programs",
+      });
+    }
+  }
+
+  // Sentiment-based optimizations
+  if (sentimentAnalysis.overallSentiment === "negative") {
+    optimizations.push({
+      type: "feedback",
+      title: "Improve Event Quality",
+      description: "Address feedback to improve satisfaction by 40%",
+      impact: "High",
+      confidence: 0.9,
+      implementation: "Conduct post-event surveys and implement feedback",
+    });
+  }
+
+  return optimizations;
+}
+
+/**
+ * Analyze dropout patterns
+ */
+function analyzeDropoutPatterns(analyticsData, attendees) {
+  const dropoutRate = analyticsData.dropoutRate || 0.0;
+  const totalAttendees = analyticsData.totalAttendees || 0;
+
+  let recommendation = '';
+  if (dropoutRate > 50) {
+    recommendation = "High dropout rate detected. Consider improving event marketing and reminder systems.";
+  } else if (dropoutRate > 25) {
+    recommendation = "Moderate dropout rate. Implement better engagement strategies.";
+  } else {
+    recommendation = "Low dropout rate. Your event planning is effective!";
+  }
+
+  return {
+    dropoutRate,
+    recommendation,
+    severity: dropoutRate > 50 ? "High" : dropoutRate > 25 ? "Medium" : "Low",
+    totalAttendees,
+    confidence: 0.8,
+  };
+}
+
+/**
+ * Analyze repeat attendee patterns
+ */
+function analyzeRepeatAttendees(analyticsData, attendees) {
+  const repeatAttendees = analyticsData.repeatAttendees || 0;
+  const totalAttendees = analyticsData.totalAttendees || 0;
+
+  const repeatRate = totalAttendees > 0 ? (repeatAttendees / totalAttendees) * 100 : 0.0;
+
+  let recommendation = '';
+  if (repeatRate > 50) {
+    recommendation = "Excellent repeat attendance! Your events have strong community building.";
+  } else if (repeatRate > 25) {
+    recommendation = "Good repeat attendance. Consider loyalty programs to increase retention.";
+  } else {
+    recommendation = "Low repeat attendance. Focus on building community and improving event quality.";
+  }
+
+  return {
+    repeatRate,
+    repeatAttendees,
+    totalAttendees,
+    recommendation,
+    confidence: 0.8,
+  };
+}

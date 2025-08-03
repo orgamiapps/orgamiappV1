@@ -55,6 +55,16 @@ dependencies:
   shimmer: ^3.0.0
   fl_chart: ^0.66.0
   csv: ^5.0.2
+  # AI and ML dependencies
+  # firebase_ml_kit: ^0.16.3  # Removed due to compatibility issues
+  # firebase_ml_model_downloader: ^0.2.3+8  # Removed due to compatibility issues
+  # PDF generation
+  pdf: ^3.10.7
+  printing: ^5.11.1
+  # HTTP for API calls
+  http: ^1.1.2
+  # Natural language processing
+  # natural: ^0.2.0  # Removed due to compatibility issues
 
 dev_dependencies:
   flutter_test:

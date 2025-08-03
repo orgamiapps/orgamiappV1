@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
+import 'package:orgami/Firebase/AIAnalyticsHelper.dart';
 import 'package:orgami/Models/AttendanceModel.dart';
 import 'package:orgami/Models/EventModel.dart';
 import 'package:orgami/Utils/AppButtons.dart';
@@ -19,10 +20,7 @@ import 'package:share_plus/share_plus.dart';
 class EventAnalyticsScreen extends StatefulWidget {
   final String eventId;
 
-  const EventAnalyticsScreen({
-    super.key,
-    required this.eventId,
-  });
+  const EventAnalyticsScreen({super.key, required this.eventId});
 
   @override
   State<EventAnalyticsScreen> createState() => _EventAnalyticsScreenState();
@@ -36,11 +34,13 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
   String? _eventHostUid;
   List<AttendanceModel> _attendeesList = [];
   bool _isLoadingAttendees = false;
+  AIInsights? _aiInsights;
+  bool _isLoadingAI = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _checkAuthorization();
   }
 
@@ -83,11 +83,14 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
 
       if (!_isAuthorized) {
         ShowToast().showSnackBar(
-            'Access denied. Only event hosts can view analytics.', context);
+          'Access denied. Only event hosts can view analytics.',
+          context,
+        );
         Navigator.pop(context);
       } else {
         // Load attendees data if authorized
         _loadAttendeesData();
+        _loadAIInsights();
       }
     } catch (e) {
       setState(() {
@@ -120,6 +123,37 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
     }
   }
 
+  Future<void> _loadAIInsights() async {
+    setState(() {
+      _isLoadingAI = true;
+    });
+
+    try {
+      final aiHelper = AIAnalyticsHelper();
+      final insights = await aiHelper.getAIInsights(widget.eventId);
+
+      if (insights == null) {
+        // Generate new insights if none exist
+        final newInsights = await aiHelper.generateAIInsights(widget.eventId);
+        await aiHelper.saveAIInsights(widget.eventId, newInsights);
+        setState(() {
+          _aiInsights = newInsights;
+          _isLoadingAI = false;
+        });
+      } else {
+        setState(() {
+          _aiInsights = insights;
+          _isLoadingAI = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingAI = false;
+      });
+      print('Error loading AI insights: $e');
+    }
+  }
+
   /// Get display name for attendee, handling anonymous users
   String _getDisplayName(AttendanceModel attendee) {
     if (attendee.isAnonymous) {
@@ -144,18 +178,31 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
   Widget build(BuildContext context) {
     if (!_isAuthorized) {
       return Scaffold(
+        backgroundColor: AppThemeColor.backGroundColor,
         body: SafeArea(
           child: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+                  decoration: BoxDecoration(
+                    color: AppThemeColor.lightBlueColor,
+                    borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+                  ),
+                  child: const CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppThemeColor.darkBlueColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: Dimensions.spaceSizedLarge),
                 Text(
                   'Checking authorization...',
                   style: TextStyle(
-                    fontSize: Dimensions.fontSizeDefault,
+                    fontSize: Dimensions.fontSizeLarge,
                     color: AppThemeColor.darkBlueColor,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -166,98 +213,147 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
     }
 
     return Scaffold(
+      backgroundColor: AppThemeColor.backGroundColor,
       body: SafeArea(
         child: Column(
           children: [
-            // App Bar
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
+            // Modern App Bar
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: Dimensions.paddingSizeLarge,
+                vertical: Dimensions.paddingSizeDefault,
+              ),
+              decoration: BoxDecoration(
+                color: AppThemeColor.pureWhiteColor,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
               child: Row(
                 children: [
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.arrow_back),
-                  ),
-                  Expanded(
-                    child: Text(
-                      'Event Analytics',
-                      style: TextStyle(
-                        fontSize: Dimensions.fontSizeLarge,
-                        fontWeight: FontWeight.bold,
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppThemeColor.lightBlueColor,
+                      borderRadius: BorderRadius.circular(
+                        Dimensions.radiusDefault,
+                      ),
+                    ),
+                    child: IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new,
                         color: AppThemeColor.darkBlueColor,
+                        size: 20,
                       ),
                     ),
                   ),
-                  IconButton(
-                    onPressed: _exportData,
-                    icon: const Icon(Icons.download),
-                    tooltip: 'Export Data',
+                  const SizedBox(width: Dimensions.spaceSizedDefault),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Event Analytics',
+                          style: TextStyle(
+                            fontSize: Dimensions.fontSizeExtraLarge,
+                            fontWeight: FontWeight.bold,
+                            color: AppThemeColor.darkBlueColor,
+                          ),
+                        ),
+                        Text(
+                          'Comprehensive insights & AI analysis',
+                          style: TextStyle(
+                            fontSize: Dimensions.fontSizeSmall,
+                            color: AppThemeColor.dullFontColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppThemeColor.darkBlueColor,
+                      borderRadius: BorderRadius.circular(
+                        Dimensions.radiusDefault,
+                      ),
+                    ),
+                    child: IconButton(
+                      onPressed: _exportData,
+                      icon: const Icon(
+                        Icons.download_rounded,
+                        color: AppThemeColor.pureWhiteColor,
+                        size: 20,
+                      ),
+                      tooltip: 'Export Data',
+                    ),
                   ),
                 ],
               ),
             ),
 
-            // Date Filter Chips
+            // Modern Date Filter Chips
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              margin: const EdgeInsets.symmetric(
+                horizontal: Dimensions.paddingSizeLarge,
+                vertical: Dimensions.paddingSizeDefault,
+              ),
               child: Wrap(
-                spacing: 8,
+                spacing: Dimensions.spaceSizeSmall,
+                runSpacing: Dimensions.spaceSizeSmall,
                 children: [
-                  FilterChip(
-                    label: const Text('All Time'),
-                    selected: _selectedDateFilter == 'all',
-                    onSelected: (selected) {
-                      setState(() {
-                        _selectedDateFilter = 'all';
-                      });
-                    },
-                    selectedColor: AppThemeColor.darkGreenColor,
-                    checkmarkColor: Colors.white,
-                  ),
-                  FilterChip(
-                    label: const Text('Last Week'),
-                    selected: _selectedDateFilter == 'week',
-                    onSelected: (selected) {
-                      setState(() {
-                        _selectedDateFilter = 'week';
-                      });
-                    },
-                    selectedColor: AppThemeColor.darkGreenColor,
-                    checkmarkColor: Colors.white,
-                  ),
-                  FilterChip(
-                    label: const Text('Last Month'),
-                    selected: _selectedDateFilter == 'month',
-                    onSelected: (selected) {
-                      setState(() {
-                        _selectedDateFilter = 'month';
-                      });
-                    },
-                    selectedColor: AppThemeColor.darkGreenColor,
-                    checkmarkColor: Colors.white,
-                  ),
+                  _buildFilterChip('All Time', 'all'),
+                  _buildFilterChip('Last Week', 'week'),
+                  _buildFilterChip('Last Month', 'month'),
                 ],
               ),
             ),
 
-            // Tab Bar
+            // Modern Tab Bar
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
+              margin: const EdgeInsets.symmetric(
+                horizontal: Dimensions.paddingSizeLarge,
+              ),
               decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(8),
+                color: AppThemeColor.lightBlueColor,
+                borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 5,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: TabBar(
                 controller: _tabController,
                 indicator: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: AppThemeColor.darkGreenColor,
+                  borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                  color: AppThemeColor.darkBlueColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppThemeColor.darkBlueColor.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                labelColor: Colors.white,
+                labelColor: AppThemeColor.pureWhiteColor,
                 unselectedLabelColor: AppThemeColor.darkBlueColor,
+                labelStyle: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: Dimensions.fontSizeDefault,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: Dimensions.fontSizeDefault,
+                ),
                 tabs: const [
                   Tab(text: 'Overview'),
+                  Tab(text: 'AI Insights'),
                   Tab(text: 'Trends'),
                   Tab(text: 'Users'),
                 ],
@@ -270,49 +366,61 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                 controller: _tabController,
                 children: [
                   _overviewTab(),
+                  _aiInsightsTab(),
                   _trendsTab(),
                   _usersTab(),
                 ],
               ),
             ),
 
-            // Compliance Notice
+            // Modern Compliance Notice
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              margin: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+              margin: const EdgeInsets.all(Dimensions.paddingSizeLarge),
               decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[300]!),
+                color: AppThemeColor.lightBlueColor,
+                borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+                border: Border.all(color: AppThemeColor.borderColor),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.security,
-                        size: 16,
-                        color: Colors.grey[600],
+                  Container(
+                    padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
+                    decoration: BoxDecoration(
+                      color: AppThemeColor.darkBlueColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(
+                        Dimensions.radiusDefault,
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Privacy & Compliance',
-                        style: TextStyle(
-                          fontSize: Dimensions.fontSizeDefault,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                    ],
+                    ),
+                    child: Icon(
+                      Icons.security_rounded,
+                      size: 16,
+                      color: AppThemeColor.darkBlueColor,
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Data is aggregated without personal identifiers. Analytics are anonymized for privacy compliance.',
-                    style: TextStyle(
-                      fontSize: Dimensions.fontSizeSmall,
-                      color: Colors.grey[600],
+                  const SizedBox(width: Dimensions.spaceSizeSmall),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Privacy & Compliance',
+                          style: TextStyle(
+                            fontSize: Dimensions.fontSizeDefault,
+                            fontWeight: FontWeight.w600,
+                            color: AppThemeColor.darkBlueColor,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Data is aggregated without personal identifiers. Analytics are anonymized for privacy compliance.',
+                          style: TextStyle(
+                            fontSize: Dimensions.fontSizeSmall,
+                            color: AppThemeColor.dullFontColor,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -321,6 +429,40 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, String value) {
+    final isSelected = _selectedDateFilter == value;
+    return FilterChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          color: isSelected
+              ? AppThemeColor.pureWhiteColor
+              : AppThemeColor.darkBlueColor,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+        ),
+      ),
+      selected: isSelected,
+      onSelected: (selected) {
+        setState(() {
+          _selectedDateFilter = value;
+        });
+      },
+      selectedColor: AppThemeColor.darkBlueColor,
+      checkmarkColor: AppThemeColor.pureWhiteColor,
+      backgroundColor: AppThemeColor.lightBlueColor,
+      side: BorderSide(
+        color: isSelected
+            ? AppThemeColor.darkBlueColor
+            : AppThemeColor.borderColor,
+        width: 1,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+      ),
+      elevation: isSelected ? 4 : 0,
     );
   }
 
@@ -338,11 +480,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: Colors.grey[400],
-                ),
+                Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
                 const SizedBox(height: 16),
                 Text(
                   'Failed to load analytics data',
@@ -385,9 +523,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
+          return const Center(child: CircularProgressIndicator());
         }
 
         if (!snapshot.hasData || !snapshot.data!.exists) {
@@ -436,11 +572,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.history,
-                    size: 64,
-                    color: Colors.grey[400],
-                  ),
+                  Icon(Icons.history, size: 64, color: Colors.grey[400]),
                   const SizedBox(height: 16),
                   Text(
                     'No data available for selected period',
@@ -458,81 +590,343 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
         }
 
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
           child: Column(
             children: [
-              // Total Attendees Card
-              _analyticsCard(
-                title: 'Total Attendees',
-                value: '${data['totalAttendees'] ?? 0}',
-                icon: Icons.people,
-                color: const Color(0xFF4CAF50), // Green accent
-                tooltip: 'Number of unique sign-ins',
-              ),
-
-              const SizedBox(height: 16),
-
-              // Repeat Attendees Card
-              _analyticsCard(
-                title: 'Repeat Attendees',
-                value: '${data['repeatAttendees'] ?? 0}',
-                icon: Icons.repeat,
-                color: const Color(0xFF4CAF50), // Green accent
-                tooltip: 'Users who attended previous events by you',
-              ),
-
-              const SizedBox(height: 16),
-
-              // Dropout Rate Card
-              _analyticsCard(
-                title: 'Dropout Rate',
-                value: '${(data['dropoutRate'] ?? 0).toStringAsFixed(1)}%',
-                icon: Icons.trending_down,
-                color: const Color(0xFF4CAF50), // Green accent
-                tooltip:
-                    'Percentage of pre-registered who didn\'t attend ((Pre-registered - Attendees) / Pre-registered * 100)',
-              ),
-
-              const SizedBox(height: 16),
-
-              // Last Updated
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Last Updated',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppThemeColor.darkBlueColor,
-                        fontFamily: 'Roboto',
-                      ),
+              // Modern Analytics Cards Grid
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                crossAxisSpacing: Dimensions.spaceSizeSmall,
+                mainAxisSpacing: Dimensions.spaceSizeSmall,
+                childAspectRatio: 1.2,
+                children: [
+                  _buildModernAnalyticsCard(
+                    title: 'Total Attendees',
+                    value: '${data['totalAttendees'] ?? 0}',
+                    icon: Icons.people_rounded,
+                    color: AppThemeColor.darkBlueColor,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF2C5A96), Color(0xFF4A90E2)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      data['lastUpdated'] != null
-                          ? _formatTimestamp(data['lastUpdated'])
-                          : 'Never',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                        fontFamily: 'Roboto',
-                      ),
+                  ),
+                  _buildModernAnalyticsCard(
+                    title: 'Repeat Attendees',
+                    value: '${data['repeatAttendees'] ?? 0}',
+                    icon: Icons.repeat_rounded,
+                    color: AppThemeColor.dullBlueColor,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF73ABE4), Color(0xFF9BC2F0)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                  ],
-                ),
+                  ),
+                  _buildModernAnalyticsCard(
+                    title: 'Dropout Rate',
+                    value: '${(data['dropoutRate'] ?? 0).toStringAsFixed(1)}%',
+                    icon: Icons.trending_down_rounded,
+                    color: AppThemeColor.grayColor,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF60676C), Color(0xFF8A8A8A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  _buildModernAnalyticsCard(
+                    title: 'Engagement Score',
+                    value: _calculateEngagementScore(data).toStringAsFixed(0),
+                    icon: Icons.insights_rounded,
+                    color: AppThemeColor.darkBlueColor,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF2C5A96), Color(0xFF5B7BC0)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                ],
               ),
+
+              const SizedBox(height: Dimensions.spaceSizedLarge),
+
+              // Last Updated Card
+              _buildLastUpdatedCard(data),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildModernAnalyticsCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+    required Gradient gradient,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
+              decoration: BoxDecoration(
+                color: AppThemeColor.pureWhiteColor.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+              ),
+              child: Icon(icon, color: AppThemeColor.pureWhiteColor, size: 24),
+            ),
+            const SizedBox(height: Dimensions.spaceSizeSmall),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: Dimensions.fontSizeOverLarge,
+                fontWeight: FontWeight.bold,
+                color: AppThemeColor.pureWhiteColor,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: Dimensions.fontSizeSmall,
+                fontWeight: FontWeight.w500,
+                color: AppThemeColor.pureWhiteColor,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLastUpdatedCard(Map<String, dynamic> data) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+      decoration: BoxDecoration(
+        color: AppThemeColor.pureWhiteColor,
+        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
+            decoration: BoxDecoration(
+              color: AppThemeColor.lightBlueColor,
+              borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+            ),
+            child: Icon(
+              Icons.update_rounded,
+              color: AppThemeColor.darkBlueColor,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: Dimensions.spaceSizeSmall),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Last Updated',
+                  style: TextStyle(
+                    fontSize: Dimensions.fontSizeDefault,
+                    fontWeight: FontWeight.w600,
+                    color: AppThemeColor.darkBlueColor,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  data['lastUpdated'] != null
+                      ? _formatTimestamp(data['lastUpdated'])
+                      : 'Never',
+                  style: TextStyle(
+                    fontSize: Dimensions.fontSizeSmall,
+                    color: AppThemeColor.dullFontColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  double _calculateEngagementScore(Map<String, dynamic> data) {
+    final totalAttendees = data['totalAttendees'] ?? 0;
+    final repeatAttendees = data['repeatAttendees'] ?? 0;
+    final dropoutRate = data['dropoutRate'] ?? 0.0;
+
+    if (totalAttendees == 0) return 0;
+
+    // Calculate engagement score based on multiple factors
+    final repeatRate = (repeatAttendees / totalAttendees) * 100;
+    final retentionScore = (100 - dropoutRate) * 0.4; // 40% weight
+    final repeatScore = repeatRate * 0.6; // 60% weight
+
+    return retentionScore + repeatScore;
+  }
+
+  Widget _buildErrorState({
+    required IconData icon,
+    required String title,
+    required String message,
+    required String actionText,
+    required VoidCallback onAction,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+              decoration: BoxDecoration(
+                color: AppThemeColor.lightBlueColor,
+                borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+              ),
+              child: Icon(icon, size: 64, color: AppThemeColor.dullIconColor),
+            ),
+            const SizedBox(height: Dimensions.spaceSizedLarge),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: Dimensions.fontSizeExtraLarge,
+                fontWeight: FontWeight.w600,
+                color: AppThemeColor.darkBlueColor,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: Dimensions.spaceSizeSmall),
+            Text(
+              message,
+              style: TextStyle(
+                fontSize: Dimensions.fontSizeDefault,
+                color: AppThemeColor.dullFontColor,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: Dimensions.spaceSizedLarge),
+            ElevatedButton.icon(
+              onPressed: onAction,
+              icon: const Icon(Icons.refresh_rounded),
+              label: Text(actionText),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppThemeColor.darkBlueColor,
+                foregroundColor: AppThemeColor.pureWhiteColor,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: Dimensions.paddingSizeLarge,
+                  vertical: Dimensions.paddingSizeDefault,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+            decoration: BoxDecoration(
+              color: AppThemeColor.lightBlueColor,
+              borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+            ),
+            child: const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(
+                AppThemeColor.darkBlueColor,
+              ),
+            ),
+          ),
+          const SizedBox(height: Dimensions.spaceSizedLarge),
+          Text(
+            'Loading analytics...',
+            style: TextStyle(
+              fontSize: Dimensions.fontSizeLarge,
+              fontWeight: FontWeight.w500,
+              color: AppThemeColor.darkBlueColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String title,
+    required String message,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+              decoration: BoxDecoration(
+                color: AppThemeColor.lightBlueColor,
+                borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+              ),
+              child: Icon(icon, size: 64, color: AppThemeColor.dullIconColor),
+            ),
+            const SizedBox(height: Dimensions.spaceSizedLarge),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: Dimensions.fontSizeExtraLarge,
+                fontWeight: FontWeight.w600,
+                color: AppThemeColor.darkBlueColor,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: Dimensions.spaceSizeSmall),
+            Text(
+              message,
+              style: TextStyle(
+                fontSize: Dimensions.fontSizeDefault,
+                color: AppThemeColor.dullFontColor,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -550,11 +944,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: Colors.grey[400],
-                ),
+                Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
                 const SizedBox(height: 16),
                 Text(
                   'Failed to load trends data',
@@ -587,9 +977,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
+          return const Center(child: CircularProgressIndicator());
         }
 
         if (!snapshot.hasData || !snapshot.data!.exists) {
@@ -597,11 +985,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.trending_up,
-                  size: 64,
-                  color: Colors.grey[400],
-                ),
+                Icon(Icons.trending_up, size: 64, color: Colors.grey[400]),
                 const SizedBox(height: 16),
                 Text(
                   'No trends data available',
@@ -683,9 +1067,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
 
   Widget _usersTab() {
     if (_isLoadingAttendees) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_attendeesList.isEmpty) {
@@ -693,11 +1075,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.people_outline,
-              size: 64,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
               'No attendees data available',
@@ -828,9 +1206,9 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                       leading: CircleAvatar(
                         backgroundColor: const Color(0xFF4CAF50),
                         child: Text(
-                          _getDisplayName(attendee)
-                              .substring(0, 1)
-                              .toUpperCase(),
+                          _getDisplayName(
+                            attendee,
+                          ).substring(0, 1).toUpperCase(),
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -901,11 +1279,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
               color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 24,
-            ),
+            child: Icon(icon, color: color, size: 24),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -1043,10 +1417,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
           horizontalInterval: 1,
           drawVerticalLine: false,
           getDrawingHorizontalLine: (value) {
-            return FlLine(
-              color: Colors.grey[300]!,
-              strokeWidth: 1,
-            );
+            return FlLine(color: Colors.grey[300]!, strokeWidth: 1);
           },
         ),
       ),
@@ -1109,6 +1480,543 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
     return 'Unknown';
   }
 
+  Widget _aiInsightsTab() {
+    if (_isLoadingAI) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_aiInsights == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.psychology, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              'No AI insights available',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[600],
+                fontFamily: 'Roboto',
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'AI insights will be generated once sufficient data is available',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[500],
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: _loadAIInsights,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Generate Insights'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppThemeColor.darkBlueColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          // Peak Hours Analysis
+          _aiInsightCard(
+            title: 'Peak Hours Analysis',
+            icon: Icons.access_time,
+            color: AppThemeColor.darkBlueColor,
+            content: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Peak Hour: ${_aiInsights!.peakHoursAnalysis['peakHour'] ?? 'N/A'}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Peak Count: ${_aiInsights!.peakHoursAnalysis['peakCount'] ?? 0}',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Confidence: ${((_aiInsights!.peakHoursAnalysis['confidence'] ?? 0) * 100).toStringAsFixed(1)}%',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppThemeColor.darkBlueColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _aiInsights!.peakHoursAnalysis['recommendation'] ??
+                        'No recommendation available',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Sentiment Analysis
+          _aiInsightCard(
+            title: 'Sentiment Analysis',
+            icon: Icons.sentiment_satisfied,
+            color: _getSentimentColor(
+              _aiInsights!.sentimentAnalysis['overallSentiment'] ?? 'neutral',
+            ),
+            content: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      _getSentimentIcon(
+                        _aiInsights!.sentimentAnalysis['overallSentiment'] ??
+                            'neutral',
+                      ),
+                      color: _getSentimentColor(
+                        _aiInsights!.sentimentAnalysis['overallSentiment'] ??
+                            'neutral',
+                      ),
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Overall: ${_aiInsights!.sentimentAnalysis['overallSentiment'] ?? 'neutral'}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _sentimentBar(
+                        'Positive',
+                        _aiInsights!.sentimentAnalysis['positiveRatio'] ?? 0,
+                        AppThemeColor.darkBlueColor,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _sentimentBar(
+                        'Neutral',
+                        _aiInsights!.sentimentAnalysis['neutralRatio'] ?? 0,
+                        AppThemeColor.dullIconColor,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _sentimentBar(
+                        'Negative',
+                        _aiInsights!.sentimentAnalysis['negativeRatio'] ?? 0,
+                        AppThemeColor.grayColor,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _getSentimentColor(
+                      _aiInsights!.sentimentAnalysis['overallSentiment'] ??
+                          'neutral',
+                    ).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _aiInsights!.sentimentAnalysis['recommendation'] ??
+                        'No recommendation available',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Optimization Predictions
+          _aiInsightCard(
+            title: 'AI Optimization Recommendations',
+            icon: Icons.trending_up,
+            color: AppThemeColor.dullBlueColor,
+            content: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ...(_aiInsights!.optimizationPredictions)
+                    .map(
+                      (optimization) => Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey[300]!),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  _getOptimizationIcon(
+                                    optimization['type'] ?? '',
+                                  ),
+                                  color: _getOptimizationColor(
+                                    optimization['type'] ?? '',
+                                  ),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    optimization['title'] ?? 'Unknown',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _getImpactColor(
+                                      optimization['impact'] ?? '',
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    optimization['impact'] ?? 'Unknown',
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              optimization['description'] ??
+                                  'No description available',
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Confidence: ${((optimization['confidence'] ?? 0) * 100).toStringAsFixed(1)}%',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Dropout Analysis
+          _aiInsightCard(
+            title: 'Dropout Analysis',
+            icon: Icons.trending_down,
+            color: AppThemeColor.grayColor,
+            content: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Dropout Rate: ${(_aiInsights!.dropoutAnalysis['dropoutRate'] ?? 0).toStringAsFixed(1)}%',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getSeverityColor(
+                      _aiInsights!.dropoutAnalysis['severity'] ?? '',
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'Severity: ${_aiInsights!.dropoutAnalysis['severity'] ?? 'Unknown'}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppThemeColor.grayColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _aiInsights!.dropoutAnalysis['recommendation'] ??
+                        'No recommendation available',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Repeat Attendee Analysis
+          _aiInsightCard(
+            title: 'Repeat Attendee Analysis',
+            icon: Icons.repeat,
+            color: AppThemeColor.darkBlueColor,
+            content: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Repeat Rate: ${(_aiInsights!.repeatAttendeeAnalysis['repeatRate'] ?? 0).toStringAsFixed(1)}%',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Repeat Attendees: ${_aiInsights!.repeatAttendeeAnalysis['repeatAttendees'] ?? 0}',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Total Attendees: ${_aiInsights!.repeatAttendeeAnalysis['totalAttendees'] ?? 0}',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppThemeColor.darkBlueColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _aiInsights!.repeatAttendeeAnalysis['recommendation'] ??
+                        'No recommendation available',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _aiInsightCard({
+    required String title,
+    required IconData icon,
+    required Color color,
+    required Widget content,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 24),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppThemeColor.darkBlueColor,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          content,
+        ],
+      ),
+    );
+  }
+
+  Widget _sentimentBar(String label, double ratio, Color color) {
+    return Column(
+      children: [
+        Text(
+          '${(ratio * 100).toStringAsFixed(1)}%',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(fontSize: 10)),
+      ],
+    );
+  }
+
+  Color _getSentimentColor(String sentiment) {
+    switch (sentiment.toLowerCase()) {
+      case 'positive':
+        return AppThemeColor.darkBlueColor;
+      case 'negative':
+        return AppThemeColor.grayColor;
+      default:
+        return AppThemeColor.dullIconColor;
+    }
+  }
+
+  IconData _getSentimentIcon(String sentiment) {
+    switch (sentiment.toLowerCase()) {
+      case 'positive':
+        return Icons.sentiment_satisfied;
+      case 'negative':
+        return Icons.sentiment_dissatisfied;
+      default:
+        return Icons.sentiment_neutral;
+    }
+  }
+
+  IconData _getOptimizationIcon(String type) {
+    switch (type) {
+      case 'timing':
+        return Icons.access_time;
+      case 'scheduling':
+        return Icons.calendar_today;
+      case 'engagement':
+        return Icons.notifications;
+      case 'retention':
+        return Icons.repeat;
+      case 'feedback':
+        return Icons.feedback;
+      default:
+        return Icons.trending_up;
+    }
+  }
+
+  Color _getOptimizationColor(String type) {
+    switch (type) {
+      case 'timing':
+        return AppThemeColor.darkBlueColor;
+      case 'scheduling':
+        return AppThemeColor.dullBlueColor;
+      case 'engagement':
+        return AppThemeColor.grayColor;
+      case 'retention':
+        return AppThemeColor.darkBlueColor;
+      case 'feedback':
+        return AppThemeColor.grayColor;
+      default:
+        return AppThemeColor.dullIconColor;
+    }
+  }
+
+  Color _getImpactColor(String impact) {
+    switch (impact.toLowerCase()) {
+      case 'high':
+        return AppThemeColor.darkBlueColor;
+      case 'medium':
+        return AppThemeColor.dullBlueColor;
+      case 'low':
+        return AppThemeColor.grayColor;
+      default:
+        return AppThemeColor.dullIconColor;
+    }
+  }
+
+  Color _getSeverityColor(String severity) {
+    switch (severity.toLowerCase()) {
+      case 'high':
+        return AppThemeColor.darkBlueColor;
+      case 'medium':
+        return AppThemeColor.dullBlueColor;
+      case 'low':
+        return AppThemeColor.grayColor;
+      default:
+        return AppThemeColor.dullIconColor;
+    }
+  }
+
   Future<void> _exportData() async {
     try {
       // Get analytics data
@@ -1131,15 +2039,63 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
         ['Repeat Attendees', '${analyticsData['repeatAttendees'] ?? 0}'],
         [
           'Dropout Rate',
-          '${(analyticsData['dropoutRate'] ?? 0).toStringAsFixed(1)}%'
+          '${(analyticsData['dropoutRate'] ?? 0).toStringAsFixed(1)}%',
         ],
         [
           'Last Updated',
           analyticsData['lastUpdated'] != null
               ? _formatTimestamp(analyticsData['lastUpdated'])
-              : 'Never'
+              : 'Never',
         ],
       ];
+
+      // Add AI insights if available
+      if (_aiInsights != null) {
+        csvData.add([]);
+        csvData.add(['AI Insights']);
+        csvData.add([
+          'Peak Hour',
+          _aiInsights!.peakHoursAnalysis['peakHour'] ?? 'N/A',
+        ]);
+        csvData.add([
+          'Peak Count',
+          '${_aiInsights!.peakHoursAnalysis['peakCount'] ?? 0}',
+        ]);
+        csvData.add([
+          'Overall Sentiment',
+          _aiInsights!.sentimentAnalysis['overallSentiment'] ?? 'neutral',
+        ]);
+        csvData.add([
+          'Positive Ratio',
+          '${((_aiInsights!.sentimentAnalysis['positiveRatio'] ?? 0) * 100).toStringAsFixed(1)}%',
+        ]);
+        csvData.add([
+          'Negative Ratio',
+          '${((_aiInsights!.sentimentAnalysis['negativeRatio'] ?? 0) * 100).toStringAsFixed(1)}%',
+        ]);
+        csvData.add([
+          'Dropout Rate',
+          '${(_aiInsights!.dropoutAnalysis['dropoutRate'] ?? 0).toStringAsFixed(1)}%',
+        ]);
+        csvData.add([
+          'Repeat Rate',
+          '${(_aiInsights!.repeatAttendeeAnalysis['repeatRate'] ?? 0).toStringAsFixed(1)}%',
+        ]);
+
+        // Add optimization recommendations
+        if (_aiInsights!.optimizationPredictions.isNotEmpty) {
+          csvData.add([]);
+          csvData.add(['Optimization Recommendations']);
+          for (final optimization in _aiInsights!.optimizationPredictions) {
+            csvData.add([
+              optimization['title'] ?? 'Unknown',
+              optimization['description'] ?? 'No description',
+              optimization['impact'] ?? 'Unknown',
+              '${((optimization['confidence'] ?? 0) * 100).toStringAsFixed(1)}%',
+            ]);
+          }
+        }
+      }
 
       // Add hourly data
       final hourlySignIns =
@@ -1170,8 +2126,9 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
 
       // Save to temporary file
       final directory = await getTemporaryDirectory();
-      final file =
-          File('${directory.path}/event_analytics_${widget.eventId}.csv');
+      final file = File(
+        '${directory.path}/event_analytics_${widget.eventId}.csv',
+      );
       await file.writeAsString(csvString);
 
       // Share file

@@ -1322,4 +1322,59 @@ class FirebaseFirestoreHelper {
       rethrow;
     }
   }
+
+  /// Deletes an event from Firestore
+  /// 
+  /// This method deletes the event document and all related data
+  Future<void> deleteEvent(String eventId) async {
+    try {
+      // Delete the event document
+      await _firestore.collection(EventModel.firebaseKey).doc(eventId).delete();
+      
+      // Delete related attendance records
+      final attendanceQuery = await _firestore
+          .collection(AttendanceModel.firebaseKey)
+          .where('eventId', isEqualTo: eventId)
+          .get();
+      
+      for (var doc in attendanceQuery.docs) {
+        await doc.reference.delete();
+      }
+
+      // Delete related pre-registration records
+      final preRegistrationQuery = await _firestore
+          .collection(AttendanceModel.registerFirebaseKey)
+          .where('eventId', isEqualTo: eventId)
+          .get();
+      
+      for (var doc in preRegistrationQuery.docs) {
+        await doc.reference.delete();
+      }
+
+      // Delete related tickets
+      final ticketsQuery = await _firestore
+          .collection(TicketModel.firebaseKey)
+          .where('eventId', isEqualTo: eventId)
+          .get();
+      
+      for (var doc in ticketsQuery.docs) {
+        await doc.reference.delete();
+      }
+
+      // Delete related comments
+      final commentsQuery = await _firestore
+          .collection(CommentModel.firebaseKey)
+          .where('eventId', isEqualTo: eventId)
+          .get();
+      
+      for (var doc in commentsQuery.docs) {
+        await doc.reference.delete();
+      }
+
+      print('Successfully deleted event: $eventId');
+    } catch (e) {
+      print('Error deleting event: $e');
+      rethrow;
+    }
+  }
 }

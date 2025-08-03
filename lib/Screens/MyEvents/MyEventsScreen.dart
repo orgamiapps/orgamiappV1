@@ -11,6 +11,7 @@ import 'package:orgami/Screens/Events/SingleEventScreen.dart';
 import 'package:orgami/Utils/Colors.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:orgami/Utils/Router.dart';
+import 'package:orgami/Utils/Toast.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -50,6 +51,10 @@ class _MyEventsScreenState extends State<MyEventsScreen>
   // Filter/Sort state
   SortOption currentSortOption = SortOption.none;
   List<String> selectedCategories = [];
+
+  // Selection state
+  bool isSelectionMode = false;
+  Set<String> selectedEventIds = <String>{};
 
   // Categories for filtering (tailored for each tab)
   final List<String> _allCategories = ['Educational', 'Professional', 'Other'];
@@ -99,6 +104,139 @@ class _MyEventsScreenState extends State<MyEventsScreen>
       }
     }
     return eventPreRegistered;
+  }
+
+  // Selection methods
+  void _toggleSelectionMode() {
+    setState(() {
+      isSelectionMode = !isSelectionMode;
+      if (!isSelectionMode) {
+        selectedEventIds.clear();
+      }
+    });
+  }
+
+  void _toggleEventSelection(String eventId) {
+    setState(() {
+      if (selectedEventIds.contains(eventId)) {
+        selectedEventIds.remove(eventId);
+      } else {
+        selectedEventIds.add(eventId);
+      }
+    });
+  }
+
+  void _selectAllEvents(List<EventModel> events) {
+    setState(() {
+      selectedEventIds = events.map((e) => e.id).toSet();
+    });
+  }
+
+  void _deselectAllEvents() {
+    setState(() {
+      selectedEventIds.clear();
+    });
+  }
+
+  void _toggleSelectAll(List<EventModel> events) {
+    setState(() {
+      if (selectedEventIds.length == events.length) {
+        // If all are selected, deselect all
+        selectedEventIds.clear();
+      } else {
+        // Select all
+        selectedEventIds = events.map((e) => e.id).toSet();
+      }
+    });
+  }
+
+  Future<void> _deleteSelectedEvents() async {
+    if (selectedEventIds.isEmpty) {
+      ShowToast().showNormalToast(msg: 'Please select events to delete');
+      return;
+    }
+
+    // Show confirmation dialog
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Delete Events',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Roboto',
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to delete ${selectedEventIds.length} selected event${selectedEventIds.length == 1 ? '' : 's'}? This action cannot be undone.',
+          style: const TextStyle(fontSize: 16, fontFamily: 'Roboto'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                color: Color(0xFF6B7280),
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Delete',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // Delete events from Firebase
+      for (String eventId in selectedEventIds) {
+        await FirebaseFirestoreHelper().deleteEvent(eventId);
+      }
+
+      if (mounted) {
+        setState(() {
+          selectedEventIds.clear();
+          isSelectionMode = false;
+          isLoading = false;
+        });
+        ShowToast().showNormalToast(
+          msg:
+              '${selectedEventIds.length} event${selectedEventIds.length == 1 ? '' : 's'} deleted successfully',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+        ShowToast().showNormalToast(msg: 'Failed to delete events: $e');
+      }
+    }
   }
 
   // Sort events based on current sort option and tab context
@@ -678,10 +816,17 @@ class _MyEventsScreenState extends State<MyEventsScreen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Back button
+                // Back button or Cancel selection
                 GestureDetector(
                   onTap: () {
-                    Navigator.of(context).pop();
+                    if (isSelectionMode) {
+                      setState(() {
+                        isSelectionMode = false;
+                        selectedEventIds.clear();
+                      });
+                    } else {
+                      Navigator.of(context).pop();
+                    }
                   },
                   child: Container(
                     width: 40,
@@ -690,8 +835,8 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                       color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Icon(
-                      Icons.arrow_back,
+                    child: Icon(
+                      isSelectionMode ? Icons.close : Icons.arrow_back,
                       color: Colors.white,
                       size: 24,
                     ),
@@ -701,9 +846,11 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.only(left: 16),
-                    child: const Text(
-                      'My Events',
-                      style: TextStyle(
+                    child: Text(
+                      isSelectionMode
+                          ? '${selectedEventIds.length} selected'
+                          : 'My Events',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 28,
@@ -712,74 +859,171 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                     ),
                   ),
                 ),
-                // Sort button with indicator
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  child: Column(
-                    children: [
-                      GestureDetector(
-                        onTap: () {
-                          _showFilterSortModal();
-                        },
-                        child: Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(25),
-                          ),
-                          child: Stack(
-                            children: [
-                              const Center(
-                                child: Icon(
-                                  Icons.tune,
-                                  color: Colors.white,
-                                  size: 24,
-                                ),
-                              ),
-                              if (selectedCategories.isNotEmpty ||
-                                  currentSortOption != SortOption.none)
-                                Positioned(
-                                  top: 4,
-                                  right: 4,
-                                  child: Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFFFF6B6B),
-                                      shape: BoxShape.circle,
-                                    ),
+                // Action buttons
+                if (isSelectionMode) ...[
+                  // Select All / Deselect All button
+                  GestureDetector(
+                    onTap: () {
+                      // This will be handled by the selection controls in the list
+                      ShowToast().showNormalToast(
+                        msg: 'Use the "Select All" button in the list below',
+                      );
+                    },
+                    child: Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(25),
+                      ),
+                      child: const Icon(
+                        Icons.select_all,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Delete button
+                  GestureDetector(
+                    onTap: selectedEventIds.isNotEmpty
+                        ? _deleteSelectedEvents
+                        : null,
+                    child: Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: selectedEventIds.isNotEmpty
+                            ? const Color(0xFFEF4444).withValues(alpha: 0.9)
+                            : Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(25),
+                      ),
+                      child: Icon(
+                        Icons.delete,
+                        color: selectedEventIds.isNotEmpty
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.7),
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  // Sort button with indicator
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    child: Column(
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            _showFilterSortModal();
+                          },
+                          child: Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                            child: Stack(
+                              children: [
+                                const Center(
+                                  child: Icon(
+                                    Icons.tune,
+                                    color: Colors.white,
+                                    size: 24,
                                   ),
                                 ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (_headerHeight > 100) ...[
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            _getCurrentFilterSortIndicator(),
-                            style: const TextStyle(
-                              color: Color(0xFF667EEA),
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              fontFamily: 'Roboto',
+                                if (selectedCategories.isNotEmpty ||
+                                    currentSortOption != SortOption.none)
+                                  Positioned(
+                                    top: 4,
+                                    right: 4,
+                                    child: Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFFF6B6B),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ),
+                        if (_headerHeight > 100) ...[
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              _getCurrentFilterSortIndicator(),
+                              style: const TextStyle(
+                                color: Color(0xFF667EEA),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Roboto',
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  // Select button
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    child: Column(
+                      children: [
+                        GestureDetector(
+                          onTap: _toggleSelectionMode,
+                          child: Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                            child: const Icon(
+                              Icons.checklist,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                        if (_headerHeight > 100) ...[
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Select',
+                              style: TextStyle(
+                                color: Color(0xFF667EEA),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Roboto',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -965,16 +1209,69 @@ class _MyEventsScreenState extends State<MyEventsScreen>
             return _buildEmptyState();
           }
 
-          return ListView.builder(
-            controller: _scrollController,
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            itemCount: EventsList.length,
-            itemBuilder: (context, index) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: _buildEventCard(EventsList[index]),
-              );
-            },
+          return Column(
+            children: [
+              // Selection mode controls
+              if (isSelectionMode)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        spreadRadius: 0,
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${selectedEventIds.length} of ${EventsList.length} selected',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1A1A1A),
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => _toggleSelectAll(EventsList),
+                        child: Text(
+                          selectedEventIds.length == EventsList.length
+                              ? 'Deselect All'
+                              : 'Select All',
+                          style: const TextStyle(
+                            color: Color(0xFF667EEA),
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              // Events list
+              Expanded(
+                child: ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  itemCount: EventsList.length,
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _buildEventCard(EventsList[index]),
+                    );
+                  },
+                ),
+              ),
+            ],
           );
         },
       );
@@ -1092,16 +1389,69 @@ class _MyEventsScreenState extends State<MyEventsScreen>
             print('=== DEBUG: Refreshing attended events ===');
             _refreshAttendedEvents();
           },
-          child: ListView.builder(
-            controller: _scrollController,
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            itemCount: attendedEvents.length,
-            itemBuilder: (context, index) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: _buildEventCard(attendedEvents[index]),
-              );
-            },
+          child: Column(
+            children: [
+              // Selection mode controls
+              if (isSelectionMode)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        spreadRadius: 0,
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${selectedEventIds.length} of ${attendedEvents.length} selected',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1A1A1A),
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => _toggleSelectAll(attendedEvents),
+                        child: Text(
+                          selectedEventIds.length == attendedEvents.length
+                              ? 'Deselect All'
+                              : 'Select All',
+                          style: const TextStyle(
+                            color: Color(0xFF667EEA),
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              // Events list
+              Expanded(
+                child: ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  itemCount: attendedEvents.length,
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _buildEventCard(attendedEvents[index]),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -1109,20 +1459,37 @@ class _MyEventsScreenState extends State<MyEventsScreen>
   }
 
   Widget _buildEventCard(EventModel event) {
+    final bool isSelected = selectedEventIds.contains(event.id);
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: () {
-          RouterClass.nextScreenNormal(
-            context,
-            SingleEventScreen(eventModel: event),
-          );
+          if (isSelectionMode) {
+            _toggleEventSelection(event.id);
+          } else {
+            RouterClass.nextScreenNormal(
+              context,
+              SingleEventScreen(eventModel: event),
+            );
+          }
+        },
+        onLongPress: () {
+          if (!isSelectionMode) {
+            setState(() {
+              isSelectionMode = true;
+              selectedEventIds.add(event.id);
+            });
+          }
         },
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
+            border: isSelectionMode && isSelected
+                ? Border.all(color: const Color(0xFF667EEA), width: 2)
+                : null,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.08),
@@ -1132,50 +1499,163 @@ class _MyEventsScreenState extends State<MyEventsScreen>
               ),
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
             children: [
-              // Image section
-              ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
-                ),
-                child: Stack(
-                  children: [
-                    AspectRatio(
-                      aspectRatio: 16 / 9,
-                      child: CachedNetworkImage(
-                        imageUrl: event.imageUrl,
-                        fit: BoxFit.cover,
-                        memCacheWidth: 400, // Optimize memory usage
-                        memCacheHeight: 225,
-                        placeholder: (context, url) => Container(
-                          color: const Color(0xFFF5F7FA),
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              color: Color(0xFF667EEA),
-                              strokeWidth: 2,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Image section
+                  ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                    child: Stack(
+                      children: [
+                        AspectRatio(
+                          aspectRatio: 16 / 9,
+                          child: CachedNetworkImage(
+                            imageUrl: event.imageUrl,
+                            fit: BoxFit.cover,
+                            memCacheWidth: 400, // Optimize memory usage
+                            memCacheHeight: 225,
+                            placeholder: (context, url) => Container(
+                              color: const Color(0xFFF5F7FA),
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  color: Color(0xFF667EEA),
+                                  strokeWidth: 2,
+                                ),
+                              ),
                             ),
+                            errorWidget: (context, url, error) => Container(
+                              color: const Color(0xFFF5F7FA),
+                              child: const Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.image_not_supported,
+                                      color: Color(0xFF667EEA),
+                                      size: 32,
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      'Image not available',
+                                      style: TextStyle(
+                                        color: Color(0xFF667EEA),
+                                        fontSize: 12,
+                                        fontFamily: 'Roboto',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            fadeInDuration: const Duration(milliseconds: 300),
+                            fadeOutDuration: const Duration(milliseconds: 300),
                           ),
                         ),
-                        errorWidget: (context, url, error) => Container(
-                          color: const Color(0xFFF5F7FA),
-                          child: const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                        if (event.isFeatured)
+                          Positioned(
+                            top: 12,
+                            right: 12,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFF9800),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.star,
+                                    color: Colors.white,
+                                    size: 12,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Featured',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10,
+                                      fontFamily: 'Roboto',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        // Past event indicator for attended events
+                        if (selectedTab == 2 &&
+                            event.selectedDateTime.isBefore(DateTime.now()))
+                          Positioned(
+                            top: 12,
+                            left: 12,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[600],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.history,
+                                    color: Colors.white,
+                                    size: 12,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Past',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10,
+                                      fontFamily: 'Roboto',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        // Status badge based on tab
+                        Positioned(
+                          top: 12,
+                          right: isSelectionMode ? 40 : 12,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _getStatusColor(),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  Icons.image_not_supported,
-                                  color: Color(0xFF667EEA),
-                                  size: 32,
+                                  _getStatusIcon(),
+                                  color: Colors.white,
+                                  size: 12,
                                 ),
-                                SizedBox(height: 4),
+                                const SizedBox(width: 4),
                                 Text(
-                                  'Image not available',
-                                  style: TextStyle(
-                                    color: Color(0xFF667EEA),
-                                    fontSize: 12,
+                                  _getStatusText(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 10,
                                     fontFamily: 'Roboto',
                                   ),
                                 ),
@@ -1183,248 +1663,173 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                             ),
                           ),
                         ),
-                        fadeInDuration: const Duration(milliseconds: 300),
-                        fadeOutDuration: const Duration(milliseconds: 300),
-                      ),
+                      ],
                     ),
-                    if (event.isFeatured)
-                      Positioned(
-                        top: 12,
-                        right: 12,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
+                  ),
+                  // Content section
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          event.title,
+                          style: const TextStyle(
+                            color: Color(0xFF1A1A1A),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 20,
+                            fontFamily: 'Roboto',
                           ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFF9800),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.star, color: Colors.white, size: 12),
-                              SizedBox(width: 4),
-                              Text(
-                                'Featured',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 10,
-                                  fontFamily: 'Roboto',
-                                ),
-                              ),
-                            ],
-                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    // Past event indicator for attended events
-                    if (selectedTab == 2 &&
-                        event.selectedDateTime.isBefore(DateTime.now()))
-                      Positioned(
-                        top: 12,
-                        left: 12,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[600],
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.history,
-                                color: Colors.white,
-                                size: 12,
-                              ),
-                              SizedBox(width: 4),
-                              Text(
-                                'Past',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 10,
-                                  fontFamily: 'Roboto',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    // Status badge based on tab
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getStatusColor(),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                        const SizedBox(height: 8),
+                        Row(
                           children: [
                             Icon(
-                              _getStatusIcon(),
-                              color: Colors.white,
-                              size: 12,
+                              Icons.group,
+                              color: const Color(0xFF667EEA),
+                              size: 16,
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _getStatusText(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 10,
-                                fontFamily: 'Roboto',
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                event.groupName,
+                                style: const TextStyle(
+                                  color: Color(0xFF6B7280),
+                                  fontSize: 14,
+                                  fontFamily: 'Roboto',
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Content section
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      event.title,
-                      style: const TextStyle(
-                        color: Color(0xFF1A1A1A),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                        fontFamily: 'Roboto',
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.group,
-                          color: const Color(0xFF667EEA),
-                          size: 16,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            event.groupName,
-                            style: const TextStyle(
-                              color: Color(0xFF6B7280),
-                              fontSize: 14,
-                              fontFamily: 'Roboto',
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on,
+                              color: const Color(0xFF667EEA),
+                              size: 16,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on,
-                          color: const Color(0xFF667EEA),
-                          size: 16,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            event.location,
-                            style: const TextStyle(
-                              color: Color(0xFF6B7280),
-                              fontSize: 14,
-                              fontFamily: 'Roboto',
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      event.description,
-                      style: const TextStyle(
-                        color: Color(0xFF4B5563),
-                        fontSize: 14,
-                        fontFamily: 'Roboto',
-                        height: 1.5,
-                      ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(
-                                0xFF667EEA,
-                              ).withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              DateFormat(
-                                'MMM dd, yyyy\nKK:mm a',
-                              ).format(event.selectedDateTime),
-                              style: const TextStyle(
-                                color: Color(0xFF667EEA),
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
-                                fontFamily: 'Roboto',
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                event.location,
+                                style: const TextStyle(
+                                  color: Color(0xFF6B7280),
+                                  fontSize: 14,
+                                  fontFamily: 'Roboto',
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                          ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
+                        const SizedBox(height: 12),
+                        Text(
+                          event.description,
+                          style: const TextStyle(
+                            color: Color(0xFF4B5563),
+                            fontSize: 14,
+                            fontFamily: 'Roboto',
+                            height: 1.5,
                           ),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFF667EEA,
+                                  ).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  DateFormat(
+                                    'MMM dd, yyyy\nKK:mm a',
+                                  ).format(event.selectedDateTime),
+                                  style: const TextStyle(
+                                    color: Color(0xFF667EEA),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                    fontFamily: 'Roboto',
+                                  ),
+                                ),
+                              ),
                             ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Text(
-                            'View Details',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
+                            if (!isSelectionMode) ...[
+                              const SizedBox(width: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      Color(0xFF667EEA),
+                                      Color(0xFF764BA2),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Text(
+                                  'View Details',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                    fontFamily: 'Roboto',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
+              // Selection checkbox overlay
+              if (isSelectionMode)
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? const Color(0xFF667EEA)
+                          : Colors.white.withValues(alpha: 0.9),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isSelected
+                            ? const Color(0xFF667EEA)
+                            : const Color(0xFF9CA3AF),
+                        width: 2,
+                      ),
+                    ),
+                    child: isSelected
+                        ? const Icon(Icons.check, color: Colors.white, size: 16)
+                        : null,
+                  ),
+                ),
             ],
           ),
         ),
