@@ -47,10 +47,10 @@ class _AnsQuestionsToSignInEventScreenState
     await FirebaseFirestoreHelper()
         .getEventQuestions(eventId: widget.eventModel.id)
         .then((value) {
-      setState(() {
-        questionsList = value;
-      });
-    });
+          setState(() {
+            questionsList = value;
+          });
+        });
   }
 
   void _makeSingIn() {
@@ -61,12 +61,14 @@ class _AnsQuestionsToSignInEventScreenState
       print('M called 1');
 
       for (var element in questionsList) {
-        newAttendance.answers
-            .add('${element.questionTitle}--ans--${element.answer}');
+        newAttendance.answers.add(
+          '${element.questionTitle}--ans--${element.answer}',
+        );
       }
 
       print(
-          'Recording attendance with questions for event: ${newAttendance.eventId}');
+        'Recording attendance with questions for event: ${newAttendance.eventId}',
+      );
       print('Attendance data: ${newAttendance.toJson()}');
 
       FirebaseFirestore.instance
@@ -74,66 +76,54 @@ class _AnsQuestionsToSignInEventScreenState
           .doc(newAttendance.id)
           .set(newAttendance.toJson())
           .then((value) {
-        print('Attendance with questions recorded successfully');
-        ShowToast().showSnackBar('Signed In Successful!', context);
-        _btnCtlr.success();
-        Future.delayed(const Duration(seconds: 1), () {
-          _btnCtlr.reset();
-          if (widget.nextPageRoute == 'singleEventPopup') {
-            // Pop current screen and navigate to fresh SingleEventScreen to refresh data
-            Navigator.pop(context);
-            RouterClass.nextScreenAndReplacement(
-              context,
-              SingleEventScreen(eventModel: widget.eventModel),
-            );
-          } else if (widget.nextPageRoute == 'dashboardQrScanner') {
-            RouterClass.nextScreenAndReplacement(
-              context,
-              SingleEventScreen(
-                eventModel: widget.eventModel,
-              ),
-            );
-          } else if (widget.nextPageRoute == 'qrScannerForLogedIn') {
-            RouterClass.nextScreenAndReplacement(
-              context,
-              SingleEventScreen(
-                eventModel: widget.eventModel,
-              ),
-            );
-          } else if (widget.nextPageRoute == 'withoutLogin') {
-            Navigator.pop(context);
-            // RouterClass.nextScreenAndReplacement(
+            print('Attendance with questions recorded successfully');
+            ShowToast().showSnackBar('Signed In Successful!', context);
+            _btnCtlr.success();
+            Future.delayed(const Duration(seconds: 1), () {
+              _btnCtlr.reset();
+              if (widget.nextPageRoute == 'singleEventPopup') {
+                // Pop current screen and navigate back to SingleEventScreen to refresh data
+                Navigator.pop(context);
+                // Navigate back to the SingleEventScreen that was already open
+                Navigator.pop(context);
+              } else if (widget.nextPageRoute == 'dashboardQrScanner') {
+                RouterClass.nextScreenAndReplacement(
+                  context,
+                  SingleEventScreen(eventModel: widget.eventModel),
+                );
+              } else if (widget.nextPageRoute == 'qrScannerForLogedIn') {
+                RouterClass.nextScreenAndReplacement(
+                  context,
+                  SingleEventScreen(eventModel: widget.eventModel),
+                );
+              } else if (widget.nextPageRoute == 'withoutLogin') {
+                Navigator.pop(context);
+                // RouterClass.nextScreenAndReplacement(
+                //   context,
+                //   SingleEventScreen(
+                //     eventModel: widget.eventModel,
+                //   ),
+                // );
+              }
+            });
+            // RouterClass.nextScreenAndReplacementAndRemoveUntil(
+            //   context: context,
+            //   page: const DashboardScreen(),
+            // );
+            // RouterClass.nextScreenNormal(
             //   context,
             //   SingleEventScreen(
             //     eventModel: widget.eventModel,
             //   ),
             // );
-          }
-          // Add this block to always navigate to MyEventsScreen and refresh after sign-in
-          Future.delayed(const Duration(milliseconds: 500), () {
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (context) => const MyEventsScreen()),
-              (Route<dynamic> route) => false,
-            );
+          })
+          .catchError((error) {
+            _btnCtlr.error();
+            ShowToast().showSnackBar('Error signing in: $error', context);
+            Future.delayed(const Duration(seconds: 2), () {
+              _btnCtlr.reset();
+            });
           });
-        });
-        // RouterClass.nextScreenAndReplacementAndRemoveUntil(
-        //   context: context,
-        //   page: const DashboardScreen(),
-        // );
-        // RouterClass.nextScreenNormal(
-        //   context,
-        //   SingleEventScreen(
-        //     eventModel: widget.eventModel,
-        //   ),
-        // );
-      }).catchError((error) {
-        _btnCtlr.error();
-        ShowToast().showSnackBar('Error signing in: $error', context);
-        Future.delayed(const Duration(seconds: 2), () {
-          _btnCtlr.reset();
-        });
-      });
     } else {
       _btnCtlr.reset();
     }
@@ -148,14 +138,9 @@ class _AnsQuestionsToSignInEventScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: _bodyView(),
-      ),
+      body: SafeArea(child: _bodyView()),
       bottomNavigationBar: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 20.0,
-          vertical: 10,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
         child: RoundedLoadingButton(
           animateOnTap: true,
           borderRadius: 13,
@@ -173,7 +158,7 @@ class _AnsQuestionsToSignInEventScreenState
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
                 ),
-              )
+              ),
             ],
           ),
         ),
@@ -196,9 +181,7 @@ class _AnsQuestionsToSignInEventScreenState
               title: 'Question for Event',
             ),
           ),
-          Expanded(
-            child: _questionsView(),
-          ),
+          Expanded(child: _questionsView()),
         ],
       ),
     );
@@ -219,14 +202,8 @@ class _AnsQuestionsToSignInEventScreenState
   Widget _singleQuestion({required int index}) {
     EventQuestionModel singleQuestion = questionsList[index];
     return Container(
-      margin: const EdgeInsets.symmetric(
-        horizontal: 15,
-        vertical: 10,
-      ),
-      padding: const EdgeInsets.symmetric(
-        horizontal: 15,
-        vertical: 10,
-      ),
+      margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
       decoration: BoxDecoration(
         color: AppThemeColor.pureWhiteColor,
         borderRadius: BorderRadius.circular(10),
@@ -264,9 +241,7 @@ class _AnsQuestionsToSignInEventScreenState
                       ),
                     ),
                   ),
-                  const SizedBox(
-                    width: 10,
-                  ),
+                  const SizedBox(width: 10),
                   Text(
                     singleQuestion.questionTitle,
                     style: const TextStyle(
@@ -287,9 +262,7 @@ class _AnsQuestionsToSignInEventScreenState
               ),
             ],
           ),
-          const SizedBox(
-            height: 10,
-          ),
+          const SizedBox(height: 10),
           TextFormField(
             decoration: const InputDecoration(
               border: OutlineInputBorder(),

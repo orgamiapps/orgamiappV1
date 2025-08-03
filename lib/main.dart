@@ -5,6 +5,8 @@ import 'package:flutter/scheduler.dart';
 import 'package:orgami/Screens/Splash/SplashScreen.dart';
 import 'package:orgami/Utils/AppConstants.dart';
 import 'package:orgami/Utils/Colors.dart';
+import 'package:orgami/Utils/ErrorBoundary.dart';
+import 'package:orgami/Utils/PerformanceMonitor.dart';
 import 'package:orgami/firebase_options.dart';
 
 /// Comprehensive error handling for GoogleApiManager SecurityException and GMS issues
@@ -94,9 +96,11 @@ class FirebaseErrorHandler {
         if (frameSkipRate > 0.5 && !_performanceWarningShown) {
           // More than 50% frame skips
           print(
-              '⚠️ PERFORMANCE WARNING: High frame skip rate detected ($frameSkipRate)');
+            '⚠️ PERFORMANCE WARNING: High frame skip rate detected ($frameSkipRate)',
+          );
           print(
-              '💡 Enable Hardware GLES 2.0 in AVD Manager for better emulator performance');
+            '💡 Enable Hardware GLES 2.0 in AVD Manager for better emulator performance',
+          );
           _performanceWarningShown = true;
         }
       }
@@ -120,7 +124,8 @@ class FirebaseErrorHandler {
 
     if (shouldRetry) {
       print(
-          '🔄 User confirmed retry - attempting Firebase reinitialization...');
+        '🔄 User confirmed retry - attempting Firebase reinitialization...',
+      );
       return await initializeFirebase();
     }
 
@@ -210,8 +215,11 @@ class FirebaseErrorHandler {
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.info_outline,
-                                  color: Colors.orange[700], size: 16),
+                              Icon(
+                                Icons.info_outline,
+                                color: Colors.orange[700],
+                                size: 16,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 'Additional Notes:',
@@ -229,7 +237,9 @@ class FirebaseErrorHandler {
                             '• Check that google-services.json is valid JSON\n'
                             '• If using emulator, restart with hardware acceleration enabled',
                             style: TextStyle(
-                                fontSize: 12, color: Colors.orange[700]),
+                              fontSize: 12,
+                              color: Colors.orange[700],
+                            ),
                           ),
                         ],
                       ),
@@ -268,10 +278,7 @@ class FirebaseErrorHandler {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
           Text(
             description,
@@ -387,11 +394,7 @@ class ErrorApp extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: Colors.red[400],
-                ),
+                Icon(Icons.error_outline, size: 64, color: Colors.red[400]),
                 const SizedBox(height: 20),
                 Text(
                   'App Initialization Error',
@@ -430,11 +433,14 @@ class MyApp extends StatelessWidget {
           title: AppConstants.appName,
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
-            colorScheme:
-                ColorScheme.fromSeed(seedColor: AppThemeColor.darkGreenColor),
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: AppThemeColor.darkGreenColor,
+            ),
             useMaterial3: true,
           ),
-          home: const SplashScreen(),
+          home: const SplashScreen()
+              .withErrorBoundary()
+              .withPerformanceMonitoring(),
           builder: (context, child) {
             // Show persistent error message if Firebase failed
             if (!FirebaseErrorHandler.isFirebaseInitialized &&
@@ -460,9 +466,7 @@ class MyApp extends StatelessWidget {
           children: [
             const Icon(Icons.error_outline, color: Colors.white),
             const SizedBox(width: 8),
-            Expanded(
-              child: Text(FirebaseErrorHandler.getErrorMessage()),
-            ),
+            Expanded(child: Text(FirebaseErrorHandler.getErrorMessage())),
             TextButton(
               onPressed: () async {
                 bool fixed = await FirebaseErrorHandler.attemptFix(context);
@@ -472,7 +476,8 @@ class MyApp extends StatelessWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text(
-                          'Switched to offline mode. Some features may be limited.'),
+                        'Switched to offline mode. Some features may be limited.',
+                      ),
                       duration: Duration(seconds: 3),
                     ),
                   );
@@ -488,8 +493,10 @@ class MyApp extends StatelessWidget {
               },
               child: const Text(
                 'FIX',
-                style:
-                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],

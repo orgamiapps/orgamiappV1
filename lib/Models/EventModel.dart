@@ -16,6 +16,9 @@ class EventModel {
   List<String> categories;
   bool isFeatured;
   DateTime? featureEndDate;
+  bool ticketsEnabled;
+  int maxTickets;
+  int issuedTickets;
 
   LatLng getLatLngOfEvent() {
     return LatLng(latitude, longitude);
@@ -40,6 +43,9 @@ class EventModel {
     this.categories = const [],
     this.isFeatured = false,
     this.featureEndDate,
+    this.ticketsEnabled = false,
+    this.maxTickets = 0,
+    this.issuedTickets = 0,
   });
 
   factory EventModel.fromJson(dynamic parsedJson) {
@@ -69,9 +75,12 @@ class EventModel {
       isFeatured: data['isFeatured'] ?? false,
       featureEndDate: data['featureEndDate'] != null
           ? (data['featureEndDate'] is Timestamp
-              ? (data['featureEndDate'] as Timestamp).toDate()
-              : DateTime.tryParse(data['featureEndDate'].toString()))
+                ? (data['featureEndDate'] as Timestamp).toDate()
+                : DateTime.tryParse(data['featureEndDate'].toString()))
           : null,
+      ticketsEnabled: data['ticketsEnabled'] ?? false,
+      maxTickets: data['maxTickets'] ?? 0,
+      issuedTickets: data['issuedTickets'] ?? 0,
     );
   }
 
@@ -121,6 +130,9 @@ class EventModel {
     data['categories'] = categories;
     data['isFeatured'] = isFeatured;
     data['featureEndDate'] = featureEndDate;
+    data['ticketsEnabled'] = ticketsEnabled;
+    data['maxTickets'] = maxTickets;
+    data['issuedTickets'] = issuedTickets;
     return data;
   }
 }

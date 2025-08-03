@@ -219,16 +219,6 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                           SingleEventScreen(eventModel: eventExist),
                         );
                       });
-
-                      // Also navigate to MyEventsScreen to show the attended event
-                      Future.delayed(const Duration(milliseconds: 1500), () {
-                        Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(
-                            builder: (context) => const MyEventsScreen(),
-                          ),
-                          (Route<dynamic> route) => false,
-                        );
-                      });
                     }
                   } else {
                     ShowToast().showNormalToast(

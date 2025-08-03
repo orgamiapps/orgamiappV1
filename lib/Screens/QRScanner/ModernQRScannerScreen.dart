@@ -190,7 +190,6 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
                       child: const Text('Grant Permission'),
                     ),
                     const SizedBox(height: 20),
-                    
                   ],
                 ),
               ),
@@ -219,23 +218,23 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
                       color: AppThemeColor.pureWhiteColor.withOpacity(0.5),
                     ),
                     const SizedBox(height: 20),
-                                         Text(
-                       'QR Scanner Unavailable',
-                       style: TextStyle(
-                         color: AppThemeColor.pureWhiteColor,
-                         fontSize: Dimensions.fontSizeLarge,
-                         fontWeight: FontWeight.w600,
-                       ),
-                     ),
+                    Text(
+                      'QR Scanner Unavailable',
+                      style: TextStyle(
+                        color: AppThemeColor.pureWhiteColor,
+                        fontSize: Dimensions.fontSizeLarge,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 10),
-                                         Text(
-                       'Camera not available.\nPlease grant camera permission.',
-                       textAlign: TextAlign.center,
-                       style: TextStyle(
-                         color: AppThemeColor.pureWhiteColor.withOpacity(0.7),
-                         fontSize: Dimensions.fontSizeDefault,
-                       ),
-                     ),
+                    Text(
+                      'Camera not available.\nPlease grant camera permission.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppThemeColor.pureWhiteColor.withOpacity(0.7),
+                        fontSize: Dimensions.fontSizeDefault,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -799,14 +798,6 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
             RouterClass.nextScreenAndReplacement(
               context,
               SingleEventScreen(eventModel: eventExist),
-            );
-          });
-
-          // Also navigate to MyEventsScreen to show the attended event
-          Future.delayed(const Duration(milliseconds: 1500), () {
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (context) => const MyEventsScreen()),
-              (Route<dynamic> route) => false,
             );
           });
         }

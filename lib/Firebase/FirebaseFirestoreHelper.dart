@@ -7,6 +7,7 @@ import 'package:orgami/Models/CommentModel.dart';
 import 'package:orgami/Models/CustomerModel.dart';
 import 'package:orgami/Models/EventModel.dart';
 import 'package:orgami/Models/EventQuestionModel.dart';
+import 'package:orgami/Models/TicketModel.dart';
 
 class FirebaseFirestoreHelper {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -179,17 +180,92 @@ class FirebaseFirestoreHelper {
 
     // Curated list of positive, memorable words
     const List<String> positiveWords = [
-      'SUNNY', 'HAPPY', 'BRIGHT', 'SHINE', 'SPARK', 'GLOW', 'BEAM', 'RISE',
-      'PEACE', 'JOY', 'HOPE', 'DREAM', 'STAR', 'MOON', 'SKY', 'OCEAN',
-      'MOUNTAIN', 'RIVER', 'FOREST', 'GARDEN', 'FLOWER', 'TREE', 'BIRD',
-      'DOLPHIN', 'EAGLE', 'LION', 'TIGER', 'BEAR', 'WOLF', 'FOX', 'DEER',
-      'MUSIC', 'DANCE', 'SING', 'PLAY', 'LAUGH', 'SMILE', 'FRIEND', 'LOVE',
-      'HEART', 'SOUL', 'MIND', 'SPIRIT', 'WISDOM', 'POWER', 'STRENGTH',
-      'BRAVE', 'BOLD', 'SWIFT', 'QUICK', 'FAST', 'SLOW', 'GENTLE', 'KIND',
-      'WARM', 'COOL', 'FRESH', 'NEW', 'OLD', 'YOUNG', 'WISE', 'CLEVER',
-      'SMART', 'BRIGHT', 'SHARP', 'FOCUS', 'AIM', 'GOAL', 'DREAM', 'PLAN',
-      'BUILD', 'CREATE', 'MAKE', 'DO', 'GO', 'COME', 'STAY', 'WAIT',
-      'WATCH', 'SEE', 'LOOK', 'FIND', 'SEEK', 'SEARCH', 'EXPLORE', 'DISCOVER'
+      'SUNNY',
+      'HAPPY',
+      'BRIGHT',
+      'SHINE',
+      'SPARK',
+      'GLOW',
+      'BEAM',
+      'RISE',
+      'PEACE',
+      'JOY',
+      'HOPE',
+      'DREAM',
+      'STAR',
+      'MOON',
+      'SKY',
+      'OCEAN',
+      'MOUNTAIN',
+      'RIVER',
+      'FOREST',
+      'GARDEN',
+      'FLOWER',
+      'TREE',
+      'BIRD',
+      'DOLPHIN',
+      'EAGLE',
+      'LION',
+      'TIGER',
+      'BEAR',
+      'WOLF',
+      'FOX',
+      'DEER',
+      'MUSIC',
+      'DANCE',
+      'SING',
+      'PLAY',
+      'LAUGH',
+      'SMILE',
+      'FRIEND',
+      'LOVE',
+      'HEART',
+      'SOUL',
+      'MIND',
+      'SPIRIT',
+      'WISDOM',
+      'POWER',
+      'STRENGTH',
+      'BRAVE',
+      'BOLD',
+      'SWIFT',
+      'QUICK',
+      'FAST',
+      'SLOW',
+      'GENTLE',
+      'KIND',
+      'WARM',
+      'COOL',
+      'FRESH',
+      'NEW',
+      'OLD',
+      'YOUNG',
+      'WISE',
+      'CLEVER',
+      'SMART',
+      'BRIGHT',
+      'SHARP',
+      'FOCUS',
+      'AIM',
+      'GOAL',
+      'DREAM',
+      'PLAN',
+      'BUILD',
+      'CREATE',
+      'MAKE',
+      'DO',
+      'GO',
+      'COME',
+      'STAY',
+      'WAIT',
+      'WATCH',
+      'SEE',
+      'LOOK',
+      'FIND',
+      'SEEK',
+      'SEARCH',
+      'EXPLORE',
+      'DISCOVER',
     ];
 
     // Generate a word-based ID (Word-Number format)
@@ -691,172 +767,63 @@ class FirebaseFirestoreHelper {
     }
   }
 
-  // Get events attended by a user
+  // Get events attended by a user - Optimized version
   Future<List<EventModel>> getEventsAttendedByUser(String userId) async {
     try {
       print('=== DEBUG: Fetching events attended by user: $userId ===');
 
-      // First, let's check if there are any attendance records at all
-      final allAttendanceQuery = await _firestore
-          .collection(AttendanceModel.firebaseKey)
-          .get();
-      print(
-        'Total attendance records in database: ${allAttendanceQuery.docs.length}',
-      );
-
-      // Now get attendance records for this specific user
+      // Get attendance records for this specific user with timeout
       final attendanceQuery = await _firestore
           .collection(AttendanceModel.firebaseKey)
           .where('customerUid', isEqualTo: userId)
-          .get();
+          .get()
+          .timeout(const Duration(seconds: 10));
+
       print(
         'Found ${attendanceQuery.docs.length} attendance records for user $userId',
       );
 
-      // Print all attendance records for debugging
-      for (var doc in attendanceQuery.docs) {
-        print('Attendance record: ${doc.data()}');
-        print('Document ID: ${doc.id}');
-        print('Event ID from record: ${doc.data()['eventId']}');
-        print('Customer UID from record: ${doc.data()['customerUid']}');
-      }
-
-      // Also check if there are any attendance records at all for this user
       if (attendanceQuery.docs.isEmpty) {
-        print('WARNING: No attendance records found for user $userId');
-        print('This could mean:');
-        print('1. User has never signed into any events');
-        print('2. Attendance records are not being created properly');
-        print('3. User ID mismatch');
-        print('4. Firestore permissions issue');
+        print('No attendance records found for user $userId');
         return [];
       }
 
       // Clean and extract event IDs from attendance records
       Set<String> cleanedEventIds = {};
       for (var doc in attendanceQuery.docs) {
-        String rawEventId = doc['eventId'] as String;
-
-        // Clean the event ID by taking the numeric part before '-'
-        String cleanedEventId = _cleanEventId(rawEventId);
-        cleanedEventIds.add(cleanedEventId);
-
-        print('Raw event ID: $rawEventId -> Cleaned: $cleanedEventId');
+        try {
+          String rawEventId = doc['eventId'] as String;
+          String cleanedEventId = _cleanEventId(rawEventId);
+          cleanedEventIds.add(cleanedEventId);
+        } catch (e) {
+          print('Error processing attendance record: $e');
+          continue;
+        }
       }
 
       final eventIds = cleanedEventIds.toList();
       print('Unique cleaned event IDs from attendance: $eventIds');
 
-      // Also log attendance dates for debugging
-      for (var doc in attendanceQuery.docs) {
-        final attendanceDate = (doc.data()['attendanceDateTime'] as Timestamp)
-            .toDate();
-        print('Attended event ${doc.data()['eventId']} on ${attendanceDate}');
-      }
-
       if (eventIds.isEmpty) {
-        print('No events attended by user $userId');
+        print('No valid event IDs found for user $userId');
         return [];
       }
 
-      // Let's also check what events exist in the database
-      final allEventsQuery = await _firestore
-          .collection(EventModel.firebaseKey)
-          .get();
-      print('Total events in database: ${allEventsQuery.docs.length}');
-      for (var doc in allEventsQuery.docs) {
-        print('Event in database: ID=${doc['id']}, Title=${doc['title']}');
-      }
-
-      // Handle the case where we have more than 10 event IDs
+      // Fetch events in parallel with timeout
       List<EventModel> allEvents = [];
-      // Process event IDs in batches of 10 (Firestore limitation)
-      for (int i = 0; i < eventIds.length; i += 10) {
-        final batch = eventIds.skip(i).take(10).toList();
-        print('Processing batch ${i ~/ 10 + 1}: $batch');
+      final futures = eventIds.map(
+        (eventId) => _fetchEventSafely(eventId, userId),
+      );
 
-        // Use document IDs directly instead of querying by field
-        for (String eventId in batch) {
-          try {
-            final eventDoc = await _firestore
-                .collection(EventModel.firebaseKey)
-                .doc(eventId)
-                .get();
-            if (eventDoc.exists) {
-              print('Found event document for ID: $eventId');
-              final eventData = eventDoc.data() as Map<String, dynamic>;
+      final results = await Future.wait(
+        futures,
+        eagerError: false,
+      ).timeout(const Duration(seconds: 15));
 
-              // Check if the event is accessible to the user
-              bool canAccessEvent = false;
-              if (eventData.containsKey('customerUid')) {
-                String eventOwnerId = eventData['customerUid'] as String;
-                bool isPrivate = eventData['private'] ?? false;
-
-                // User can access if they own the event or if it's public
-                canAccessEvent = (eventOwnerId == userId) || !isPrivate;
-                print(
-                  'Event $eventId - Owner: $eventOwnerId, Private: $isPrivate, CanAccess: $canAccessEvent',
-                );
-              } else {
-                // If no customerUid field, assume it's accessible
-                canAccessEvent = true;
-                print(
-                  'Event $eventId - No customerUid field, assuming accessible',
-                );
-              }
-
-              if (canAccessEvent) {
-                // Check if the document has an 'id' field and if it matches the document ID
-                if (eventData.containsKey('id')) {
-                  final documentId = eventData['id'] as String;
-                  if (documentId == eventId) {
-                    try {
-                      final event = EventModel.fromJson(eventData);
-                      allEvents.add(event);
-                      print('Successfully parsed event: ${event.title}');
-                    } catch (e) {
-                      print('Error parsing event document for ID $eventId: $e');
-                      print('Document data: $eventData');
-                    }
-                  } else {
-                    print(
-                      'Document ID mismatch: expected $eventId, got $documentId',
-                    );
-                  }
-                } else {
-                  print('Document does not have an id field: $eventId');
-                  // Try to create event with document ID as the id
-                  try {
-                    eventData['id'] = eventId;
-                    final event = EventModel.fromJson(eventData);
-                    allEvents.add(event);
-                    print(
-                      'Successfully parsed event with document ID: ${event.title}',
-                    );
-                  } catch (e) {
-                    print('Error parsing event document for ID $eventId: $e');
-                    print('Document data: $eventData');
-                  }
-                }
-              } else {
-                print(
-                  'Skipping private event $eventId - user does not have access',
-                );
-              }
-            } else {
-              print('Event document not found for ID: $eventId');
-            }
-          } catch (e) {
-            print('Error fetching event document for ID $eventId: $e');
-            // Check if it's a permission error
-            if (e.toString().contains('PERMISSION_DENIED')) {
-              print(
-                'PERMISSION_DENIED for event $eventId - this might be a private event',
-              );
-            }
-          }
+      for (var result in results) {
+        if (result != null) {
+          allEvents.add(result);
         }
-        print('Successfully parsed ${allEvents.length} events so far');
       }
 
       print(
@@ -865,15 +832,54 @@ class FirebaseFirestoreHelper {
       return allEvents;
     } catch (e) {
       print('Error fetching attended events: $e');
-      print('Stack trace: ${StackTrace.current}');
-      // Check if it's a permission error
       if (e.toString().contains('PERMISSION_DENIED')) {
-        print('PERMISSION_DENIED error - this might be due to Firestore rules');
-        print(
-          'Make sure the Attendance collection rules allow users to read their own records',
-        );
+        print('PERMISSION_DENIED error - check Firestore rules');
       }
       return [];
+    }
+  }
+
+  // Safely fetch a single event with error handling
+  Future<EventModel?> _fetchEventSafely(String eventId, String userId) async {
+    try {
+      final eventDoc = await _firestore
+          .collection(EventModel.firebaseKey)
+          .doc(eventId)
+          .get()
+          .timeout(const Duration(seconds: 5));
+
+      if (!eventDoc.exists) {
+        print('Event document not found for ID: $eventId');
+        return null;
+      }
+
+      final eventData = eventDoc.data() as Map<String, dynamic>;
+
+      // Check if the event is accessible to the user
+      bool canAccessEvent = false;
+      if (eventData.containsKey('customerUid')) {
+        String eventOwnerId = eventData['customerUid'] as String;
+        bool isPrivate = eventData['private'] ?? false;
+        canAccessEvent = (eventOwnerId == userId) || !isPrivate;
+      } else {
+        canAccessEvent = true;
+      }
+
+      if (!canAccessEvent) {
+        print('Skipping private event $eventId - user does not have access');
+        return null;
+      }
+
+      // Ensure the document has an 'id' field
+      if (!eventData.containsKey('id')) {
+        eventData['id'] = eventId;
+      }
+
+      final event = EventModel.fromJson(eventData);
+      return event;
+    } catch (e) {
+      print('Error fetching event $eventId: $e');
+      return null;
     }
   }
 
@@ -1015,6 +1021,243 @@ class FirebaseFirestoreHelper {
       }
     } catch (e) {
       print('Error checking event access: $e');
+    }
+  }
+
+  // Ticket-related methods
+  Future<void> enableTicketsForEvent({
+    required String eventId,
+    required int maxTickets,
+  }) async {
+    try {
+      await _firestore.collection(EventModel.firebaseKey).doc(eventId).update({
+        'ticketsEnabled': true,
+        'maxTickets': maxTickets,
+        'issuedTickets': 0,
+      });
+    } catch (e) {
+      print('Error enabling tickets for event: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> disableTicketsForEvent({required String eventId}) async {
+    try {
+      await _firestore.collection(EventModel.firebaseKey).doc(eventId).update({
+        'ticketsEnabled': false,
+        'maxTickets': 0,
+        'issuedTickets': 0,
+      });
+    } catch (e) {
+      print('Error disabling tickets for event: $e');
+      rethrow;
+    }
+  }
+
+  Future<TicketModel?> issueTicket({
+    required String eventId,
+    required String customerUid,
+    required String customerName,
+    required EventModel eventModel,
+  }) async {
+    try {
+      print('=== TICKET ISSUANCE DEBUG ===');
+      print('Event ID: $eventId');
+      print('Customer UID: $customerUid');
+      print('Customer Name: $customerName');
+
+      // First, check if tickets are enabled and available
+      final eventDoc = await _firestore
+          .collection(EventModel.firebaseKey)
+          .doc(eventId)
+          .get();
+
+      if (!eventDoc.exists) {
+        throw Exception('Event not found');
+      }
+
+      final eventData = eventDoc.data() as Map<String, dynamic>;
+      final ticketsEnabled = eventData['ticketsEnabled'] ?? false;
+      final maxTickets = eventData['maxTickets'] ?? 0;
+      final issuedTickets = eventData['issuedTickets'] ?? 0;
+
+      print('Event data:');
+      print('- Tickets enabled: $ticketsEnabled');
+      print('- Max tickets: $maxTickets');
+      print('- Issued tickets: $issuedTickets');
+
+      if (!ticketsEnabled) {
+        throw Exception('Tickets are not enabled for this event');
+      }
+
+      if (issuedTickets >= maxTickets) {
+        throw Exception('No tickets available for this event');
+      }
+
+      // Check if user already has a ticket for this event
+      final existingTicketQuery = await _firestore
+          .collection(TicketModel.firebaseKey)
+          .where('eventId', isEqualTo: eventId)
+          .where('customerUid', isEqualTo: customerUid)
+          .get();
+
+      print(
+        'Existing tickets for this user: ${existingTicketQuery.docs.length}',
+      );
+
+      // Debug: Print details of existing tickets
+      for (var doc in existingTicketQuery.docs) {
+        final ticketData = doc.data();
+        print('Existing ticket: ${ticketData}');
+      }
+
+      // Only block if user has an active (unused) ticket
+      final activeTickets = existingTicketQuery.docs.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return data['isUsed'] != true;
+      }).toList();
+
+      print('Active tickets for this user: ${activeTickets.length}');
+
+      if (activeTickets.isNotEmpty) {
+        throw Exception('You already have a ticket for this event');
+      }
+
+      // Generate ticket
+      final ticketId = _firestore.collection(TicketModel.firebaseKey).doc().id;
+      final ticketCode = TicketModel.generateTicketCode();
+
+      final ticket = TicketModel(
+        id: ticketId,
+        eventId: eventId,
+        eventTitle: eventModel.title,
+        eventImageUrl: eventModel.imageUrl,
+        eventLocation: eventModel.location,
+        eventDateTime: eventModel.selectedDateTime,
+        customerUid: customerUid,
+        customerName: customerName,
+        ticketCode: ticketCode,
+        issuedDateTime: DateTime.now(),
+      );
+
+      print('Creating ticket with ID: $ticketId');
+      print('Ticket code: $ticketCode');
+
+      // Save ticket
+      await _firestore
+          .collection(TicketModel.firebaseKey)
+          .doc(ticketId)
+          .set(ticket.toJson());
+
+      print('Ticket created successfully');
+
+      // Update event ticket count
+      await _firestore.collection(EventModel.firebaseKey).doc(eventId).update({
+        'issuedTickets': issuedTickets + 1,
+      });
+
+      print('Event ticket count updated');
+
+      return ticket;
+    } catch (e) {
+      print('Error issuing ticket: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<TicketModel>> getUserTickets({
+    required String customerUid,
+  }) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection(TicketModel.firebaseKey)
+          .where('customerUid', isEqualTo: customerUid)
+          .orderBy('issuedDateTime', descending: true)
+          .get();
+
+      return querySnapshot.docs.map((doc) {
+        return TicketModel.fromJson(doc);
+      }).toList();
+    } catch (e) {
+      print('Error getting user tickets: $e');
+      return [];
+    }
+  }
+
+  Future<List<TicketModel>> getEventTickets({required String eventId}) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection(TicketModel.firebaseKey)
+          .where('eventId', isEqualTo: eventId)
+          .orderBy('issuedDateTime', descending: true)
+          .get();
+
+      return querySnapshot.docs.map((doc) {
+        return TicketModel.fromJson(doc);
+      }).toList();
+    } catch (e) {
+      print('Error getting event tickets: $e');
+      return [];
+    }
+  }
+
+  Future<void> useTicket({
+    required String ticketId,
+    required String usedBy,
+  }) async {
+    try {
+      await _firestore.collection(TicketModel.firebaseKey).doc(ticketId).update(
+        {'isUsed': true, 'usedDateTime': DateTime.now(), 'usedBy': usedBy},
+      );
+    } catch (e) {
+      print('Error using ticket: $e');
+      rethrow;
+    }
+  }
+
+  Future<TicketModel?> getTicketByCode({required String ticketCode}) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection(TicketModel.firebaseKey)
+          .where('ticketCode', isEqualTo: ticketCode)
+          .get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        return TicketModel.fromJson(querySnapshot.docs.first);
+      }
+      return null;
+    } catch (e) {
+      print('Error getting ticket by code: $e');
+      return null;
+    }
+  }
+
+  // Debug method to clear all tickets for a user (for testing)
+  Future<void> clearUserTickets({
+    required String customerUid,
+    String? eventId,
+  }) async {
+    try {
+      Query query = _firestore
+          .collection(TicketModel.firebaseKey)
+          .where('customerUid', isEqualTo: customerUid);
+
+      if (eventId != null) {
+        query = query.where('eventId', isEqualTo: eventId);
+      }
+
+      final querySnapshot = await query.get();
+
+      for (var doc in querySnapshot.docs) {
+        await doc.reference.delete();
+      }
+
+      print(
+        'Cleared ${querySnapshot.docs.length} tickets for user: $customerUid',
+      );
+    } catch (e) {
+      print('Error clearing user tickets: $e');
+      rethrow;
     }
   }
 }

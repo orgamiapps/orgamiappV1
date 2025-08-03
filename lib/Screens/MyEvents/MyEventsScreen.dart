@@ -57,9 +57,9 @@ class _MyEventsScreenState extends State<MyEventsScreen>
   List<AttendanceModel> attendanceList = [];
   List<AttendanceModel> preRegisteredAttendanceList = [];
 
-  late StreamSubscription<QuerySnapshot<Map<String, dynamic>>>
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
   _attendanceSubscription;
-  late StreamSubscription<QuerySnapshot<Map<String, dynamic>>>
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
   _preRegisteredSubscription;
 
   // Animation controllers
@@ -76,6 +76,10 @@ class _MyEventsScreenState extends State<MyEventsScreen>
 
   // Future for attended events (to allow refreshing)
   Future<List<EventModel>>? _attendedEventsFuture;
+
+  // Performance optimization: Debounce scroll updates
+  Timer? _scrollDebounceTimer;
+  bool _isDisposed = false;
 
   bool signedInEvent({required String eventId}) {
     bool eventSignedIn = false;
@@ -208,6 +212,7 @@ class _MyEventsScreenState extends State<MyEventsScreen>
   @override
   void initState() {
     super.initState();
+    _isDisposed = false;
 
     // Initialize attended events future
     _refreshAttendedEvents();
@@ -230,41 +235,12 @@ class _MyEventsScreenState extends State<MyEventsScreen>
     ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
     _fadeController.forward();
 
-    _attendanceSubscription = _fireStore
-        .collection(AttendanceModel.firebaseKey)
-        .where('customerUid', isEqualTo: CustomerController.logeInCustomer!.uid)
-        .snapshots()
-        .listen((snapshot) {
-          if (mounted) {
-            setState(() {
-              attendanceList = snapshot.docs
-                  .map((doc) => AttendanceModel.fromJson(doc.data()))
-                  .toList();
-            });
-            // Refresh attended events if on attended tab
-            if (selectedTab == 2) {
-              _refreshAttendedEvents();
-            }
-          }
-        });
-
-    _preRegisteredSubscription = _fireStore
-        .collection(AttendanceModel.registerFirebaseKey)
-        .where('customerUid', isEqualTo: CustomerController.logeInCustomer!.uid)
-        .snapshots()
-        .listen((snapshot) {
-          if (mounted) {
-            setState(() {
-              preRegisteredAttendanceList = snapshot.docs
-                  .map((doc) => AttendanceModel.fromJson(doc.data()))
-                  .toList();
-            });
-          }
-        });
+    // Initialize Firebase streams with error handling
+    _initializeFirebaseStreams();
 
     // Simulate loading
     Future.delayed(const Duration(seconds: 1), () {
-      if (mounted) {
+      if (mounted && !_isDisposed) {
         setState(() {
           isLoading = false;
         });
@@ -275,12 +251,77 @@ class _MyEventsScreenState extends State<MyEventsScreen>
     selectedTab = widget.initialTab;
   }
 
+  // Initialize Firebase streams with proper error handling
+  void _initializeFirebaseStreams() {
+    try {
+      _attendanceSubscription = _fireStore
+          .collection(AttendanceModel.firebaseKey)
+          .where(
+            'customerUid',
+            isEqualTo: CustomerController.logeInCustomer!.uid,
+          )
+          .snapshots()
+          .listen(
+            (snapshot) {
+              if (mounted && !_isDisposed) {
+                setState(() {
+                  attendanceList = snapshot.docs
+                      .map((doc) => AttendanceModel.fromJson(doc.data()))
+                      .toList();
+                });
+                // Refresh attended events if on attended tab
+                if (selectedTab == 2) {
+                  _refreshAttendedEvents();
+                }
+              }
+            },
+            onError: (error) {
+              print('Error in attendance stream: $error');
+            },
+          );
+
+      _preRegisteredSubscription = _fireStore
+          .collection(AttendanceModel.registerFirebaseKey)
+          .where(
+            'customerUid',
+            isEqualTo: CustomerController.logeInCustomer!.uid,
+          )
+          .snapshots()
+          .listen(
+            (snapshot) {
+              if (mounted && !_isDisposed) {
+                setState(() {
+                  preRegisteredAttendanceList = snapshot.docs
+                      .map((doc) => AttendanceModel.fromJson(doc.data()))
+                      .toList();
+                });
+              }
+            },
+            onError: (error) {
+              print('Error in pre-registered stream: $error');
+            },
+          );
+    } catch (e) {
+      print('Error initializing Firebase streams: $e');
+    }
+  }
+
   @override
   void dispose() {
-    _attendanceSubscription.cancel();
-    _preRegisteredSubscription.cancel();
+    _isDisposed = true;
+
+    // Cancel all subscriptions
+    _attendanceSubscription?.cancel();
+    _preRegisteredSubscription?.cancel();
+
+    // Dispose animation controllers
     _fadeController.dispose();
     _scrollController.dispose();
+
+    // Cancel debounce timer
+    _scrollDebounceTimer?.cancel();
+
+    // Remove lifecycle observer
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -288,13 +329,16 @@ class _MyEventsScreenState extends State<MyEventsScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    if (state == AppLifecycleState.resumed && selectedTab == 2 && mounted) {
+    if (state == AppLifecycleState.resumed &&
+        selectedTab == 2 &&
+        mounted &&
+        !_isDisposed) {
       _refreshAttendedEvents();
     }
   }
 
   void _refreshAttendedEvents() {
-    if (mounted) {
+    if (mounted && !_isDisposed) {
       setState(() {
         _attendedEventsFuture = FirebaseFirestoreHelper()
             .getEventsAttendedByUser(CustomerController.logeInCustomer!.uid);
@@ -302,34 +346,53 @@ class _MyEventsScreenState extends State<MyEventsScreen>
     }
   }
 
+  // Optimized scroll handler with debouncing
   void _onScroll() {
-    final double scrollOffset = _scrollController.offset;
-    final double maxScrollOffset = 100.0; // Distance to fully collapse
+    if (_isDisposed) return;
 
-    if (!mounted) return; // Prevent setState after dispose
+    // Cancel previous timer
+    _scrollDebounceTimer?.cancel();
 
-    if (scrollOffset > 0) {
-      setState(() {
-        _isScrollingDown = true;
-        // Calculate opacity based on scroll position
-        _tabBarOpacity = (1.0 - (scrollOffset / maxScrollOffset)).clamp(
+    // Debounce scroll updates to reduce setState calls
+    _scrollDebounceTimer = Timer(const Duration(milliseconds: 16), () {
+      if (_isDisposed || !mounted) return;
+
+      final double scrollOffset = _scrollController.offset;
+      final double maxScrollOffset = 100.0;
+
+      if (scrollOffset > 0) {
+        final newTabBarOpacity = (1.0 - (scrollOffset / maxScrollOffset)).clamp(
           0.0,
           1.0,
         );
-        // Calculate header height
-        _headerHeight =
+        final newHeaderHeight =
             _collapsedHeaderHeight +
             ((120.0 - _collapsedHeaderHeight) *
                     (1.0 - (scrollOffset / maxScrollOffset)))
                 .clamp(0.0, 120.0 - _collapsedHeaderHeight);
-      });
-    } else {
-      setState(() {
-        _isScrollingDown = false;
-        _tabBarOpacity = 1.0;
-        _headerHeight = 120.0;
-      });
-    }
+
+        // Only update if values actually changed
+        if (_tabBarOpacity != newTabBarOpacity ||
+            _headerHeight != newHeaderHeight ||
+            !_isScrollingDown) {
+          setState(() {
+            _isScrollingDown = true;
+            _tabBarOpacity = newTabBarOpacity;
+            _headerHeight = newHeaderHeight;
+          });
+        }
+      } else {
+        if (_tabBarOpacity != 1.0 ||
+            _headerHeight != 120.0 ||
+            _isScrollingDown) {
+          setState(() {
+            _isScrollingDown = false;
+            _tabBarOpacity = 1.0;
+            _headerHeight = 120.0;
+          });
+        }
+      }
+    });
   }
 
   @override
@@ -344,7 +407,7 @@ class _MyEventsScreenState extends State<MyEventsScreen>
 
   // Show filter/sort modal
   void _showFilterSortModal() {
-    if (!mounted) return;
+    if (!mounted || _isDisposed) return;
 
     showModalBottomSheet(
       context: context,
@@ -355,14 +418,14 @@ class _MyEventsScreenState extends State<MyEventsScreen>
         currentSortOption: currentSortOption,
         allCategories: _allCategories,
         onCategoriesChanged: (categories) {
-          if (mounted) {
+          if (mounted && !_isDisposed) {
             setState(() {
               selectedCategories = categories;
             });
           }
         },
         onSortOptionChanged: (sortOption) {
-          if (mounted) {
+          if (mounted && !_isDisposed) {
             setState(() {
               currentSortOption = sortOption;
             });
@@ -739,7 +802,7 @@ class _MyEventsScreenState extends State<MyEventsScreen>
     return Expanded(
       child: GestureDetector(
         onTap: () {
-          if (!mounted) return; // Prevent setState after dispose
+          if (!mounted || _isDisposed) return; // Prevent setState after dispose
           setState(() {
             selectedTab = index;
           });
@@ -1040,11 +1103,14 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                       child: CachedNetworkImage(
                         imageUrl: event.imageUrl,
                         fit: BoxFit.cover,
+                        memCacheWidth: 400, // Optimize memory usage
+                        memCacheHeight: 225,
                         placeholder: (context, url) => Container(
                           color: const Color(0xFFF5F7FA),
                           child: const Center(
                             child: CircularProgressIndicator(
                               color: Color(0xFF667EEA),
+                              strokeWidth: 2,
                             ),
                           ),
                         ),
@@ -1072,6 +1138,8 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                             ),
                           ),
                         ),
+                        fadeInDuration: const Duration(milliseconds: 300),
+                        fadeOutDuration: const Duration(milliseconds: 300),
                       ),
                     ),
                     if (event.isFeatured)

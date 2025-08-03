@@ -20,12 +20,15 @@ import 'package:orgami/Screens/Events/Widget/PreRegisteredHorizontalList.dart';
 import 'package:orgami/Screens/Events/Widget/CommentsSection.dart';
 import 'package:orgami/Screens/Events/Widget/DeleteEventDialouge.dart';
 import 'package:orgami/Screens/Events/Widget/QRDialouge.dart';
+import 'package:orgami/Screens/Events/TicketManagementScreen.dart';
+import 'package:orgami/Screens/MyProfile/MyTicketsScreen.dart';
 import 'package:orgami/Screens/QRScanner/AnsQuestionsToSignInEventScreen.dart';
 import 'package:orgami/Screens/QRScanner/QrScannerScreenForLogedIn.dart';
 import 'package:orgami/Utils/Colors.dart';
 import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Utils/dimensions.dart';
+import 'package:orgami/Models/TicketModel.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 import 'package:orgami/Screens/MyEvents/MyEventsScreen.dart';
 import 'package:orgami/Screens/Events/FeatureEventScreen.dart';
@@ -41,7 +44,7 @@ class SingleEventScreen extends StatefulWidget {
 }
 
 class _SingleEventScreenState extends State<SingleEventScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late EventModel eventModel;
   late final double _screenWidth = MediaQuery.of(context).size.width;
   late final double _screenHeight = MediaQuery.of(context).size.height;
@@ -50,6 +53,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   final _btnCtlr = RoundedLoadingButtonController();
   bool _isAnonymousSignIn = false;
   bool _isAnonymousPreRegister = false;
+  bool _isGettingTicket = false;
+  bool _hasTicket = false;
+  bool _isCheckingTicket = false;
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -444,23 +450,15 @@ class _SingleEventScreenState extends State<SingleEventScreen>
           _btnCtlr.success(); // Show success state
           ShowToast().showNormalToast(msg: 'Signed In Successfully!');
 
-          // Navigate to event details after a short delay
+          // Refresh attendance status and stay on the same screen
           Future.delayed(const Duration(seconds: 1), () {
             _btnCtlr.reset();
             // Refresh attendance status
             getAttendance();
-            RouterClass.nextScreenAndReplacement(
-              context,
-              SingleEventScreen(eventModel: eventModel),
-            );
-          });
-
-          // Also navigate to MyEventsScreen to show the attended event
-          Future.delayed(const Duration(milliseconds: 1500), () {
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (context) => const MyEventsScreen()),
-              (Route<dynamic> route) => false,
-            );
+            // Refresh the current screen to show updated sign-in status
+            setState(() {
+              // Trigger a rebuild to show the updated UI
+            });
           });
         } catch (firestoreError) {
           print('Firestore error during sign-in: $firestoreError');
@@ -485,6 +483,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   @override
   void initState() {
     super.initState();
+
+    // Add lifecycle observer to refresh data when screen is focused
+    WidgetsBinding.instance.addObserver(this);
 
     // Initialize eventModel with the widget's eventModel
     eventModel = widget.eventModel;
@@ -514,13 +515,43 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     getAttendance();
     getRegisterAttendance();
     getPreRegisterCount();
+    checkUserTicket();
   }
 
   @override
   void dispose() {
+    // Remove lifecycle observer
+    WidgetsBinding.instance.removeObserver(this);
+
     _fadeController.dispose();
     _slideController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Refresh attendance data when app becomes active
+    if (state == AppLifecycleState.resumed) {
+      getAttendance();
+      getRegisterAttendance();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh data when dependencies change (e.g., when navigating back to this screen)
+    // Only refresh if the screen is mounted and visible
+    if (mounted) {
+      // Add a small delay to ensure the screen is fully visible
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted) {
+          getAttendance();
+          getRegisterAttendance();
+        }
+      });
+    }
   }
 
   @override
@@ -716,6 +747,11 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                 FirebaseAuth.instance.currentUser!.uid)
               if (signedIn != null)
                 if (!signedIn!) _buildSignInSection(),
+            const SizedBox(height: 24),
+            // Ticket Section (for non-owners)
+            if (eventModel.customerUid !=
+                FirebaseAuth.instance.currentUser!.uid)
+              if (eventModel.ticketsEnabled) _buildTicketSection(),
             const SizedBox(height: 24),
             // Attendees List
             AttendeesHorizontalList(eventModel: eventModel),
@@ -1162,6 +1198,227 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     );
   }
 
+  Widget _buildTicketSection() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            spreadRadius: 0,
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: _hasTicket
+                      ? const Color(0xFF10B981).withOpacity(0.1)
+                      : const Color(0xFFFF9800).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  _hasTicket ? Icons.check_circle : Icons.confirmation_number,
+                  color: _hasTicket
+                      ? const Color(0xFF10B981)
+                      : const Color(0xFFFF9800),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  _hasTicket ? 'Ticket Received' : 'Get Event Ticket',
+                  style: const TextStyle(
+                    color: Color(0xFF1A1A1A),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 18,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _hasTicket
+                ? 'You have a ticket for this event. Show the ticket code to the event host when you arrive.'
+                : 'Get a free ticket for this event. Show the ticket code to the event host when you arrive.',
+            style: const TextStyle(
+              color: Color(0xFF6B7280),
+              fontSize: 14,
+              fontFamily: 'Roboto',
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          if (_isCheckingTicket)
+            const Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  color: Color(0xFFFF9800),
+                  strokeWidth: 2,
+                ),
+              ),
+            )
+          else if (_hasTicket)
+            Container(
+              width: double.infinity,
+              height: 56,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF10B981), Color(0xFF059669)],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF10B981).withOpacity(0.3),
+                    spreadRadius: 0,
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MyTicketsScreen(),
+                      ),
+                    );
+                  },
+                  child: const Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.visibility, color: Colors.white, size: 24),
+                        SizedBox(width: 12),
+                        Text(
+                          'View Ticket',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            )
+          else
+            Container(
+              width: double.infinity,
+              height: 56,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFFFF9800), Color(0xFFFF5722)],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFF9800).withOpacity(0.3),
+                    spreadRadius: 0,
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: _isGettingTicket ? null : _getTicket,
+                  child: Center(
+                    child: _isGettingTicket
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.confirmation_number,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                              SizedBox(width: 12),
+                              Text(
+                                'Get Ticket',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  fontFamily: 'Roboto',
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
+          // Debug button for testing
+          Container(
+            width: double.infinity,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.grey.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.withOpacity(0.3)),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: _clearTicketsForTesting,
+                child: const Center(
+                  child: Text(
+                    'Clear Tickets (Debug)',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 12,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildActionButtons() {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -1356,6 +1613,62 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                 ),
             ],
           ),
+          // Ticket Management Button (for event creators)
+          if (eventModel.customerUid == FirebaseAuth.instance.currentUser!.uid)
+            const SizedBox(height: 12),
+          if (eventModel.customerUid == FirebaseAuth.instance.currentUser!.uid)
+            Container(
+              width: double.infinity,
+              height: 56,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFFFF9800), Color(0xFFFF5722)],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFF9800).withOpacity(0.3),
+                    spreadRadius: 0,
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => RouterClass.nextScreenNormal(
+                    context,
+                    TicketManagementScreen(eventModel: eventModel),
+                  ),
+                  child: const Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.confirmation_number,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Manage Tickets',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           // Pre-Register Button (for non-owners)
           if (eventModel.customerUid != FirebaseAuth.instance.currentUser!.uid)
             if (registered != null)
@@ -1653,5 +1966,117 @@ Join us for an amazing time!
     HapticFeedback.lightImpact();
     Clipboard.setData(ClipboardData(text: eventModel.rawId));
     ShowToast().showSnackBar('Event ID copied to clipboard', context);
+  }
+
+  Future<void> _getTicket() async {
+    print('=== GET TICKET DEBUG ===');
+    print('Customer logged in: ${CustomerController.logeInCustomer != null}');
+    if (CustomerController.logeInCustomer != null) {
+      print('Customer UID: ${CustomerController.logeInCustomer!.uid}');
+      print('Customer Name: ${CustomerController.logeInCustomer!.name}');
+    }
+    print('Event ID: ${eventModel.id}');
+    print('Event Title: ${eventModel.title}');
+    print('Tickets Enabled: ${eventModel.ticketsEnabled}');
+    print('Max Tickets: ${eventModel.maxTickets}');
+    print('Issued Tickets: ${eventModel.issuedTickets}');
+
+    if (CustomerController.logeInCustomer == null) {
+      ShowToast().showNormalToast(msg: 'Please log in to get a ticket');
+      return;
+    }
+
+    setState(() {
+      _isGettingTicket = true;
+    });
+
+    try {
+      final ticket = await FirebaseFirestoreHelper().issueTicket(
+        eventId: eventModel.id,
+        customerUid: CustomerController.logeInCustomer!.uid,
+        customerName: CustomerController.logeInCustomer!.name,
+        eventModel: eventModel,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isGettingTicket = false;
+        });
+
+        if (ticket != null) {
+          ShowToast().showNormalToast(msg: 'Ticket obtained successfully!');
+          // Refresh ticket status
+          checkUserTicket();
+          // Navigate to MyTicketsScreen to show the new ticket
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const MyTicketsScreen()),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error in _getTicket: $e');
+      if (mounted) {
+        setState(() {
+          _isGettingTicket = false;
+        });
+        ShowToast().showNormalToast(msg: 'Failed to get ticket: $e');
+      }
+    }
+  }
+
+  // Debug method to clear tickets for testing
+  Future<void> _clearTicketsForTesting() async {
+    if (CustomerController.logeInCustomer == null) {
+      ShowToast().showNormalToast(msg: 'Please log in first');
+      return;
+    }
+
+    try {
+      await FirebaseFirestoreHelper().clearUserTickets(
+        customerUid: CustomerController.logeInCustomer!.uid,
+        eventId: eventModel.id,
+      );
+      ShowToast().showNormalToast(msg: 'Tickets cleared for testing');
+      // Refresh ticket status after clearing
+      checkUserTicket();
+    } catch (e) {
+      ShowToast().showNormalToast(msg: 'Failed to clear tickets: $e');
+    }
+  }
+
+  Future<void> checkUserTicket() async {
+    if (CustomerController.logeInCustomer == null) {
+      return;
+    }
+
+    setState(() {
+      _isCheckingTicket = true;
+    });
+
+    try {
+      final userTickets = await FirebaseFirestoreHelper().getUserTickets(
+        customerUid: CustomerController.logeInCustomer!.uid,
+      );
+
+      // Check if user has an active ticket for this event
+      final hasActiveTicket = userTickets.any(
+        (ticket) => ticket.eventId == eventModel.id && !ticket.isUsed,
+      );
+
+      if (mounted) {
+        setState(() {
+          _hasTicket = hasActiveTicket;
+          _isCheckingTicket = false;
+        });
+      }
+    } catch (e) {
+      print('Error checking user ticket: $e');
+      if (mounted) {
+        setState(() {
+          _isCheckingTicket = false;
+        });
+      }
+    }
   }
 }

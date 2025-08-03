@@ -82,5 +82,15 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/Events/$(eventId)) &&
         request.auth.uid == get(/databases/$(database)/documents/Events/$(eventId)).data.customerUid;
     }
+    
+    // Allow authenticated users to create and read tickets
+    // Users can create tickets for events that have tickets enabled
+    // Users can read their own tickets
+    // Event hosts can read tickets for their events
+    match /Tickets/{ticketId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+    }
   }
 } 

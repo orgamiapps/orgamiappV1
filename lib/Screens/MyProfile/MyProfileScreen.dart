@@ -8,6 +8,7 @@ import 'package:orgami/Screens/Events/Widget/SingleEventListViewItem.dart';
 import 'package:orgami/Utils/Toast.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:orgami/Screens/MyProfile/MyTicketsScreen.dart';
 
 class MyProfileScreen extends StatefulWidget {
   @override
@@ -42,25 +43,18 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeInOut,
-    ));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
+    );
 
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOutCubic,
-    ));
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+        );
 
     _fadeController.forward();
     _slideController.forward();
@@ -91,16 +85,19 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       }
 
       print(
-          'Loading profile data for user: ${CustomerController.logeInCustomer!.uid}');
+        'Loading profile data for user: ${CustomerController.logeInCustomer!.uid}',
+      );
 
       // Fetch events created by user
-      final created = await FirebaseFirestoreHelper()
-          .getEventsCreatedByUser(CustomerController.logeInCustomer!.uid);
+      final created = await FirebaseFirestoreHelper().getEventsCreatedByUser(
+        CustomerController.logeInCustomer!.uid,
+      );
       print('Created events count: ${created.length}');
 
       // Fetch events attended by user
-      final attended = await FirebaseFirestoreHelper()
-          .getEventsAttendedByUser(CustomerController.logeInCustomer!.uid);
+      final attended = await FirebaseFirestoreHelper().getEventsAttendedByUser(
+        CustomerController.logeInCustomer!.uid,
+      );
       print('Attended events count: ${attended.length}');
 
       if (mounted) {
@@ -120,7 +117,8 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           isLoading = false;
         });
         ShowToast().showNormalToast(
-            msg: 'Failed to load profile data: ${e.toString()}');
+          msg: 'Failed to load profile data: ${e.toString()}',
+        );
       }
     }
   }
@@ -276,15 +274,16 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         margin: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
           children: List.generate(
-              3,
-              (index) => Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  )),
+            3,
+            (index) => Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -297,25 +296,15 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       child: CustomScrollView(
         slivers: [
           // Back Button and Profile Header
-          SliverToBoxAdapter(
-            child: _buildProfileHeader(user),
-          ),
+          SliverToBoxAdapter(child: _buildProfileHeader(user)),
           // Bio Section
-          SliverToBoxAdapter(
-            child: _buildBioSection(),
-          ),
+          SliverToBoxAdapter(child: _buildBioSection()),
           // Stats Section
-          SliverToBoxAdapter(
-            child: _buildStatsSection(),
-          ),
+          SliverToBoxAdapter(child: _buildStatsSection()),
           // Tab Bar
-          SliverToBoxAdapter(
-            child: _buildTabBar(),
-          ),
+          SliverToBoxAdapter(child: _buildTabBar()),
           // Tab Content
-          SliverToBoxAdapter(
-            child: _buildTabContent(),
-          ),
+          SliverToBoxAdapter(child: _buildTabContent()),
         ],
       ),
     );
@@ -328,10 +317,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF667EEA),
-            Color(0xFF764BA2),
-          ],
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
         ),
       ),
       padding: const EdgeInsets.fromLTRB(24, 32, 24, 40),
@@ -383,10 +369,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                   height: 120,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white,
-                      width: 4,
-                    ),
+                    border: Border.all(color: Colors.white, width: 4),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.2),
@@ -463,11 +446,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   Widget _buildDefaultProfilePicture() {
     return Container(
       color: const Color(0xFFE1E5E9),
-      child: const Icon(
-        Icons.person,
-        size: 60,
-        color: Color(0xFF9CA3AF),
-      ),
+      child: const Icon(Icons.person, size: 60, color: Color(0xFF9CA3AF)),
     );
   }
 
@@ -654,11 +633,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         children: [
           Row(
             children: [
-              Icon(
-                Icons.analytics,
-                color: const Color(0xFF667EEA),
-                size: 18,
-              ),
+              Icon(Icons.analytics, color: const Color(0xFF667EEA), size: 18),
               const SizedBox(width: 8),
               const Text(
                 'My Activity',
@@ -682,11 +657,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                   color: const Color(0xFF667EEA),
                 ),
               ),
-              Container(
-                width: 1,
-                height: 40,
-                color: const Color(0xFFE1E5E9),
-              ),
+              Container(width: 1, height: 40, color: const Color(0xFFE1E5E9)),
               Expanded(
                 child: _buildStatItem(
                   icon: Icons.check_circle_outline,
@@ -696,6 +667,80 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF9800).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFFF9800).withOpacity(0.3),
+              ),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const MyTicketsScreen(),
+                    ),
+                  );
+                },
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF9800).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.confirmation_number,
+                        color: Color(0xFFFF9800),
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'My Tickets',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1A1A1A),
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'View and manage your event tickets',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6B7280),
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.arrow_forward_ios,
+                      color: Color(0xFFFF9800),
+                      size: 16,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -710,11 +755,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   }) {
     return Column(
       children: [
-        Icon(
-          icon,
-          color: color,
-          size: 24,
-        ),
+        Icon(icon, color: color, size: 24),
         const SizedBox(height: 8),
         Text(
           value,
@@ -759,11 +800,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
             index: 1,
             icon: Icons.add_circle_outline,
           ),
-          Container(
-            width: 1,
-            height: 40,
-            color: const Color(0xFFE1E5E9),
-          ),
+          Container(width: 1, height: 40, color: const Color(0xFFE1E5E9)),
           _buildTabButton(
             label: 'Attended',
             index: 2,
@@ -844,9 +881,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                 print('Building event item at index: $index');
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
-                  child: SingleEventListViewItem(
-                    eventModel: events[index],
-                  ),
+                  child: SingleEventListViewItem(eventModel: events[index]),
                 );
               },
             ),
@@ -870,11 +905,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       ),
       child: Column(
         children: [
-          Icon(
-            icon,
-            size: 64,
-            color: const Color(0xFF9CA3AF),
-          ),
+          Icon(icon, size: 64, color: const Color(0xFF9CA3AF)),
           const SizedBox(height: 16),
           Text(
             message,
@@ -907,10 +938,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             ),
             child: const Text(
               'Retry',
