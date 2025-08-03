@@ -12,9 +12,7 @@ import 'package:orgami/Utils/dimensions.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({
-    super.key,
-  });
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -31,8 +29,13 @@ class _LoginScreenState extends State<LoginScreen>
   final TextEditingController _passwordEdtController = TextEditingController();
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  bool _obscurePassword = true;
+  bool _isEmailFocused = false;
+  bool _isPasswordFocused = false;
 
   late AnimationController logoAnimation;
+  late Animation<double> fadeAnimation;
+  late Animation<Offset> slideAnimation;
 
   void _makeLogin() async {
     try {
@@ -42,18 +45,18 @@ class _LoginScreenState extends State<LoginScreen>
       await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password)
           .then((signInCustomer) {
-        if (signInCustomer.user != null) {
-          FirebaseFirestoreHelper()
-              .getSingleCustomer(customerId: signInCustomer.user!.uid)
-              .then((fireStoreCustomer) {
-            setState(() {
-              CustomerController.logeInCustomer = fireStoreCustomer;
-            });
-            RouterClass().homeScreenRoute(context: context);
-            _btnCtlr.success();
+            if (signInCustomer.user != null) {
+              FirebaseFirestoreHelper()
+                  .getSingleCustomer(customerId: signInCustomer.user!.uid)
+                  .then((fireStoreCustomer) {
+                    setState(() {
+                      CustomerController.logeInCustomer = fireStoreCustomer;
+                    });
+                    RouterClass().homeScreenRoute(context: context);
+                    _btnCtlr.success();
+                  });
+            }
           });
-        }
-      });
     } on FirebaseAuthException catch (e) {
       print(e.code);
       switch (e.code) {
@@ -64,20 +67,24 @@ class _LoginScreenState extends State<LoginScreen>
           ShowToast().showNormalToast(msg: "Your password is wrong.");
           break;
         case "ERROR_USER_NOT_FOUND":
-          ShowToast()
-              .showNormalToast(msg: "User with this email doesn't exist.");
+          ShowToast().showNormalToast(
+            msg: "User with this email doesn't exist.",
+          );
           break;
         case "ERROR_USER_DISABLED":
-          ShowToast()
-              .showNormalToast(msg: "User with this email has been disabled.");
+          ShowToast().showNormalToast(
+            msg: "User with this email has been disabled.",
+          );
           break;
         case "ERROR_TOO_MANY_REQUESTS":
-          ShowToast()
-              .showNormalToast(msg: "Too many requests. Try again later.");
+          ShowToast().showNormalToast(
+            msg: "Too many requests. Try again later.",
+          );
           break;
         case "ERROR_OPERATION_NOT_ALLOWED":
           ShowToast().showNormalToast(
-              msg: "Signing in with Email and Password is not enabled.");
+            msg: "Signing in with Email and Password is not enabled.",
+          );
           break;
         default:
           ShowToast().showNormalToast(msg: "An undefined Error happened.");
@@ -91,10 +98,20 @@ class _LoginScreenState extends State<LoginScreen>
 
   _handleAnimation() {
     logoAnimation = AnimationController(
-      upperBound: 180,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 2000),
       vsync: this,
     );
+
+    fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: logoAnimation, curve: Curves.easeInOut));
+
+    slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(parent: logoAnimation, curve: Curves.easeOutCubic),
+        );
+
     logoAnimation.forward();
     logoAnimation.addListener(() {
       setState(() {});
@@ -104,7 +121,6 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void initState() {
     _handleAnimation();
-
     super.initState();
   }
 
@@ -117,12 +133,11 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Stack(
         children: [
           _bodyView(),
-          AppAppBarView.appBarWithOnlyBackButton(
-            context: context,
-          ),
+          AppAppBarView.appBarWithOnlyBackButton(context: context),
         ],
       ),
     );
@@ -132,23 +147,26 @@ class _LoginScreenState extends State<LoginScreen>
     return Container(
       width: _screenWidth,
       height: _screenHeight,
-      decoration: const BoxDecoration(),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.white, AppThemeColor.lightBlueColor.withOpacity(0.3)],
+        ),
+      ),
       child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(25),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                children: [
-                  Image.asset(
-                    Images.inAppLogo,
-                    width: logoAnimation.value,
-                  ),
-                ],
-              ),
-              _labelView(),
-              _loginDetailsView(),
+              const SizedBox(height: 60),
+              _logoSection(),
+              const SizedBox(height: 40),
+              _welcomeSection(),
+              const SizedBox(height: 40),
+              _loginFormSection(),
+              const SizedBox(height: 30),
+              _forgotPasswordSection(),
             ],
           ),
         ),
@@ -156,164 +174,304 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _loginDetailsView() {
-    return Container(
-      width: _screenWidth,
-      decoration: BoxDecoration(
-        color: AppThemeColor.pureWhiteColor,
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.5),
-            spreadRadius: 1,
-            blurRadius: 7,
-            offset: const Offset(0, 7), // changes position of shadow
+  Widget _logoSection() {
+    return FadeTransition(
+      opacity: fadeAnimation,
+      child: SlideTransition(
+        position: slideAnimation,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Image.asset(Images.inAppLogo, width: 120, height: 120),
+        ),
+      ),
+    );
+  }
+
+  Widget _welcomeSection() {
+    return FadeTransition(
+      opacity: fadeAnimation,
+      child: Column(
+        children: [
+          Text(
+            'Welcome Back!',
+            style: TextStyle(
+              color: AppThemeColor.darkBlueColor,
+              fontSize: 32,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Sign in to continue to your account',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppThemeColor.dullFontColor,
+              fontSize: 16,
+              fontWeight: FontWeight.w400,
+              height: 1.5,
+            ),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(15),
+    );
+  }
+
+  Widget _loginFormSection() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 25,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: Form(
         key: _formKey,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Enter Your Details',
+            Text(
+              'Sign In',
               style: TextStyle(
                 color: AppThemeColor.darkBlueColor,
-                fontSize: Dimensions.fontSizeLarge,
+                fontSize: 24,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(
-              height: 15,
-            ),
-            TextFormField(
-              controller: _emailEdtController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                hintText: 'example@mail.com',
-                labelText: 'Email',
-                hintStyle: const TextStyle(
-                  color: AppThemeColor.lightGrayColor,
-                ),
-              ),
-              validator: (newVal) {
-                if (newVal!.isEmpty) {
-                  return 'Enter your Email first!';
-                } else if (!RegExp(r'\S+@\S+\.\S+').hasMatch(newVal)) {
-                  return "Please Enter a Valid Email";
-                }
-                return null;
-              },
-            ),
-            const SizedBox(
-              height: 15,
-            ),
-            TextFormField(
-              controller: _passwordEdtController,
-              keyboardType: TextInputType.visiblePassword,
-              obscureText: true,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                hintText: '*******',
-                labelText: 'Password',
-                hintStyle: const TextStyle(
-                  color: AppThemeColor.lightGrayColor,
-                ),
-              ),
-              validator: (value) {
-                if (value == null && value!.length < 8) {
-                  return 'Enter Valid Password';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(
-              height: 25,
-            ),
-            RoundedLoadingButton(
-              animateOnTap: true,
-              borderRadius: 13,
-              width: _screenWidth,
-              controller: _btnCtlr,
-              onPressed: () {
-                _btnCtlr.start();
-                if (_formKey.currentState!.validate()) {
-                  _makeLogin();
-                } else {
-                  _btnCtlr.reset();
-                }
-              },
-              color: AppThemeColor.darkGreenColor,
-              elevation: 0,
-              child: const Wrap(
-                children: [
-                  Text(
-                    'Login',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  )
-                ],
-              ),
-            ),
-            const SizedBox(
-              height: 15,
-            ),
-            GestureDetector(
-              onTap: () => RouterClass.nextScreenNormal(
-                context,
-                const ForgotPasswordScreen(),
-              ),
-              child: Container(
-                color: Colors.transparent,
-                child: const Text(
-                  'Forgot Password',
-                  style: TextStyle(
-                    color: AppThemeColor.pureBlackColor,
-                    fontSize: Dimensions.fontSizeLarge,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
+            const SizedBox(height: 24),
+            _buildEmailField(),
+            const SizedBox(height: 20),
+            _buildPasswordField(),
+            const SizedBox(height: 32),
+            _buildLoginButton(),
           ],
         ),
       ),
     );
   }
 
-  Widget _labelView() {
-    return const Column(
+  Widget _buildEmailField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Welcome Back!',
+          'Email Address',
           style: TextStyle(
             color: AppThemeColor.darkBlueColor,
-            fontSize: 34,
-            fontWeight: FontWeight.w700,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
           ),
         ),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 15.0),
-          child: Text(
-            'Fill out the information below in order to access your account.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppThemeColor.dullFontColor,
-              fontSize: Dimensions.fontSizeLarge,
-              fontWeight: FontWeight.w500,
+        const SizedBox(height: 8),
+        Focus(
+          onFocusChange: (hasFocus) {
+            setState(() {
+              _isEmailFocused = hasFocus;
+            });
+          },
+          child: TextFormField(
+            controller: _emailEdtController,
+            keyboardType: TextInputType.emailAddress,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+            decoration: InputDecoration(
+              hintText: 'Enter your email',
+              hintStyle: TextStyle(
+                color: AppThemeColor.lightGrayColor,
+                fontSize: 16,
+              ),
+              filled: true,
+              fillColor: _isEmailFocused
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
+                  : Colors.grey.withOpacity(0.05),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: AppThemeColor.darkBlueColor,
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+              prefixIcon: Icon(
+                Icons.email_outlined,
+                color: _isEmailFocused
+                    ? AppThemeColor.darkBlueColor
+                    : AppThemeColor.lightGrayColor,
+                size: 20,
+              ),
             ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your email';
+              }
+              if (!RegExp(
+                r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+              ).hasMatch(value)) {
+                return 'Please enter a valid email address';
+              }
+              return null;
+            },
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPasswordField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Password',
+          style: TextStyle(
+            color: AppThemeColor.darkBlueColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Focus(
+          onFocusChange: (hasFocus) {
+            setState(() {
+              _isPasswordFocused = hasFocus;
+            });
+          },
+          child: TextFormField(
+            controller: _passwordEdtController,
+            obscureText: _obscurePassword,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+            decoration: InputDecoration(
+              hintText: 'Enter your password',
+              hintStyle: TextStyle(
+                color: AppThemeColor.lightGrayColor,
+                fontSize: 16,
+              ),
+              filled: true,
+              fillColor: _isPasswordFocused
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
+                  : Colors.grey.withOpacity(0.05),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: AppThemeColor.darkBlueColor,
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+              prefixIcon: Icon(
+                Icons.lock_outline,
+                color: _isPasswordFocused
+                    ? AppThemeColor.darkBlueColor
+                    : AppThemeColor.lightGrayColor,
+                size: 20,
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  color: AppThemeColor.lightGrayColor,
+                  size: 20,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your password';
+              }
+              if (value.length < 6) {
+                return 'Password must be at least 6 characters';
+              }
+              return null;
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLoginButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: RoundedLoadingButton(
+        animateOnTap: true,
+        borderRadius: 12,
+        controller: _btnCtlr,
+        onPressed: () {
+          _btnCtlr.start();
+          if (_formKey.currentState!.validate()) {
+            _makeLogin();
+          } else {
+            _btnCtlr.reset();
+          }
+        },
+        color: AppThemeColor.darkBlueColor,
+        elevation: 0,
+        child: const Text(
+          'Sign In',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _forgotPasswordSection() {
+    return Center(
+      child: TextButton(
+        onPressed: () =>
+            RouterClass.nextScreenNormal(context, const ForgotPasswordScreen()),
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        ),
+        child: Text(
+          'Forgot Password?',
+          style: TextStyle(
+            color: AppThemeColor.darkBlueColor,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            decoration: TextDecoration.underline,
+          ),
+        ),
+      ),
     );
   }
 }

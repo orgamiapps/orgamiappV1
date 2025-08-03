@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:orgami/Controller/CustomerController.dart';
 import 'package:orgami/Models/CustomerModel.dart';
 import 'package:orgami/Utils/AppAppBarView.dart';
@@ -13,9 +14,7 @@ import 'package:orgami/Utils/dimensions.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({
-    super.key,
-  });
+  const SignupScreen({super.key});
 
   @override
   State<SignupScreen> createState() => _SignupScreenState();
@@ -36,7 +35,16 @@ class _SignupScreenState extends State<SignupScreen>
   final TextEditingController _confirmPasswordEdtController =
       TextEditingController();
 
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+  bool _isNameFocused = false;
+  bool _isEmailFocused = false;
+  bool _isPasswordFocused = false;
+  bool _isConfirmPasswordFocused = false;
+
   late AnimationController logoAnimation;
+  late Animation<double> fadeAnimation;
+  late Animation<Offset> slideAnimation;
 
   void _signupCalled() async {
     try {
@@ -49,31 +57,30 @@ class _SignupScreenState extends State<SignupScreen>
         await FirebaseAuth.instance
             .createUserWithEmailAndPassword(email: email, password: password)
             .then((newCreatedCustomer) async {
-          if (newCreatedCustomer.user != null) {
-            CustomerModel newCustomerModel = CustomerModel(
-              uid: newCreatedCustomer.user!.uid,
-              name: name,
-              email: email,
-              createdAt: DateTime.now(),
-            );
+              if (newCreatedCustomer.user != null) {
+                CustomerModel newCustomerModel = CustomerModel(
+                  uid: newCreatedCustomer.user!.uid,
+                  name: name,
+                  email: email,
+                  createdAt: DateTime.now(),
+                );
 
-            await FirebaseFirestore.instance
-                .collection(CustomerModel.firebaseKey)
-                .doc(newCustomerModel.uid)
-                .set(
-                  CustomerModel.getMap(newCustomerModel),
-                )
-                .then((value) {
-              ShowToast()
-                  .showNormalToast(msg: 'Welcome to ${AppConstants.appName}');
-              _btnCtlr.success();
-              setState(() {
-                CustomerController.logeInCustomer = newCustomerModel;
-              });
-              RouterClass().homeScreenRoute(context: context);
+                await FirebaseFirestore.instance
+                    .collection(CustomerModel.firebaseKey)
+                    .doc(newCustomerModel.uid)
+                    .set(CustomerModel.getMap(newCustomerModel))
+                    .then((value) {
+                      ShowToast().showNormalToast(
+                        msg: 'Welcome to ${AppConstants.appName}',
+                      );
+                      _btnCtlr.success();
+                      setState(() {
+                        CustomerController.logeInCustomer = newCustomerModel;
+                      });
+                      RouterClass().homeScreenRoute(context: context);
+                    });
+              }
             });
-          }
-        });
       } else {
         _btnCtlr.reset();
         ShowToast().showNormalToast(msg: 'Password Not Matched!');
@@ -86,10 +93,20 @@ class _SignupScreenState extends State<SignupScreen>
 
   _handleAnimation() {
     logoAnimation = AnimationController(
-      upperBound: 180,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 2000),
       vsync: this,
     );
+
+    fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: logoAnimation, curve: Curves.easeInOut));
+
+    slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(parent: logoAnimation, curve: Curves.easeOutCubic),
+        );
+
     logoAnimation.forward();
     logoAnimation.addListener(() {
       setState(() {});
@@ -99,7 +116,6 @@ class _SignupScreenState extends State<SignupScreen>
   @override
   void initState() {
     _handleAnimation();
-
     super.initState();
   }
 
@@ -112,12 +128,11 @@ class _SignupScreenState extends State<SignupScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Stack(
         children: [
           _bodyView(),
-          AppAppBarView.appBarWithOnlyBackButton(
-            context: context,
-          ),
+          AppAppBarView.appBarWithOnlyBackButton(context: context),
         ],
       ),
     );
@@ -127,218 +142,501 @@ class _SignupScreenState extends State<SignupScreen>
     return Container(
       width: _screenWidth,
       height: _screenHeight,
-      decoration: const BoxDecoration(),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.white, AppThemeColor.lightBlueColor.withOpacity(0.3)],
+        ),
+      ),
       child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(25),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  children: [
-                    Image.asset(
-                      Images.inAppLogo,
-                      width: logoAnimation.value,
-                    ),
-                  ],
-                ),
-                _labelView(),
-                _signupDetailsView(),
-                const SizedBox(),
-              ],
-            ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
+            children: [
+              const SizedBox(height: 60),
+              _logoSection(),
+              const SizedBox(height: 40),
+              _welcomeSection(),
+              const SizedBox(height: 40),
+              _signupFormSection(),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _signupDetailsView() {
-    return Container(
-      width: _screenWidth,
-      decoration: BoxDecoration(
-        color: AppThemeColor.pureWhiteColor,
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.5),
-            spreadRadius: 1,
-            blurRadius: 7,
-            offset: const Offset(0, 7), // changes position of shadow
+  Widget _logoSection() {
+    return FadeTransition(
+      opacity: fadeAnimation,
+      child: SlideTransition(
+        position: slideAnimation,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Image.asset(Images.inAppLogo, width: 120, height: 120),
+        ),
+      ),
+    );
+  }
+
+  Widget _welcomeSection() {
+    return FadeTransition(
+      opacity: fadeAnimation,
+      child: Column(
+        children: [
+          Text(
+            'Create Account',
+            style: TextStyle(
+              color: AppThemeColor.darkBlueColor,
+              fontSize: 32,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Join us and start your journey today',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppThemeColor.dullFontColor,
+              fontSize: 16,
+              fontWeight: FontWeight.w400,
+              height: 1.5,
+            ),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(15),
+    );
+  }
+
+  Widget _signupFormSection() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 25,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: Form(
         key: _formKey,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Enter Your Details',
+            Text(
+              'Sign Up',
               style: TextStyle(
                 color: AppThemeColor.darkBlueColor,
-                fontSize: Dimensions.fontSizeLarge,
+                fontSize: 24,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(
-              height: 15,
-            ),
-            TextFormField(
-              controller: _userNameEdtController,
-              keyboardType: TextInputType.name,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                hintText: 'Enter you name here...',
-                labelText: 'Name',
-                hintStyle: const TextStyle(
-                  color: AppThemeColor.lightGrayColor,
-                ),
-              ),
-              validator: (newVal) {
-                if (newVal!.isEmpty) {
-                  return 'Enter your name first!';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(
-              height: 15,
-            ),
-            TextFormField(
-              controller: _emailEdtController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                hintText: 'example@mail.com',
-                labelText: 'Email',
-                hintStyle: const TextStyle(
-                  color: AppThemeColor.lightGrayColor,
-                ),
-              ),
-              validator: (newVal) {
-                if (newVal!.isEmpty) {
-                  return 'Enter your Email first!';
-                } else if (!RegExp(r'\S+@\S+\.\S+').hasMatch(newVal)) {
-                  return "Please Enter a Valid Email";
-                }
-                return null;
-              },
-            ),
-            const SizedBox(
-              height: 15,
-            ),
-            TextFormField(
-              controller: _passwordEdtController,
-              keyboardType: TextInputType.visiblePassword,
-              obscureText: true,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                hintText: '*******',
-                labelText: 'Password',
-                hintStyle: const TextStyle(
-                  color: AppThemeColor.lightGrayColor,
-                ),
-              ),
-              validator: (value) {
-                if (value == null && value!.length < 8) {
-                  return 'Enter Valid Password';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(
-              height: 15,
-            ),
-            TextFormField(
-              controller: _confirmPasswordEdtController,
-              keyboardType: TextInputType.visiblePassword,
-              obscureText: true,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                hintText: '*******',
-                labelText: 'Confirm Password',
-                hintStyle: const TextStyle(
-                  color: AppThemeColor.lightGrayColor,
-                ),
-              ),
-              validator: (value) {
-                if (value == null && value!.length < 8) {
-                  return 'Enter Valid Password';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(
-              height: 25,
-            ),
-            RoundedLoadingButton(
-              animateOnTap: true,
-              borderRadius: 13,
-              width: _screenWidth,
-              controller: _btnCtlr,
-              onPressed: () {
-                _btnCtlr.start();
-                if (_formKey.currentState!.validate()) {
-                  _signupCalled();
-                } else {
-                  _btnCtlr.reset();
-                }
-              },
-              color: AppThemeColor.darkGreenColor,
-              elevation: 0,
-              child: const Wrap(
-                children: [
-                  Text(
-                    'Sign Up',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  )
-                ],
-              ),
-            ),
+            const SizedBox(height: 24),
+            _buildNameField(),
+            const SizedBox(height: 20),
+            _buildEmailField(),
+            const SizedBox(height: 20),
+            _buildPasswordField(),
+            const SizedBox(height: 20),
+            _buildConfirmPasswordField(),
+            const SizedBox(height: 32),
+            _buildSignupButton(),
           ],
         ),
       ),
     );
   }
 
-  Widget _labelView() {
-    return const Column(
+  Widget _buildNameField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Create Account',
+          'Full Name',
           style: TextStyle(
             color: AppThemeColor.darkBlueColor,
-            fontSize: 34,
-            fontWeight: FontWeight.w700,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
           ),
         ),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 15.0),
-          child: Text(
-            'Let\'s get started by filling out the form below.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppThemeColor.dullFontColor,
-              fontSize: Dimensions.fontSizeLarge,
-              fontWeight: FontWeight.w500,
+        const SizedBox(height: 8),
+        Focus(
+          onFocusChange: (hasFocus) {
+            setState(() {
+              _isNameFocused = hasFocus;
+            });
+          },
+          child: TextFormField(
+            controller: _userNameEdtController,
+            keyboardType: TextInputType.name,
+            textCapitalization: TextCapitalization.words,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+              LengthLimitingTextInputFormatter(50),
+            ],
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+            decoration: InputDecoration(
+              hintText: 'Enter your full name',
+              hintStyle: TextStyle(
+                color: AppThemeColor.lightGrayColor,
+                fontSize: 16,
+              ),
+              filled: true,
+              fillColor: _isNameFocused
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
+                  : Colors.grey.withOpacity(0.05),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: AppThemeColor.darkBlueColor,
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+              prefixIcon: Icon(
+                Icons.person_outline,
+                color: _isNameFocused
+                    ? AppThemeColor.darkBlueColor
+                    : AppThemeColor.lightGrayColor,
+                size: 20,
+              ),
             ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your name';
+              }
+              if (value.length < 2) {
+                return 'Name must be at least 2 characters';
+              }
+              // Check if name contains at least one space (first and last name)
+              if (!value.contains(' ')) {
+                return 'Please enter your full name (first and last name)';
+              }
+              return null;
+            },
+            onChanged: (value) {
+              // Ensure proper capitalization for each word
+              if (value.isNotEmpty) {
+                final words = value.split(' ');
+                final capitalizedWords = words
+                    .map((word) {
+                      if (word.isNotEmpty) {
+                        return word[0].toUpperCase() +
+                            word.substring(1).toLowerCase();
+                      }
+                      return word;
+                    })
+                    .join(' ');
+
+                // Only update if the formatted text is different to avoid cursor jumping
+                if (capitalizedWords != value) {
+                  final cursorPosition = _userNameEdtController.selection.start;
+                  _userNameEdtController.value = TextEditingValue(
+                    text: capitalizedWords,
+                    selection: TextSelection.collapsed(offset: cursorPosition),
+                  );
+                }
+              }
+            },
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildEmailField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Email Address',
+          style: TextStyle(
+            color: AppThemeColor.darkBlueColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Focus(
+          onFocusChange: (hasFocus) {
+            setState(() {
+              _isEmailFocused = hasFocus;
+            });
+          },
+          child: TextFormField(
+            controller: _emailEdtController,
+            keyboardType: TextInputType.emailAddress,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+            decoration: InputDecoration(
+              hintText: 'Enter your email',
+              hintStyle: TextStyle(
+                color: AppThemeColor.lightGrayColor,
+                fontSize: 16,
+              ),
+              filled: true,
+              fillColor: _isEmailFocused
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
+                  : Colors.grey.withOpacity(0.05),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: AppThemeColor.darkBlueColor,
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+              prefixIcon: Icon(
+                Icons.email_outlined,
+                color: _isEmailFocused
+                    ? AppThemeColor.darkBlueColor
+                    : AppThemeColor.lightGrayColor,
+                size: 20,
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your email';
+              }
+              if (!RegExp(
+                r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+              ).hasMatch(value)) {
+                return 'Please enter a valid email address';
+              }
+              return null;
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPasswordField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Password',
+          style: TextStyle(
+            color: AppThemeColor.darkBlueColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Focus(
+          onFocusChange: (hasFocus) {
+            setState(() {
+              _isPasswordFocused = hasFocus;
+            });
+          },
+          child: TextFormField(
+            controller: _passwordEdtController,
+            obscureText: _obscurePassword,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+            decoration: InputDecoration(
+              hintText: 'Create a password',
+              hintStyle: TextStyle(
+                color: AppThemeColor.lightGrayColor,
+                fontSize: 16,
+              ),
+              filled: true,
+              fillColor: _isPasswordFocused
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
+                  : Colors.grey.withOpacity(0.05),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: AppThemeColor.darkBlueColor,
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+              prefixIcon: Icon(
+                Icons.lock_outline,
+                color: _isPasswordFocused
+                    ? AppThemeColor.darkBlueColor
+                    : AppThemeColor.lightGrayColor,
+                size: 20,
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  color: AppThemeColor.lightGrayColor,
+                  size: 20,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter a password';
+              }
+              if (value.length < 6) {
+                return 'Password must be at least 6 characters';
+              }
+              return null;
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildConfirmPasswordField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Confirm Password',
+          style: TextStyle(
+            color: AppThemeColor.darkBlueColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Focus(
+          onFocusChange: (hasFocus) {
+            setState(() {
+              _isConfirmPasswordFocused = hasFocus;
+            });
+          },
+          child: TextFormField(
+            controller: _confirmPasswordEdtController,
+            obscureText: _obscureConfirmPassword,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+            decoration: InputDecoration(
+              hintText: 'Confirm your password',
+              hintStyle: TextStyle(
+                color: AppThemeColor.lightGrayColor,
+                fontSize: 16,
+              ),
+              filled: true,
+              fillColor: _isConfirmPasswordFocused
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
+                  : Colors.grey.withOpacity(0.05),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: AppThemeColor.darkBlueColor,
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+              prefixIcon: Icon(
+                Icons.lock_outline,
+                color: _isConfirmPasswordFocused
+                    ? AppThemeColor.darkBlueColor
+                    : AppThemeColor.lightGrayColor,
+                size: 20,
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscureConfirmPassword
+                      ? Icons.visibility_off
+                      : Icons.visibility,
+                  color: AppThemeColor.lightGrayColor,
+                  size: 20,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscureConfirmPassword = !_obscureConfirmPassword;
+                  });
+                },
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please confirm your password';
+              }
+              if (value != _passwordEdtController.text) {
+                return 'Passwords do not match';
+              }
+              return null;
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSignupButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: RoundedLoadingButton(
+        animateOnTap: true,
+        borderRadius: 12,
+        controller: _btnCtlr,
+        onPressed: () {
+          _btnCtlr.start();
+          if (_formKey.currentState!.validate()) {
+            _signupCalled();
+          } else {
+            _btnCtlr.reset();
+          }
+        },
+        color: AppThemeColor.darkBlueColor,
+        elevation: 0,
+        child: const Text(
+          'Create Account',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+      ),
     );
   }
 }

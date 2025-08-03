@@ -65,7 +65,10 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   Future _pickImage() async {
     final ImagePicker picker = ImagePicker();
     XFile? image = await picker.pickImage(
-        source: ImageSource.gallery, maxHeight: 600, maxWidth: 1000);
+      source: ImageSource.gallery,
+      maxHeight: 600,
+      maxWidth: 1000,
+    );
     if (image != null) {
       setState(() {
         _selectedImagePath = image.path;
@@ -78,11 +81,12 @@ class _CreateEventScreenState extends State<CreateEventScreen>
     //return download link
     String? imageUrl;
     Uint8List imageData = await XFile(_selectedImagePath!).readAsBytes();
-    final Reference storageReference = FirebaseStorage.instance
-        .ref()
-        .child('events_images/${_selectedImagePath.hashCode}.png');
-    final SettableMetadata metadata =
-        SettableMetadata(contentType: 'image/png');
+    final Reference storageReference = FirebaseStorage.instance.ref().child(
+      'events_images/${_selectedImagePath.hashCode}.png',
+    );
+    final SettableMetadata metadata = SettableMetadata(
+      contentType: 'image/png',
+    );
     final UploadTask uploadTask = storageReference.putData(imageData, metadata);
     await uploadTask.whenComplete(() async {
       imageUrl = await storageReference.getDownloadURL();
@@ -177,9 +181,10 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
 
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 600),
@@ -201,8 +206,6 @@ class _CreateEventScreenState extends State<CreateEventScreen>
     super.dispose();
   }
 
-
-
   Widget _bodyView() {
     return SizedBox(
       width: _screenWidth,
@@ -223,10 +226,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF667EEA),
-            Color(0xFF764BA2),
-          ],
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
         ),
       ),
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
@@ -332,7 +332,9 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           _buildSummaryItem(
             icon: Icons.calendar_month_rounded,
             label: 'Date',
-            value: DateFormat('EEEE, MMMM dd, yyyy').format(widget.selectedDateTime),
+            value: DateFormat(
+              'EEEE, MMMM dd, yyyy',
+            ).format(widget.selectedDateTime),
           ),
           const SizedBox(height: 16),
           _buildSummaryItem(
@@ -359,11 +361,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             color: const Color(0xFF667EEA).withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(
-            icon,
-            color: const Color(0xFF667EEA),
-            size: 20,
-          ),
+          child: Icon(icon, color: const Color(0xFF667EEA), size: 20),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -420,11 +418,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
               color: const Color(0xFF667EEA).withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
-              Icons.lock,
-              color: Color(0xFF667EEA),
-              size: 20,
-            ),
+            child: const Icon(Icons.lock, color: Color(0xFF667EEA), size: 20),
           ),
           const SizedBox(width: 16),
           const Expanded(
@@ -537,13 +531,13 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       backgroundColor: Colors.grey.withOpacity(0.1),
       selectedColor: const Color(0xFF667EEA),
       side: BorderSide(
-        color: isSelected ? const Color(0xFF667EEA) : Colors.grey.withOpacity(0.3),
+        color: isSelected
+            ? const Color(0xFF667EEA)
+            : Colors.grey.withOpacity(0.3),
         width: 1,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     );
   }
 
@@ -600,6 +594,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             label: 'Organizer',
             hint: 'Type here...',
             icon: Icons.person,
+            enableCapitalization: true,
             validator: (value) {
               if (value!.isEmpty) {
                 return 'Enter Organizer first!';
@@ -614,6 +609,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             label: 'Title',
             hint: 'Type here...',
             icon: Icons.title,
+            enableCapitalization: true,
             validator: (value) {
               if (value!.isEmpty) {
                 return 'Enter Title first!';
@@ -662,6 +658,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
     required IconData icon,
     int maxLines = 1,
     String? Function(String?)? validator,
+    bool enableCapitalization = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -680,6 +677,45 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           controller: controller,
           maxLines: maxLines,
           validator: validator,
+          textCapitalization: enableCapitalization
+              ? TextCapitalization.words
+              : TextCapitalization.none,
+          inputFormatters: enableCapitalization
+              ? [
+                  FilteringTextInputFormatter.allow(
+                    RegExp(r'[a-zA-Z0-9\s\-_.,!?]'),
+                  ),
+                  LengthLimitingTextInputFormatter(100),
+                ]
+              : null,
+          onChanged: enableCapitalization
+              ? (value) {
+                  // Ensure proper capitalization for each word
+                  if (value.isNotEmpty) {
+                    final words = value.split(' ');
+                    final capitalizedWords = words
+                        .map((word) {
+                          if (word.isNotEmpty) {
+                            return word[0].toUpperCase() +
+                                word.substring(1).toLowerCase();
+                          }
+                          return word;
+                        })
+                        .join(' ');
+
+                    // Only update if the formatted text is different to avoid cursor jumping
+                    if (capitalizedWords != value) {
+                      final cursorPosition = controller.selection.start;
+                      controller.value = TextEditingValue(
+                        text: capitalizedWords,
+                        selection: TextSelection.collapsed(
+                          offset: cursorPosition,
+                        ),
+                      );
+                    }
+                  }
+                }
+              : null,
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: TextStyle(
@@ -695,17 +731,11 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Color(0xFF667EEA),
-                width: 2,
-              ),
+              borderSide: const BorderSide(color: Color(0xFF667EEA), width: 2),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Colors.red,
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Colors.red, width: 1),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
