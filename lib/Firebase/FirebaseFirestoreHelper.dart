@@ -1180,6 +1180,46 @@ class FirebaseFirestoreHelper {
 
       print('Event ticket count updated');
 
+      // AUTO-REGISTER USER FOR THE EVENT (combining pre-registration with ticketing)
+      try {
+        // Check if user is already registered
+        final existingRegistrationQuery = await _firestore
+            .collection(AttendanceModel.registerFirebaseKey)
+            .where('eventId', isEqualTo: eventId)
+            .where('customerUid', isEqualTo: customerUid)
+            .get();
+
+        if (existingRegistrationQuery.docs.isEmpty) {
+          // Create registration record
+          final registrationId = _firestore
+              .collection(AttendanceModel.registerFirebaseKey)
+              .doc()
+              .id;
+          final registration = AttendanceModel(
+            id: registrationId,
+            eventId: eventId,
+            userName: customerName,
+            customerUid: customerUid,
+            attendanceDateTime: DateTime.now(),
+            answers: [],
+            isAnonymous: false,
+            realName: customerName,
+          );
+
+          await _firestore
+              .collection(AttendanceModel.registerFirebaseKey)
+              .doc(registrationId)
+              .set(registration.toJson());
+
+          print('User automatically registered for event');
+        } else {
+          print('User already registered for this event');
+        }
+      } catch (e) {
+        print('Error auto-registering user: $e');
+        // Don't fail the ticket issuance if registration fails
+      }
+
       return ticket;
     } catch (e) {
       print('Error issuing ticket: $e');

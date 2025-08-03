@@ -3,9 +3,8 @@ import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Models/AttendanceModel.dart';
 import 'package:orgami/Models/CustomerModel.dart';
 import 'package:orgami/Models/EventModel.dart';
+import 'package:orgami/Models/TicketModel.dart';
 import 'package:orgami/Utils/Colors.dart';
-import 'package:orgami/Utils/Router.dart';
-import 'package:orgami/Utils/dimensions.dart';
 
 class PreRegisteredHorizontalList extends StatefulWidget {
   final EventModel eventModel;
@@ -20,16 +19,17 @@ class PreRegisteredHorizontalList extends StatefulWidget {
 class _PreRegisteredHorizontalListState
     extends State<PreRegisteredHorizontalList> {
   List<AttendanceModel> preRegistered = [];
+  List<TicketModel> eventTickets = [];
   List<CustomerModel> customerDetails = [];
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadPreRegistered();
+    _loadRegisteredAndTicketedUsers();
   }
 
-  Future<void> _loadPreRegistered() async {
+  Future<void> _loadRegisteredAndTicketedUsers() async {
     try {
       setState(() {
         isLoading = true;
@@ -39,9 +39,46 @@ class _PreRegisteredHorizontalListState
       final preRegisteredList = await FirebaseFirestoreHelper()
           .getRegisterAttendance(eventId: widget.eventModel.id);
 
-      // Get customer details for each pre-registered (limit to first 10 for performance)
+      // Get all tickets for this event
+      final ticketsList = await FirebaseFirestoreHelper().getEventTickets(
+        eventId: widget.eventModel.id,
+      );
+
+      // Combine unique users (both registered and ticketed)
+      final Set<String> uniqueUserIds = <String>{};
+      final List<AttendanceModel> allUsers = [];
+
+      // Add registered users
+      for (var attendee in preRegisteredList) {
+        if (!uniqueUserIds.contains(attendee.customerUid)) {
+          uniqueUserIds.add(attendee.customerUid);
+          allUsers.add(attendee);
+        }
+      }
+
+      // Add users with tickets who aren't already in the registered list
+      for (var ticket in ticketsList) {
+        if (!uniqueUserIds.contains(ticket.customerUid)) {
+          uniqueUserIds.add(ticket.customerUid);
+          // Create a registration record for ticket holders
+          allUsers.add(
+            AttendanceModel(
+              id: 'ticket_${ticket.id}',
+              eventId: ticket.eventId,
+              userName: ticket.customerName,
+              customerUid: ticket.customerUid,
+              attendanceDateTime: ticket.issuedDateTime,
+              answers: [],
+              isAnonymous: false,
+              realName: ticket.customerName,
+            ),
+          );
+        }
+      }
+
+      // Get customer details for each user (limit to first 10 for performance)
       List<CustomerModel> customers = [];
-      for (var attendee in preRegisteredList.take(10)) {
+      for (var attendee in allUsers.take(10)) {
         final customer = await FirebaseFirestoreHelper().getSingleCustomer(
           customerId: attendee.customerUid,
         );
@@ -51,7 +88,8 @@ class _PreRegisteredHorizontalListState
       }
 
       setState(() {
-        preRegistered = preRegisteredList;
+        preRegistered = allUsers;
+        eventTickets = ticketsList;
         customerDetails = customers;
         isLoading = false;
       });
@@ -59,7 +97,7 @@ class _PreRegisteredHorizontalListState
       setState(() {
         isLoading = false;
       });
-      print('Error loading pre-registered: $e');
+      print('Error loading registered and ticketed users: $e');
     }
   }
 
@@ -118,7 +156,7 @@ class _PreRegisteredHorizontalListState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Registered',
+                        'Registered & Ticketed',
                         style: const TextStyle(
                           color: Color(0xFF1A1A1A),
                           fontSize: 18,
@@ -127,7 +165,7 @@ class _PreRegisteredHorizontalListState
                         ),
                       ),
                       Text(
-                        '${preRegistered.length} people registered',
+                        '${preRegistered.length} people registered & ticketed',
                         style: const TextStyle(
                           color: Color(0xFF6B7280),
                           fontSize: 14,
@@ -222,23 +260,36 @@ class _PreRegisteredHorizontalListState
                                           Color(0xFF9CA3AF),
                                         ],
                                       )
-                                    : const LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          Color(0xFF667EEA),
-                                          Color(0xFF764BA2),
-                                        ],
-                                      ),
+                                    : (attendee.id.startsWith('ticket_')
+                                          ? const LinearGradient(
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                              colors: [
+                                                Color(0xFFFF9800),
+                                                Color(0xFFFF5722),
+                                              ],
+                                            )
+                                          : const LinearGradient(
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                              colors: [
+                                                Color(0xFF667EEA),
+                                                Color(0xFF764BA2),
+                                              ],
+                                            )),
                                 boxShadow: [
                                   BoxShadow(
                                     color: isAnon
                                         ? const Color(
                                             0xFF6B7280,
                                           ).withOpacity(0.3)
-                                        : const Color(
-                                            0xFF667EEA,
-                                          ).withOpacity(0.3),
+                                        : (attendee.id.startsWith('ticket_')
+                                              ? const Color(
+                                                  0xFFFF9800,
+                                                ).withOpacity(0.3)
+                                              : const Color(
+                                                  0xFF667EEA,
+                                                ).withOpacity(0.3)),
                                     spreadRadius: 0,
                                     blurRadius: 8,
                                     offset: const Offset(0, 4),
@@ -351,7 +402,7 @@ class _PreRegisteredHorizontalListState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'All Registered',
+                            'All Registered & Ticketed',
                             style: const TextStyle(
                               color: Color(0xFF1A1A1A),
                               fontSize: 20,
@@ -360,7 +411,7 @@ class _PreRegisteredHorizontalListState
                             ),
                           ),
                           Text(
-                            '${preRegistered.length} people registered',
+                            '${preRegistered.length} people registered & ticketed',
                             style: const TextStyle(
                               color: Color(0xFF6B7280),
                               fontSize: 14,
@@ -422,23 +473,36 @@ class _PreRegisteredHorizontalListState
                                           Color(0xFF9CA3AF),
                                         ],
                                       )
-                                    : const LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          Color(0xFF667EEA),
-                                          Color(0xFF764BA2),
-                                        ],
-                                      ),
+                                    : (attendee.id.startsWith('ticket_')
+                                          ? const LinearGradient(
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                              colors: [
+                                                Color(0xFFFF9800),
+                                                Color(0xFFFF5722),
+                                              ],
+                                            )
+                                          : const LinearGradient(
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                              colors: [
+                                                Color(0xFF667EEA),
+                                                Color(0xFF764BA2),
+                                              ],
+                                            )),
                                 boxShadow: [
                                   BoxShadow(
                                     color: isAnon
                                         ? const Color(
                                             0xFF6B7280,
                                           ).withOpacity(0.3)
-                                        : const Color(
-                                            0xFF667EEA,
-                                          ).withOpacity(0.3),
+                                        : (attendee.id.startsWith('ticket_')
+                                              ? const Color(
+                                                  0xFFFF9800,
+                                                ).withOpacity(0.3)
+                                              : const Color(
+                                                  0xFF667EEA,
+                                                ).withOpacity(0.3)),
                                     spreadRadius: 0,
                                     blurRadius: 8,
                                     offset: const Offset(0, 4),
@@ -513,13 +577,19 @@ class _PreRegisteredHorizontalListState
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF667EEA).withOpacity(0.1),
+                                color: attendee.id.startsWith('ticket_')
+                                    ? const Color(0xFFFF9800).withOpacity(0.1)
+                                    : const Color(0xFF667EEA).withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                'Registered',
-                                style: const TextStyle(
-                                  color: Color(0xFF667EEA),
+                                attendee.id.startsWith('ticket_')
+                                    ? 'Ticketed'
+                                    : 'Registered',
+                                style: TextStyle(
+                                  color: attendee.id.startsWith('ticket_')
+                                      ? const Color(0xFFFF9800)
+                                      : const Color(0xFF667EEA),
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                   fontFamily: 'Roboto',

@@ -54,10 +54,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   late final double _screenWidth = MediaQuery.of(context).size.width;
   late final double _screenHeight = MediaQuery.of(context).size.height;
   bool? signedIn;
-  bool? registered;
   final _btnCtlr = RoundedLoadingButtonController();
   bool _isAnonymousSignIn = false;
-  bool _isAnonymousPreRegister = false;
   bool _isGettingTicket = false;
   bool _hasTicket = false;
   bool _isCheckingTicket = false;
@@ -78,6 +76,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   }
 
   int preRegisteredCount = 0;
+  int actualAttendanceCount = 0;
+  int usedTicketsCount = 0;
+  bool isLoadingSummary = false;
 
   Future<void> getPreRegisterCount() async {
     await FirebaseFirestoreHelper()
@@ -87,6 +88,49 @@ class _SingleEventScreenState extends State<SingleEventScreen>
             preRegisteredCount = countValue;
           });
         });
+  }
+
+  Future<void> getActualAttendanceCount() async {
+    try {
+      final attendanceList = await FirebaseFirestoreHelper().getAttendance(
+        eventId: eventModel.id,
+      );
+      setState(() {
+        actualAttendanceCount = attendanceList.length;
+      });
+    } catch (e) {
+      print('Error getting actual attendance: $e');
+    }
+  }
+
+  Future<void> getUsedTicketsCount() async {
+    try {
+      final ticketsList = await FirebaseFirestoreHelper().getEventTickets(
+        eventId: eventModel.id,
+      );
+      final usedTickets = ticketsList.where((ticket) => ticket.isUsed).length;
+      setState(() {
+        usedTicketsCount = usedTickets;
+      });
+    } catch (e) {
+      print('Error getting used tickets: $e');
+    }
+  }
+
+  Future<void> loadEventSummary() async {
+    setState(() {
+      isLoadingSummary = true;
+    });
+
+    await Future.wait([
+      getPreRegisterCount(),
+      getActualAttendanceCount(),
+      getUsedTicketsCount(),
+    ]);
+
+    setState(() {
+      isLoadingSummary = false;
+    });
   }
 
   bool isInInRadius(LatLng center, double radiusInFeet, LatLng point) {
@@ -126,17 +170,6 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         _getCurrentLocation();
       }
     });
-  }
-
-  Future<void> getRegisterAttendance() async {
-    await FirebaseFirestoreHelper().checkIfUserIsRegistered(eventModel.id).then(
-      (value) {
-        print('Register Exist value is $value');
-        setState(() {
-          registered = value;
-        });
-      },
-    );
   }
 
   bool isInEventInTime() {
@@ -866,9 +899,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     _slideController.forward();
 
     getAttendance();
-    getRegisterAttendance();
     getPreRegisterCount();
     checkUserTicket();
+    loadEventSummary();
   }
 
   @override
@@ -887,7 +920,6 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     // Refresh attendance data when app becomes active
     if (state == AppLifecycleState.resumed) {
       getAttendance();
-      getRegisterAttendance();
     }
   }
 
@@ -901,7 +933,6 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted) {
           getAttendance();
-          getRegisterAttendance();
         }
       });
     }
@@ -1861,29 +1892,53 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         const SizedBox(height: 16),
 
         // Summary Cards
-        Row(
-          children: [
-            Expanded(
-              child: _buildSummaryCard(
-                icon: Icons.people,
-                title: 'Pre-Registered',
-                value: '$preRegisteredCount',
-                color: const Color(0xFF667EEA),
+        if (isLoadingSummary) ...[
+          Row(
+            children: [
+              Expanded(
+                child: _buildSummaryCard(
+                  icon: Icons.hourglass_empty,
+                  title: 'Loading...',
+                  value: '...',
+                  color: const Color(0xFF6B7280),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildSummaryCard(
-                icon: Icons.confirmation_number,
-                title: 'Tickets',
-                value: eventModel.ticketsEnabled
-                    ? '${eventModel.issuedTickets}/${eventModel.maxTickets}'
-                    : 'Disabled',
-                color: const Color(0xFFFF9800),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildSummaryCard(
+                  icon: Icons.hourglass_empty,
+                  title: 'Loading...',
+                  value: '...',
+                  color: const Color(0xFF6B7280),
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ] else ...[
+          Row(
+            children: [
+              Expanded(
+                child: _buildSummaryCard(
+                  icon: Icons.check_circle,
+                  title: 'Attendance',
+                  value: '$actualAttendanceCount',
+                  color: const Color(0xFF10B981),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildSummaryCard(
+                  icon: Icons.confirmation_number,
+                  title: 'Tickets Used',
+                  value: eventModel.ticketsEnabled
+                      ? '$usedTicketsCount/${eventModel.issuedTickets}'
+                      : 'Disabled',
+                  color: const Color(0xFFFF9800),
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -2420,7 +2475,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                   context,
                                   AddQuestionsToEventScreen(
                                     eventModel: eventModel,
-                                    onBackPressed: () => _showEventManagementModal(),
+                                    onBackPressed: () =>
+                                        _showEventManagementModal(),
                                   ),
                                 );
                               },
@@ -2436,7 +2492,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                   context,
                                   AttendanceSheetScreen(
                                     eventModel: eventModel,
-                                    onBackPressed: () => _showEventManagementModal(),
+                                    onBackPressed: () =>
+                                        _showEventManagementModal(),
                                   ),
                                 );
                               },
@@ -2526,29 +2583,53 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                           title: 'Event Summary',
                           color: const Color(0xFF6B7280),
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _buildSummaryCard(
-                                    icon: Icons.people,
-                                    title: 'Pre-Registered',
-                                    value: '$preRegisteredCount',
-                                    color: const Color(0xFF667EEA),
+                            if (isLoadingSummary) ...[
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildSummaryCard(
+                                      icon: Icons.hourglass_empty,
+                                      title: 'Loading...',
+                                      value: '...',
+                                      color: const Color(0xFF6B7280),
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _buildSummaryCard(
-                                    icon: Icons.confirmation_number,
-                                    title: 'Tickets',
-                                    value: eventModel.ticketsEnabled
-                                        ? '${eventModel.issuedTickets}/${eventModel.maxTickets}'
-                                        : 'Disabled',
-                                    color: const Color(0xFFFF9800),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _buildSummaryCard(
+                                      icon: Icons.hourglass_empty,
+                                      title: 'Loading...',
+                                      value: '...',
+                                      color: const Color(0xFF6B7280),
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
+                                ],
+                              ),
+                            ] else ...[
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildSummaryCard(
+                                      icon: Icons.check_circle,
+                                      title: 'Attendance',
+                                      value: '$actualAttendanceCount',
+                                      color: const Color(0xFF10B981),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _buildSummaryCard(
+                                      icon: Icons.confirmation_number,
+                                      title: 'Tickets Used',
+                                      value: eventModel.ticketsEnabled
+                                          ? '$usedTicketsCount/${eventModel.issuedTickets}'
+                                          : 'Disabled',
+                                      color: const Color(0xFFFF9800),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                         const SizedBox(height: 24),
@@ -2913,9 +2994,13 @@ Join us for an amazing time!
         });
 
         if (ticket != null) {
-          ShowToast().showNormalToast(msg: 'Ticket obtained successfully!');
-          // Refresh ticket status
+          ShowToast().showNormalToast(
+            msg:
+                'Ticket obtained successfully! You are now registered for this event.',
+          );
+          // Refresh ticket status and pre-registered count
           checkUserTicket();
+          getPreRegisterCount();
           // Navigate to MyTicketsScreen to show the new ticket
           Navigator.push(
             context,
@@ -3024,24 +3109,16 @@ Join us for an amazing time!
                   child: _buildTabButton(
                     index: 0,
                     icon: Icons.confirmation_number,
-                    label: 'Tickets',
+                    label: 'Get Ticket',
                     isSelected: _selectedTabIndex == 0,
                   ),
                 ),
                 Expanded(
                   child: _buildTabButton(
                     index: 1,
-                    icon: Icons.how_to_reg,
-                    label: 'Register',
-                    isSelected: _selectedTabIndex == 1,
-                  ),
-                ),
-                Expanded(
-                  child: _buildTabButton(
-                    index: 2,
                     icon: Icons.qr_code_scanner,
                     label: 'Sign In',
-                    isSelected: _selectedTabIndex == 2,
+                    isSelected: _selectedTabIndex == 1,
                   ),
                 ),
               ],
@@ -3119,8 +3196,6 @@ Join us for an amazing time!
       case 0:
         return _buildTicketsTab();
       case 1:
-        return _buildRegisterTab();
-      case 2:
         return _buildSignInTab();
       default:
         return _buildTicketsTab();
@@ -3190,8 +3265,8 @@ Join us for an amazing time!
         // Description
         Text(
           _hasTicket
-              ? 'You have a ticket for this event. Show the QR code to the event host when you arrive.'
-              : 'Get a free ticket for this event. You\'ll receive a QR code to show the event host when you arrive.',
+              ? 'You have a ticket for this event and are pre-registered. Show the QR code to the event host when you arrive.'
+              : 'Get a free ticket for this event. You\'ll be automatically pre-registered and receive a QR code to show the event host when you arrive.',
           style: const TextStyle(
             color: Color(0xFF6B7280),
             fontSize: 14,
@@ -3327,6 +3402,89 @@ Join us for an amazing time!
             ),
           ),
 
+        // Paid Ticket Section (Coming Soon)
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8F9FA),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF667EEA).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.payment,
+                      color: Color(0xFF667EEA),
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Paid Tickets',
+                      style: TextStyle(
+                        color: Color(0xFF1A1A1A),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Premium tickets with additional benefits will be available soon with Stripe integration.',
+                style: TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontSize: 14,
+                  fontFamily: 'Roboto',
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6B7280).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF6B7280), width: 1),
+                ),
+                child: const Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.payment, color: Color(0xFF6B7280), size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Buy Ticket (Coming Soon)',
+                        style: TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
         // Debug button (smaller and less prominent)
         if (!_hasTicket) ...[
           const SizedBox(height: 12),
@@ -3343,188 +3501,6 @@ Join us for an amazing time!
             ),
           ),
         ],
-      ],
-    );
-  }
-
-  Widget _buildRegisterTab() {
-    if (registered == null || registered!) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.check_circle, color: Color(0xFF10B981), size: 48),
-            SizedBox(height: 16),
-            Text(
-              'Already Registered',
-              style: TextStyle(
-                color: Color(0xFF1A1A1A),
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-                fontFamily: 'Roboto',
-              ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'You\'re already registered for this event.',
-              style: TextStyle(
-                color: Color(0xFF6B7280),
-                fontSize: 14,
-                fontFamily: 'Roboto',
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        // Header
-        Row(
-          children: [
-            const Icon(Icons.how_to_reg, color: Color(0xFF667EEA), size: 24),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                'Pre-Register for Event',
-                style: TextStyle(
-                  color: Color(0xFF1A1A1A),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  fontFamily: 'Roboto',
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-
-        // Description
-        const Text(
-          'Let the organizer know you\'re interested in attending this event.',
-          style: TextStyle(
-            color: Color(0xFF6B7280),
-            fontSize: 14,
-            fontFamily: 'Roboto',
-            height: 1.4,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 16),
-
-        // Anonymous Checkbox
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8F9FA),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
-          ),
-          child: Row(
-            children: [
-              Checkbox(
-                value: _isAnonymousPreRegister,
-                onChanged: (value) {
-                  setState(() {
-                    _isAnonymousPreRegister = value ?? false;
-                  });
-                },
-                activeColor: const Color(0xFF667EEA),
-              ),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  'Pre-Register anonymously to public',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    fontFamily: 'Roboto',
-                    color: Color(0xFF1A1A1A),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Register Button
-        Container(
-          width: double.infinity,
-          height: 48,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF667EEA).withOpacity(0.3),
-                spreadRadius: 0,
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () {
-                try {
-                  String docId = FirebaseFirestore.instance
-                      .collection(AttendanceModel.registerFirebaseKey)
-                      .doc()
-                      .id;
-                  AttendanceModel newAttendanceMode = AttendanceModel(
-                    id: docId,
-                    eventId: eventModel.id,
-                    userName: _isAnonymousPreRegister
-                        ? 'Anonymous'
-                        : CustomerController.logeInCustomer!.name,
-                    customerUid: CustomerController.logeInCustomer!.uid,
-                    attendanceDateTime: DateTime.now(),
-                    answers: [],
-                    isAnonymous: _isAnonymousPreRegister,
-                    realName: _isAnonymousPreRegister
-                        ? CustomerController.logeInCustomer!.name
-                        : null,
-                  );
-                  FirebaseFirestore.instance
-                      .collection(AttendanceModel.registerFirebaseKey)
-                      .doc(docId)
-                      .set(newAttendanceMode.toJson())
-                      .then((value) {
-                        ShowToast().showSnackBar(
-                          'Register Successful!',
-                          context,
-                        );
-                        Navigator.pop(context);
-                      });
-                } catch (e) {
-                  ShowToast().showNormalToast(
-                    msg: 'Failed to register. Please try again.',
-                  );
-                }
-              },
-              child: const Center(
-                child: Text(
-                  'Pre-Register',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }
