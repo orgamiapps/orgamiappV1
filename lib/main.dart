@@ -10,6 +10,8 @@ import 'package:orgami/Utils/ErrorBoundary.dart';
 import 'package:orgami/Utils/PerformanceMonitor.dart';
 import 'package:orgami/Utils/ThemeProvider.dart';
 import 'package:orgami/firebase_options.dart';
+import 'package:orgami/Firebase/FirebaseMessagingHelper.dart';
+import 'package:orgami/Services/NotificationService.dart';
 
 /// Comprehensive error handling for GoogleApiManager SecurityException and GMS issues
 class FirebaseErrorHandler {
@@ -361,6 +363,26 @@ Future<void> main() async {
     bool firebaseInitialized = false;
     try {
       firebaseInitialized = await FirebaseErrorHandler.initializeFirebase();
+
+      // Initialize Firebase Messaging if Firebase is initialized
+      if (firebaseInitialized) {
+        try {
+          await FirebaseMessagingHelper().initialize();
+          print('✅ Firebase Messaging initialized successfully');
+        } catch (e) {
+          print('❌ Firebase Messaging initialization failed: $e');
+          // Continue without messaging - app will still work
+        }
+      }
+
+      // Initialize local notification service
+      try {
+        await NotificationService().initialize();
+        print('✅ Local notification service initialized successfully');
+      } catch (e) {
+        print('❌ Local notification service initialization failed: $e');
+        // Continue without local notifications - app will still work
+      }
     } catch (e) {
       print('❌ Firebase initialization crashed: $e');
       // Continue without Firebase - app will run in offline mode

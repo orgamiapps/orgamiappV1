@@ -9,6 +9,7 @@
 
 const {setGlobalOptions} = require("firebase-functions");
 const {onDocumentCreated, onDocumentUpdated} = require("firebase-functions/v2/firestore");
+const {onSchedule} = require("firebase-functions/v2/scheduler");
 const logger = require("firebase-functions/logger");
 
 // Initialize Firebase Admin SDK
@@ -152,8 +153,8 @@ exports.triggerAIInsights = onDocumentUpdated("event_analytics/{docId}",
         logger.info("Checking if AI insights should be generated for event:", eventId);
 
         // Only trigger if there's significant new data
-        const beforeAttendees = beforeData?.totalAttendees || 0;
-        const afterAttendees = afterData?.totalAttendees || 0;
+        const beforeAttendees = (beforeData && beforeData.totalAttendees) || 0;
+        const afterAttendees = (afterData && afterData.totalAttendees) || 0;
 
         if (afterAttendees > beforeAttendees && afterAttendees >= 5) {
           logger.info("Generating AI insights for event:", eventId);
@@ -509,4 +510,523 @@ function analyzeRepeatAttendees(analyticsData, attendees) {
     recommendation,
     confidence: 0.8,
   };
+}
+
+/**
+ * Send scheduled notifications
+ * Runs every minute to check for notifications that need to be sent
+ */
+exports.sendScheduledNotifications = onSchedule({
+  schedule: "every 1 minutes",
+  region: "us-central1",
+}, async (event) => {
+  try {
+    logger.info("Checking for scheduled notifications...");
+    
+    const db = admin.firestore();
+    const now = admin.firestore.Timestamp.now();
+    
+    // Get notifications that are due to be sent
+    const scheduledNotifications = await db.collection("scheduledNotifications")
+      .where("scheduledTime", "<=", now)
+      .where("sent", "==", false)
+      .limit(100)
+      .get();
+
+    if (scheduledNotifications.empty) {
+      logger.info("No scheduled notifications to send");
+      return;
+    }
+
+    const batch = db.batch();
+    const messaging = admin.messaging();
+
+    for (const doc of scheduledNotifications.docs) {
+      const notification = doc.data();
+      
+      try {
+        // Get user's FCM token
+        const userDoc = await db.collection("users").doc(notification.userId).get();
+        if (!userDoc.exists) {
+          logger.warn(`User ${notification.userId} not found, skipping notification`);
+          continue;
+        }
+
+        const userData = userDoc.data();
+        const fcmToken = userData.fcmToken;
+
+        if (!fcmToken) {
+          logger.warn(`No FCM token for user ${notification.userId}`);
+          continue;
+        }
+
+        // Send push notification
+        const message = {
+          token: fcmToken,
+          notification: {
+            title: notification.title,
+            body: notification.body,
+          },
+          data: {
+            type: notification.type,
+            eventId: notification.eventId || "",
+            eventTitle: notification.eventTitle || "",
+            click_action: "FLUTTER_NOTIFICATION_CLICK",
+          },
+          android: {
+            notification: {
+              channelId: "orgami_channel",
+              priority: "high",
+              defaultSound: true,
+              defaultVibrateTimings: true,
+            },
+          },
+          apns: {
+            payload: {
+              aps: {
+                sound: "default",
+                badge: 1,
+              },
+            },
+          },
+        };
+
+        await messaging.send(message);
+        logger.info(`Sent notification to user ${notification.userId}`);
+
+        // Mark as sent
+        batch.update(doc.ref, {
+          sent: true,
+          sentAt: now,
+        });
+
+        // Save to user's notifications collection
+        const userNotificationRef = db.collection("users")
+          .doc(notification.userId)
+          .collection("notifications")
+          .doc();
+
+        batch.set(userNotificationRef, {
+          title: notification.title,
+          body: notification.body,
+          type: notification.type,
+          eventId: notification.eventId,
+          eventTitle: notification.eventTitle,
+          createdAt: now,
+          isRead: false,
+          data: notification.data || {},
+        });
+
+      } catch (error) {
+        logger.error(`Error sending notification ${doc.id}:`, error);
+        
+        // Mark as failed
+        batch.update(doc.ref, {
+          sent: false,
+          error: error.message,
+          retryCount: (notification.retryCount || 0) + 1,
+        });
+      }
+    }
+
+    await batch.commit();
+    logger.info(`Processed ${scheduledNotifications.docs.length} scheduled notifications`);
+
+  } catch (error) {
+    logger.error("Error in sendScheduledNotifications:", error);
+  }
+});
+
+/**
+ * Send event reminder notifications
+ * Triggered when a new event is created or updated
+ */
+exports.sendEventReminders = onDocumentCreated("Events/{eventId}", async (event) => {
+  try {
+    const eventData = event.data.data();
+    const eventId = event.data.id;
+    
+    if (!eventData || !eventData.eventDateTime) {
+      return;
+    }
+
+    const eventTime = eventData.eventDateTime.toDate();
+    const now = new Date();
+    
+    // Only schedule reminders for future events
+    if (eventTime <= now) {
+      return;
+    }
+
+    logger.info(`Scheduling reminders for event ${eventId}`);
+
+    const db = admin.firestore();
+    
+    // Get all users who should receive notifications
+    const usersSnapshot = await db.collection("users").get();
+    
+    for (const userDoc of usersSnapshot.docs) {
+      const userData = userDoc.data();
+      const userId = userDoc.id;
+      
+      // Check user's notification settings
+      const settingsDoc = await db.collection("users")
+        .doc(userId)
+        .collection("notificationSettings")
+        .doc("settings")
+        .get();
+
+      let shouldSendReminder = true;
+      let reminderTime = 60; // Default 1 hour
+
+      if (settingsDoc.exists) {
+        const settings = settingsDoc.data();
+        shouldSendReminder = settings.eventReminders !== false;
+        reminderTime = settings.reminderTime || 60;
+      }
+
+      if (!shouldSendReminder) {
+        continue;
+      }
+
+      // Check if user has a ticket for this event or is the creator
+      const hasTicket = await checkUserHasTicket(userId, eventId, db);
+      const isCreator = eventData.customerUid === userId;
+
+      if (!hasTicket && !isCreator) {
+        continue; // Skip if user has no ticket and is not the creator
+      }
+
+      // Calculate reminder time
+      const reminderDateTime = new Date(eventTime.getTime() - (reminderTime * 60 * 1000));
+      
+      // Only schedule if reminder time is in the future
+      if (reminderDateTime > now) {
+        await db.collection("scheduledNotifications").add({
+          type: "event_reminder",
+          eventId: eventId,
+          eventTitle: eventData.eventTitle || "Event",
+          eventTime: eventData.eventDateTime,
+          scheduledTime: admin.firestore.Timestamp.fromDate(reminderDateTime),
+          title: "Event Reminder",
+          body: `Your event "${eventData.eventTitle || "Event"}" starts in ${reminderTime} minutes`,
+          userId: userId,
+          createdAt: admin.firestore.Timestamp.now(),
+          sent: false,
+        });
+      }
+    }
+
+    logger.info(`Scheduled reminders for event ${eventId}`);
+
+  } catch (error) {
+    logger.error("Error scheduling event reminders:", error);
+  }
+});
+
+/**
+ * Send new event notifications to users within specified distance
+ * Triggered when a new event is created
+ */
+exports.sendNewEventNotifications = onDocumentCreated("Events/{eventId}", async (event) => {
+  try {
+    const eventData = event.data.data();
+    const eventId = event.data.id;
+    
+    if (!eventData || !eventData.eventLocation) {
+      return;
+    }
+
+    logger.info(`Sending new event notifications for event ${eventId}`);
+
+    const db = admin.firestore();
+    const eventLocation = eventData.eventLocation;
+    
+    // Get all users
+    const usersSnapshot = await db.collection("users").get();
+    
+    for (const userDoc of usersSnapshot.docs) {
+      const userData = userDoc.data();
+      const userId = userDoc.id;
+      
+      // Check user's notification settings
+      const settingsDoc = await db.collection("users")
+        .doc(userId)
+        .collection("notificationSettings")
+        .doc("settings")
+        .get();
+
+      let shouldSendNewEventNotification = true;
+      let distance = 15; // Default 15 miles
+
+      if (settingsDoc.exists) {
+        const settings = settingsDoc.data();
+        shouldSendNewEventNotification = settings.newEvents !== false;
+        distance = settings.newEventsDistance || 15;
+      }
+
+      if (!shouldSendNewEventNotification) {
+        continue;
+      }
+
+      // Check if user has location and is within distance
+      if (userData.location && eventLocation) {
+        const userLocation = userData.location;
+        const distanceInKm = calculateDistance(
+          userLocation.latitude, userLocation.longitude,
+          eventLocation.latitude, eventLocation.longitude
+        );
+
+        if (distanceInKm <= distance) {
+          // Send immediate notification
+          await sendNotificationToUser(userId, {
+            type: "new_event",
+            title: "New Event Near You",
+            body: `"${eventData.eventTitle || "Event"}" is happening near you!`,
+            eventId: eventId,
+            eventTitle: eventData.eventTitle || "Event",
+          }, db);
+        }
+      }
+    }
+
+    logger.info(`Sent new event notifications for event ${eventId}`);
+
+  } catch (error) {
+    logger.error("Error sending new event notifications:", error);
+  }
+});
+
+/**
+ * Send ticket update notifications
+ * Triggered when a ticket is created or event is updated
+ */
+exports.sendTicketUpdateNotifications = onDocumentCreated("Tickets/{ticketId}", async (event) => {
+  try {
+    const ticketData = event.data.data();
+    const ticketId = event.data.id;
+    
+    if (!ticketData) {
+      return;
+    }
+
+    const userId = ticketData.customerUid;
+    const eventId = ticketData.eventId;
+
+    logger.info(`Sending ticket update notification for ticket ${ticketId}`);
+
+    const db = admin.firestore();
+    
+    // Check user's notification settings
+    const settingsDoc = await db.collection("users")
+      .doc(userId)
+      .collection("notificationSettings")
+      .doc("settings")
+      .get();
+
+    let shouldSendTicketNotification = true;
+
+    if (settingsDoc.exists) {
+      const settings = settingsDoc.data();
+      shouldSendTicketNotification = settings.ticketUpdates !== false;
+    }
+
+    if (shouldSendTicketNotification) {
+      // Send notification for new ticket
+      await sendNotificationToUser(userId, {
+        type: "ticket_update",
+        title: "Ticket Confirmed",
+        body: `You've successfully registered for "${ticketData.eventTitle || "Event"}"`,
+        eventId: eventId,
+        eventTitle: ticketData.eventTitle || "Event",
+      }, db);
+    }
+
+  } catch (error) {
+    logger.error("Error sending ticket update notification:", error);
+  }
+});
+
+/**
+ * Send event update notifications
+ * Triggered when an event is updated
+ */
+exports.sendEventUpdateNotifications = onDocumentUpdated("Events/{eventId}", async (event) => {
+  try {
+    const beforeData = event.data.before.data();
+    const afterData = event.data.after.data();
+    const eventId = event.data.id;
+    
+    if (!beforeData || !afterData) {
+      return;
+    }
+
+    // Check if important fields have changed
+    const hasLocationChanged = JSON.stringify(beforeData.eventLocation) !== JSON.stringify(afterData.eventLocation);
+    const hasDateTimeChanged = beforeData.eventDateTime.toDate().getTime() !== afterData.eventDateTime.toDate().getTime();
+    const hasTitleChanged = beforeData.eventTitle !== afterData.eventTitle;
+
+    if (!hasLocationChanged && !hasDateTimeChanged && !hasTitleChanged) {
+      return; // No important changes
+    }
+
+    logger.info(`Sending event update notifications for event ${eventId}`);
+
+    const db = admin.firestore();
+    
+    // Get all users who have tickets for this event
+    const ticketsSnapshot = await db.collection("Tickets")
+      .where("eventId", "==", eventId)
+      .get();
+
+    for (const ticketDoc of ticketsSnapshot.docs) {
+      const ticketData = ticketDoc.data();
+      const userId = ticketData.customerUid;
+      
+      // Check user's notification settings
+      const settingsDoc = await db.collection("users")
+        .doc(userId)
+        .collection("notificationSettings")
+        .doc("settings")
+        .get();
+
+      let shouldSendTicketNotification = true;
+
+      if (settingsDoc.exists) {
+        const settings = settingsDoc.data();
+        shouldSendTicketNotification = settings.ticketUpdates !== false;
+      }
+
+      if (shouldSendTicketNotification) {
+        let updateMessage = "Event details have been updated";
+        if (hasLocationChanged) {
+          updateMessage = "Event location has changed";
+        } else if (hasDateTimeChanged) {
+          updateMessage = "Event date/time has changed";
+        } else if (hasTitleChanged) {
+          updateMessage = "Event title has been updated";
+        }
+
+        await sendNotificationToUser(userId, {
+          type: "ticket_update",
+          title: "Event Updated",
+          body: `${updateMessage}: "${afterData.eventTitle || "Event"}"`,
+          eventId: eventId,
+          eventTitle: afterData.eventTitle || "Event",
+        }, db);
+      }
+    }
+
+    logger.info(`Sent event update notifications for event ${eventId}`);
+
+  } catch (error) {
+    logger.error("Error sending event update notifications:", error);
+  }
+});
+
+/**
+ * Helper function to check if user has a ticket for an event
+ */
+async function checkUserHasTicket(userId, eventId, db) {
+  try {
+    const ticketQuery = await db.collection("Tickets")
+      .where("customerUid", "==", userId)
+      .where("eventId", "==", eventId)
+      .limit(1)
+      .get();
+    
+    return !ticketQuery.empty;
+  } catch (error) {
+    logger.error("Error checking user ticket:", error);
+    return false;
+  }
+}
+
+/**
+ * Helper function to calculate distance between two points
+ */
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+/**
+ * Helper function to send notification to user
+ */
+async function sendNotificationToUser(userId, notificationData, db) {
+  try {
+    // Get user's FCM token
+    const userDoc = await db.collection("users").doc(userId).get();
+    if (!userDoc.exists) {
+      logger.warn(`User ${userId} not found`);
+      return;
+    }
+
+    const userData = userDoc.data();
+    const fcmToken = userData.fcmToken;
+
+    if (!fcmToken) {
+      logger.warn(`No FCM token for user ${userId}`);
+      return;
+    }
+
+    // Send push notification
+    const messaging = admin.messaging();
+    const message = {
+      token: fcmToken,
+      notification: {
+        title: notificationData.title,
+        body: notificationData.body,
+      },
+      data: {
+        type: notificationData.type,
+        eventId: notificationData.eventId || "",
+        eventTitle: notificationData.eventTitle || "",
+        click_action: "FLUTTER_NOTIFICATION_CLICK",
+      },
+      android: {
+        notification: {
+          channelId: "orgami_channel",
+          priority: "high",
+          defaultSound: true,
+          defaultVibrateTimings: true,
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: "default",
+            badge: 1,
+          },
+        },
+      },
+    };
+
+    await messaging.send(message);
+    logger.info(`Sent notification to user ${userId}`);
+
+    // Save to user's notifications collection
+    await db.collection("users")
+      .doc(userId)
+      .collection("notifications")
+      .add({
+        title: notificationData.title,
+        body: notificationData.body,
+        type: notificationData.type,
+        eventId: notificationData.eventId,
+        eventTitle: notificationData.eventTitle,
+        createdAt: admin.firestore.Timestamp.now(),
+        isRead: false,
+        data: notificationData.data || {},
+      });
+
+  } catch (error) {
+    logger.error(`Error sending notification to user ${userId}:`, error);
+  }
 }
