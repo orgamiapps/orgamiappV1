@@ -1529,7 +1529,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                     ),
                     const SizedBox(width: 12),
                     Tooltip(
-                      message: 'Share QR Code & Event ID',
+                      message: 'Share Event',
                       child: GestureDetector(
                         onTap: () => _showQuickShareOptions(),
                         child: Container(
@@ -1544,7 +1544,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                             ),
                           ),
                           child: const Icon(
-                            Icons.qr_code_2_rounded,
+                            Icons.share_rounded,
                             color: Colors.white,
                             size: 20,
                           ),
@@ -1552,6 +1552,31 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                       ),
                     ),
                   ],
+                )
+              else
+                // Share button for non-creators
+                Tooltip(
+                  message: 'Share Event',
+                  child: GestureDetector(
+                    onTap: () => _shareEventDetails(),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.share_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -1852,9 +1877,15 @@ class _SingleEventScreenState extends State<SingleEventScreen>
             ),
           ),
           const SizedBox(height: 20),
-          // Feedback Button (for attendees only)
+          // Share and Feedback Buttons (for attendees only)
           if (eventModel.customerUid != FirebaseAuth.instance.currentUser!.uid)
-            _buildFeedbackButton(),
+            Column(
+              children: [
+                _buildShareEventButton(),
+                const SizedBox(height: 16),
+                _buildFeedbackButton(),
+              ],
+            ),
         ],
       ),
     );
@@ -1903,6 +1934,69 @@ class _SingleEventScreenState extends State<SingleEventScreen>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildShareEventButton() {
+    return GestureDetector(
+      onTap: () => _shareEventDetails(),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF10B981).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF10B981), width: 1),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.share_rounded,
+                color: Color(0xFF10B981),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 16),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Share This Event',
+                    style: TextStyle(
+                      color: Color(0xFF1A1A1A),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Share this event with friends and family',
+                    style: TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontSize: 14,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios,
+              color: Color(0xFF6B7280),
+              size: 16,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -3181,6 +3275,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   }
 
   void _showQuickShareOptions() {
+    final bool isCreator =
+        eventModel.customerUid == FirebaseAuth.instance.currentUser!.uid;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -3222,40 +3319,47 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Column(
                   children: [
-                    _buildShareOption(
-                      icon: Icons.qr_code_2_rounded,
-                      title: 'Share QR Code & Event ID',
-                      subtitle: 'Generate QR code with event identifier',
-                      onTap: () {
-                        Navigator.pop(context);
-                        showDialog(
-                          context: context,
-                          barrierDismissible: true,
-                          builder: (context) =>
-                              ShareQRDialog(singleEvent: eventModel),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
+                    if (isCreator) ...[
+                      _buildShareOption(
+                        icon: Icons.qr_code_2_rounded,
+                        title: 'Share QR Code & Event ID',
+                        subtitle:
+                            'Generate QR code with event identifier (Creator Only)',
+                        onTap: () {
+                          Navigator.pop(context);
+                          showDialog(
+                            context: context,
+                            barrierDismissible: true,
+                            builder: (context) =>
+                                ShareQRDialog(singleEvent: eventModel),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     _buildShareOption(
                       icon: Icons.share_rounded,
                       title: 'Share Event Details',
-                      subtitle: 'Share event information',
+                      subtitle: isCreator
+                          ? 'Share event information with others'
+                          : 'Share this event with friends',
                       onTap: () {
                         Navigator.pop(context);
                         _shareEventDetails();
                       },
                     ),
-                    const SizedBox(height: 16),
-                    _buildShareOption(
-                      icon: Icons.copy_rounded,
-                      title: 'Copy Event ID',
-                      subtitle: 'Copy event identifier to clipboard',
-                      onTap: () {
-                        Navigator.pop(context);
-                        _copyEventId();
-                      },
-                    ),
+                    if (!isCreator) ...[
+                      const SizedBox(height: 16),
+                      _buildShareOption(
+                        icon: Icons.copy_rounded,
+                        title: 'Copy Event ID',
+                        subtitle: 'Copy event identifier to clipboard',
+                        onTap: () {
+                          Navigator.pop(context);
+                          _copyEventId();
+                        },
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -3331,8 +3435,11 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
   void _shareEventDetails() {
     HapticFeedback.lightImpact();
-    final eventDetails =
-        '''
+    final bool isCreator =
+        eventModel.customerUid == FirebaseAuth.instance.currentUser!.uid;
+
+    final eventDetails = isCreator
+        ? '''
 🎉 Join my event!
 
 📅 Event: ${eventModel.title}
@@ -3341,12 +3448,24 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 📝 Description: ${eventModel.description}
 
 Join us for an amazing time!
-    '''
-            .trim();
+        '''
+              .trim()
+        : '''
+🎉 Check out this event!
+
+📅 Event: ${eventModel.title}
+📍 Location: ${eventModel.location}
+📝 Description: ${eventModel.description}
+
+This looks like a great event!
+        '''
+              .trim();
 
     Share.share(
       eventDetails,
-      subject: 'Event Invitation - ${eventModel.title}',
+      subject: isCreator
+          ? 'Event Invitation - ${eventModel.title}'
+          : 'Event Recommendation - ${eventModel.title}',
     );
   }
 
