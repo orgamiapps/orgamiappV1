@@ -10,6 +10,13 @@ class AttendanceModel {
   DateTime attendanceDateTime;
   List<String> answers;
   bool isAnonymous;
+  
+  // Dwell time tracking fields
+  DateTime? entryTimestamp;
+  DateTime? exitTimestamp;
+  Duration? dwellTime;
+  String? dwellStatus; // 'active', 'completed', 'auto-stopped', 'manual-stopped'
+  String? dwellNotes; // For notes like 'Auto-stopped', 'Manual check-out', etc.
 
   AttendanceModel({
     required this.id,
@@ -20,6 +27,11 @@ class AttendanceModel {
     required this.answers,
     this.isAnonymous = false,
     this.realName,
+    this.entryTimestamp,
+    this.exitTimestamp,
+    this.dwellTime,
+    this.dwellStatus,
+    this.dwellNotes,
   });
 
   factory AttendanceModel.fromJson(dynamic parsedJson) {
@@ -37,6 +49,17 @@ class AttendanceModel {
       answers: List<String>.from(data['answers']),
       isAnonymous: data['isAnonymous'] ?? false,
       realName: data['realName'],
+      entryTimestamp: data['entryTimestamp'] != null 
+          ? (data['entryTimestamp'] as Timestamp).toDate() 
+          : null,
+      exitTimestamp: data['exitTimestamp'] != null 
+          ? (data['exitTimestamp'] as Timestamp).toDate() 
+          : null,
+      dwellTime: data['dwellTime'] != null 
+          ? Duration(milliseconds: data['dwellTime'])
+          : null,
+      dwellStatus: data['dwellStatus'],
+      dwellNotes: data['dwellNotes'],
     );
   }
 
@@ -51,7 +74,53 @@ class AttendanceModel {
     data['answers'] = answers;
     data['isAnonymous'] = isAnonymous;
     if (realName != null) data['realName'] = realName;
+    
+    // Dwell time fields
+    if (entryTimestamp != null) data['entryTimestamp'] = Timestamp.fromDate(entryTimestamp!);
+    if (exitTimestamp != null) data['exitTimestamp'] = Timestamp.fromDate(exitTimestamp!);
+    if (dwellTime != null) data['dwellTime'] = dwellTime!.inMilliseconds;
+    if (dwellStatus != null) data['dwellStatus'] = dwellStatus;
+    if (dwellNotes != null) data['dwellNotes'] = dwellNotes;
 
     return data;
+  }
+  
+  /// Returns formatted dwell time string (e.g., "2h 30m")
+  String get formattedDwellTime {
+    if (dwellTime == null) return '';
+    
+    final hours = dwellTime!.inHours;
+    final minutes = dwellTime!.inMinutes % 60;
+    
+    if (hours > 0) {
+      return '${hours}h ${minutes}m';
+    } else {
+      return '${minutes}m';
+    }
+  }
+  
+  /// Returns true if dwell tracking is active
+  bool get isDwellActive => dwellStatus == 'active';
+  
+  /// Returns true if dwell tracking is completed
+  bool get isDwellCompleted => dwellStatus == 'completed' || 
+                              dwellStatus == 'auto-stopped' || 
+                              dwellStatus == 'manual-stopped';
+  
+  /// Returns the tracking state for visual indicators
+  /// 'active' = green circle (actively tracking)
+  /// 'completed' = red circle (finished tracking)
+  /// 'pending' = grey circle (left but grace period not expired)
+  /// 'none' = no circle (no tracking data)
+  String get trackingState {
+    if (dwellStatus == 'active') return 'active';
+    if (dwellStatus == 'completed' || dwellStatus == 'auto-stopped' || dwellStatus == 'manual-stopped') {
+      return 'completed';
+    }
+    if (entryTimestamp != null && exitTimestamp == null) {
+      // Has entry but no exit - might be in grace period
+      return 'pending';
+    }
+    return 'none';
   }
 }

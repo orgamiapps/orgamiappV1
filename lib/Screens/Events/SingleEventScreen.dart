@@ -10,6 +10,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:orgami/Controller/CustomerController.dart';
+import 'package:orgami/Firebase/DwellTimeTracker.dart';
 import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Models/AttendanceModel.dart';
 import 'package:orgami/Models/EventModel.dart';
@@ -64,6 +65,13 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   int _selectedTabIndex = 0;
   final TextEditingController _codeController = TextEditingController();
   // _isLoading removed - no longer needed after removing manual code input
+
+  // Dwell time tracking variables
+  final DwellTimeTracker _dwellTracker = DwellTimeTracker();
+  bool _isDwellTrackingActive = false;
+  String _dwellStatusMessage = '';
+  bool _hasShownPrivacyDialog = false;
+  AttendanceModel? _currentAttendance;
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -169,7 +177,240 @@ class _SingleEventScreenState extends State<SingleEventScreen>
           isInEventInTime()) {
         _getCurrentLocation();
       }
+
+      // Check dwell tracking status if user is signed in
+      if (signedIn! && CustomerController.logeInCustomer != null) {
+        _checkDwellTrackingStatus();
+      }
     });
+  }
+
+  /// Checks if dwell tracking is active for the current user
+  Future<void> _checkDwellTrackingStatus() async {
+    if (CustomerController.logeInCustomer == null) return;
+
+    try {
+      final attendanceList = await FirebaseFirestoreHelper().getAttendance(
+        eventId: eventModel.id,
+      );
+
+      final userAttendance = attendanceList.firstWhere(
+        (attendance) =>
+            attendance.customerUid == CustomerController.logeInCustomer!.uid,
+        orElse: () => AttendanceModel(
+          id: '',
+          userName: '',
+          eventId: '',
+          customerUid: '',
+          attendanceDateTime: DateTime.now(),
+          answers: [],
+        ),
+      );
+
+      if (mounted) {
+        setState(() {
+          _currentAttendance = userAttendance.id.isNotEmpty
+              ? userAttendance
+              : null;
+          _isDwellTrackingActive = userAttendance.isDwellActive;
+        });
+      }
+    } catch (e) {
+      print('Error checking dwell tracking status: $e');
+    }
+  }
+
+  /// Shows privacy opt-in dialog for dwell tracking
+  void _showPrivacyDialog() {
+    if (_hasShownPrivacyDialog) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.0),
+          ),
+          title: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.location_on,
+                  color: Color(0xFF667EEA),
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Enable Dwell Tracking',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'This event uses location tracking to measure your time at the venue.',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontFamily: 'Roboto',
+                  height: 1.4,
+                ),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'What we track:',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                '• Entry and exit times\n'
+                '• Total time spent at the event\n'
+                '• Location within 200 feet of venue\n'
+                '• Auto-stop when event ends',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontFamily: 'Roboto',
+                  height: 1.4,
+                ),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Privacy:',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                '• Data is only visible to event organizers\n'
+                '• Tracking stops automatically\n'
+                '• You can manually stop tracking anytime',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontFamily: 'Roboto',
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                setState(() {
+                  _hasShownPrivacyDialog = true;
+                });
+              },
+              child: const Text(
+                'Decline',
+                style: TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _startDwellTracking();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF667EEA),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Enable Tracking',
+                style: TextStyle(color: Colors.white, fontFamily: 'Roboto'),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Starts dwell time tracking
+  Future<void> _startDwellTracking() async {
+    if (CustomerController.logeInCustomer == null) {
+      ShowToast().showNormalToast(
+        msg: 'Please log in to enable dwell tracking',
+      );
+      return;
+    }
+
+    try {
+      await _dwellTracker.startDwellTracking(
+        eventId: eventModel.id,
+        customerUid: CustomerController.logeInCustomer!.uid,
+        eventModel: eventModel,
+        onStatusUpdate: (String status) {
+          if (mounted) {
+            setState(() {
+              _dwellStatusMessage = status;
+            });
+          }
+        },
+      );
+
+      if (mounted) {
+        setState(() {
+          _isDwellTrackingActive = true;
+          _hasShownPrivacyDialog = true;
+        });
+      }
+
+      ShowToast().showNormalToast(msg: 'Dwell tracking started');
+    } catch (e) {
+      ShowToast().showNormalToast(msg: 'Failed to start dwell tracking: $e');
+    }
+  }
+
+  /// Stops dwell time tracking
+  Future<void> _stopDwellTracking() async {
+    if (CustomerController.logeInCustomer == null) return;
+
+    try {
+      await _dwellTracker.stopDwellTracking(
+        eventId: eventModel.id,
+        customerUid: CustomerController.logeInCustomer!.uid,
+        notes: 'Manual check-out',
+      );
+
+      if (mounted) {
+        setState(() {
+          _isDwellTrackingActive = false;
+          _dwellStatusMessage = '';
+        });
+      }
+
+      ShowToast().showNormalToast(msg: 'Dwell tracking stopped');
+    } catch (e) {
+      ShowToast().showNormalToast(msg: 'Failed to stop dwell tracking: $e');
+    }
   }
 
   bool isInEventInTime() {
@@ -461,6 +702,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         realName: _isAnonymousSignIn
             ? CustomerController.logeInCustomer!.name
             : null,
+        entryTimestamp: eventModel.getLocation ? DateTime.now() : null,
+        dwellStatus: eventModel.getLocation ? 'active' : null,
+        dwellNotes: eventModel.getLocation ? 'Geofence entry detected' : null,
       );
 
       print('Attendance model created: ${newAttendanceModel.toJson()}');
@@ -522,6 +766,15 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         setState(() {
           // Trigger a rebuild to show the updated UI
         });
+
+        // Show privacy dialog for dwell tracking if event has location enabled
+        if (eventModel.getLocation && !_hasShownPrivacyDialog) {
+          Future.delayed(const Duration(seconds: 4), () {
+            if (mounted) {
+              _showPrivacyDialog();
+            }
+          });
+        }
       });
     } catch (firestoreError) {
       print('Firestore error during sign-in: $firestoreError');
@@ -911,6 +1164,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
     _fadeController.dispose();
     _slideController.dispose();
+
+    // Dispose dwell tracker
+    _dwellTracker.dispose();
+
     super.dispose();
   }
 
@@ -1339,6 +1596,12 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
             // Comments Section (for everyone)
             CommentsSection(eventModel: eventModel),
+            const SizedBox(height: 24),
+
+            // Dwell Tracking Section (for signed-in users)
+            if (signedIn == true && CustomerController.logeInCustomer != null)
+              _buildDwellTrackingSection(),
+
             const SizedBox(height: 140), // Increased space for bottom buttons
           ],
         ),
@@ -3640,4 +3903,306 @@ Join us for an amazing time!
   }
 
   // _signInWithCode method removed - functionality now handled by QRScannerFlowScreen
+
+  /// Builds the dwell tracking section UI
+  Widget _buildDwellTrackingSection() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            spreadRadius: 0,
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.timer,
+                  color: Color(0xFF667EEA),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Text(
+                  'Dwell Time Tracking',
+                  style: TextStyle(
+                    color: Color(0xFF1A1A1A),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 18,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Status and Controls
+          if (_isDwellTrackingActive) ...[
+            // Active tracking status
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF10B981).withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on,
+                        color: Color(0xFF10B981),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Tracking Active',
+                        style: TextStyle(
+                          color: Color(0xFF10B981),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_dwellStatusMessage.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _dwellStatusMessage,
+                      style: const TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontSize: 14,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Check Out button
+            Container(
+              width: double.infinity,
+              height: 48,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFFFF5722), Color(0xFFE91E63)],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFF5722).withOpacity(0.3),
+                    spreadRadius: 0,
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: _stopDwellTracking,
+                  child: const Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.logout, color: Colors.white, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Check Out',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ] else if (_currentAttendance?.isDwellCompleted == true) ...[
+            // Completed tracking display
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF6B7280).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF6B7280).withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.check_circle,
+                        color: Color(0xFF6B7280),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Tracking Completed',
+                        style: TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_currentAttendance?.formattedDwellTime.isNotEmpty ==
+                      true) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Dwell Time: ${_currentAttendance!.formattedDwellTime}',
+                      style: const TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontSize: 14,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
+                  if (_currentAttendance?.dwellNotes != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Note: ${_currentAttendance!.dwellNotes}',
+                      style: const TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontSize: 12,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ] else ...[
+            // Enable tracking option
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF667EEA).withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Track your time at this event',
+                    style: TextStyle(
+                      color: Color(0xFF1A1A1A),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Enable location tracking to automatically measure your time spent at the event venue.',
+                    style: TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontSize: 14,
+                      fontFamily: 'Roboto',
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF667EEA).withOpacity(0.3),
+                          spreadRadius: 0,
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: _showPrivacyDialog,
+                        child: const Center(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Enable Tracking',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  fontFamily: 'Roboto',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }

@@ -19,6 +19,7 @@ class EventModel {
   bool ticketsEnabled;
   int maxTickets;
   int issuedTickets;
+  int eventDuration; // Duration in hours
 
   LatLng getLatLngOfEvent() {
     return LatLng(latitude, longitude);
@@ -46,6 +47,7 @@ class EventModel {
     this.ticketsEnabled = false,
     this.maxTickets = 0,
     this.issuedTickets = 0,
+    this.eventDuration = 2, // Default 2 hours
   });
 
   factory EventModel.fromJson(dynamic parsedJson) {
@@ -81,6 +83,7 @@ class EventModel {
       ticketsEnabled: data['ticketsEnabled'] ?? false,
       maxTickets: data['maxTickets'] ?? 0,
       issuedTickets: data['issuedTickets'] ?? 0,
+      eventDuration: data['eventDuration'] ?? 2,
     );
   }
 
@@ -108,6 +111,12 @@ class EventModel {
 
   /// Returns the raw ID without formatting
   String get rawId => id;
+  
+  /// Returns the event end time based on selectedDateTime + eventDuration
+  DateTime get eventEndTime => selectedDateTime.add(Duration(hours: eventDuration));
+  
+  /// Returns the dwell tracking end time (event end + 1 hour buffer)
+  DateTime get dwellTrackingEndTime => eventEndTime.add(const Duration(hours: 1));
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
@@ -133,6 +142,7 @@ class EventModel {
     data['ticketsEnabled'] = ticketsEnabled;
     data['maxTickets'] = maxTickets;
     data['issuedTickets'] = issuedTickets;
+    data['eventDuration'] = eventDuration;
     return data;
   }
 }
