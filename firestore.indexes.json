@@ -63,6 +63,22 @@
         { "fieldPath": "eventId", "order": "ASCENDING" },
         { "fieldPath": "customerUid", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "Customers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isDiscoverable", "order": "ASCENDING" },
+        { "fieldPath": "name", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "Customers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "username", "order": "ASCENDING" },
+        { "fieldPath": "isDiscoverable", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

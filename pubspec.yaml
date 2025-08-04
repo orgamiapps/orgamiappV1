@@ -40,7 +40,7 @@ dependencies:
   dotted_border: ^2.1.0
   image_picker: ^1.0.5
   firebase_ui_firestore: ^1.5.15
-  cached_network_image: ^3.3.0
+  cached_network_image: ^3.3.1
   flashy_tab_bar2: ^0.0.10
   qr_code_scanner_plus: ^2.0.9+1
   qr_flutter: ^4.1.0

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:orgami/Controller/CustomerController.dart';
+import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Models/CustomerModel.dart';
 import 'package:orgami/Utils/AppAppBarView.dart';
 import 'package:orgami/Utils/AppConstants.dart';
@@ -32,7 +33,10 @@ class _SignupScreenState extends State<SignupScreen>
   final TextEditingController _userNameEdtController = TextEditingController();
   final TextEditingController _emailEdtController = TextEditingController();
   final TextEditingController _passwordEdtController = TextEditingController();
-  final TextEditingController _confirmPasswordEdtController = TextEditingController();
+  final TextEditingController _confirmPasswordEdtController =
+      TextEditingController();
+  final TextEditingController _usernameController =
+      TextEditingController(); // New username controller
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _ageController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
@@ -48,6 +52,7 @@ class _SignupScreenState extends State<SignupScreen>
   bool _isEmailFocused = false;
   bool _isPasswordFocused = false;
   bool _isConfirmPasswordFocused = false;
+  bool _isUsernameFocused = false; // New username focus state
   bool _isPhoneFocused = false;
   bool _isAgeFocused = false;
   bool _isLocationFocused = false;
@@ -55,9 +60,14 @@ class _SignupScreenState extends State<SignupScreen>
   bool _isCompanyFocused = false;
   bool _isWebsiteFocused = false;
   bool _isBioFocused = false;
-  
+
   String? _selectedGender;
-  final List<String> _genderOptions = ['Male', 'Female', 'Other', 'Prefer not to say'];
+  final List<String> _genderOptions = [
+    'Male',
+    'Female',
+    'Other',
+    'Prefer not to say',
+  ];
 
   late AnimationController logoAnimation;
   late Animation<double> fadeAnimation;
@@ -75,18 +85,41 @@ class _SignupScreenState extends State<SignupScreen>
             .createUserWithEmailAndPassword(email: email, password: password)
             .then((newCreatedCustomer) async {
               if (newCreatedCustomer.user != null) {
+                // Generate username from full name
+                String username = _usernameController.text.trim().isNotEmpty
+                    ? _usernameController.text.trim().toLowerCase()
+                    : await FirebaseFirestoreHelper().generateUniqueUsername(
+                        name,
+                      );
+
                 CustomerModel newCustomerModel = CustomerModel(
                   uid: newCreatedCustomer.user!.uid,
                   name: name,
                   email: email,
-                  phoneNumber: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
-                  age: _ageController.text.trim().isEmpty ? null : int.tryParse(_ageController.text.trim()),
+                  username: username, // Add username
+                  phoneNumber: _phoneController.text.trim().isEmpty
+                      ? null
+                      : _phoneController.text.trim(),
+                  age: _ageController.text.trim().isEmpty
+                      ? null
+                      : int.tryParse(_ageController.text.trim()),
                   gender: _selectedGender,
-                  location: _locationController.text.trim().isEmpty ? null : _locationController.text.trim(),
-                  occupation: _occupationController.text.trim().isEmpty ? null : _occupationController.text.trim(),
-                  company: _companyController.text.trim().isEmpty ? null : _companyController.text.trim(),
-                  website: _websiteController.text.trim().isEmpty ? null : _websiteController.text.trim(),
-                  bio: _bioController.text.trim().isEmpty ? null : _bioController.text.trim(),
+                  location: _locationController.text.trim().isEmpty
+                      ? null
+                      : _locationController.text.trim(),
+                  occupation: _occupationController.text.trim().isEmpty
+                      ? null
+                      : _occupationController.text.trim(),
+                  company: _companyController.text.trim().isEmpty
+                      ? null
+                      : _companyController.text.trim(),
+                  website: _websiteController.text.trim().isEmpty
+                      ? null
+                      : _websiteController.text.trim(),
+                  bio: _bioController.text.trim().isEmpty
+                      ? null
+                      : _bioController.text.trim(),
+                  isDiscoverable: true, // Default to discoverable for new users
                   createdAt: DateTime.now(),
                 );
 
@@ -94,7 +127,11 @@ class _SignupScreenState extends State<SignupScreen>
                     .collection(CustomerModel.firebaseKey)
                     .doc(newCustomerModel.uid)
                     .set(CustomerModel.getMap(newCustomerModel))
-                    .then((value) {
+                    .then((value) async {
+                      // Ensure user profile has all required fields
+                      await FirebaseFirestoreHelper()
+                          .ensureUserProfileCompleteness(newCustomerModel.uid);
+
                       ShowToast().showNormalToast(
                         msg: 'Welcome to ${AppConstants.appName}',
                       );
@@ -275,11 +312,17 @@ class _SignupScreenState extends State<SignupScreen>
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Required Fields Section
-            _buildSectionHeader('Required Information', Icons.star, Colors.orange),
+            _buildSectionHeader(
+              'Required Information',
+              Icons.star,
+              Colors.orange,
+            ),
             const SizedBox(height: 16),
             _buildNameField(),
+            const SizedBox(height: 20),
+            _buildUsernameField(),
             const SizedBox(height: 20),
             _buildEmailField(),
             const SizedBox(height: 20),
@@ -287,9 +330,13 @@ class _SignupScreenState extends State<SignupScreen>
             const SizedBox(height: 20),
             _buildConfirmPasswordField(),
             const SizedBox(height: 32),
-            
+
             // Optional Fields Section
-            _buildSectionHeader('Additional Information (Optional)', Icons.info_outline, AppThemeColor.darkBlueColor),
+            _buildSectionHeader(
+              'Additional Information (Optional)',
+              Icons.info_outline,
+              AppThemeColor.darkBlueColor,
+            ),
             const SizedBox(height: 16),
             _buildPhoneField(),
             const SizedBox(height: 20),
@@ -307,7 +354,7 @@ class _SignupScreenState extends State<SignupScreen>
             const SizedBox(height: 20),
             _buildBioField(),
             const SizedBox(height: 32),
-            
+
             _buildSignupButton(),
           ],
         ),
@@ -440,6 +487,93 @@ class _SignupScreenState extends State<SignupScreen>
     );
   }
 
+  Widget _buildUsernameField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Username',
+          style: TextStyle(
+            color: AppThemeColor.darkBlueColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Focus(
+          onFocusChange: (hasFocus) {
+            setState(() {
+              _isUsernameFocused = hasFocus;
+            });
+          },
+          child: TextFormField(
+            controller: _usernameController,
+            keyboardType: TextInputType.text,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9_]')),
+              LengthLimitingTextInputFormatter(20),
+            ],
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+            decoration: InputDecoration(
+              hintText: 'Choose a username (optional)',
+              hintStyle: TextStyle(
+                color: AppThemeColor.lightGrayColor,
+                fontSize: 16,
+              ),
+              filled: true,
+              fillColor: _isUsernameFocused
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
+                  : Colors.grey.withOpacity(0.05),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: AppThemeColor.darkBlueColor,
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+              prefixIcon: Icon(
+                Icons.alternate_email,
+                color: _isUsernameFocused
+                    ? AppThemeColor.darkBlueColor
+                    : AppThemeColor.lightGrayColor,
+                size: 20,
+              ),
+            ),
+            validator: (value) {
+              if (value != null && value.isNotEmpty) {
+                if (value.length < 3) {
+                  return 'Username must be at least 3 characters';
+                }
+                if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value)) {
+                  return 'Username can only contain letters, numbers, and underscores';
+                }
+              }
+              return null;
+            },
+            onChanged: (value) {
+              // Convert to lowercase as user types
+              if (value.isNotEmpty && value != value.toLowerCase()) {
+                final cursorPosition = _usernameController.selection.start;
+                _usernameController.value = TextEditingValue(
+                  text: value.toLowerCase(),
+                  selection: TextSelection.collapsed(offset: cursorPosition),
+                );
+              }
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildEmailField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -500,7 +634,9 @@ class _SignupScreenState extends State<SignupScreen>
               if (value == null || value.isEmpty) {
                 return 'Please enter your email';
               }
-              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+              if (!RegExp(
+                r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+              ).hasMatch(value)) {
                 return 'Please enter a valid email address';
               }
               return null;
@@ -1195,9 +1331,7 @@ class _SignupScreenState extends State<SignupScreen>
                 ),
               ),
             ),
-            inputFormatters: [
-              LengthLimitingTextInputFormatter(200),
-            ],
+            inputFormatters: [LengthLimitingTextInputFormatter(200)],
           ),
         ),
       ],

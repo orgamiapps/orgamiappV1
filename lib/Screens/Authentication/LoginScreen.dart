@@ -48,7 +48,10 @@ class _LoginScreenState extends State<LoginScreen>
             if (signInCustomer.user != null) {
               FirebaseFirestoreHelper()
                   .getSingleCustomer(customerId: signInCustomer.user!.uid)
-                  .then((fireStoreCustomer) {
+                  .then((fireStoreCustomer) async {
+                    // Ensure user profile has all required fields
+                    await FirebaseFirestoreHelper().ensureUserProfileCompleteness(signInCustomer.user!.uid);
+                    
                     setState(() {
                       CustomerController.logeInCustomer = fireStoreCustomer;
                     });

@@ -18,6 +18,7 @@ import 'package:orgami/Models/EventQuestionModel.dart';
 import 'package:orgami/Screens/Events/AddQuestionsToEventScreen.dart';
 import 'package:orgami/Screens/Events/Attendance/AttendanceSheetScreen.dart';
 import 'package:orgami/Screens/Events/Widget/AttendeesHorizontalList.dart';
+import 'package:orgami/Screens/Events/Widget/CoHostManagementWidget.dart';
 import 'package:orgami/Screens/Events/Widget/PreRegisteredHorizontalList.dart';
 import 'package:orgami/Screens/Events/Widget/CommentsSection.dart';
 // DeleteEventDialouge import removed - no longer needed in SingleEventScreen
@@ -1203,7 +1204,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       floatingActionButton:
-          eventModel.customerUid == FirebaseAuth.instance.currentUser!.uid
+          eventModel.hasManagementPermissions(
+            FirebaseAuth.instance.currentUser!.uid,
+          )
           ? _buildFloatingActionButton()
           : null,
       body: SafeArea(
@@ -1501,8 +1504,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (eventModel.customerUid ==
-                  FirebaseAuth.instance.currentUser!.uid)
+              if (eventModel.hasManagementPermissions(
+                FirebaseAuth.instance.currentUser!.uid,
+              ))
                 Row(
                   children: [
                     Tooltip(
@@ -1651,8 +1655,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
             if (eventModel.categories.isNotEmpty) const SizedBox(height: 24),
 
             // Tabbed Content Section (only for non-creators)
-            if (eventModel.customerUid !=
-                FirebaseAuth.instance.currentUser!.uid)
+            if (!eventModel.hasManagementPermissions(
+              FirebaseAuth.instance.currentUser!.uid,
+            ))
               _buildTabbedContentSection(),
 
             // Attendees List (for everyone)
@@ -1804,8 +1809,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                   ),
                 ),
               ),
-              if (eventModel.customerUid ==
-                  FirebaseAuth.instance.currentUser!.uid)
+              if (eventModel.hasManagementPermissions(
+                FirebaseAuth.instance.currentUser!.uid,
+              ))
                 Row(
                   children: [
                     GestureDetector(
@@ -1907,7 +1913,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
           ),
           const SizedBox(height: 20),
           // Feedback Button (for attendees only)
-          if (eventModel.customerUid != FirebaseAuth.instance.currentUser!.uid)
+          if (!eventModel.hasManagementPermissions(
+            FirebaseAuth.instance.currentUser!.uid,
+          ))
             _buildFeedbackButton(),
         ],
       ),
@@ -2967,16 +2975,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                 );
                               },
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Quick Actions Section
-                        _buildManagementSection(
-                          icon: Icons.flash_on,
-                          title: 'Quick Actions',
-                          color: const Color(0xFF10B981),
-                          children: [
+                            const SizedBox(height: 12),
                             _buildManagementOption(
                               icon: Icons.qr_code_scanner,
                               title: 'Scan Tickets',
@@ -3015,75 +3014,26 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                 );
                               },
                             ),
-                            const SizedBox(height: 12),
-                            _buildManagementOption(
-                              icon: Icons.share,
-                              title: 'Share Event',
-                              subtitle: 'Share event with potential attendees',
-                              onTap: () {
-                                Navigator.pop(context);
-                                _showQuickShareOptions();
-                              },
-                            ),
                           ],
                         ),
                         const SizedBox(height: 20),
 
-                        // Event Summary Section
+                        // Co-Host Management Section
                         _buildManagementSection(
-                          icon: Icons.insights,
-                          title: 'Event Summary',
-                          color: const Color(0xFF6B7280),
+                          icon: Icons.people_alt,
+                          title: 'Co-Host Management',
+                          color: const Color(0xFF9C27B0),
                           children: [
-                            if (isLoadingSummary) ...[
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildSummaryCard(
-                                      icon: Icons.hourglass_empty,
-                                      title: 'Loading...',
-                                      value: '...',
-                                      color: const Color(0xFF6B7280),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _buildSummaryCard(
-                                      icon: Icons.hourglass_empty,
-                                      title: 'Loading...',
-                                      value: '...',
-                                      color: const Color(0xFF6B7280),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ] else ...[
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildSummaryCard(
-                                      icon: Icons.check_circle,
-                                      title: 'Attendance',
-                                      value: '$actualAttendanceCount',
-                                      color: const Color(0xFF10B981),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _buildSummaryCard(
-                                      icon: Icons.confirmation_number,
-                                      title: 'Tickets Used',
-                                      value: eventModel.ticketsEnabled
-                                          ? '$usedTicketsCount/${eventModel.issuedTickets}'
-                                          : 'Disabled',
-                                      color: const Color(0xFFFF9800),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                            CoHostManagementWidget(
+                              eventModel: eventModel,
+                              onCoHostsChanged: () {
+                                // Refresh the event model to get updated co-hosts
+                                setState(() {});
+                              },
+                            ),
                           ],
                         ),
+
                         const SizedBox(height: 24),
                       ],
                     ),
@@ -3235,8 +3185,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   }
 
   void _showQuickShareOptions() {
-    final bool isCreator =
-        eventModel.customerUid == FirebaseAuth.instance.currentUser!.uid;
+    final bool isCreator = eventModel.hasManagementPermissions(
+      FirebaseAuth.instance.currentUser!.uid,
+    );
 
     showModalBottomSheet(
       context: context,
@@ -3405,8 +3356,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
   void _shareEventDetails() {
     HapticFeedback.lightImpact();
-    final bool isCreator =
-        eventModel.customerUid == FirebaseAuth.instance.currentUser!.uid;
+    final bool isCreator = eventModel.hasManagementPermissions(
+      FirebaseAuth.instance.currentUser!.uid,
+    );
 
     final eventDetails = isCreator
         ? '''

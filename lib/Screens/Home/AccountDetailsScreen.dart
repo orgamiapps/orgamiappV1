@@ -8,6 +8,7 @@ import 'package:orgami/Utils/Colors.dart';
 import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
+import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 
 class AccountDetailsScreen extends StatefulWidget {
   const AccountDetailsScreen({super.key});
@@ -26,6 +27,8 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   // Controllers for form fields
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _usernameController =
+      TextEditingController(); // New username controller
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _ageController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
@@ -37,6 +40,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   // Focus nodes for better UX
   final FocusNode _nameFocus = FocusNode();
   final FocusNode _emailFocus = FocusNode();
+  final FocusNode _usernameFocus = FocusNode(); // New username focus
   final FocusNode _phoneFocus = FocusNode();
   final FocusNode _ageFocus = FocusNode();
   final FocusNode _locationFocus = FocusNode();
@@ -48,7 +52,12 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   String? _selectedGender;
   bool _isLoading = false;
 
-  final List<String> _genderOptions = ['Male', 'Female', 'Other', 'Prefer not to say'];
+  final List<String> _genderOptions = [
+    'Male',
+    'Female',
+    'Other',
+    'Prefer not to say',
+  ];
 
   @override
   void initState() {
@@ -60,6 +69,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _usernameController.dispose(); // Dispose new username controller
     _phoneController.dispose();
     _ageController.dispose();
     _locationController.dispose();
@@ -67,9 +77,10 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
     _companyController.dispose();
     _websiteController.dispose();
     _bioController.dispose();
-    
+
     _nameFocus.dispose();
     _emailFocus.dispose();
+    _usernameFocus.dispose(); // Dispose new username focus
     _phoneFocus.dispose();
     _ageFocus.dispose();
     _locationFocus.dispose();
@@ -80,11 +91,30 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
     super.dispose();
   }
 
-  void _loadUserData() {
+  void _loadUserData() async {
     if (CustomerController.logeInCustomer != null) {
       final customer = CustomerController.logeInCustomer!;
       _nameController.text = customer.name;
       _emailController.text = customer.email;
+
+      // Check if user has a username, if not generate one
+      if (customer.username == null || customer.username!.isEmpty) {
+        final firestoreHelper = FirebaseFirestoreHelper();
+        final newUsername = await firestoreHelper
+            .generateUsernameForExistingUser(customer.name);
+
+        // Update the customer model and save to Firestore
+        customer.username = newUsername;
+        await firestoreHelper.updateUsername(
+          userId: customer.uid,
+          newUsername: newUsername,
+        );
+
+        // Update the controller
+        CustomerController.logeInCustomer = customer;
+      }
+
+      _usernameController.text = customer.username ?? '';
       _phoneController.text = customer.phoneNumber ?? '';
       _ageController.text = customer.age?.toString() ?? '';
       _locationController.text = customer.location ?? '';
@@ -93,6 +123,8 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
       _websiteController.text = customer.website ?? '';
       _bioController.text = customer.bio ?? '';
       _selectedGender = customer.gender;
+
+      setState(() {}); // Refresh the UI
     }
   }
 
@@ -108,18 +140,35 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
 
     try {
       final customer = CustomerController.logeInCustomer!;
-      
+
       // Update customer model with new data
       customer.name = _nameController.text.trim();
       customer.email = _emailController.text.trim();
-      customer.phoneNumber = _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim();
-      customer.age = _ageController.text.trim().isEmpty ? null : int.tryParse(_ageController.text.trim());
+      customer.username = _usernameController.text.trim().isEmpty
+          ? null
+          : _usernameController.text.trim().toLowerCase(); // Update username
+      customer.phoneNumber = _phoneController.text.trim().isEmpty
+          ? null
+          : _phoneController.text.trim();
+      customer.age = _ageController.text.trim().isEmpty
+          ? null
+          : int.tryParse(_ageController.text.trim());
       customer.gender = _selectedGender;
-      customer.location = _locationController.text.trim().isEmpty ? null : _locationController.text.trim();
-      customer.occupation = _occupationController.text.trim().isEmpty ? null : _occupationController.text.trim();
-      customer.company = _companyController.text.trim().isEmpty ? null : _companyController.text.trim();
-      customer.website = _websiteController.text.trim().isEmpty ? null : _websiteController.text.trim();
-      customer.bio = _bioController.text.trim().isEmpty ? null : _bioController.text.trim();
+      customer.location = _locationController.text.trim().isEmpty
+          ? null
+          : _locationController.text.trim();
+      customer.occupation = _occupationController.text.trim().isEmpty
+          ? null
+          : _occupationController.text.trim();
+      customer.company = _companyController.text.trim().isEmpty
+          ? null
+          : _companyController.text.trim();
+      customer.website = _websiteController.text.trim().isEmpty
+          ? null
+          : _websiteController.text.trim();
+      customer.bio = _bioController.text.trim().isEmpty
+          ? null
+          : _bioController.text.trim();
 
       // Update in Firestore
       await FirebaseFirestore.instance
@@ -129,15 +178,14 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
 
       _btnCtlr.success();
       ShowToast().showNormalToast(msg: 'Account details updated successfully!');
-      
+
       // Update the local customer data
       CustomerController.logeInCustomer = customer;
-      
+
       // Navigate back after a short delay
       Future.delayed(const Duration(seconds: 1), () {
         Navigator.pop(context);
       });
-
     } catch (e) {
       _btnCtlr.reset();
       setState(() {
@@ -263,18 +311,28 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Required Fields Section
-            _buildSectionHeader('Required Information', Icons.star, Colors.orange),
+            _buildSectionHeader(
+              'Required Information',
+              Icons.star,
+              Colors.orange,
+            ),
             const SizedBox(height: 16),
             _buildNameField(),
             const SizedBox(height: 20),
             _buildEmailField(),
             const SizedBox(height: 32),
-            
+
             // Optional Fields Section
-            _buildSectionHeader('Additional Information (Optional)', Icons.info_outline, AppThemeColor.darkBlueColor),
+            _buildSectionHeader(
+              'Additional Information (Optional)',
+              Icons.info_outline,
+              AppThemeColor.darkBlueColor,
+            ),
             const SizedBox(height: 16),
+            _buildUsernameField(), // Add new username field
+            const SizedBox(height: 20),
             _buildPhoneField(),
             const SizedBox(height: 20),
             _buildAgeField(),
@@ -283,9 +341,13 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
             const SizedBox(height: 20),
             _buildLocationField(),
             const SizedBox(height: 32),
-            
+
             // Professional Information Section
-            _buildSectionHeader('Professional Information', Icons.work, Colors.green),
+            _buildSectionHeader(
+              'Professional Information',
+              Icons.work,
+              Colors.green,
+            ),
             const SizedBox(height: 16),
             _buildOccupationField(),
             const SizedBox(height: 20),
@@ -293,13 +355,17 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
             const SizedBox(height: 20),
             _buildWebsiteField(),
             const SizedBox(height: 32),
-            
+
             // Bio Section
-            _buildSectionHeader('About You', Icons.person_outline, Colors.purple),
+            _buildSectionHeader(
+              'About You',
+              Icons.person_outline,
+              Colors.purple,
+            ),
             const SizedBox(height: 16),
             _buildBioField(),
             const SizedBox(height: 32),
-            
+
             _buildSaveButton(),
           ],
         ),
@@ -372,6 +438,32 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
         }
         if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
           return 'Please enter a valid email address';
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _buildUsernameField() {
+    return _buildTextField(
+      controller: _usernameController,
+      focusNode: _usernameFocus,
+      label: 'Username',
+      hint: 'Enter your username (optional)',
+      icon: Icons.alternate_email,
+      textCapitalization: TextCapitalization.none,
+      inputFormatters: [
+        FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9_]')),
+        LengthLimitingTextInputFormatter(20),
+      ],
+      validator: (value) {
+        if (value != null && value.isNotEmpty) {
+          if (value.length < 3) {
+            return 'Username must be at least 3 characters';
+          }
+          if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value)) {
+            return 'Username can only contain letters, numbers, and underscores';
+          }
         }
         return null;
       },
@@ -517,15 +609,15 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
       hint: 'Enter your website URL (optional)',
       icon: Icons.language_outlined,
       keyboardType: TextInputType.url,
-             validator: (value) {
-         if (value != null && value.isNotEmpty) {
-           final uri = Uri.tryParse(value);
-           if (uri == null || !uri.hasAbsolutePath) {
-             return 'Please enter a valid URL';
-           }
-         }
-         return null;
-       },
+      validator: (value) {
+        if (value != null && value.isNotEmpty) {
+          final uri = Uri.tryParse(value);
+          if (uri == null || !uri.hasAbsolutePath) {
+            return 'Please enter a valid URL';
+          }
+        }
+        return null;
+      },
     );
   }
 
@@ -587,9 +679,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
                 ),
               ),
             ),
-            inputFormatters: [
-              LengthLimitingTextInputFormatter(500),
-            ],
+            inputFormatters: [LengthLimitingTextInputFormatter(500)],
           ),
         ),
       ],
@@ -692,4 +782,4 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
       ),
     );
   }
-} 
+}

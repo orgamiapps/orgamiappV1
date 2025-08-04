@@ -55,32 +55,40 @@ service cloud.firestore {
     // Allow users to read/write their own events
     // Also allow reading public events (private == false) for all authenticated users
     // And allow reading events that the user has attended (for attendance tracking)
+    // Co-hosts can also write to events they are co-hosting
     match /Events/{eventId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == resource.data.customerUid;
+      allow write: if request.auth != null && 
+        (request.auth.uid == resource.data.customerUid || 
+         request.auth.uid in resource.data.coHosts);
       allow create: if request.auth != null && request.auth.uid == request.resource.data.customerUid;
     }
     
-    // Allow event hosts to read/write their event analytics
+    // Allow event hosts and co-hosts to read/write their event analytics
     match /event_analytics/{eventId} {
       allow read, write: if request.auth != null && 
         exists(/databases/$(database)/documents/Events/$(eventId)) &&
-        request.auth.uid == get(/databases/$(database)/documents/Events/$(eventId)).data.customerUid;
+        (request.auth.uid == get(/databases/$(database)/documents/Events/$(eventId)).data.customerUid ||
+         request.auth.uid in get(/databases/$(database)/documents/Events/$(eventId)).data.coHosts);
     }
     
     // Allow users to read/write their own event questions
     // Also allow reading event questions for public events
+    // Co-hosts can also write to event questions
     match /Events/{eventId}/EventQuestions/{questionId} {
       allow read: if request.auth != null && 
         (exists(/databases/$(database)/documents/Events/$(eventId)) &&
         (get(/databases/$(database)/documents/Events/$(eventId)).data.customerUid == request.auth.uid || 
+         request.auth.uid in get(/databases/$(database)/documents/Events/$(eventId)).data.coHosts ||
          get(/databases/$(database)/documents/Events/$(eventId)).data.private == false));
       allow write: if request.auth != null && 
         exists(/databases/$(database)/documents/Events/$(eventId)) &&
-        request.auth.uid == get(/databases/$(database)/documents/Events/$(eventId)).data.customerUid;
+        (request.auth.uid == get(/databases/$(database)/documents/Events/$(eventId)).data.customerUid ||
+         request.auth.uid in get(/databases/$(database)/documents/Events/$(eventId)).data.coHosts);
       allow create: if request.auth != null && 
         exists(/databases/$(database)/documents/Events/$(eventId)) &&
-        request.auth.uid == get(/databases/$(database)/documents/Events/$(eventId)).data.customerUid;
+        (request.auth.uid == get(/databases/$(database)/documents/Events/$(eventId)).data.customerUid ||
+         request.auth.uid in get(/databases/$(database)/documents/Events/$(eventId)).data.coHosts);
     }
     
     // Allow authenticated users to create and read tickets

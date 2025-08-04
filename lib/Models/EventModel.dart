@@ -20,6 +20,7 @@ class EventModel {
   int maxTickets;
   int issuedTickets;
   int eventDuration; // Duration in hours
+  List<String> coHosts; // Array of user IDs who are co-hosts
 
   LatLng getLatLngOfEvent() {
     return LatLng(latitude, longitude);
@@ -48,6 +49,7 @@ class EventModel {
     this.maxTickets = 0,
     this.issuedTickets = 0,
     this.eventDuration = 2, // Default 2 hours
+    this.coHosts = const [],
   });
 
   factory EventModel.fromJson(dynamic parsedJson) {
@@ -84,6 +86,9 @@ class EventModel {
       maxTickets: data['maxTickets'] ?? 0,
       issuedTickets: data['issuedTickets'] ?? 0,
       eventDuration: data['eventDuration'] ?? 2,
+      coHosts: (data.containsKey('coHosts') && data['coHosts'] != null)
+          ? List<String>.from(data['coHosts'])
+          : [],
     );
   }
 
@@ -111,12 +116,24 @@ class EventModel {
 
   /// Returns the raw ID without formatting
   String get rawId => id;
-  
+
   /// Returns the event end time based on selectedDateTime + eventDuration
-  DateTime get eventEndTime => selectedDateTime.add(Duration(hours: eventDuration));
-  
+  DateTime get eventEndTime =>
+      selectedDateTime.add(Duration(hours: eventDuration));
+
   /// Returns the dwell tracking end time (event end + 1 hour buffer)
-  DateTime get dwellTrackingEndTime => eventEndTime.add(const Duration(hours: 1));
+  DateTime get dwellTrackingEndTime =>
+      eventEndTime.add(const Duration(hours: 1));
+
+  /// Check if a user is a co-host of this event
+  bool isCoHost(String userId) {
+    return coHosts.contains(userId);
+  }
+
+  /// Check if a user has management permissions (creator or co-host)
+  bool hasManagementPermissions(String userId) {
+    return customerUid == userId || coHosts.contains(userId);
+  }
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
@@ -143,6 +160,7 @@ class EventModel {
     data['maxTickets'] = maxTickets;
     data['issuedTickets'] = issuedTickets;
     data['eventDuration'] = eventDuration;
+    data['coHosts'] = coHosts;
     return data;
   }
 }

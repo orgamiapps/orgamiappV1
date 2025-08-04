@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:orgami/Controller/CustomerController.dart';
 import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Models/EventModel.dart';
+import 'package:orgami/Models/CustomerModel.dart';
 import 'package:orgami/Utils/Colors.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:orgami/Screens/Events/Widget/SingleEventListViewItem.dart';
@@ -9,6 +10,7 @@ import 'package:orgami/Utils/Toast.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:orgami/Screens/MyProfile/MyTicketsScreen.dart';
+import 'package:orgami/Screens/MyProfile/UserProfileScreen.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -35,6 +37,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   List<EventModel> attendedEvents = [];
   bool isLoading = true;
   int selectedTab = 1; // 1 = Created, 2 = Attended
+  bool isDiscoverable = true; // User discoverability setting
 
   // Selection state
   bool isSelectionMode = false;
@@ -126,6 +129,8 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           attendedEvents = attended;
           bio = CustomerController.logeInCustomer?.bio ?? '';
           _bioController.text = bio ?? '';
+          isDiscoverable =
+              CustomerController.logeInCustomer?.isDiscoverable ?? true;
           isLoading = false;
         });
         print('Profile data loaded successfully');
@@ -449,6 +454,8 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           SliverToBoxAdapter(child: _buildProfileHeader(user)),
           // Bio Section
           SliverToBoxAdapter(child: _buildBioSection()),
+          // Discoverability Section
+          SliverToBoxAdapter(child: _buildDiscoverabilitySection()),
           // Stats Section
           SliverToBoxAdapter(child: _buildStatsSection()),
           // Tab Bar
@@ -579,7 +586,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                 ],
               ),
               const SizedBox(width: 16),
-              
+
               // User Info - Vertical Stack
               Expanded(
                 child: Column(
@@ -588,12 +595,64 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                     Text(
                       'Hi ${user?.name ?? 'User'}',
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: AppThemeColor.pureWhiteColor,
+                        fontSize: 24,
                         fontWeight: FontWeight.w600,
-                        fontSize: 20,
                         fontFamily: 'Roboto',
                       ),
                     ),
+                    if (user?.username != null &&
+                        user!.username!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      GestureDetector(
+                        onTap: () {
+                          // Navigate to public profile view
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => UserProfileScreen(
+                                user: user!,
+                                isOwnProfile: true,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '@${user.username}',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 16,
+                                  fontFamily: 'Roboto',
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.open_in_new,
+                                color: Colors.white.withValues(alpha: 0.7),
+                                size: 14,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 2),
                     Text(
                       'Welcome to your profile',
@@ -781,6 +840,113 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         ],
       ),
     );
+  }
+
+  Widget _buildDiscoverabilitySection() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            spreadRadius: 0,
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.visibility, color: const Color(0xFF667EEA), size: 18),
+              const SizedBox(width: 8),
+              const Text(
+                'Privacy Settings',
+                style: TextStyle(
+                  color: Color(0xFF1A1A1A),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Profile Discoverability',
+                      style: TextStyle(
+                        color: Color(0xFF1A1A1A),
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isDiscoverable
+                          ? 'Your profile can be found in user searches'
+                          : 'Your profile is hidden from user searches',
+                      style: TextStyle(
+                        color: const Color(0xFF6B7280),
+                        fontSize: 12,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: isDiscoverable,
+                onChanged: (value) {
+                  setState(() {
+                    isDiscoverable = value;
+                  });
+                  _updateDiscoverability(value);
+                },
+                activeColor: const Color(0xFF667EEA),
+                activeTrackColor: const Color(0xFF667EEA).withOpacity(0.3),
+                inactiveThumbColor: const Color(0xFF9CA3AF),
+                inactiveTrackColor: const Color(0xFFE1E5E9),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateDiscoverability(bool value) async {
+    try {
+      final user = CustomerController.logeInCustomer;
+      if (user != null) {
+        await FirebaseFirestoreHelper().updateUserDiscoverability(
+          userId: user.uid,
+          isDiscoverable: value,
+        );
+        ShowToast().showNormalToast(
+          msg: value
+              ? 'Profile is now discoverable'
+              : 'Profile is now hidden from searches',
+        );
+      }
+    } catch (e) {
+      ShowToast().showNormalToast(msg: 'Failed to update privacy settings: $e');
+      // Revert the state if update failed
+      setState(() {
+        isDiscoverable = !value;
+      });
+    }
   }
 
   Widget _buildStatsSection() {

@@ -51,10 +51,10 @@ class SingleEventListViewItem extends StatelessWidget {
                   children: [
                     AspectRatio(
                       aspectRatio: 16 / 9,
-                      child: CachedNetworkImage(
+                      child: SafeNetworkImage(
                         imageUrl: eventModel.imageUrl,
                         fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
+                        placeholder: Container(
                           color: const Color(0xFFF5F7FA),
                           child: const Center(
                             child: CircularProgressIndicator(
@@ -62,7 +62,7 @@ class SingleEventListViewItem extends StatelessWidget {
                             ),
                           ),
                         ),
-                        errorWidget: (context, url, error) => Container(
+                        errorWidget: Container(
                           color: const Color(0xFFF5F7FA),
                           child: const Center(
                             child: Column(

@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:orgami/Models/EventModel.dart';
+import 'package:orgami/Models/CustomerModel.dart';
 import 'package:orgami/Screens/Events/SingleEventScreen.dart';
+import 'package:orgami/Screens/MyProfile/UserProfileScreen.dart';
 import 'package:orgami/Utils/Colors.dart';
 import 'package:orgami/Utils/Images.dart';
 import 'package:orgami/Utils/Router.dart';
@@ -9,6 +11,9 @@ import 'package:orgami/Utils/dimensions.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
+import 'package:orgami/Utils/Toast.dart';
+import 'package:orgami/Controller/CustomerController.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -20,6 +25,9 @@ enum SortOption {
   eventDateAsc,
   eventDateDesc,
 }
+
+// Enum for search type
+enum SearchType { events, users }
 
 class SearchEventsScreen extends StatefulWidget {
   const SearchEventsScreen({super.key});
@@ -39,6 +47,9 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
 
   List<String> selectedCategories = [];
   bool isLoading = true;
+  SearchType _currentSearchType = SearchType.events;
+  List<CustomerModel> _searchUsers = [];
+  bool _isSearchingUsers = false;
 
   // Sorting state
   SortOption currentSortOption = SortOption.none;
@@ -66,11 +77,15 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
     _fadeController.forward();
 
     // Simulate loading
-    Future.delayed(const Duration(seconds: 1), () {
+    Future.delayed(const Duration(seconds: 1), () async {
       if (mounted) {
         setState(() {
           isLoading = false;
         });
+        // Load users if starting on users tab
+        if (_currentSearchType == SearchType.users) {
+          await _performSearch();
+        }
       }
     });
   }
@@ -81,6 +96,38 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
     _searchFocusNode.dispose();
     _fadeController.dispose();
     super.dispose();
+  }
+
+  // Perform search based on current search type
+  Future<void> _performSearch() async {
+    if (_currentSearchType == SearchType.users) {
+      print('Performing user search with query: "$_searchValue"');
+      setState(() {
+        _isSearchingUsers = true;
+      });
+
+      try {
+        final users = await FirebaseFirestoreHelper().searchUsers(
+          searchQuery: _searchValue,
+          limit: 100, // Increased limit to show more users by default
+        );
+
+        print('Search returned ${users.length} users');
+        if (mounted) {
+          setState(() {
+            _searchUsers = users;
+            _isSearchingUsers = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isSearchingUsers = false;
+          });
+        }
+        print('Error searching users: $e');
+      }
+    }
   }
 
   // Sort events based on current sort option
@@ -194,7 +241,116 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
       child: Column(
         children: [
-          // Search bar
+          // Search Type Toggle
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _currentSearchType = SearchType.events;
+                        _searchUsers.clear();
+                        _searchValue = '';
+                        _searchController.clear();
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _currentSearchType == SearchType.events
+                            ? Colors.white.withOpacity(0.3)
+                            : Colors.transparent,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(12),
+                          bottomLeft: Radius.circular(12),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.event, color: Colors.white, size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Events',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight:
+                                  _currentSearchType == SearchType.events
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              fontSize: 14,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () async {
+                      setState(() {
+                        _currentSearchType = SearchType.users;
+                        _searchUsers.clear();
+                        _searchValue = '';
+                        _searchController.clear();
+                      });
+                      // Ensure current user has required fields
+                      try {
+                        await FirebaseFirestoreHelper()
+                            .ensureCurrentUserFields();
+                      } catch (e) {
+                        print('Error ensuring current user fields: $e');
+                      }
+                      _performSearch(); // Load all users when switching to users tab
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _currentSearchType == SearchType.users
+                            ? Colors.white.withOpacity(0.3)
+                            : Colors.transparent,
+                        borderRadius: const BorderRadius.only(
+                          topRight: Radius.circular(12),
+                          bottomRight: Radius.circular(12),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.people, color: Colors.white, size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Users',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: _currentSearchType == SearchType.users
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              fontSize: 14,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           // Search bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -224,7 +380,9 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
                       fontFamily: 'Roboto',
                     ),
                     decoration: InputDecoration(
-                      hintText: 'Search events by title...',
+                      hintText: _currentSearchType == SearchType.events
+                          ? 'Search events by title...'
+                          : 'Search users by name...',
                       hintStyle: TextStyle(
                         color: Colors.white.withOpacity(0.8),
                         fontSize: 16,
@@ -238,6 +396,9 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
                         setState(() {
                           _searchValue = newVal;
                         });
+                        if (_currentSearchType == SearchType.users) {
+                          _performSearch();
+                        }
                       }
                     },
                   ),
@@ -250,6 +411,9 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
                         setState(() {
                           _searchValue = '';
                         });
+                        if (_currentSearchType == SearchType.users) {
+                          _performSearch(); // Reload all users when clearing search
+                        }
                       }
                     },
                     child: Icon(
@@ -259,44 +423,45 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
                     ),
                   ),
                 const SizedBox(width: 12),
-                GestureDetector(
-                  onTap: () {
-                    _showFilterSortModal();
-                  },
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Stack(
-                      children: [
-                        const Center(
-                          child: Icon(
-                            Icons.tune,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                        if (selectedCategories.isNotEmpty ||
-                            currentSortOption != SortOption.none)
-                          Positioned(
-                            top: 4,
-                            right: 4,
-                            child: Container(
-                              width: 6,
-                              height: 6,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFFF6B6B),
-                                shape: BoxShape.circle,
-                              ),
+                if (_currentSearchType == SearchType.events)
+                  GestureDetector(
+                    onTap: () {
+                      _showFilterSortModal();
+                    },
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Stack(
+                        children: [
+                          const Center(
+                            child: Icon(
+                              Icons.tune,
+                              color: Colors.white,
+                              size: 20,
                             ),
                           ),
-                      ],
+                          if (selectedCategories.isNotEmpty ||
+                              currentSortOption != SortOption.none)
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFFF6B6B),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -306,6 +471,10 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
   }
 
   Widget _eventsView() {
+    if (_currentSearchType == SearchType.users) {
+      return _buildUsersView();
+    }
+
     Stream<QuerySnapshot> eventsStream = FirebaseFirestore.instance
         .collection(EventModel.firebaseKey)
         .where('private', isEqualTo: false)
@@ -366,6 +535,319 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
 
         return _buildEventsList(categoryFilteredList);
       },
+    );
+  }
+
+  Widget _buildUsersView() {
+    if (_isSearchingUsers && _searchUsers.isEmpty) {
+      return _buildUsersLoadingState();
+    }
+
+    if (_searchUsers.isEmpty) {
+      return _buildUsersEmptyState();
+    }
+
+    return _buildUsersList(_searchUsers);
+  }
+
+  Widget _buildUsersLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: const Color(0xFF667EEA).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(40),
+            ),
+            child: const CircularProgressIndicator(color: Color(0xFF667EEA)),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Loading users...',
+            style: TextStyle(
+              color: Color(0xFF1A1A1A),
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              fontFamily: 'Roboto',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUsersEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(50),
+              ),
+              child: Icon(
+                Icons.people_outline,
+                size: 50,
+                color: const Color(0xFF667EEA),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'No Users Found',
+              style: TextStyle(
+                color: Color(0xFF1A1A1A),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'No discoverable users are currently available',
+              style: TextStyle(
+                color: const Color(0xFF6B7280),
+                fontSize: 16,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF667EEA).withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: const Color(0xFF667EEA),
+                    size: 24,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Want to be discoverable?',
+                    style: TextStyle(
+                      color: Color(0xFF1A1A1A),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Roboto',
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Go to your profile and enable "Profile Discoverability" to appear in user searches',
+                    style: TextStyle(
+                      color: const Color(0xFF6B7280),
+                      fontSize: 12,
+                      fontFamily: 'Roboto',
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: () async {
+                      try {
+                        await FirebaseFirestoreHelper()
+                            .ensureCurrentUserFields();
+                        ShowToast().showNormalToast(
+                          msg: 'Your profile is now discoverable!',
+                        );
+                        _performSearch(); // Refresh the search
+                      } catch (e) {
+                        ShowToast().showNormalToast(
+                          msg: 'Failed to update profile: $e',
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF667EEA),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Make Me Discoverable',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUsersNoResultsState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(50),
+              ),
+              child: Icon(
+                Icons.search_off,
+                size: 50,
+                color: const Color(0xFF667EEA),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'No users found',
+              style: TextStyle(
+                color: Color(0xFF1A1A1A),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try adjusting your search terms',
+              style: TextStyle(
+                color: const Color(0xFF6B7280),
+                fontSize: 16,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUsersList(List<CustomerModel> users) {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+      itemCount: users.length,
+      itemBuilder: (context, index) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: _buildUserCard(users[index]),
+        );
+      },
+    );
+  }
+
+  Widget _buildUserCard(CustomerModel user) {
+    return GestureDetector(
+      onTap: () => _showUserProfile(user),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 25,
+              backgroundColor: AppThemeColor.lightGrayColor,
+              backgroundImage: user.profilePictureUrl != null
+                  ? CachedNetworkImageProvider(user.profilePictureUrl!)
+                  : null,
+              child: user.profilePictureUrl == null
+                  ? Text(
+                      user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                      style: const TextStyle(
+                        color: AppThemeColor.darkBlueColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user.name,
+                    style: const TextStyle(
+                      color: AppThemeColor.darkBlueColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                  if (user.occupation != null &&
+                      user.occupation!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      user.occupation!,
+                      style: const TextStyle(
+                        color: AppThemeColor.lightGrayColor,
+                        fontSize: 14,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
+                  if (user.username != null && user.username!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '@${user.username}',
+                      style: const TextStyle(
+                        color: Color(0xFF667EEA),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios,
+              color: AppThemeColor.lightGrayColor,
+              size: 16,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -752,6 +1234,84 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
               ),
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF667EEA).withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: const Color(0xFF667EEA),
+                    size: 24,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Want to be discoverable?',
+                    style: TextStyle(
+                      color: Color(0xFF1A1A1A),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Roboto',
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Go to your profile and enable "Profile Discoverability" to appear in user searches',
+                    style: TextStyle(
+                      color: const Color(0xFF6B7280),
+                      fontSize: 12,
+                      fontFamily: 'Roboto',
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: () async {
+                      try {
+                        await FirebaseFirestoreHelper()
+                            .ensureCurrentUserFields();
+                        ShowToast().showNormalToast(
+                          msg: 'Your profile is now discoverable!',
+                        );
+                        _performSearch(); // Refresh the search
+                      } catch (e) {
+                        ShowToast().showNormalToast(
+                          msg: 'Failed to update profile: $e',
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF667EEA),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Make Me Discoverable',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -828,6 +1388,13 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
           ],
         ),
       ),
+    );
+  }
+
+  void _showUserProfile(CustomerModel user) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => UserProfileScreen(user: user)),
     );
   }
 }

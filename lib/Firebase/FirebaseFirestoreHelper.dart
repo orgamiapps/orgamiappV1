@@ -9,6 +9,7 @@ import 'package:orgami/Models/EventModel.dart';
 import 'package:orgami/Models/EventQuestionModel.dart';
 import 'package:orgami/Models/TicketModel.dart';
 import 'package:orgami/Models/EventFeedbackModel.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class FirebaseFirestoreHelper {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -1465,6 +1466,745 @@ class FirebaseFirestoreHelper {
       return querySnapshot.docs.isNotEmpty;
     } catch (e) {
       print('Error checking if user submitted feedback: $e');
+      return false;
+    }
+  }
+
+  // Enhanced user search with username support
+  Future<List<CustomerModel>> searchUsers({
+    required String searchQuery,
+    int limit = 100,
+  }) async {
+    try {
+      print('Searching users with query: "$searchQuery"');
+
+      List<CustomerModel> users = [];
+
+      // Remove @ prefix if present for searching
+      String cleanSearchQuery = searchQuery.startsWith('@')
+          ? searchQuery.substring(1)
+          : searchQuery;
+
+      // If search query is empty, get all discoverable users
+      if (searchQuery.isEmpty) {
+        try {
+          final allUsersQuery = await _firestore
+              .collection(CustomerModel.firebaseKey)
+              .where('isDiscoverable', isEqualTo: true)
+              .orderBy('name', descending: false)
+              .limit(limit)
+              .get();
+
+          users = allUsersQuery.docs
+              .map((doc) => CustomerModel.fromFirestore(doc))
+              .toList();
+        } catch (e) {
+          print(
+            'Composite index query failed, falling back to client-side filtering: $e',
+          );
+          // Fallback: get all users and filter client-side
+          final allUsersQuery = await _firestore
+              .collection(CustomerModel.firebaseKey)
+              .get();
+
+          users = allUsersQuery.docs
+              .map((doc) => CustomerModel.fromFirestore(doc))
+              .where((user) => user.isDiscoverable == true)
+              .take(limit)
+              .toList();
+        }
+      } else {
+        // Search by username first (exact match)
+        if (cleanSearchQuery.isNotEmpty) {
+          try {
+            final usernameQuery = await _firestore
+                .collection(CustomerModel.firebaseKey)
+                .where('username', isEqualTo: cleanSearchQuery.toLowerCase())
+                .where('isDiscoverable', isEqualTo: true)
+                .get();
+
+            users.addAll(
+              usernameQuery.docs
+                  .map((doc) => CustomerModel.fromFirestore(doc))
+                  .toList(),
+            );
+          } catch (e) {
+            print('Error searching by username: $e');
+          }
+        }
+
+        // Search by name (prefix search)
+        try {
+          Query query = _firestore
+              .collection(CustomerModel.firebaseKey)
+              .where('isDiscoverable', isEqualTo: true)
+              .orderBy('name', descending: false)
+              .limit(limit);
+
+          if (searchQuery.isNotEmpty) {
+            query = query
+                .where('name', isGreaterThanOrEqualTo: searchQuery)
+                .where('name', isLessThan: searchQuery + '\uf8ff');
+          }
+
+          final querySnapshot = await query.get();
+          print('Found ${querySnapshot.docs.length} users in Firestore');
+
+          final nameUsers = querySnapshot.docs
+              .map((doc) => CustomerModel.fromFirestore(doc))
+              .toList();
+
+          // Combine and remove duplicates
+          users.addAll(nameUsers);
+          users = users.toSet().toList(); // Remove duplicates
+        } catch (e) {
+          print(
+            'Composite index query failed, falling back to client-side filtering: $e',
+          );
+          // Fallback: get all users and filter client-side
+          final allUsersQuery = await _firestore
+              .collection(CustomerModel.firebaseKey)
+              .get();
+
+          final allUsers = allUsersQuery.docs
+              .map((doc) => CustomerModel.fromFirestore(doc))
+              .where((user) => user.isDiscoverable == true)
+              .toList();
+
+          // Filter by search query
+          users = allUsers
+              .where(
+                (user) =>
+                    user.name.toLowerCase().contains(
+                      searchQuery.toLowerCase(),
+                    ) ||
+                    (user.username != null &&
+                        user.username!.toLowerCase().contains(
+                          cleanSearchQuery.toLowerCase(),
+                        )),
+              )
+              .take(limit)
+              .toList();
+        }
+      }
+
+      // Sort users alphabetically by name
+      users.sort(
+        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+      );
+
+      print('Returning ${users.length} users after sorting');
+      return users;
+    } catch (e) {
+      print('Error searching users: $e');
+      return [];
+    }
+  }
+
+  /// Updates user discoverability setting
+  Future<void> updateUserDiscoverability({
+    required String userId,
+    required bool isDiscoverable,
+  }) async {
+    try {
+      await _firestore.collection('Customers').doc(userId).update({
+        'isDiscoverable': isDiscoverable,
+      });
+    } catch (e) {
+      print('Error updating user discoverability: $e');
+      rethrow;
+    }
+  }
+
+  /// Follow a user
+  Future<void> followUser({
+    required String followerId,
+    required String followingId,
+  }) async {
+    try {
+      // Add to following collection
+      await _firestore
+          .collection('Customers')
+          .doc(followerId)
+          .collection('following')
+          .doc(followingId)
+          .set({
+            'followingId': followingId,
+            'followedAt': FieldValue.serverTimestamp(),
+          });
+
+      // Add to followers collection
+      await _firestore
+          .collection('Customers')
+          .doc(followingId)
+          .collection('followers')
+          .doc(followerId)
+          .set({
+            'followerId': followerId,
+            'followedAt': FieldValue.serverTimestamp(),
+          });
+
+      print('User $followerId is now following $followingId');
+    } catch (e) {
+      print('Error following user: $e');
+      // If permission denied, show user-friendly error
+      if (e.toString().contains('permission-denied')) {
+        throw Exception(
+          'Follow feature is not available. Please contact support.',
+        );
+      }
+      rethrow;
+    }
+  }
+
+  /// Unfollow a user
+  Future<void> unfollowUser({
+    required String followerId,
+    required String followingId,
+  }) async {
+    try {
+      // Remove from following collection
+      await _firestore
+          .collection('Customers')
+          .doc(followerId)
+          .collection('following')
+          .doc(followingId)
+          .delete();
+
+      // Remove from followers collection
+      await _firestore
+          .collection('Customers')
+          .doc(followingId)
+          .collection('followers')
+          .doc(followerId)
+          .delete();
+
+      print('User $followerId unfollowed $followingId');
+    } catch (e) {
+      print('Error unfollowing user: $e');
+      // If permission denied, show user-friendly error
+      if (e.toString().contains('permission-denied')) {
+        throw Exception(
+          'Unfollow feature is not available. Please contact support.',
+        );
+      }
+      rethrow;
+    }
+  }
+
+  /// Check if a user is following another user
+  Future<bool> isFollowingUser({
+    required String followerId,
+    required String followingId,
+  }) async {
+    try {
+      final doc = await _firestore
+          .collection('Customers')
+          .doc(followerId)
+          .collection('following')
+          .doc(followingId)
+          .get();
+      return doc.exists;
+    } catch (e) {
+      print('Error checking follow status: $e');
+      // If permission denied or collection doesn't exist, return false
+      if (e.toString().contains('permission-denied') ||
+          e.toString().contains('not-found')) {
+        print('Following collection not accessible, returning false');
+        return false;
+      }
+      return false;
+    }
+  }
+
+  /// Get followers count for a user
+  Future<int> getFollowersCount({required String userId}) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('Customers')
+          .doc(userId)
+          .collection('followers')
+          .get();
+      return querySnapshot.docs.length;
+    } catch (e) {
+      print('Error getting followers count: $e');
+      // If permission denied or collection doesn't exist, return 0
+      if (e.toString().contains('permission-denied') ||
+          e.toString().contains('not-found')) {
+        print('Followers collection not accessible, returning 0');
+        return 0;
+      }
+      return 0;
+    }
+  }
+
+  /// Get following count for a user
+  Future<int> getFollowingCount({required String userId}) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('Customers')
+          .doc(userId)
+          .collection('following')
+          .get();
+      return querySnapshot.docs.length;
+    } catch (e) {
+      print('Error getting following count: $e');
+      // If permission denied or collection doesn't exist, return 0
+      if (e.toString().contains('permission-denied') ||
+          e.toString().contains('not-found')) {
+        print('Following collection not accessible, returning 0');
+        return 0;
+      }
+      return 0;
+    }
+  }
+
+  /// Get list of followers for a user
+  Future<List<String>> getFollowersList({required String userId}) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('Customers')
+          .doc(userId)
+          .collection('followers')
+          .get();
+      return querySnapshot.docs.map((doc) => doc.id).toList();
+    } catch (e) {
+      print('Error getting followers list: $e');
+      return [];
+    }
+  }
+
+  /// Get list of users that a user is following
+  Future<List<String>> getFollowingList({required String userId}) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('Customers')
+          .doc(userId)
+          .collection('following')
+          .get();
+      return querySnapshot.docs.map((doc) => doc.id).toList();
+    } catch (e) {
+      print('Error getting following list: $e');
+      return [];
+    }
+  }
+
+  // Method to ensure current user has required fields
+  Future<void> ensureCurrentUserFields() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final userDoc = await _firestore
+          .collection(CustomerModel.firebaseKey)
+          .doc(user.uid)
+          .get();
+
+      if (!userDoc.exists) return;
+
+      final data = userDoc.data()!;
+      Map<String, dynamic> updates = {};
+
+      // Check for missing isDiscoverable field
+      if (!data.containsKey('isDiscoverable')) {
+        updates['isDiscoverable'] = true;
+      }
+
+      // Check for missing username field
+      if (!data.containsKey('username') || data['username'] == null) {
+        final customer = CustomerModel.fromFirestore(userDoc);
+        final username = await generateUsernameForExistingUser(customer.name);
+        updates['username'] = username;
+      }
+
+      // Update if there are any missing fields
+      if (updates.isNotEmpty) {
+        await userDoc.reference.update(updates);
+        print('Updated current user with: $updates');
+
+        // Update the CustomerController if user is logged in
+        if (CustomerController.logeInCustomer != null) {
+          CustomerController.logeInCustomer!.isDiscoverable =
+              updates['isDiscoverable'] ??
+              CustomerController.logeInCustomer!.isDiscoverable;
+          if (updates['username'] != null) {
+            CustomerController.logeInCustomer!.username = updates['username'];
+          }
+        }
+      }
+    } catch (e) {
+      print('Error ensuring current user fields: $e');
+    }
+  }
+
+  Future<List<CustomerModel>> getUsersByIds({
+    required List<String> userIds,
+  }) async {
+    try {
+      if (userIds.isEmpty) return [];
+
+      // Firestore has a limit of 10 items in 'in' queries
+      // So we need to batch the requests
+      List<CustomerModel> allUsers = [];
+
+      for (int i = 0; i < userIds.length; i += 10) {
+        final batch = userIds.skip(i).take(10).toList();
+
+        final querySnapshot = await _firestore
+            .collection(CustomerModel.firebaseKey)
+            .where(FieldPath.documentId, whereIn: batch)
+            .get();
+
+        final users = querySnapshot.docs
+            .map((doc) => CustomerModel.fromFirestore(doc))
+            .toList();
+
+        allUsers.addAll(users);
+      }
+
+      return allUsers;
+    } catch (e) {
+      print('Error getting users by IDs: $e');
+      return [];
+    }
+  }
+
+  // Utility method to update existing users to have isDiscoverable field
+  Future<void> updateExistingUsersWithDiscoverability() async {
+    try {
+      final querySnapshot = await _firestore
+          .collection(CustomerModel.firebaseKey)
+          .get();
+
+      int updatedCount = 0;
+      for (var doc in querySnapshot.docs) {
+        try {
+          final data = doc.data();
+          if (!data.containsKey('isDiscoverable')) {
+            await doc.reference.update({
+              'isDiscoverable': true, // Default to true for existing users
+            });
+            updatedCount++;
+            print('Updated user ${doc.id} with isDiscoverable field');
+          }
+        } catch (e) {
+          print('Error updating user ${doc.id}: $e');
+          // Continue with other users even if one fails
+        }
+      }
+      print('Finished updating $updatedCount users with discoverability field');
+    } catch (e) {
+      print('Error updating existing users: $e');
+    }
+  }
+
+  // Method to ensure all users have required fields
+  Future<void> ensureUserProfileCompleteness(String userId) async {
+    try {
+      final userDoc = await _firestore
+          .collection(CustomerModel.firebaseKey)
+          .doc(userId)
+          .get();
+
+      if (userDoc.exists) {
+        final data = userDoc.data() as Map<String, dynamic>;
+        Map<String, dynamic> updates = {};
+
+        // Ensure isDiscoverable field exists
+        if (!data.containsKey('isDiscoverable')) {
+          updates['isDiscoverable'] = true;
+        }
+
+        // Update if there are any missing fields
+        if (updates.isNotEmpty) {
+          await userDoc.reference.update(updates);
+          print('Updated user $userId with missing fields: $updates');
+        }
+      }
+    } catch (e) {
+      print('Error ensuring user profile completeness: $e');
+    }
+  }
+
+  // Check if username is available
+  Future<bool> isUsernameAvailable(String username) async {
+    try {
+      // Remove @ prefix if present for checking
+      String cleanUsername = username.startsWith('@')
+          ? username.substring(1)
+          : username;
+
+      final querySnapshot = await _firestore
+          .collection(CustomerModel.firebaseKey)
+          .where('username', isEqualTo: cleanUsername.toLowerCase())
+          .get();
+
+      return querySnapshot.docs.isEmpty;
+    } catch (e) {
+      print('Error checking username availability: $e');
+      return false;
+    }
+  }
+
+  // Generate a unique username from full name
+  Future<String> generateUniqueUsername(String fullName) async {
+    try {
+      // Remove special characters and convert to lowercase
+      String baseUsername = fullName
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z0-9]'), '')
+          .trim();
+
+      if (baseUsername.isEmpty) {
+        baseUsername = 'user';
+      }
+
+      String username = baseUsername;
+      int counter = 1;
+
+      // Keep trying until we find an available username
+      while (!await isUsernameAvailable(username)) {
+        username = '$baseUsername$counter';
+        counter++;
+
+        // Prevent infinite loop
+        if (counter > 100) {
+          username = 'user${DateTime.now().millisecondsSinceEpoch}';
+          break;
+        }
+      }
+
+      return username;
+    } catch (e) {
+      print('Error generating unique username: $e');
+      return 'user${DateTime.now().millisecondsSinceEpoch}';
+    }
+  }
+
+  // Generate username for existing users (name + 100)
+  Future<String> generateUsernameForExistingUser(String fullName) async {
+    try {
+      // Remove special characters and convert to lowercase
+      String baseUsername = fullName
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z0-9]'), '')
+          .trim();
+
+      if (baseUsername.isEmpty) {
+        baseUsername = 'user';
+      }
+
+      // Add 100 to the end
+      String username = '${baseUsername}100';
+      int counter = 1;
+
+      // Keep trying until we find an available username
+      while (!await isUsernameAvailable(username)) {
+        username = '${baseUsername}${100 + counter}';
+        counter++;
+
+        // Prevent infinite loop
+        if (counter > 100) {
+          username = 'user${DateTime.now().millisecondsSinceEpoch}';
+          break;
+        }
+      }
+
+      return username;
+    } catch (e) {
+      print('Error generating username for existing user: $e');
+      return 'user${DateTime.now().millisecondsSinceEpoch}';
+    }
+  }
+
+  // Update user's username
+  Future<bool> updateUsername({
+    required String userId,
+    required String newUsername,
+  }) async {
+    try {
+      // Remove @ prefix if present for storage
+      String cleanUsername = newUsername.startsWith('@')
+          ? newUsername.substring(1)
+          : newUsername;
+
+      // Check if username is available
+      if (!await isUsernameAvailable(cleanUsername)) {
+        return false;
+      }
+
+      await _firestore.collection(CustomerModel.firebaseKey).doc(userId).update(
+        {'username': cleanUsername.toLowerCase()},
+      );
+
+      print('Username updated successfully');
+      return true;
+    } catch (e) {
+      print('Error updating username: $e');
+      return false;
+    }
+  }
+
+  // Update existing users to have usernames if they don't have one
+  Future<void> updateExistingUsersWithUsernames() async {
+    try {
+      final querySnapshot = await _firestore
+          .collection(CustomerModel.firebaseKey)
+          .get();
+
+      int updatedCount = 0;
+      for (var doc in querySnapshot.docs) {
+        try {
+          final data = doc.data();
+          if (!data.containsKey('username') || data['username'] == null) {
+            final user = CustomerModel.fromFirestore(doc);
+            final username = await generateUsernameForExistingUser(user.name);
+
+            await doc.reference.update({'username': username});
+            updatedCount++;
+            print('Updated user ${doc.id} with username: $username');
+          }
+        } catch (e) {
+          print('Error updating user ${doc.id}: $e');
+          // Continue with other users even if one fails
+        }
+      }
+      print('Finished updating $updatedCount users with usernames');
+    } catch (e) {
+      print('Error updating existing users with usernames: $e');
+    }
+  }
+
+  // Co-host management methods
+  Future<bool> addCoHost({
+    required String eventId,
+    required String coHostUserId,
+  }) async {
+    try {
+      // Get the current event
+      final eventDoc = await _firestore
+          .collection(EventModel.firebaseKey)
+          .doc(eventId)
+          .get();
+
+      if (!eventDoc.exists) {
+        print('Event not found: $eventId');
+        return false;
+      }
+
+      final eventData = eventDoc.data()!;
+      List<String> coHosts = List<String>.from(eventData['coHosts'] ?? []);
+
+      // Check if user is already a co-host
+      if (coHosts.contains(coHostUserId)) {
+        print('User is already a co-host: $coHostUserId');
+        return false;
+      }
+
+      // Add the new co-host
+      coHosts.add(coHostUserId);
+
+      // Update the event
+      await _firestore.collection(EventModel.firebaseKey).doc(eventId).update({
+        'coHosts': coHosts,
+      });
+
+      print('Co-host added successfully: $coHostUserId to event: $eventId');
+      return true;
+    } catch (e) {
+      print('Error adding co-host: $e');
+      return false;
+    }
+  }
+
+  Future<bool> removeCoHost({
+    required String eventId,
+    required String coHostUserId,
+  }) async {
+    try {
+      // Get the current event
+      final eventDoc = await _firestore
+          .collection(EventModel.firebaseKey)
+          .doc(eventId)
+          .get();
+
+      if (!eventDoc.exists) {
+        print('Event not found: $eventId');
+        return false;
+      }
+
+      final eventData = eventDoc.data()!;
+      List<String> coHosts = List<String>.from(eventData['coHosts'] ?? []);
+
+      // Check if user is a co-host
+      if (!coHosts.contains(coHostUserId)) {
+        print('User is not a co-host: $coHostUserId');
+        return false;
+      }
+
+      // Remove the co-host
+      coHosts.remove(coHostUserId);
+
+      // Update the event
+      await _firestore.collection(EventModel.firebaseKey).doc(eventId).update({
+        'coHosts': coHosts,
+      });
+
+      print('Co-host removed successfully: $coHostUserId from event: $eventId');
+      return true;
+    } catch (e) {
+      print('Error removing co-host: $e');
+      return false;
+    }
+  }
+
+  Future<List<CustomerModel>> getCoHosts({required String eventId}) async {
+    try {
+      final eventDoc = await _firestore
+          .collection(EventModel.firebaseKey)
+          .doc(eventId)
+          .get();
+
+      if (!eventDoc.exists) {
+        print('Event not found: $eventId');
+        return [];
+      }
+
+      final eventData = eventDoc.data()!;
+      List<String> coHostIds = List<String>.from(eventData['coHosts'] ?? []);
+
+      if (coHostIds.isEmpty) {
+        return [];
+      }
+
+      // Get co-host user details
+      return await getUsersByIds(userIds: coHostIds);
+    } catch (e) {
+      print('Error getting co-hosts: $e');
+      return [];
+    }
+  }
+
+  Future<bool> isUserCoHost({
+    required String eventId,
+    required String userId,
+  }) async {
+    try {
+      final eventDoc = await _firestore
+          .collection(EventModel.firebaseKey)
+          .doc(eventId)
+          .get();
+
+      if (!eventDoc.exists) {
+        return false;
+      }
+
+      final eventData = eventDoc.data()!;
+      List<String> coHosts = List<String>.from(eventData['coHosts'] ?? []);
+
+      return coHosts.contains(userId);
+    } catch (e) {
+      print('Error checking if user is co-host: $e');
       return false;
     }
   }

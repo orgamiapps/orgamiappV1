@@ -4,6 +4,7 @@ import 'package:orgami/Models/AttendanceModel.dart';
 import 'package:orgami/Models/CustomerModel.dart';
 import 'package:orgami/Models/EventModel.dart';
 import 'package:orgami/Screens/Events/AllAttendeesScreen.dart';
+import 'package:orgami/Screens/MyProfile/UserProfileScreen.dart';
 import 'package:orgami/Utils/Colors.dart';
 import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/Utils/dimensions.dart';
@@ -251,17 +252,28 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    isAnon
-                                        ? 'Anonymous'
-                                        : (customer?.name ?? attendee.userName),
-                                    style: TextStyle(
-                                      color: isAnon
-                                          ? const Color(0xFF6B7280)
-                                          : const Color(0xFF1A1A1A),
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      fontFamily: 'Roboto',
+                                  GestureDetector(
+                                    onTap: () {
+                                      if (!isAnon && customer != null) {
+                                        RouterClass.nextScreenNormal(
+                                          context,
+                                          UserProfileScreen(user: customer!),
+                                        );
+                                      }
+                                    },
+                                    child: Text(
+                                      isAnon
+                                          ? 'Anonymous'
+                                          : (customer?.name ??
+                                                attendee.userName),
+                                      style: TextStyle(
+                                        color: isAnon
+                                            ? const Color(0xFF6B7280)
+                                            : const Color(0xFF1A1A1A),
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        fontFamily: 'Roboto',
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -444,104 +456,119 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
                         );
                       }
 
-                      return Container(
-                        margin: const EdgeInsets.only(right: 16),
-                        child: Column(
-                          children: [
-                            // Modern Profile Picture
-                            Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: isAnon
-                                    ? const LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          Color(0xFF6B7280),
-                                          Color(0xFF9CA3AF),
-                                        ],
-                                      )
-                                    : const LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          Color(0xFF10B981),
-                                          Color(0xFF059669),
-                                        ],
-                                      ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: isAnon
-                                        ? const Color(
-                                            0xFF6B7280,
-                                          ).withOpacity(0.3)
-                                        : const Color(
-                                            0xFF10B981,
-                                          ).withOpacity(0.3),
-                                    spreadRadius: 0,
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: ClipOval(
-                                child: isAnon
-                                    ? Container(
-                                        color: Colors.transparent,
-                                        child: const Icon(
-                                          Icons.person_off,
-                                          size: 28,
-                                          color: Colors.white,
+                      return GestureDetector(
+                        onTap: () {
+                          if (!isAnon && customer != null) {
+                            RouterClass.nextScreenNormal(
+                              context,
+                              UserProfileScreen(user: customer!),
+                            );
+                          }
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 16),
+                          child: Column(
+                            children: [
+                              // Modern Profile Picture
+                              Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: isAnon
+                                      ? const LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [
+                                            Color(0xFF6B7280),
+                                            Color(0xFF9CA3AF),
+                                          ],
+                                        )
+                                      : const LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [
+                                            Color(0xFF10B981),
+                                            Color(0xFF059669),
+                                          ],
                                         ),
-                                      )
-                                    : (customer?.profilePictureUrl != null
-                                          ? Image.network(
-                                              customer!.profilePictureUrl!,
-                                              fit: BoxFit.cover,
-                                              errorBuilder:
-                                                  (context, error, stackTrace) {
-                                                    return Container(
-                                                      color: Colors.transparent,
-                                                      child: const Icon(
-                                                        Icons.person,
-                                                        size: 28,
-                                                        color: Colors.white,
-                                                      ),
-                                                    );
-                                                  },
-                                            )
-                                          : Container(
-                                              color: Colors.transparent,
-                                              child: const Icon(
-                                                Icons.person,
-                                                size: 28,
-                                                color: Colors.white,
-                                              ),
-                                            )),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            // Name with better styling
-                            SizedBox(
-                              width: 70,
-                              child: Text(
-                                attendee.userName,
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: isAnon
-                                      ? const Color(0xFF6B7280)
-                                      : const Color(0xFF1A1A1A),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  fontFamily: 'Roboto',
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: isAnon
+                                          ? const Color(
+                                              0xFF6B7280,
+                                            ).withOpacity(0.3)
+                                          : const Color(
+                                              0xFF10B981,
+                                            ).withOpacity(0.3),
+                                      spreadRadius: 0,
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: ClipOval(
+                                  child: isAnon
+                                      ? Container(
+                                          color: Colors.transparent,
+                                          child: const Icon(
+                                            Icons.person_off,
+                                            size: 28,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : (customer?.profilePictureUrl != null
+                                            ? Image.network(
+                                                customer!.profilePictureUrl!,
+                                                fit: BoxFit.cover,
+                                                errorBuilder:
+                                                    (
+                                                      context,
+                                                      error,
+                                                      stackTrace,
+                                                    ) {
+                                                      return Container(
+                                                        color:
+                                                            Colors.transparent,
+                                                        child: const Icon(
+                                                          Icons.person,
+                                                          size: 28,
+                                                          color: Colors.white,
+                                                        ),
+                                                      );
+                                                    },
+                                              )
+                                            : Container(
+                                                color: Colors.transparent,
+                                                child: const Icon(
+                                                  Icons.person,
+                                                  size: 28,
+                                                  color: Colors.white,
+                                                ),
+                                              )),
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 8),
+                              // Name with better styling
+                              SizedBox(
+                                width: 70,
+                                child: Text(
+                                  attendee.userName,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: isAnon
+                                        ? const Color(0xFF6B7280)
+                                        : const Color(0xFF1A1A1A),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    fontFamily: 'Roboto',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     },

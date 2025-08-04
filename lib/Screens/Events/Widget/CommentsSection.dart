@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:orgami/Controller/CustomerController.dart';
 import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Models/CommentModel.dart';
+import 'package:orgami/Models/CustomerModel.dart';
 import 'package:orgami/Models/EventModel.dart';
+import 'package:orgami/Screens/MyProfile/UserProfileScreen.dart';
+import 'package:orgami/Utils/Router.dart';
 
 class CommentsSection extends StatefulWidget {
   final EventModel eventModel;
@@ -306,32 +309,35 @@ class _CommentsSectionState extends State<CommentsSection> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Avatar
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor: Colors.grey[200],
-                        child:
-                            comment.userProfilePictureUrl != null &&
-                                comment.userProfilePictureUrl!.isNotEmpty
-                            ? ClipOval(
-                                child: Image.network(
-                                  comment.userProfilePictureUrl!,
-                                  width: 40,
-                                  height: 40,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const Icon(
-                                      Icons.person,
-                                      size: 22,
-                                      color: Colors.grey,
-                                    );
-                                  },
+                      GestureDetector(
+                        onTap: () => _showUserProfile(comment.userId),
+                        child: CircleAvatar(
+                          radius: 20,
+                          backgroundColor: Colors.grey[200],
+                          child:
+                              comment.userProfilePictureUrl != null &&
+                                  comment.userProfilePictureUrl!.isNotEmpty
+                              ? ClipOval(
+                                  child: Image.network(
+                                    comment.userProfilePictureUrl!,
+                                    width: 40,
+                                    height: 40,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return const Icon(
+                                        Icons.person,
+                                        size: 22,
+                                        color: Colors.grey,
+                                      );
+                                    },
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.person,
+                                  size: 22,
+                                  color: Colors.grey,
                                 ),
-                              )
-                            : const Icon(
-                                Icons.person,
-                                size: 22,
-                                color: Colors.grey,
-                              ),
+                        ),
                       ),
                       const SizedBox(width: 14),
                       // Name, timestamp, and comment
@@ -342,13 +348,17 @@ class _CommentsSectionState extends State<CommentsSection> {
                             Row(
                               children: [
                                 Expanded(
-                                  child: Text(
-                                    comment.userName,
-                                    style: const TextStyle(
-                                      color: Color(0xFF1A1A1A),
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 15,
-                                      fontFamily: 'Roboto',
+                                  child: GestureDetector(
+                                    onTap: () =>
+                                        _showUserProfile(comment.userId),
+                                    child: Text(
+                                      comment.userName,
+                                      style: const TextStyle(
+                                        color: Color(0xFF1A1A1A),
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 15,
+                                        fontFamily: 'Roboto',
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -394,5 +404,29 @@ class _CommentsSectionState extends State<CommentsSection> {
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     if (diff.inDays < 7) return '${diff.inDays}d ago';
     return '${timestamp.year}/${timestamp.month.toString().padLeft(2, '0')}/${timestamp.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _showUserProfile(String? userId) async {
+    if (userId == null || userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User profile not available')),
+      );
+      return;
+    }
+
+    try {
+      final user = await _firestoreHelper.getSingleCustomer(customerId: userId);
+      if (user != null) {
+        RouterClass.nextScreenNormal(context, UserProfileScreen(user: user));
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('User profile not found')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading user profile: $e')));
+    }
   }
 }
