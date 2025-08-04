@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:orgami/Models/NotificationModel.dart';
+import 'package:orgami/Models/EventModel.dart';
 
 class FirebaseMessagingHelper {
   static final FirebaseMessagingHelper _instance =
@@ -18,6 +19,7 @@ class FirebaseMessagingHelper {
   FlutterLocalNotificationsPlugin? _localNotifications;
   String? _fcmToken;
   UserNotificationSettings? _settings;
+  EventModel? _pendingFeedbackEvent;
 
   // Initialize messaging
   Future<void> initialize() async {
@@ -192,10 +194,33 @@ class FirebaseMessagingHelper {
       case 'ticket_update':
         // Navigate to tickets
         break;
+      case 'event_feedback':
+        // Navigate to feedback screen
+        _navigateToFeedbackScreen(eventId);
+        break;
       default:
         // Navigate to notifications screen
         break;
     }
+  }
+
+  void _navigateToFeedbackScreen(String? eventId) {
+    if (eventId == null) return;
+
+    // Get the event model and navigate to feedback screen
+    FirebaseFirestore.instance.collection('Events').doc(eventId).get().then((
+      doc,
+    ) {
+      if (doc.exists) {
+        final eventData = doc.data() as Map<String, dynamic>;
+        final eventModel = EventModel.fromJson(doc);
+
+        // Navigate to feedback screen
+        // Note: This requires a global navigator key or context
+        // For now, we'll store the event data to be used when the app opens
+        _pendingFeedbackEvent = eventModel;
+      }
+    });
   }
 
   Future<void> _showLocalNotification(fcm.RemoteMessage message) async {
@@ -245,6 +270,11 @@ class FirebaseMessagingHelper {
   }
 
   UserNotificationSettings? get settings => _settings;
+  EventModel? get pendingFeedbackEvent => _pendingFeedbackEvent;
+
+  void clearPendingFeedbackEvent() {
+    _pendingFeedbackEvent = null;
+  }
 
   Future<void> sendEventReminder(
     String eventId,

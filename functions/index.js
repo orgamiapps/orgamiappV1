@@ -1030,3 +1030,196 @@ async function sendNotificationToUser(userId, notificationData, db) {
     logger.error(`Error sending notification to user ${userId}:`, error);
   }
 }
+
+/**
+ * Scheduled function to send post-event feedback notifications
+ * Runs 1 hour after each event ends
+ */
+exports.sendPostEventFeedbackNotifications = onSchedule({
+  schedule: "every 1 hours",
+  timeZone: "UTC",
+}, async (event) => {
+  try {
+    const db = admin.firestore();
+    const now = new Date();
+    
+    // Get all events that ended 1 hour ago
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    
+    const eventsQuery = await db.collection("Events")
+      .where("selectedDateTime", "<=", oneHourAgo)
+      .get();
+
+    logger.info(`Found ${eventsQuery.docs.length} events that ended 1 hour ago`);
+
+    for (const eventDoc of eventsQuery.docs) {
+      const eventData = eventDoc.data();
+      const eventId = eventDoc.id;
+      const eventEndTime = new Date(eventData.selectedDateTime.toDate().getTime() + 
+        (eventData.eventDuration || 2) * 60 * 60 * 1000); // Add event duration
+      
+      // Check if it's been exactly 1 hour since event ended
+      const timeSinceEventEnd = now.getTime() - eventEndTime.getTime();
+      const oneHourInMs = 60 * 60 * 1000;
+      
+      if (Math.abs(timeSinceEventEnd - oneHourInMs) > 5 * 60 * 1000) { // Within 5 minutes
+        continue;
+      }
+
+      // Get all attendees for this event
+      const attendeesQuery = await db.collection("Attendance")
+        .where("eventId", "==", eventId)
+        .get();
+
+      logger.info(`Found ${attendeesQuery.docs.length} attendees for event ${eventId}`);
+
+      for (const attendeeDoc of attendeesQuery.docs) {
+        const attendeeData = attendeeDoc.data();
+        const userId = attendeeData.customerUid;
+
+        if (!userId || userId === "manual" || userId === "without_login") {
+          continue; // Skip anonymous/manual attendees
+        }
+
+        // Check if user has already submitted feedback
+        const feedbackQuery = await db.collection("event_feedback")
+          .where("eventId", "==", eventId)
+          .where("userId", "==", userId)
+          .get();
+
+        if (!feedbackQuery.empty) {
+          logger.info(`User ${userId} already submitted feedback for event ${eventId}`);
+          continue;
+        }
+
+        // Check user's notification settings
+        const userDoc = await db.collection("users").doc(userId).get();
+        if (!userDoc.exists) {
+          continue;
+        }
+
+        const userData = userDoc.data();
+        const notificationSettings = userData.notificationSettings || {};
+        
+        if (notificationSettings.eventFeedback === false) {
+          logger.info(`User ${userId} has disabled event feedback notifications`);
+          continue;
+        }
+
+        // Send feedback notification
+        await sendNotificationToUser(userId, {
+          title: "How was your event?",
+          body: `Rate your experience at "${eventData.title}" and help us improve!`,
+          type: "event_feedback",
+          eventId: eventId,
+          eventTitle: eventData.title,
+          data: {
+            action: "open_feedback",
+            eventId: eventId,
+          },
+        }, db);
+
+        logger.info(`Sent feedback notification to user ${userId} for event ${eventId}`);
+      }
+    }
+
+    logger.info("Completed sending post-event feedback notifications");
+  } catch (error) {
+    logger.error("Error sending post-event feedback notifications:", error);
+  }
+});
+
+/**
+ * Cloud Function to aggregate feedback data when new feedback is submitted
+ */
+exports.aggregateFeedbackData = onDocumentCreated("event_feedback/{docId}",
+    async (event) => {
+      try {
+        const feedbackData = event.data.data();
+        const eventId = feedbackData.eventId;
+        const rating = feedbackData.rating;
+        const isAnonymous = feedbackData.isAnonymous;
+
+        logger.info("Processing feedback for event:", eventId);
+
+        // Use a transaction to ensure atomic updates
+        const db = admin.firestore();
+        await db.runTransaction(async (transaction) => {
+          const analyticsRef = db.collection("event_analytics").doc(eventId);
+          const analyticsDoc = await transaction.get(analyticsRef);
+
+          // Get current analytics data or initialize if doesn't exist
+          const analyticsData = analyticsDoc.exists ? analyticsDoc.data() : {
+            totalAttendees: 0,
+            hourlySignIns: {},
+            repeatAttendees: 0,
+            dropoutRate: 0,
+            lastUpdated: admin.firestore.Timestamp.now(),
+          };
+
+          // Initialize feedback analytics if doesn't exist
+          if (!analyticsData.feedbackAnalytics) {
+            analyticsData.feedbackAnalytics = {
+              averageRating: 0,
+              totalRatings: 0,
+              ratingDistribution: {},
+              sentiment: "neutral",
+              commentSummaries: [],
+              anonymousCount: 0,
+              namedCount: 0,
+            };
+          }
+
+          const feedbackAnalytics = analyticsData.feedbackAnalytics;
+
+          // Update rating statistics
+          const totalRatings = feedbackAnalytics.totalRatings + 1;
+          const totalRatingSum = (feedbackAnalytics.averageRating * feedbackAnalytics.totalRatings) + rating;
+          feedbackAnalytics.averageRating = totalRatingSum / totalRatings;
+          feedbackAnalytics.totalRatings = totalRatings;
+
+          // Update rating distribution
+          if (!feedbackAnalytics.ratingDistribution[rating]) {
+            feedbackAnalytics.ratingDistribution[rating] = 0;
+          }
+          feedbackAnalytics.ratingDistribution[rating] += 1;
+
+          // Update anonymous/named counts
+          if (isAnonymous) {
+            feedbackAnalytics.anonymousCount += 1;
+          } else {
+            feedbackAnalytics.namedCount += 1;
+          }
+
+          // Update sentiment based on average rating
+          if (feedbackAnalytics.averageRating >= 4.0) {
+            feedbackAnalytics.sentiment = "positive";
+          } else if (feedbackAnalytics.averageRating >= 3.0) {
+            feedbackAnalytics.sentiment = "neutral";
+          } else {
+            feedbackAnalytics.sentiment = "negative";
+          }
+
+          // Update comment summaries (simplified - in production you might use ML)
+          if (feedbackData.comment) {
+            const commentSummary = feedbackData.comment.length > 100 
+                ? feedbackData.comment.substring(0, 100) + "..."
+                : feedbackData.comment;
+            
+            if (feedbackAnalytics.commentSummaries.length < 10) {
+              feedbackAnalytics.commentSummaries.push(commentSummary);
+            }
+          }
+
+          analyticsData.lastUpdated = admin.firestore.Timestamp.now();
+
+          // Update the document
+          transaction.set(analyticsRef, analyticsData, { merge: true });
+
+          logger.info(`Updated feedback analytics for event ${eventId}`);
+        });
+
+      } catch (error) {
+        logger.error("Error aggregating feedback data:", error);
+      }
+    });

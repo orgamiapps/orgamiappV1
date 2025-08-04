@@ -20,6 +20,7 @@ import 'package:orgami/Utils/WebViewPage.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'dart:io';
 import 'package:orgami/Screens/MyProfile/MyProfileScreen.dart';
+import 'package:orgami/Screens/Home/AccountDetailsScreen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -211,6 +212,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           _buildDivider(),
           _buildSettingsItem(
+            icon: Icons.account_circle,
+            title: 'Account Details',
+            subtitle: 'Manage your personal information',
+            onTap: () =>
+                RouterClass.nextScreenNormal(context, AccountDetailsScreen()),
+          ),
+          _buildDivider(),
+          _buildSettingsItem(
             icon: Icons.analytics_rounded,
             title: 'Analytics Dashboard',
             subtitle: 'Comprehensive insights across all events',
@@ -353,7 +362,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       subtitle: Text(
         subtitle,
         style: TextStyle(
-          color: Theme.of(context).textTheme.bodyMedium?.color ?? const Color(0xFF9CA3AF),
+          color:
+              Theme.of(context).textTheme.bodyMedium?.color ??
+              const Color(0xFF9CA3AF),
           fontSize: 14,
           fontFamily: 'Roboto',
         ),

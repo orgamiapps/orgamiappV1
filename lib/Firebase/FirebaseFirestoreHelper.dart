@@ -8,6 +8,7 @@ import 'package:orgami/Models/CustomerModel.dart';
 import 'package:orgami/Models/EventModel.dart';
 import 'package:orgami/Models/EventQuestionModel.dart';
 import 'package:orgami/Models/TicketModel.dart';
+import 'package:orgami/Models/EventFeedbackModel.dart';
 
 class FirebaseFirestoreHelper {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -1324,19 +1325,19 @@ class FirebaseFirestoreHelper {
   }
 
   /// Deletes an event from Firestore
-  /// 
+  ///
   /// This method deletes the event document and all related data
   Future<void> deleteEvent(String eventId) async {
     try {
       // Delete the event document
       await _firestore.collection(EventModel.firebaseKey).doc(eventId).delete();
-      
+
       // Delete related attendance records
       final attendanceQuery = await _firestore
           .collection(AttendanceModel.firebaseKey)
           .where('eventId', isEqualTo: eventId)
           .get();
-      
+
       for (var doc in attendanceQuery.docs) {
         await doc.reference.delete();
       }
@@ -1346,7 +1347,7 @@ class FirebaseFirestoreHelper {
           .collection(AttendanceModel.registerFirebaseKey)
           .where('eventId', isEqualTo: eventId)
           .get();
-      
+
       for (var doc in preRegistrationQuery.docs) {
         await doc.reference.delete();
       }
@@ -1356,7 +1357,7 @@ class FirebaseFirestoreHelper {
           .collection(TicketModel.firebaseKey)
           .where('eventId', isEqualTo: eventId)
           .get();
-      
+
       for (var doc in ticketsQuery.docs) {
         await doc.reference.delete();
       }
@@ -1366,7 +1367,7 @@ class FirebaseFirestoreHelper {
           .collection(CommentModel.firebaseKey)
           .where('eventId', isEqualTo: eventId)
           .get();
-      
+
       for (var doc in commentsQuery.docs) {
         await doc.reference.delete();
       }
@@ -1375,6 +1376,96 @@ class FirebaseFirestoreHelper {
     } catch (e) {
       print('Error deleting event: $e');
       rethrow;
+    }
+  }
+
+  // Event Feedback Methods
+  Future<void> submitEventFeedback({
+    required String eventId,
+    required int rating,
+    String? comment,
+    required bool isAnonymous,
+    String? userId,
+  }) async {
+    try {
+      final feedbackData = {
+        'eventId': eventId,
+        'userId': isAnonymous ? null : userId,
+        'rating': rating,
+        'comment': comment,
+        'timestamp': Timestamp.now(),
+        'isAnonymous': isAnonymous,
+      };
+
+      await _firestore
+          .collection(EventFeedbackModel.firebaseKey)
+          .add(feedbackData);
+
+      print('Feedback submitted successfully for event: $eventId');
+    } catch (e) {
+      print('Error submitting feedback: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<EventFeedbackModel>> getEventFeedback({
+    required String eventId,
+  }) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection(EventFeedbackModel.firebaseKey)
+          .where('eventId', isEqualTo: eventId)
+          .orderBy('timestamp', descending: true)
+          .get();
+
+      return querySnapshot.docs
+          .map((doc) => EventFeedbackModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      print('Error getting event feedback: $e');
+      return [];
+    }
+  }
+
+  Future<EventFeedbackAnalytics?> getEventFeedbackAnalytics({
+    required String eventId,
+  }) async {
+    try {
+      final analyticsDoc = await _firestore
+          .collection('event_analytics')
+          .doc(eventId)
+          .get();
+
+      if (analyticsDoc.exists) {
+        final data = analyticsDoc.data() as Map<String, dynamic>;
+        if (data.containsKey('feedbackAnalytics')) {
+          return EventFeedbackAnalytics.fromFirestore(
+            data['feedbackAnalytics'],
+          );
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error getting feedback analytics: $e');
+      return null;
+    }
+  }
+
+  Future<bool> hasUserSubmittedFeedback({
+    required String eventId,
+    required String userId,
+  }) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection(EventFeedbackModel.firebaseKey)
+          .where('eventId', isEqualTo: eventId)
+          .where('userId', isEqualTo: userId)
+          .get();
+
+      return querySnapshot.docs.isNotEmpty;
+    } catch (e) {
+      print('Error checking if user submitted feedback: $e');
+      return false;
     }
   }
 }

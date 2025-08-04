@@ -5,6 +5,14 @@ class CustomerModel {
   String uid, name, email;
   String? profilePictureUrl;
   String? bio;
+  String? phoneNumber;
+  int? age;
+  String? gender;
+  String? location;
+  String? occupation;
+  String? company;
+  String? website;
+  String? socialMediaLinks;
   DateTime createdAt;
 
   CustomerModel({
@@ -13,6 +21,14 @@ class CustomerModel {
     required this.email,
     this.profilePictureUrl,
     this.bio,
+    this.phoneNumber,
+    this.age,
+    this.gender,
+    this.location,
+    this.occupation,
+    this.company,
+    this.website,
+    this.socialMediaLinks,
     required this.createdAt,
   });
 
@@ -25,9 +41,18 @@ class CustomerModel {
       email: d['email'],
       profilePictureUrl: d['profilePictureUrl'],
       bio: d['bio'],
+      phoneNumber: d['phoneNumber'],
+      age: d['age'],
+      gender: d['gender'],
+      location: d['location'],
+      occupation: d['occupation'],
+      company: d['company'],
+      website: d['website'],
+      socialMediaLinks: d['socialMediaLinks'],
       createdAt: (d['createdAt'] as Timestamp).toDate(),
     );
   }
+  
   static Map<String, dynamic> getMap(CustomerModel d) {
     return {
       'uid': d.uid,
@@ -35,6 +60,14 @@ class CustomerModel {
       'name': d.name,
       'profilePictureUrl': d.profilePictureUrl,
       'bio': d.bio,
+      'phoneNumber': d.phoneNumber,
+      'age': d.age,
+      'gender': d.gender,
+      'location': d.location,
+      'occupation': d.occupation,
+      'company': d.company,
+      'website': d.website,
+      'socialMediaLinks': d.socialMediaLinks,
       'createdAt': d.createdAt,
     };
   }

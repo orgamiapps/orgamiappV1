@@ -118,6 +118,18 @@ class _NotificationSettingsScreenState
                           ),
                           const Divider(),
                           _buildSettingSwitch(
+                            title: 'Event Feedback',
+                            subtitle:
+                                'Get reminded to rate and comment on events you attended',
+                            value: _settings!.eventFeedback,
+                            onChanged: (value) {
+                              _updateSettings(
+                                _settings!.copyWith(eventFeedback: value),
+                              );
+                            },
+                          ),
+                          const Divider(),
+                          _buildSettingSwitch(
                             title: 'General Notifications',
                             subtitle: 'Other app notifications and updates',
                             value: _settings!.generalNotifications,

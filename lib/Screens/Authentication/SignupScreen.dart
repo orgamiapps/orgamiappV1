@@ -26,21 +26,38 @@ class _SignupScreenState extends State<SignupScreen>
   late final double _screenHeight = MediaQuery.of(context).size.height;
 
   final _btnCtlr = RoundedLoadingButtonController();
-
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
+  // Controllers for form fields
   final TextEditingController _userNameEdtController = TextEditingController();
   final TextEditingController _emailEdtController = TextEditingController();
   final TextEditingController _passwordEdtController = TextEditingController();
-  final TextEditingController _confirmPasswordEdtController =
-      TextEditingController();
+  final TextEditingController _confirmPasswordEdtController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _ageController = TextEditingController();
+  final TextEditingController _locationController = TextEditingController();
+  final TextEditingController _occupationController = TextEditingController();
+  final TextEditingController _companyController = TextEditingController();
+  final TextEditingController _websiteController = TextEditingController();
+  final TextEditingController _bioController = TextEditingController();
 
+  // Focus states
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isNameFocused = false;
   bool _isEmailFocused = false;
   bool _isPasswordFocused = false;
   bool _isConfirmPasswordFocused = false;
+  bool _isPhoneFocused = false;
+  bool _isAgeFocused = false;
+  bool _isLocationFocused = false;
+  bool _isOccupationFocused = false;
+  bool _isCompanyFocused = false;
+  bool _isWebsiteFocused = false;
+  bool _isBioFocused = false;
+  
+  String? _selectedGender;
+  final List<String> _genderOptions = ['Male', 'Female', 'Other', 'Prefer not to say'];
 
   late AnimationController logoAnimation;
   late Animation<double> fadeAnimation;
@@ -62,6 +79,14 @@ class _SignupScreenState extends State<SignupScreen>
                   uid: newCreatedCustomer.user!.uid,
                   name: name,
                   email: email,
+                  phoneNumber: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+                  age: _ageController.text.trim().isEmpty ? null : int.tryParse(_ageController.text.trim()),
+                  gender: _selectedGender,
+                  location: _locationController.text.trim().isEmpty ? null : _locationController.text.trim(),
+                  occupation: _occupationController.text.trim().isEmpty ? null : _occupationController.text.trim(),
+                  company: _companyController.text.trim().isEmpty ? null : _companyController.text.trim(),
+                  website: _websiteController.text.trim().isEmpty ? null : _websiteController.text.trim(),
+                  bio: _bioController.text.trim().isEmpty ? null : _bioController.text.trim(),
                   createdAt: DateTime.now(),
                 );
 
@@ -250,6 +275,10 @@ class _SignupScreenState extends State<SignupScreen>
               ),
             ),
             const SizedBox(height: 24),
+            
+            // Required Fields Section
+            _buildSectionHeader('Required Information', Icons.star, Colors.orange),
+            const SizedBox(height: 16),
             _buildNameField(),
             const SizedBox(height: 20),
             _buildEmailField(),
@@ -258,10 +287,55 @@ class _SignupScreenState extends State<SignupScreen>
             const SizedBox(height: 20),
             _buildConfirmPasswordField(),
             const SizedBox(height: 32),
+            
+            // Optional Fields Section
+            _buildSectionHeader('Additional Information (Optional)', Icons.info_outline, AppThemeColor.darkBlueColor),
+            const SizedBox(height: 16),
+            _buildPhoneField(),
+            const SizedBox(height: 20),
+            _buildAgeField(),
+            const SizedBox(height: 20),
+            _buildGenderField(),
+            const SizedBox(height: 20),
+            _buildLocationField(),
+            const SizedBox(height: 20),
+            _buildOccupationField(),
+            const SizedBox(height: 20),
+            _buildCompanyField(),
+            const SizedBox(height: 20),
+            _buildWebsiteField(),
+            const SizedBox(height: 20),
+            _buildBioField(),
+            const SizedBox(height: 32),
+            
             _buildSignupButton(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon, Color color) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: color, size: 16),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          title,
+          style: TextStyle(
+            color: AppThemeColor.darkBlueColor,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 
@@ -333,14 +407,12 @@ class _SignupScreenState extends State<SignupScreen>
               if (value.length < 2) {
                 return 'Name must be at least 2 characters';
               }
-              // Check if name contains at least one space (first and last name)
               if (!value.contains(' ')) {
                 return 'Please enter your full name (first and last name)';
               }
               return null;
             },
             onChanged: (value) {
-              // Ensure proper capitalization for each word
               if (value.isNotEmpty) {
                 final words = value.split(' ');
                 final capitalizedWords = words
@@ -353,7 +425,6 @@ class _SignupScreenState extends State<SignupScreen>
                     })
                     .join(' ');
 
-                // Only update if the formatted text is different to avoid cursor jumping
                 if (capitalizedWords != value) {
                   final cursorPosition = _userNameEdtController.selection.start;
                   _userNameEdtController.value = TextEditingValue(
@@ -429,9 +500,7 @@ class _SignupScreenState extends State<SignupScreen>
               if (value == null || value.isEmpty) {
                 return 'Please enter your email';
               }
-              if (!RegExp(
-                r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-              ).hasMatch(value)) {
+              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
                 return 'Please enter a valid email address';
               }
               return null;
@@ -604,6 +673,531 @@ class _SignupScreenState extends State<SignupScreen>
               }
               return null;
             },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhoneField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Phone Number',
+          style: TextStyle(
+            color: AppThemeColor.darkBlueColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Focus(
+          onFocusChange: (hasFocus) {
+            setState(() {
+              _isPhoneFocused = hasFocus;
+            });
+          },
+          child: TextFormField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+            decoration: InputDecoration(
+              hintText: 'Enter your phone number (optional)',
+              hintStyle: TextStyle(
+                color: AppThemeColor.lightGrayColor,
+                fontSize: 16,
+              ),
+              filled: true,
+              fillColor: _isPhoneFocused
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
+                  : Colors.grey.withOpacity(0.05),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: AppThemeColor.darkBlueColor,
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+              prefixIcon: Icon(
+                Icons.phone_outlined,
+                color: _isPhoneFocused
+                    ? AppThemeColor.darkBlueColor
+                    : AppThemeColor.lightGrayColor,
+                size: 20,
+              ),
+            ),
+            validator: (value) {
+              if (value != null && value.isNotEmpty) {
+                if (!RegExp(r'^\+?[\d\s\-\(\)]+$').hasMatch(value)) {
+                  return 'Please enter a valid phone number';
+                }
+              }
+              return null;
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAgeField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Age',
+          style: TextStyle(
+            color: AppThemeColor.darkBlueColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Focus(
+          onFocusChange: (hasFocus) {
+            setState(() {
+              _isAgeFocused = hasFocus;
+            });
+          },
+          child: TextFormField(
+            controller: _ageController,
+            keyboardType: TextInputType.number,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+            decoration: InputDecoration(
+              hintText: 'Enter your age (optional)',
+              hintStyle: TextStyle(
+                color: AppThemeColor.lightGrayColor,
+                fontSize: 16,
+              ),
+              filled: true,
+              fillColor: _isAgeFocused
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
+                  : Colors.grey.withOpacity(0.05),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: AppThemeColor.darkBlueColor,
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+              prefixIcon: Icon(
+                Icons.cake_outlined,
+                color: _isAgeFocused
+                    ? AppThemeColor.darkBlueColor
+                    : AppThemeColor.lightGrayColor,
+                size: 20,
+              ),
+            ),
+            validator: (value) {
+              if (value != null && value.isNotEmpty) {
+                final age = int.tryParse(value);
+                if (age == null || age < 13 || age > 120) {
+                  return 'Please enter a valid age (13-120)';
+                }
+              }
+              return null;
+            },
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(3),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGenderField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Gender',
+          style: TextStyle(
+            color: AppThemeColor.darkBlueColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.grey.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.withOpacity(0.2)),
+          ),
+          child: DropdownButtonFormField<String>(
+            value: _selectedGender,
+            decoration: InputDecoration(
+              hintText: 'Select your gender (optional)',
+              hintStyle: TextStyle(
+                color: AppThemeColor.lightGrayColor,
+                fontSize: 16,
+              ),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+              prefixIcon: Icon(
+                Icons.person_outline,
+                color: AppThemeColor.lightGrayColor,
+                size: 20,
+              ),
+            ),
+            items: _genderOptions.map((String gender) {
+              return DropdownMenuItem<String>(
+                value: gender,
+                child: Text(gender),
+              );
+            }).toList(),
+            onChanged: (String? newValue) {
+              setState(() {
+                _selectedGender = newValue;
+              });
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLocationField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Location',
+          style: TextStyle(
+            color: AppThemeColor.darkBlueColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Focus(
+          onFocusChange: (hasFocus) {
+            setState(() {
+              _isLocationFocused = hasFocus;
+            });
+          },
+          child: TextFormField(
+            controller: _locationController,
+            textCapitalization: TextCapitalization.words,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+            decoration: InputDecoration(
+              hintText: 'Enter your city, state, or country (optional)',
+              hintStyle: TextStyle(
+                color: AppThemeColor.lightGrayColor,
+                fontSize: 16,
+              ),
+              filled: true,
+              fillColor: _isLocationFocused
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
+                  : Colors.grey.withOpacity(0.05),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: AppThemeColor.darkBlueColor,
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+              prefixIcon: Icon(
+                Icons.location_on_outlined,
+                color: _isLocationFocused
+                    ? AppThemeColor.darkBlueColor
+                    : AppThemeColor.lightGrayColor,
+                size: 20,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOccupationField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Occupation',
+          style: TextStyle(
+            color: AppThemeColor.darkBlueColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Focus(
+          onFocusChange: (hasFocus) {
+            setState(() {
+              _isOccupationFocused = hasFocus;
+            });
+          },
+          child: TextFormField(
+            controller: _occupationController,
+            textCapitalization: TextCapitalization.words,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+            decoration: InputDecoration(
+              hintText: 'Enter your job title or profession (optional)',
+              hintStyle: TextStyle(
+                color: AppThemeColor.lightGrayColor,
+                fontSize: 16,
+              ),
+              filled: true,
+              fillColor: _isOccupationFocused
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
+                  : Colors.grey.withOpacity(0.05),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: AppThemeColor.darkBlueColor,
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+              prefixIcon: Icon(
+                Icons.work_outline,
+                color: _isOccupationFocused
+                    ? AppThemeColor.darkBlueColor
+                    : AppThemeColor.lightGrayColor,
+                size: 20,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCompanyField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Company',
+          style: TextStyle(
+            color: AppThemeColor.darkBlueColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Focus(
+          onFocusChange: (hasFocus) {
+            setState(() {
+              _isCompanyFocused = hasFocus;
+            });
+          },
+          child: TextFormField(
+            controller: _companyController,
+            textCapitalization: TextCapitalization.words,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+            decoration: InputDecoration(
+              hintText: 'Enter your company name (optional)',
+              hintStyle: TextStyle(
+                color: AppThemeColor.lightGrayColor,
+                fontSize: 16,
+              ),
+              filled: true,
+              fillColor: _isCompanyFocused
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
+                  : Colors.grey.withOpacity(0.05),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: AppThemeColor.darkBlueColor,
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+              prefixIcon: Icon(
+                Icons.business_outlined,
+                color: _isCompanyFocused
+                    ? AppThemeColor.darkBlueColor
+                    : AppThemeColor.lightGrayColor,
+                size: 20,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWebsiteField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Website',
+          style: TextStyle(
+            color: AppThemeColor.darkBlueColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Focus(
+          onFocusChange: (hasFocus) {
+            setState(() {
+              _isWebsiteFocused = hasFocus;
+            });
+          },
+          child: TextFormField(
+            controller: _websiteController,
+            keyboardType: TextInputType.url,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+            decoration: InputDecoration(
+              hintText: 'Enter your website URL (optional)',
+              hintStyle: TextStyle(
+                color: AppThemeColor.lightGrayColor,
+                fontSize: 16,
+              ),
+              filled: true,
+              fillColor: _isWebsiteFocused
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
+                  : Colors.grey.withOpacity(0.05),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: AppThemeColor.darkBlueColor,
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+              prefixIcon: Icon(
+                Icons.language_outlined,
+                color: _isWebsiteFocused
+                    ? AppThemeColor.darkBlueColor
+                    : AppThemeColor.lightGrayColor,
+                size: 20,
+              ),
+            ),
+            validator: (value) {
+              if (value != null && value.isNotEmpty) {
+                final uri = Uri.tryParse(value);
+                if (uri == null || !uri.hasAbsolutePath) {
+                  return 'Please enter a valid URL';
+                }
+              }
+              return null;
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBioField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Bio',
+          style: TextStyle(
+            color: AppThemeColor.darkBlueColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Focus(
+          onFocusChange: (hasFocus) {
+            setState(() {
+              _isBioFocused = hasFocus;
+            });
+          },
+          child: TextFormField(
+            controller: _bioController,
+            maxLines: 3,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+            decoration: InputDecoration(
+              hintText: 'Tell us a bit about yourself (optional)',
+              hintStyle: TextStyle(
+                color: AppThemeColor.lightGrayColor,
+                fontSize: 16,
+              ),
+              filled: true,
+              fillColor: _isBioFocused
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
+                  : Colors.grey.withOpacity(0.05),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: AppThemeColor.darkBlueColor,
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+              prefixIcon: Padding(
+                padding: const EdgeInsets.only(bottom: 20),
+                child: Icon(
+                  Icons.edit_note_outlined,
+                  color: _isBioFocused
+                      ? AppThemeColor.darkBlueColor
+                      : AppThemeColor.lightGrayColor,
+                  size: 20,
+                ),
+              ),
+            ),
+            inputFormatters: [
+              LengthLimitingTextInputFormatter(200),
+            ],
           ),
         ),
       ],

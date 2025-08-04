@@ -25,6 +25,8 @@ import 'package:orgami/Screens/Events/Widget/QRDialouge.dart';
 import 'package:orgami/Screens/Events/TicketManagementScreen.dart';
 import 'package:orgami/Screens/Events/TicketScannerScreen.dart';
 import 'package:orgami/Screens/Events/EventAnalyticsScreen.dart';
+import 'package:orgami/Screens/Events/EventFeedbackScreen.dart';
+import 'package:orgami/Screens/Events/EventFeedbackManagementScreen.dart';
 import 'package:orgami/Screens/MyProfile/MyTicketsScreen.dart';
 import 'package:orgami/Screens/QRScanner/AnsQuestionsToSignInEventScreen.dart';
 import 'package:orgami/Screens/QRScanner/QrScannerScreenForLogedIn.dart';
@@ -1340,6 +1342,19 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                     ),
                     const SizedBox(height: 12),
                     _buildQuickActionOption(
+                      icon: Icons.star,
+                      title: 'Event Feedback',
+                      subtitle: 'Rate and comment on this event',
+                      onTap: () {
+                        Navigator.pop(context);
+                        RouterClass.nextScreenNormal(
+                          context,
+                          EventFeedbackScreen(eventModel: eventModel),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _buildQuickActionOption(
                       icon: Icons.share,
                       title: 'Share Event',
                       subtitle: 'Share with attendees',
@@ -1836,6 +1851,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
               height: 1.5,
             ),
           ),
+          const SizedBox(height: 20),
+          // Feedback Button (for attendees only)
+          if (eventModel.customerUid != FirebaseAuth.instance.currentUser!.uid)
+            _buildFeedbackButton(),
         ],
       ),
     );
@@ -1884,6 +1903,106 @@ class _SingleEventScreenState extends State<SingleEventScreen>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildFeedbackButton() {
+    return FutureBuilder<bool>(
+      future: FirebaseFirestoreHelper().hasUserSubmittedFeedback(
+        eventId: eventModel.id,
+        userId: FirebaseAuth.instance.currentUser?.uid ?? '',
+      ),
+      builder: (context, snapshot) {
+        final hasSubmittedFeedback = snapshot.data ?? false;
+
+        return GestureDetector(
+          onTap: hasSubmittedFeedback
+              ? null
+              : () {
+                  RouterClass.nextScreenNormal(
+                    context,
+                    EventFeedbackScreen(eventModel: eventModel),
+                  );
+                },
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: hasSubmittedFeedback
+                  ? Colors.grey[100]
+                  : const Color(0xFF667EEA).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: hasSubmittedFeedback
+                    ? Colors.grey[300]!
+                    : const Color(0xFF667EEA),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: hasSubmittedFeedback
+                        ? Colors.grey[300]
+                        : const Color(0xFF667EEA).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    hasSubmittedFeedback ? Icons.check_circle : Icons.star,
+                    color: hasSubmittedFeedback
+                        ? Colors.grey[600]
+                        : const Color(0xFF667EEA),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        hasSubmittedFeedback
+                            ? 'Feedback Submitted'
+                            : 'Rate This Event',
+                        style: TextStyle(
+                          color: hasSubmittedFeedback
+                              ? Colors.grey[600]
+                              : const Color(0xFF1A1A1A),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        hasSubmittedFeedback
+                            ? 'Thank you for your feedback!'
+                            : 'Share your experience and help improve future events',
+                        style: TextStyle(
+                          color: hasSubmittedFeedback
+                              ? Colors.grey[500]
+                              : const Color(0xFF6B7280),
+                          fontSize: 14,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!hasSubmittedFeedback)
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    color: const Color(0xFF6B7280),
+                    size: 16,
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -2774,6 +2893,22 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                     eventModel: eventModel,
                                     onBackPressed: () =>
                                         _showEventManagementModal(),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            _buildManagementOption(
+                              icon: Icons.star,
+                              title: 'Event Feedback',
+                              subtitle:
+                                  'View and manage event ratings and comments',
+                              onTap: () {
+                                Navigator.pop(context);
+                                RouterClass.nextScreenNormal(
+                                  context,
+                                  EventFeedbackManagementScreen(
+                                    eventModel: eventModel,
                                   ),
                                 );
                               },

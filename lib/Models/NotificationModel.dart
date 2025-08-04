@@ -5,7 +5,7 @@ class NotificationModel {
   final String title;
   final String body;
   final String
-  type; // 'event_reminder', 'new_event', 'ticket_update', 'general'
+  type; // 'event_reminder', 'new_event', 'ticket_update', 'event_feedback', 'general'
   final String? eventId;
   final String? eventTitle;
   final DateTime createdAt;
@@ -81,6 +81,7 @@ class UserNotificationSettings {
   final bool eventReminders;
   final bool newEvents;
   final bool ticketUpdates;
+  final bool eventFeedback;
   final bool generalNotifications;
   final int reminderTime; // minutes before event
   final int newEventsDistance; // distance in kilometers for "your area"
@@ -91,6 +92,7 @@ class UserNotificationSettings {
     this.eventReminders = true,
     this.newEvents = true,
     this.ticketUpdates = true,
+    this.eventFeedback = true,
     this.generalNotifications = true,
     this.reminderTime = 60, // 1 hour default
     this.newEventsDistance = 15, // 15 miles default for "your area"
@@ -103,6 +105,7 @@ class UserNotificationSettings {
       eventReminders: map['eventReminders'] ?? true,
       newEvents: map['newEvents'] ?? true,
       ticketUpdates: map['ticketUpdates'] ?? true,
+      eventFeedback: map['eventFeedback'] ?? true,
       generalNotifications: map['generalNotifications'] ?? true,
       reminderTime: map['reminderTime'] ?? 60,
       newEventsDistance: map['newEventsDistance'] ?? 15,
@@ -116,6 +119,7 @@ class UserNotificationSettings {
       'eventReminders': eventReminders,
       'newEvents': newEvents,
       'ticketUpdates': ticketUpdates,
+      'eventFeedback': eventFeedback,
       'generalNotifications': generalNotifications,
       'reminderTime': reminderTime,
       'newEventsDistance': newEventsDistance,
@@ -128,6 +132,7 @@ class UserNotificationSettings {
     bool? eventReminders,
     bool? newEvents,
     bool? ticketUpdates,
+    bool? eventFeedback,
     bool? generalNotifications,
     int? reminderTime,
     int? newEventsDistance,
@@ -138,6 +143,7 @@ class UserNotificationSettings {
       eventReminders: eventReminders ?? this.eventReminders,
       newEvents: newEvents ?? this.newEvents,
       ticketUpdates: ticketUpdates ?? this.ticketUpdates,
+      eventFeedback: eventFeedback ?? this.eventFeedback,
       generalNotifications: generalNotifications ?? this.generalNotifications,
       reminderTime: reminderTime ?? this.reminderTime,
       newEventsDistance: newEventsDistance ?? this.newEventsDistance,
