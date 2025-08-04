@@ -115,5 +115,24 @@ service cloud.firestore {
     match /scheduledNotifications/{notificationId} {
       allow read, write: if request.auth != null;
     }
+    
+    // Allow users to read/write conversations they are part of
+    match /Conversations/{conversationId} {
+      allow read, write: if request.auth != null && 
+        (request.auth.uid == resource.data.participant1Id || 
+         request.auth.uid == resource.data.participant2Id);
+      allow create: if request.auth != null && 
+        (request.auth.uid == request.resource.data.participant1Id || 
+         request.auth.uid == request.resource.data.participant2Id);
+    }
+    
+    // Allow users to read/write messages in conversations they are part of
+    match /Messages/{messageId} {
+      allow read, write: if request.auth != null && 
+        (request.auth.uid == resource.data.senderId || 
+         request.auth.uid == resource.data.receiverId);
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.senderId;
+    }
   }
 } 

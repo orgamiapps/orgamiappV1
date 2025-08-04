@@ -22,14 +22,14 @@ import 'dart:io';
 import 'package:orgami/Screens/MyProfile/MyProfileScreen.dart';
 import 'package:orgami/Screens/Home/AccountDetailsScreen.dart';
 
-class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+class AccountScreen extends StatefulWidget {
+  const AccountScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  State<AccountScreen> createState() => _AccountScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _AccountScreenState extends State<AccountScreen> {
   late final double _screenWidth = MediaQuery.of(context).size.width;
   late final double _screenHeight = MediaQuery.of(context).size.height;
   final FirebaseStorageHelper _storageHelper = FirebaseStorageHelper();
@@ -303,10 +303,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       padding: const EdgeInsets.all(24),
       child: Row(
         children: [
-          Icon(Icons.settings, color: const Color(0xFF667EEA), size: 20),
+          Icon(Icons.person, color: const Color(0xFF667EEA), size: 20),
           const SizedBox(width: 12),
           Text(
-            'Settings',
+            'Account',
             style: TextStyle(
               color:
                   Theme.of(context).textTheme.titleLarge?.color ??

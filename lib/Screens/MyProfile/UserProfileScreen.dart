@@ -13,6 +13,8 @@ import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Screens/Events/Widget/SingleEventListViewItem.dart';
 import 'package:orgami/Controller/CustomerController.dart';
 import 'package:orgami/Screens/MyProfile/FollowersFollowingScreen.dart';
+import 'package:orgami/Screens/Messaging/NewMessageScreen.dart';
+import 'package:orgami/Models/CustomerModel.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final CustomerModel user;
@@ -183,20 +185,23 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     return Scaffold(
       backgroundColor: AppThemeColor.backGroundColor,
       body: SafeArea(
-        child: Column(
-          children: [
-            _buildAppBar(),
-            Expanded(
-              child: Column(
-                children: [
-                  _buildProfileHeader(),
-                  _buildStatsSection(),
-                  _buildTabBar(),
-                  Expanded(child: _buildTabContent()),
-                ],
-              ),
-            ),
-          ],
+        child: RefreshIndicator(
+          onRefresh: _loadUserData,
+          color: AppThemeColor.darkBlueColor,
+          child: CustomScrollView(
+            slivers: [
+              // App Bar
+              SliverToBoxAdapter(child: _buildAppBar()),
+              // Profile Header
+              SliverToBoxAdapter(child: _buildProfileHeader()),
+              // Stats Section
+              SliverToBoxAdapter(child: _buildStatsSection()),
+              // Tab Bar
+              SliverToBoxAdapter(child: _buildTabBar()),
+              // Tab Content
+              SliverToBoxAdapter(child: _buildTabContent()),
+            ],
+          ),
         ),
       ),
     );
@@ -451,8 +456,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   Widget _buildStatsSection() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: AppThemeColor.pureWhiteColor,
         borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
@@ -474,17 +479,17 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   Text(
                     '$_followersCount',
                     style: const TextStyle(
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: AppThemeColor.darkBlueColor,
                       fontFamily: 'Roboto',
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     'Followers',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       color: AppThemeColor.dullFontColor,
                       fontFamily: 'Roboto',
                     ),
@@ -493,7 +498,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               ),
             ),
           ),
-          Container(width: 1, height: 40, color: AppThemeColor.borderColor),
+          Container(width: 1, height: 30, color: AppThemeColor.borderColor),
           Expanded(
             child: GestureDetector(
               onTap: () => _showFollowersFollowing('following'),
@@ -502,17 +507,17 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   Text(
                     '$_followingCount',
                     style: const TextStyle(
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: AppThemeColor.darkBlueColor,
                       fontFamily: 'Roboto',
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     'Following',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       color: AppThemeColor.dullFontColor,
                       fontFamily: 'Roboto',
                     ),
@@ -521,6 +526,37 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               ),
             ),
           ),
+          if (!widget.isOwnProfile) ...[
+            Container(width: 1, height: 30, color: AppThemeColor.borderColor),
+            GestureDetector(
+              onTap: () => _startMessage(),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppThemeColor.darkBlueColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.message_outlined,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Message',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppThemeColor.dullFontColor,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -555,6 +591,15 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildTabContent() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      child: _tabController.index == 0
+          ? _buildCreatedEventsTab()
+          : _buildAttendedEventsTab(),
     );
   }
 
@@ -614,16 +659,6 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     );
   }
 
-  Widget _buildTabContent() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      child: TabBarView(
-        controller: _tabController,
-        children: [_buildCreatedEventsTab(), _buildAttendedEventsTab()],
-      ),
-    );
-  }
-
   Widget _buildCreatedEventsTab() {
     print('Building created events tab with ${_createdEvents.length} events');
 
@@ -636,6 +671,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     }
 
     return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemCount: _createdEvents.length,
       itemBuilder: (context, index) {
         final event = _createdEvents[index];
@@ -659,6 +696,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     }
 
     return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemCount: _attendedEvents.length,
       itemBuilder: (context, index) {
         final event = _attendedEvents[index];
@@ -673,6 +712,17 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   Widget _buildEmptyState(String title, String message, IconData icon) {
     return Container(
       padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: AppThemeColor.pureWhiteColor,
+        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -771,6 +821,13 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           ),
         ],
       ),
+    );
+  }
+
+  void _startMessage() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => NewMessageScreen()),
     );
   }
 

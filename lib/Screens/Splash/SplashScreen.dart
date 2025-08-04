@@ -20,8 +20,6 @@ class _SplashScreenState extends State<SplashScreen>
   double screenWidth = 1000;
   double screenHeight = 1000;
 
-  // final User? _userData = FirebaseAuth.instance.currentUser;
-
   late AnimationController logoAnimation;
 
   _handleAnimation() {
@@ -37,30 +35,42 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _getUser() async {
-    User? firebaseUser = FirebaseAuth.instance.currentUser;
+    try {
+      User? firebaseUser = FirebaseAuth.instance.currentUser;
 
-    if (firebaseUser != null) {
-      try {
+      if (firebaseUser != null) {
+        print('🔍 User found: ${firebaseUser.uid}');
+
+        // Add timeout to prevent infinite loading
         final userData = await FirebaseFirestoreHelper()
-            .getSingleCustomer(customerId: firebaseUser.uid);
+            .getSingleCustomer(customerId: firebaseUser.uid)
+            .timeout(
+              const Duration(seconds: 10),
+              onTimeout: () {
+                print('⏰ Timeout getting user data');
+                return null;
+              },
+            );
 
         if (userData != null) {
           setState(() {
             CustomerController.logeInCustomer = userData;
           });
+          print('✅ User data loaded successfully');
           RouterClass().homeScreenRoute(context: context);
         } else {
-          // Handle null case - show error dialog with retry option
+          print('❌ User data is null');
           _showErrorDialog();
         }
-      } catch (e) {
-        print('Error in _getUser: $e');
-        _showErrorDialog();
+      } else {
+        print('🔍 No user found, navigating to second splash');
+        Timer(const Duration(seconds: 2), () {
+          RouterClass().secondSplashScreenRoute(context: context);
+        });
       }
-    } else {
-      Timer(const Duration(seconds: 5), () {
-        RouterClass().secondSplashScreenRoute(context: context);
-      });
+    } catch (e) {
+      print('❌ Error in _getUser: $e');
+      _showErrorDialog();
     }
   }
 
@@ -98,14 +108,18 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void initState() {
+    super.initState();
     _handleAnimation();
 
-    // Timer(const Duration(seconds: 2), () {
-    //   RouterClass().secondSplashScreenRoute(context: context);
-    // });
-    _getUser();
+    // Add a timeout to prevent infinite loading
+    Timer(const Duration(seconds: 15), () {
+      if (mounted) {
+        print('⏰ Splash screen timeout - forcing navigation');
+        RouterClass().secondSplashScreenRoute(context: context);
+      }
+    });
 
-    super.initState();
+    _getUser();
   }
 
   @override
@@ -118,25 +132,18 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     screenWidth = MediaQuery.of(context).size.width;
     screenHeight = MediaQuery.of(context).size.height;
-    return Scaffold(
-      body: _bodyView(),
-    );
+    return Scaffold(body: _bodyView());
   }
 
   Widget _bodyView() {
     return Container(
       width: screenWidth,
       height: screenHeight,
-      decoration: const BoxDecoration(
-        color: AppThemeColor.backGroundColor,
-      ),
+      decoration: const BoxDecoration(color: AppThemeColor.backGroundColor),
       child: Container(
         padding: const EdgeInsets.all(25),
         alignment: Alignment.center,
-        child: Image.asset(
-          Images.inAppLogo,
-          width: logoAnimation.value,
-        ),
+        child: Image.asset(Images.inAppLogo, width: logoAnimation.value),
       ),
     );
   }

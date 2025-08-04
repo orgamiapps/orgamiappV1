@@ -33,13 +33,16 @@ class _ErrorBoundaryState extends State<ErrorBoundary> {
     print('🚨 Flutter Error caught: ${details.exception}');
     print('Stack trace: ${details.stack}');
 
-    if (mounted) {
-      setState(() {
-        _error = details.exception;
-        _stackTrace = details.stack;
-        _hasError = true;
-      });
-    }
+    // Use a post-frame callback to avoid calling setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _error = details.exception;
+          _stackTrace = details.stack;
+          _hasError = true;
+        });
+      }
+    });
   }
 
   @override

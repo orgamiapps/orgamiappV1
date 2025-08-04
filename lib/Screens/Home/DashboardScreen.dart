@@ -1,11 +1,11 @@
-import 'package:flashy_tab_bar2/flashy_tab_bar2.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:orgami/Screens/Home/HomeScreen.dart';
 import 'package:orgami/Screens/Home/SearchEventsScreen.dart';
-import 'package:orgami/Screens/Home/SettingsScreen.dart';
+import 'package:orgami/Screens/Home/AccountScreen.dart';
 import 'package:orgami/Screens/Home/NotificationsScreen.dart';
 import 'package:orgami/Screens/QRScanner/QrScannerScreen.dart';
+import 'package:orgami/Screens/Messaging/MessagingScreen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -25,41 +25,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
     const SearchEventsScreen(),
     QRScannerScreen(),
     const NotificationsScreen(),
-    const SettingsScreen(),
+    const MessagingScreen(),
+    const AccountScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(child: _bodyView()),
-      bottomNavigationBar: FlashyTabBar(
-        selectedIndex: _selectedIndex,
-        showElevation: true,
-        onItemSelected: (index) => setState(() {
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        currentIndex: _selectedIndex,
+        onTap: (index) => setState(() {
           _selectedIndex = index;
         }),
-        items: [
-          _singleBottomBarItemView(iconData: Icons.event, title: 'Events'),
-          _singleBottomBarItemView(iconData: Icons.search, title: 'Search'),
-          _singleBottomBarItemView(
-            iconData: FontAwesomeIcons.qrcode,
-            title: 'Sign In',
+        selectedItemColor: const Color(0xFF667EEA),
+        unselectedItemColor: Colors.grey,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.event, size: 20), label: ''),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.search, size: 20),
+            label: '',
           ),
-          _singleBottomBarItemView(
-            iconData: Icons.notifications,
-            title: 'Alerts',
+          BottomNavigationBarItem(
+            icon: Icon(FontAwesomeIcons.qrcode, size: 20),
+            label: '',
           ),
-          _singleBottomBarItemView(iconData: Icons.settings, title: 'Settings'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notifications, size: 20),
+            label: '',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.message, size: 20),
+            label: '',
+          ),
+          BottomNavigationBarItem(icon: Icon(Icons.menu, size: 20), label: ''),
         ],
       ),
     );
-  }
-
-  FlashyTabBarItem _singleBottomBarItemView({
-    required IconData iconData,
-    required String title,
-  }) {
-    return FlashyTabBarItem(icon: Icon(iconData), title: Text(title));
   }
 
   Widget _bodyView() {
