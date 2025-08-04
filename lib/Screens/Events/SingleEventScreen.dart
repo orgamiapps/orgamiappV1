@@ -42,6 +42,7 @@ import 'package:orgami/Screens/Events/FeatureEventScreen.dart';
 import 'package:orgami/Screens/Events/EditEventScreen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SingleEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -1554,29 +1555,57 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                   ],
                 )
               else
-                // Share button for non-creators
-                Tooltip(
-                  message: 'Share Event',
-                  child: GestureDetector(
-                    onTap: () => _shareEventDetails(),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.3),
-                          width: 1,
+                // Calendar and Share buttons for non-creators
+                Row(
+                  children: [
+                    Tooltip(
+                      message: 'Add to Calendar',
+                      child: GestureDetector(
+                        onTap: () => _addToCalendar(),
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.calendar_today,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                         ),
                       ),
-                      child: const Icon(
-                        Icons.share_rounded,
-                        color: Colors.white,
-                        size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Tooltip(
+                      message: 'Share Event',
+                      child: GestureDetector(
+                        onTap: () => _shareEventDetails(),
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.share_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
             ],
           ),
@@ -1877,15 +1906,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
             ),
           ),
           const SizedBox(height: 20),
-          // Share and Feedback Buttons (for attendees only)
+          // Feedback Button (for attendees only)
           if (eventModel.customerUid != FirebaseAuth.instance.currentUser!.uid)
-            Column(
-              children: [
-                _buildShareEventButton(),
-                const SizedBox(height: 16),
-                _buildFeedbackButton(),
-              ],
-            ),
+            _buildFeedbackButton(),
         ],
       ),
     );
@@ -1934,69 +1957,6 @@ class _SingleEventScreenState extends State<SingleEventScreen>
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildShareEventButton() {
-    return GestureDetector(
-      onTap: () => _shareEventDetails(),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF10B981).withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF10B981), width: 1),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.share_rounded,
-                color: Color(0xFF10B981),
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 16),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Share This Event',
-                    style: TextStyle(
-                      color: Color(0xFF1A1A1A),
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                      fontFamily: 'Roboto',
-                    ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Share this event with friends and family',
-                    style: TextStyle(
-                      color: Color(0xFF6B7280),
-                      fontSize: 14,
-                      fontFamily: 'Roboto',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(
-              Icons.arrow_forward_ios,
-              color: Color(0xFF6B7280),
-              size: 16,
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -3338,6 +3298,16 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                       const SizedBox(height: 16),
                     ],
                     _buildShareOption(
+                      icon: Icons.calendar_today,
+                      title: 'Add to Calendar',
+                      subtitle: 'Add this event to your calendar',
+                      onTap: () {
+                        Navigator.pop(context);
+                        _addToCalendar();
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    _buildShareOption(
                       icon: Icons.share_rounded,
                       title: 'Share Event Details',
                       subtitle: isCreator
@@ -3473,6 +3443,299 @@ This looks like a great event!
     HapticFeedback.lightImpact();
     Clipboard.setData(ClipboardData(text: eventModel.rawId));
     ShowToast().showSnackBar('Event ID copied to clipboard', context);
+  }
+
+  void _addToCalendar() async {
+    HapticFeedback.lightImpact();
+
+    try {
+      // Format the event details for calendar
+      final eventTitle = Uri.encodeComponent(eventModel.title);
+      final eventDescription = Uri.encodeComponent(eventModel.description);
+      final eventLocation = Uri.encodeComponent(eventModel.location);
+
+      // Format date and time for calendar
+      final eventDate = eventModel.selectedDateTime;
+      final startTime = eventDate.toUtc().toIso8601String().replaceAll(
+        RegExp(r'[-:]|\.\d{3}'),
+        '',
+      );
+      final endTime = eventDate
+          .add(const Duration(hours: 2))
+          .toUtc()
+          .toIso8601String()
+          .replaceAll(RegExp(r'[-:]|\.\d{3}'), '');
+
+      // Create calendar URL (Google Calendar format)
+      final calendarUrl =
+          'https://calendar.google.com/calendar/render?'
+          'action=TEMPLATE'
+          '&text=$eventTitle'
+          '&dates=$startTime/$endTime'
+          '&details=$eventDescription'
+          '&location=$eventLocation'
+          '&sf=true'
+          '&output=xml';
+
+      // Try to launch the calendar URL
+      final uri = Uri.parse(calendarUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        ShowToast().showSnackBar('Opening calendar app...', context);
+      } else {
+        // Fallback: show a dialog with calendar options
+        _showCalendarOptionsDialog();
+      }
+    } catch (e) {
+      print('Error adding to calendar: $e');
+      ShowToast().showSnackBar('Failed to open calendar', context);
+    }
+  }
+
+  void _showCalendarOptionsDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.0),
+          ),
+          title: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.calendar_today,
+                  color: Color(0xFF667EEA),
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Add to Calendar',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Choose your calendar app:',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontFamily: 'Roboto',
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildCalendarOption(
+                'Google Calendar',
+                'calendar.google.com',
+                Icons.calendar_today,
+                () => _openGoogleCalendar(),
+              ),
+              const SizedBox(height: 8),
+              _buildCalendarOption(
+                'Apple Calendar',
+                'Calendar app',
+                Icons.apple,
+                () => _openAppleCalendar(),
+              ),
+              const SizedBox(height: 8),
+              _buildCalendarOption(
+                'Outlook Calendar',
+                'outlook.live.com',
+                Icons.email,
+                () => _openOutlookCalendar(),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildCalendarOption(
+    String title,
+    String subtitle,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF9FAFB),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: const Color(0xFF667EEA), size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF6B7280),
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios,
+              color: Color(0xFF6B7280),
+              size: 16,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openGoogleCalendar() async {
+    Navigator.of(context).pop();
+    final eventTitle = Uri.encodeComponent(eventModel.title);
+    final eventDescription = Uri.encodeComponent(eventModel.description);
+    final eventLocation = Uri.encodeComponent(eventModel.location);
+
+    final eventDate = eventModel.selectedDateTime;
+    final startTime = eventDate.toUtc().toIso8601String().replaceAll(
+      RegExp(r'[-:]|\.\d{3}'),
+      '',
+    );
+    final endTime = eventDate
+        .add(const Duration(hours: 2))
+        .toUtc()
+        .toIso8601String()
+        .replaceAll(RegExp(r'[-:]|\.\d{3}'), '');
+
+    final calendarUrl =
+        'https://calendar.google.com/calendar/render?'
+        'action=TEMPLATE'
+        '&text=$eventTitle'
+        '&dates=$startTime/$endTime'
+        '&details=$eventDescription'
+        '&location=$eventLocation'
+        '&sf=true'
+        '&output=xml';
+
+    final uri = Uri.parse(calendarUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  void _openAppleCalendar() async {
+    Navigator.of(context).pop();
+    final eventTitle = Uri.encodeComponent(eventModel.title);
+    final eventDescription = Uri.encodeComponent(eventModel.description);
+    final eventLocation = Uri.encodeComponent(eventModel.location);
+
+    final eventDate = eventModel.selectedDateTime;
+    final startTime = eventDate.toUtc().toIso8601String().replaceAll(
+      RegExp(r'[-:]|\.\d{3}'),
+      '',
+    );
+    final endTime = eventDate
+        .add(const Duration(hours: 2))
+        .toUtc()
+        .toIso8601String()
+        .replaceAll(RegExp(r'[-:]|\.\d{3}'), '');
+
+    // Apple Calendar uses a different format
+    final calendarUrl =
+        'webcal://calendar.google.com/calendar/event?'
+        'action=TEMPLATE'
+        '&text=$eventTitle'
+        '&dates=$startTime/$endTime'
+        '&details=$eventDescription'
+        '&location=$eventLocation';
+
+    final uri = Uri.parse(calendarUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  void _openOutlookCalendar() async {
+    Navigator.of(context).pop();
+    final eventTitle = Uri.encodeComponent(eventModel.title);
+    final eventDescription = Uri.encodeComponent(eventModel.description);
+    final eventLocation = Uri.encodeComponent(eventModel.location);
+
+    final eventDate = eventModel.selectedDateTime;
+    final startTime = eventDate.toUtc().toIso8601String().replaceAll(
+      RegExp(r'[-:]|\.\d{3}'),
+      '',
+    );
+    final endTime = eventDate
+        .add(const Duration(hours: 2))
+        .toUtc()
+        .toIso8601String()
+        .replaceAll(RegExp(r'[-:]|\.\d{3}'), '');
+
+    final calendarUrl =
+        'https://outlook.live.com/calendar/0/deeplink/compose?'
+        'subject=$eventTitle'
+        '&body=$eventDescription'
+        '&location=$eventLocation'
+        '&startdt=$startTime'
+        '&enddt=$endTime';
+
+    final uri = Uri.parse(calendarUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   Future<void> _getTicket() async {
