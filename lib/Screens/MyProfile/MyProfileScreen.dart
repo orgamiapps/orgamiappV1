@@ -342,32 +342,39 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       highlightColor: Colors.grey[100]!,
       child: Container(
         margin: const EdgeInsets.all(20),
-        child: Column(
+        child: Row(
           children: [
             Container(
-              width: 100,
-              height: 100,
+              width: 60,
+              height: 60,
               decoration: const BoxDecoration(
                 color: Colors.white,
                 shape: BoxShape.circle,
               ),
             ),
-            const SizedBox(height: 16),
-            Container(
-              width: 200,
-              height: 24,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              width: 300,
-              height: 16,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 150,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 200,
+                    height: 14,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -463,7 +470,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(24, 32, 24, 40),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       child: Column(
         children: [
           // Back Button and Header Row
@@ -481,16 +488,16 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                   }
                 },
                 child: Container(
-                  width: 40,
-                  height: 40,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(18),
                   ),
                   child: Icon(
                     isSelectionMode ? Icons.close : Icons.arrow_back,
                     color: Colors.white,
-                    size: 20,
+                    size: 18,
                   ),
                 ),
               ),
@@ -502,95 +509,105 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
-                  fontSize: 18,
+                  fontSize: 16,
                   fontFamily: 'Roboto',
                 ),
               ),
               const Spacer(),
               // Empty container for balance
-              const SizedBox(width: 40),
+              const SizedBox(width: 36),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
 
-          // Profile Picture Section
-          Container(
-            margin: const EdgeInsets.only(bottom: 24),
-            child: Stack(
-              children: [
-                Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 4),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: ClipOval(
-                    child: user?.profilePictureUrl != null
-                        ? Image.network(
-                            user!.profilePictureUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return _buildDefaultProfilePicture();
-                            },
-                          )
-                        : _buildDefaultProfilePicture(),
-                  ),
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 36,
-                    height: 36,
+          // Compact Profile Section - Horizontal Layout
+          Row(
+            children: [
+              // Profile Picture
+              Stack(
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
                     decoration: BoxDecoration(
-                      color: Colors.white,
                       shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 3),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons.camera_alt,
-                      color: Color(0xFF667EEA),
-                      size: 18,
+                    child: ClipOval(
+                      child: user?.profilePictureUrl != null
+                          ? Image.network(
+                              user!.profilePictureUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return _buildDefaultProfilePicture();
+                              },
+                            )
+                          : _buildDefaultProfilePicture(),
                     ),
                   ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        color: Color(0xFF667EEA),
+                        size: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 16),
+              
+              // User Info - Vertical Stack
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Hi ${user?.name ?? 'User'}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 20,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Welcome to your profile',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.8),
+                        fontWeight: FontWeight.w400,
+                        fontSize: 14,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-
-          // User Name
-          Text(
-            'Hi ${user?.name ?? 'User'}',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-              fontSize: 24,
-              fontFamily: 'Roboto',
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Welcome to your profile',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.8),
-              fontWeight: FontWeight.w400,
-              fontSize: 16,
-              fontFamily: 'Roboto',
-            ),
+              ),
+            ],
           ),
         ],
       ),
@@ -600,7 +617,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   Widget _buildDefaultProfilePicture() {
     return Container(
       color: const Color(0xFFE1E5E9),
-      child: const Icon(Icons.person, size: 60, color: Color(0xFF9CA3AF)),
+      child: const Icon(Icons.person, size: 30, color: Color(0xFF9CA3AF)),
     );
   }
 
