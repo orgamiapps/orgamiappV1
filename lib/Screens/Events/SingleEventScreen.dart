@@ -941,7 +941,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       floatingActionButton:
           eventModel.customerUid == FirebaseAuth.instance.currentUser!.uid
           ? _buildFloatingActionButton()
@@ -1005,9 +1005,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(24),
             topRight: Radius.circular(24),
           ),

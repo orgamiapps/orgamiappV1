@@ -161,7 +161,7 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: FadeTransition(opacity: _fadeAnimation, child: _bodyView()),
       ),
@@ -395,7 +395,7 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
         },
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(

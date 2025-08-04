@@ -337,7 +337,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       floatingActionButton: AnimatedOpacity(
         opacity: _fabOpacity,
         duration: const Duration(milliseconds: 300),
@@ -455,7 +455,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -481,10 +481,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     size: 18,
                   ),
                   const SizedBox(width: 8),
-                  const Text(
+                  Text(
                     'Distance',
                     style: TextStyle(
-                      color: Color(0xFF1A1A1A),
+                      color:
+                          Theme.of(context).textTheme.titleMedium?.color ??
+                          const Color(0xFF1A1A1A),
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
                       fontFamily: 'Roboto',
@@ -1023,7 +1025,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         },
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(

@@ -65,6 +65,9 @@ dependencies:
   http: ^1.1.2
   # Natural language processing
   # natural: ^0.2.0  # Removed due to compatibility issues
+  # Theme management
+  shared_preferences: ^2.2.2
+  provider: ^6.1.1
 
 dev_dependencies:
   flutter_test:

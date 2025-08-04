@@ -2,11 +2,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:provider/provider.dart';
 import 'package:orgami/Screens/Splash/SplashScreen.dart';
 import 'package:orgami/Utils/AppConstants.dart';
 import 'package:orgami/Utils/Colors.dart';
 import 'package:orgami/Utils/ErrorBoundary.dart';
 import 'package:orgami/Utils/PerformanceMonitor.dart';
+import 'package:orgami/Utils/ThemeProvider.dart';
 import 'package:orgami/firebase_options.dart';
 
 /// Comprehensive error handling for GoogleApiManager SecurityException and GMS issues
@@ -427,32 +429,30 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Builder(
-      builder: (context) {
-        return MaterialApp(
-          title: AppConstants.appName,
-          debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: AppThemeColor.darkGreenColor,
-            ),
-            useMaterial3: true,
-          ),
-          home: const SplashScreen()
-              .withErrorBoundary()
-              .withPerformanceMonitoring(),
-          builder: (context, child) {
-            // Show persistent error message if Firebase failed
-            if (!FirebaseErrorHandler.isFirebaseInitialized &&
-                !FirebaseErrorHandler.isOfflineMode) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _showPersistentErrorSnackBar(context);
-              });
-            }
-            return child!;
-          },
-        );
-      },
+    return ChangeNotifierProvider(
+      create: (_) => ThemeProvider(),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
+          return MaterialApp(
+            title: AppConstants.appName,
+            debugShowCheckedModeBanner: false,
+            theme: themeProvider.getTheme(),
+            home: const SplashScreen()
+                .withErrorBoundary()
+                .withPerformanceMonitoring(),
+            builder: (context, child) {
+              // Show persistent error message if Firebase failed
+              if (!FirebaseErrorHandler.isFirebaseInitialized &&
+                  !FirebaseErrorHandler.isOfflineMode) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _showPersistentErrorSnackBar(context);
+                });
+              }
+              return child!;
+            },
+          );
+        },
+      ),
     );
   }
 
