@@ -1063,6 +1063,7 @@ class _SignupScreenState extends State<SignupScreen>
           ),
           child: DropdownButtonFormField<String>(
             value: _selectedGender,
+            isExpanded: true,
             decoration: InputDecoration(
               hintText: 'Select your gender (optional)',
               hintStyle: TextStyle(
@@ -1083,7 +1084,11 @@ class _SignupScreenState extends State<SignupScreen>
             items: _genderOptions.map((String gender) {
               return DropdownMenuItem<String>(
                 value: gender,
-                child: Text(gender),
+                child: Text(
+                  gender,
+                  style: const TextStyle(fontSize: 16),
+                  overflow: TextOverflow.ellipsis,
+                ),
               );
             }).toList(),
             onChanged: (String? newValue) {

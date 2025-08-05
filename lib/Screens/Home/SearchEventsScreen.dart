@@ -15,6 +15,9 @@ import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Controller/CustomerController.dart';
 import 'package:orgami/Screens/Events/Widget/SingleEventListViewItem.dart';
+import 'package:orgami/Firebase/EventRecommendationHelper.dart';
+import 'package:orgami/Firebase/EngagementPredictor.dart';
+import 'package:orgami/Firebase/RecommendationAnalytics.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -193,6 +196,8 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
             setState(() {
               selectedCategories = categories;
             });
+            // Clear recommendation cache when categories change
+            EventRecommendationHelper.clearCache();
           }
         },
         onSortOptionChanged: (sortOption) {
@@ -200,6 +205,8 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
             setState(() {
               currentSortOption = sortOption;
             });
+            // Clear recommendation cache when sort options change
+            EventRecommendationHelper.clearCache();
           }
         },
       ),
@@ -242,7 +249,7 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
       child: Column(
         children: [
-          // Search Type Toggle
+          // Search Type Toggle with Personalization Indicator
           Container(
             margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
@@ -399,6 +406,9 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
                         });
                         if (_currentSearchType == SearchType.users) {
                           _performSearch();
+                        } else {
+                          // Clear recommendation cache when search changes
+                          EventRecommendationHelper.clearCache();
                         }
                       }
                     },
@@ -466,6 +476,40 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
               ],
             ),
           ),
+          // Personalization Indicator
+          if (_currentSearchType == SearchType.events)
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.psychology,
+                    color: Colors.white.withOpacity(0.8),
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Personalized Recommendations',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 12,
+                      fontFamily: 'Roboto',
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -476,14 +520,8 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
       return _buildUsersView();
     }
 
-    Stream<QuerySnapshot> eventsStream = FirebaseFirestore.instance
-        .collection(EventModel.firebaseKey)
-        .where('private', isEqualTo: false)
-        .orderBy('selectedDateTime', descending: false)
-        .snapshots();
-
-    return StreamBuilder<QuerySnapshot>(
-      stream: eventsStream,
+    return FutureBuilder<List<EventModel>>(
+      future: _getPersonalizedEvents(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting && isLoading) {
           return _buildSkeletonLoading();
@@ -493,50 +531,123 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
           return _buildErrorState();
         }
 
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return _buildEmptyState();
         }
 
-        List<EventModel> eventsList = snapshot.data!.docs
-            .map((e) => EventModel.fromJson(e.data() as Map<String, dynamic>))
-            .toList();
+        List<EventModel> events = snapshot.data!;
 
-        List<EventModel> neededEventList = eventsList
-            .where(
-              (element) => element.selectedDateTime
-                  .add(const Duration(hours: 3))
-                  .isAfter(DateTime.now()),
-            )
-            .toList();
-
-        List<EventModel> searchFilteredList = _searchValue.isNotEmpty
-            ? neededEventList
-                  .where(
-                    (element) => element.title.toLowerCase().contains(
-                      _searchValue.toLowerCase(),
-                    ),
-                  )
-                  .toList()
-            : neededEventList;
-
-        List<EventModel> categoryFilteredList = selectedCategories.isNotEmpty
-            ? searchFilteredList
-                  .where(
-                    (event) =>
-                        event.categories.any(selectedCategories.contains),
-                  )
-                  .toList()
-            : searchFilteredList;
-
-        if (categoryFilteredList.isEmpty) {
+        // Check if we have any events after filtering
+        if (events.isEmpty) {
           return _buildNoResultsState();
         }
 
-        categoryFilteredList = _sortEvents(categoryFilteredList);
+        // Apply additional sorting if user has selected a sort option
+        if (currentSortOption != SortOption.none) {
+          events = _sortEvents(events);
+        }
 
-        return _buildEventsList(categoryFilteredList);
+        return _buildEventsList(events);
       },
     );
+  }
+
+  /// Get personalized events using the recommendation algorithm
+  Future<List<EventModel>> _getPersonalizedEvents() async {
+    try {
+      // Get personalized recommendations
+      List<EventModel> recommendedEvents =
+          await EventRecommendationHelper.getPersonalizedRecommendations(
+            searchQuery: _searchValue,
+            categories: selectedCategories.isNotEmpty
+                ? selectedCategories
+                : null,
+            limit: 100,
+          );
+
+      // Apply additional filtering for search query if needed
+      if (_searchValue.isNotEmpty) {
+        recommendedEvents = recommendedEvents
+            .where(
+              (event) =>
+                  event.title.toLowerCase().contains(
+                    _searchValue.toLowerCase(),
+                  ) ||
+                  event.description.toLowerCase().contains(
+                    _searchValue.toLowerCase(),
+                  ),
+            )
+            .toList();
+      }
+
+      // Apply category filtering if needed
+      if (selectedCategories.isNotEmpty) {
+        recommendedEvents = recommendedEvents
+            .where((event) => event.categories.any(selectedCategories.contains))
+            .toList();
+      }
+
+      // Track analytics for recommendations shown
+      if (recommendedEvents.isNotEmpty) {
+        RecommendationAnalytics.trackRecommendationsShown(
+          eventIds: recommendedEvents.map((e) => e.id).toList(),
+          searchQuery: _searchValue,
+          categories: selectedCategories.isNotEmpty ? selectedCategories : null,
+        );
+      }
+
+      return recommendedEvents;
+    } catch (e) {
+      print('Error getting personalized events: $e');
+      // Fallback to basic event fetching
+      return _getBasicEvents();
+    }
+  }
+
+  /// Fallback method for basic event fetching
+  Future<List<EventModel>> _getBasicEvents() async {
+    try {
+      Query query = FirebaseFirestore.instance
+          .collection(EventModel.firebaseKey)
+          .where('private', isEqualTo: false)
+          .where(
+            'selectedDateTime',
+            isGreaterThan: DateTime.now().subtract(const Duration(hours: 3)),
+          );
+
+      if (selectedCategories.isNotEmpty) {
+        query = query.where('categories', arrayContainsAny: selectedCategories);
+      }
+
+      QuerySnapshot snapshot = await query.get();
+
+      List<EventModel> events = snapshot.docs
+          .map((e) => EventModel.fromJson(e.data() as Map<String, dynamic>))
+          .toList();
+
+      // Apply search filter
+      if (_searchValue.isNotEmpty) {
+        events = events
+            .where(
+              (element) => element.title.toLowerCase().contains(
+                _searchValue.toLowerCase(),
+              ),
+            )
+            .toList();
+      }
+
+      // Sort by featured status and date
+      events.sort((a, b) {
+        if (a.isFeatured && !b.isFeatured) return -1;
+        if (!a.isFeatured && b.isFeatured) return 1;
+        return a.selectedDateTime.compareTo(b.selectedDateTime);
+      });
+
+      return events;
+    } catch (e) {
+      print('Error in fallback event fetching: $e');
+      return [];
+    }
   }
 
   Widget _buildUsersView() {
@@ -852,6 +963,25 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
     );
   }
 
+  Widget _buildEventCard(EventModel event, int position) {
+    return SingleEventListViewItem(
+      eventModel: event,
+      onTap: () {
+        // Track interaction when user taps on an event (fire-and-forget)
+        EngagementPredictor.trackInteraction(event.id, 'view').catchError((e) {
+          print('Error tracking engagement: $e');
+        });
+        RecommendationAnalytics.trackRecommendationInteraction(
+          eventId: event.id,
+          interactionType: 'view',
+          position: position,
+        ).catchError((e) {
+          print('Error tracking recommendation interaction: $e');
+        });
+      },
+    );
+  }
+
   Widget _buildEventsList(List<EventModel> events) {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
@@ -859,14 +989,10 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
       itemBuilder: (context, index) {
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
-          child: _buildEventCard(events[index]),
+          child: _buildEventCard(events[index], index + 1),
         );
       },
     );
-  }
-
-  Widget _buildEventCard(EventModel event) {
-    return SingleEventListViewItem(eventModel: event);
   }
 
   Widget _buildSkeletonLoading() {

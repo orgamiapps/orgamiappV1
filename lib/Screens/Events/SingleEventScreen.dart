@@ -19,7 +19,6 @@ import 'package:orgami/Screens/Events/AddQuestionsToEventScreen.dart';
 import 'package:orgami/Screens/Events/Attendance/AttendanceSheetScreen.dart';
 import 'package:orgami/Screens/Events/Widget/AttendeesHorizontalList.dart';
 import 'package:orgami/Screens/Events/Widget/CoHostManagementWidget.dart';
-import 'package:orgami/Screens/Events/Widget/PreRegisteredHorizontalList.dart';
 import 'package:orgami/Screens/Events/Widget/CommentsSection.dart';
 // DeleteEventDialouge import removed - no longer needed in SingleEventScreen
 import 'package:orgami/Screens/Events/Widget/QRDialouge.dart';
@@ -1161,7 +1160,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
     getAttendance();
     getPreRegisterCount();
-    checkUserTicket();
+    checkUserTicket(updateUI: true);
     loadEventSummary();
 
     // Check if event is favorited
@@ -1255,6 +1254,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     // Refresh attendance data when app becomes active
     if (state == AppLifecycleState.resumed) {
       getAttendance();
+      checkUserTicket(updateUI: true); // Also refresh ticket status
     }
   }
 
@@ -1268,6 +1268,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted) {
           getAttendance();
+          checkUserTicket(updateUI: true); // Also refresh ticket status
         }
       });
     }
@@ -1828,10 +1829,6 @@ class _SingleEventScreenState extends State<SingleEventScreen>
             AttendeesHorizontalList(eventModel: eventModel),
             const SizedBox(height: 24),
 
-            // Pre-Registered List (for everyone)
-            PreRegisteredHorizontalList(eventModel: eventModel),
-            const SizedBox(height: 24),
-
             // Comments Section (for everyone)
             CommentsSection(eventModel: eventModel),
             const SizedBox(height: 24),
@@ -2054,6 +2051,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
             label: 'Location',
             value: eventModel.location,
           ),
+          const SizedBox(height: 16),
+          // Ticket Quantity Display
+          if (eventModel.ticketsEnabled) _buildTicketQuantityItem(),
           const SizedBox(height: 20),
           // Description
           Text(
@@ -2129,6 +2129,120 @@ class _SingleEventScreenState extends State<SingleEventScreen>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTicketQuantityItem() {
+    final int issued = eventModel.issuedTickets;
+    final int max = eventModel.maxTickets;
+    final bool hasMaxLimit = max > 0;
+    final double percentage = hasMaxLimit ? (issued / max) * 100 : 0.0;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFF9800).withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFFFF9800).withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF9800).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.confirmation_number,
+              color: Color(0xFFFF9800),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Tickets Issued',
+                  style: const TextStyle(
+                    color: Color(0xFF6B7280),
+                    fontSize: 12,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Text(
+                      '$issued',
+                      style: const TextStyle(
+                        color: Color(0xFF1A1A1A),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                    if (hasMaxLimit) ...[
+                      const Text(
+                        ' / ',
+                        style: TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontWeight: FontWeight.w500,
+                          fontSize: 16,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                      Text(
+                        '$max',
+                        style: const TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontWeight: FontWeight.w500,
+                          fontSize: 16,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                if (hasMaxLimit) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: LinearProgressIndicator(
+                          value: percentage / 100,
+                          backgroundColor: const Color(
+                            0xFFFF9800,
+                          ).withOpacity(0.2),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            Color(0xFFFF9800),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${percentage.toInt()}%',
+                        style: const TextStyle(
+                          color: Color(0xFFFF9800),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -3890,18 +4004,33 @@ This looks like a great event!
         });
 
         if (ticket != null) {
+          // Immediately update the UI to show ticket received
+          setState(() {
+            _hasTicket = true;
+            _isGettingTicket = false;
+          });
+
           ShowToast().showNormalToast(
             msg:
                 'Ticket obtained successfully! You are now registered for this event.',
           );
-          // Refresh ticket status and pre-registered count
-          checkUserTicket();
+
+          // Refresh ticket status and pre-registered count in background
+          checkUserTicket(updateUI: false);
           getPreRegisterCount();
-          // Navigate to MyTicketsScreen to show the new ticket
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const MyTicketsScreen()),
-          );
+
+          // Add a small delay to let user see the "Ticket Received" state
+          Future.delayed(const Duration(milliseconds: 1500), () {
+            if (mounted) {
+              // Navigate to MyTicketsScreen to show the new ticket
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MyTicketsScreen(),
+                ),
+              );
+            }
+          });
         }
       }
     } catch (e) {
@@ -3910,7 +4039,28 @@ This looks like a great event!
         setState(() {
           _isGettingTicket = false;
         });
-        ShowToast().showNormalToast(msg: 'Failed to get ticket: $e');
+
+        // Handle specific error cases more gracefully
+        String errorMessage = 'Failed to get ticket';
+        if (e.toString().contains('You already have a ticket for this event')) {
+          errorMessage = 'You already have a ticket for this event';
+          // Refresh ticket status to ensure UI is up to date with a small delay
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted) {
+              checkUserTicket(updateUI: true);
+            }
+          });
+        } else if (e.toString().contains('Tickets are not enabled')) {
+          errorMessage = 'Tickets are not enabled for this event';
+        } else if (e.toString().contains('No tickets available')) {
+          errorMessage = 'No tickets available for this event';
+        } else if (e.toString().contains('Event not found')) {
+          errorMessage = 'Event not found';
+        } else {
+          errorMessage = 'Failed to get ticket: $e';
+        }
+
+        ShowToast().showNormalToast(msg: errorMessage);
       }
     }
   }
@@ -3929,20 +4079,22 @@ This looks like a great event!
       );
       ShowToast().showNormalToast(msg: 'Tickets cleared for testing');
       // Refresh ticket status after clearing
-      checkUserTicket();
+      checkUserTicket(updateUI: true);
     } catch (e) {
       ShowToast().showNormalToast(msg: 'Failed to clear tickets: $e');
     }
   }
 
-  Future<void> checkUserTicket() async {
+  Future<void> checkUserTicket({bool updateUI = true}) async {
     if (CustomerController.logeInCustomer == null) {
       return;
     }
 
-    setState(() {
-      _isCheckingTicket = true;
-    });
+    if (updateUI) {
+      setState(() {
+        _isCheckingTicket = true;
+      });
+    }
 
     try {
       final userTickets = await FirebaseFirestoreHelper().getUserTickets(
@@ -3954,7 +4106,7 @@ This looks like a great event!
         (ticket) => ticket.eventId == eventModel.id && !ticket.isUsed,
       );
 
-      if (mounted) {
+      if (mounted && updateUI) {
         setState(() {
           _hasTicket = hasActiveTicket;
           _isCheckingTicket = false;
@@ -3962,7 +4114,7 @@ This looks like a great event!
       }
     } catch (e) {
       print('Error checking user ticket: $e');
-      if (mounted) {
+      if (mounted && updateUI) {
         setState(() {
           _isCheckingTicket = false;
         });
@@ -4297,89 +4449,6 @@ This looks like a great event!
               ),
             ),
           ),
-
-        // Paid Ticket Section (Coming Soon)
-        const SizedBox(height: 24),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8F9FA),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
-          ),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF667EEA).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.payment,
-                      color: Color(0xFF667EEA),
-                      size: 18,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Paid Tickets',
-                      style: TextStyle(
-                        color: Color(0xFF1A1A1A),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Premium tickets with additional benefits will be available soon with Stripe integration.',
-                style: TextStyle(
-                  color: Color(0xFF6B7280),
-                  fontSize: 14,
-                  fontFamily: 'Roboto',
-                  height: 1.4,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6B7280).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF6B7280), width: 1),
-                ),
-                child: const Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.payment, color: Color(0xFF6B7280), size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'Buy Ticket (Coming Soon)',
-                        style: TextStyle(
-                          color: Color(0xFF6B7280),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          fontFamily: 'Roboto',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
 
         // Debug button (smaller and less prominent)
         if (!_hasTicket) ...[

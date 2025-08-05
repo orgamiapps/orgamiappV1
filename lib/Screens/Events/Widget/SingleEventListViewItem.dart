@@ -15,12 +15,14 @@ class SingleEventListViewItem extends StatefulWidget {
   final EventModel eventModel;
   final bool disableTap;
   final VoidCallback? onFavoriteChanged;
+  final VoidCallback? onTap;
 
   const SingleEventListViewItem({
     super.key,
     required this.eventModel,
     this.disableTap = false,
     this.onFavoriteChanged,
+    this.onTap,
   });
 
   @override
@@ -143,6 +145,8 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
             ? null
             : () {
                 print('Tapped event: ${widget.eventModel.id}');
+                // Call the optional onTap callback if provided
+                widget.onTap?.call();
                 RouterClass.nextScreenNormal(
                   context,
                   SingleEventScreen(eventModel: widget.eventModel),
