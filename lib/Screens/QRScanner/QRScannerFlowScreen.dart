@@ -15,7 +15,6 @@ import 'package:orgami/Utils/dimensions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/Screens/Events/SingleEventScreen.dart';
 
-
 class QRScannerFlowScreen extends StatefulWidget {
   const QRScannerFlowScreen({super.key});
 
@@ -75,7 +74,11 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
         children: [
           GestureDetector(
             onTap: () {
-              Navigator.of(context).pop();
+              if (_currentStep > 0) {
+                _previousStep();
+              } else {
+                Navigator.of(context).pop();
+              }
             },
             child: Container(
               padding: const EdgeInsets.all(8),

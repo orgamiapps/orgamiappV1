@@ -12,8 +12,10 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:orgami/Models/EventModel.dart';
+import 'package:orgami/Models/CustomerModel.dart';
 import 'package:orgami/Screens/Events/ChoseDateTimeScreen.dart';
 import 'package:orgami/Screens/Events/SingleEventScreen.dart';
+import 'package:orgami/Screens/MyProfile/UserProfileScreen.dart';
 import 'package:orgami/Utils/Colors.dart';
 import 'package:orgami/Utils/Images.dart';
 import 'package:orgami/Utils/Router.dart';
@@ -25,6 +27,7 @@ import 'package:orgami/Screens/Events/Widget/SingleEventListViewItem.dart';
 import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Controller/CustomerController.dart';
 import 'package:orgami/Utils/Toast.dart';
+import 'package:orgami/Screens/QRScanner/QRScannerFlowScreen.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -36,6 +39,9 @@ enum SortOption {
   eventDateAsc,
   eventDateDesc,
 }
+
+// Enum for search type
+enum SearchType { events, users }
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -49,6 +55,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   List<String> selectedCategories = [];
   bool isLoading = true;
   bool isRefreshing = false;
+
+  // Search functionality
+  bool _isSearchExpanded = false;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  String _searchValue = '';
+  SearchType _currentSearchType = SearchType.events;
+  List<CustomerModel> _searchUsers = [];
+  bool _isSearchingUsers = false;
+  List<EventModel> _searchEvents = [];
+  bool _isSearchingEvents = false;
+
+  // Default content state variables
+  List<EventModel> _defaultEvents = [];
+  List<CustomerModel> _defaultUsers = [];
+  bool _isLoadingDefaultEvents = false;
+  bool _isLoadingDefaultUsers = false;
 
   // Sorting state
   SortOption currentSortOption =
@@ -65,6 +88,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late Animation<double> _pulseAnimation;
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
+  late AnimationController _searchAnimationController;
+  late Animation<double> _searchAnimation;
 
   // Categories including Featured for HomeScreen
   final List<String> _allCategories = [
@@ -182,6 +207,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
     _fadeController.forward();
 
+    // Initialize search animation
+    _searchAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _searchAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _searchAnimationController,
+        curve: Curves.easeOut,
+      ),
+    );
+
+    // Load default content
+    _loadDefaultEvents();
+    _loadDefaultUsers();
+
     // Simulate loading
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
@@ -197,7 +238,104 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _scrollController.dispose();
     _pulseController.dispose();
     _fadeController.dispose();
+    _searchAnimationController.dispose();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  // Search functionality methods
+  void _toggleSearch() {
+    setState(() {
+      _isSearchExpanded = !_isSearchExpanded;
+    });
+
+    if (_isSearchExpanded) {
+      _searchAnimationController.forward();
+      Future.delayed(const Duration(milliseconds: 100), () {
+        _searchFocusNode.requestFocus();
+      });
+    } else {
+      _searchAnimationController.reverse();
+      _searchController.clear();
+      _searchValue = '';
+      _searchUsers.clear();
+      _searchEvents.clear();
+      _searchFocusNode.unfocus();
+    }
+  }
+
+  Future<void> _performSearch() async {
+    if (_searchValue.isEmpty) {
+      setState(() {
+        _searchUsers.clear();
+        _searchEvents.clear();
+      });
+      return;
+    }
+
+    if (_currentSearchType == SearchType.users) {
+      setState(() {
+        _isSearchingUsers = true;
+      });
+
+      try {
+        final users = await FirebaseFirestoreHelper().searchUsers(
+          searchQuery: _searchValue,
+          limit: 100,
+        );
+
+        if (mounted) {
+          setState(() {
+            _searchUsers = users;
+            _isSearchingUsers = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isSearchingUsers = false;
+          });
+        }
+        print('Error searching users: $e');
+      }
+    } else {
+      // For events, we'll use client-side filtering since there's no searchEvents method
+      setState(() {
+        _isSearchingEvents = true;
+      });
+
+      try {
+        // Get all events and filter client-side
+        final eventsQuery = await FirebaseFirestore.instance
+            .collection(EventModel.firebaseKey)
+            .where('private', isEqualTo: false)
+            .get();
+
+        final allEvents = eventsQuery.docs
+            .map((e) => EventModel.fromJson(e.data() as Map<String, dynamic>))
+            .where(
+              (event) => event.title.toLowerCase().contains(
+                _searchValue.toLowerCase(),
+              ),
+            )
+            .toList();
+
+        if (mounted) {
+          setState(() {
+            _searchEvents = allEvents;
+            _isSearchingEvents = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isSearchingEvents = false;
+          });
+        }
+        print('Error searching events: $e');
+      }
+    }
   }
 
   void _onScroll() {
@@ -342,39 +480,43 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      floatingActionButton: AnimatedOpacity(
-        opacity: _fabOpacity,
-        duration: const Duration(milliseconds: 300),
-        child: Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-            ),
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF667EEA).withValues(alpha: 0.3),
-                spreadRadius: 2,
-                blurRadius: 8,
-                offset: const Offset(0, 4),
+      floatingActionButton: _isSearchExpanded
+          ? null
+          : AnimatedOpacity(
+              opacity: _fabOpacity,
+              duration: const Duration(milliseconds: 300),
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                  ),
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+                      spreadRadius: 2,
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(28),
+                    onTap: _onFabPressed,
+                    child: const Icon(Icons.add, color: Colors.white, size: 28),
+                  ),
+                ),
               ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(28),
-              onTap: _onFabPressed,
-              child: const Icon(Icons.add, color: Colors.white, size: 28),
             ),
-          ),
-        ),
-      ),
-      body: SafeArea(child: _bodyView()),
+      body: _isSearchExpanded
+          ? _buildFullScreenSearch()
+          : SafeArea(child: _bodyView()),
     );
   }
 
@@ -406,45 +548,119 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         ),
       ),
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Discover',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w300,
-                    fontSize: 20,
-                    fontFamily: 'Roboto',
-                  ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Discover',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w300,
+                        fontSize: 20,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                    const Text(
+                      'Amazing Events',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 24,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
                 ),
-                const Text(
-                  'Amazing Events',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 24,
-                    fontFamily: 'Roboto',
+              ),
+              Row(
+                children: [
+                  // Search Icon
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    width: _isSearchExpanded ? 0 : 40,
+                    child: _isSearchExpanded
+                        ? const SizedBox.shrink()
+                        : Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(20),
+                                onTap: _toggleSearch,
+                                child: const Icon(
+                                  Icons.search,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: Image.asset(Images.inAppLogo, width: 40, height: 40),
-            ),
+                  const SizedBox(width: 8),
+                  // QR Code Icon
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    width: _isSearchExpanded ? 0 : 40,
+                    child: _isSearchExpanded
+                        ? const SizedBox.shrink()
+                        : Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(20),
+                                onTap: () {
+                                  RouterClass.nextScreenNormal(
+                                    context,
+                                    const QRScannerFlowScreen(),
+                                  );
+                                },
+                                child: const Icon(
+                                  Icons.qr_code_scanner,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Logo
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.asset(
+                        Images.inAppLogo,
+                        width: 32,
+                        height: 32,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ],
       ),
@@ -637,6 +853,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _eventsView() {
+    // If search is active and has a value, show search results
+    if (_isSearchExpanded && _searchValue.isNotEmpty) {
+      if (_currentSearchType == SearchType.users) {
+        return _buildUsersSearchResults();
+      } else {
+        return _buildEventsSearchResults();
+      }
+    }
+
+    // If search is expanded but no value, show empty search state
+    if (_isSearchExpanded && _searchValue.isEmpty) {
+      return _buildSearchEmptyState();
+    }
+
     // Create a stream for the Firestore query
     Stream<QuerySnapshot> eventsStream = FirebaseFirestore.instance
         .collection(EventModel.firebaseKey)
@@ -976,6 +1206,754 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildEventCard(EventModel event) {
     return SingleEventListViewItem(eventModel: event);
+  }
+
+  // Search results methods
+  Widget _buildEventsSearchResults() {
+    if (_isSearchingEvents) {
+      return _buildSearchLoadingState();
+    }
+
+    if (_searchEvents.isEmpty) {
+      return _buildSearchEmptyState();
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _searchEvents.length,
+      itemBuilder: (context, index) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          child: _buildEventCard(_searchEvents[index]),
+        );
+      },
+    );
+  }
+
+  Widget _buildUsersSearchResults() {
+    if (_isSearchingUsers) {
+      return _buildSearchLoadingState();
+    }
+
+    if (_searchUsers.isEmpty) {
+      return _buildSearchEmptyState();
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _searchUsers.length,
+      itemBuilder: (context, index) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          child: _buildUserCard(_searchUsers[index]),
+        );
+      },
+    );
+  }
+
+  Widget _buildUserCard(CustomerModel user) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            spreadRadius: 0,
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // User Avatar
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(25),
+              child:
+                  user.profilePictureUrl != null &&
+                      user.profilePictureUrl!.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: user.profilePictureUrl!,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF667EEA),
+                          strokeWidth: 2,
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => const Icon(
+                        Icons.person,
+                        color: Color(0xFF667EEA),
+                        size: 24,
+                      ),
+                    )
+                  : const Icon(
+                      Icons.person,
+                      color: Color(0xFF667EEA),
+                      size: 24,
+                    ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          // User Info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+                if (user.username != null && user.username!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    '@${user.username}',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 14,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          // View Profile Button
+          GestureDetector(
+            onTap: () {
+              RouterClass.nextScreenNormal(
+                context,
+                UserProfileScreen(user: user),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text(
+                'View Profile',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchLoadingState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(color: Color(0xFF667EEA)),
+            const SizedBox(height: 16),
+            Text(
+              'Searching ${_currentSearchType == SearchType.events ? 'events' : 'users'}...',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 16,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              _currentSearchType == SearchType.events
+                  ? Icons.event_busy
+                  : Icons.people_outline,
+              size: 64,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No ${_currentSearchType == SearchType.events ? 'events' : 'users'} found',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Roboto',
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try adjusting your search terms',
+              style: TextStyle(
+                color: Colors.grey[500],
+                fontSize: 14,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Load default events (all events, past and present)
+  Future<void> _loadDefaultEvents() async {
+    setState(() {
+      _isLoadingDefaultEvents = true;
+    });
+
+    try {
+      // Get all non-private events from Firestore without complex ordering
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection(EventModel.firebaseKey)
+          .where('private', isEqualTo: false)
+          .limit(50)
+          .get();
+
+      if (mounted) {
+        List<EventModel> events = querySnapshot.docs
+            .map((doc) => EventModel.fromJson(doc.data()))
+            .toList();
+
+        // Include all events (past and present) for search screen
+        // Sort by event date (most recent first) on the client side
+        events.sort((a, b) => b.selectedDateTime.compareTo(a.selectedDateTime));
+
+        setState(() {
+          _defaultEvents = events;
+          _isLoadingDefaultEvents = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingDefaultEvents = false;
+        });
+      }
+      print('Error loading default events: $e');
+    }
+  }
+
+  // Load default users (ascending by name)
+  Future<void> _loadDefaultUsers() async {
+    setState(() {
+      _isLoadingDefaultUsers = true;
+    });
+
+    try {
+      final users = await FirebaseFirestoreHelper().searchUsers(
+        searchQuery: '', // Empty query to get all users
+        limit: 50,
+      );
+
+      if (mounted) {
+        setState(() {
+          _defaultUsers = users;
+          _isLoadingDefaultUsers = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingDefaultUsers = false;
+        });
+      }
+      print('Error loading default users: $e');
+    }
+  }
+
+  // Build default content based on current search type
+  Widget _buildDefaultContent() {
+    if (_currentSearchType == SearchType.events) {
+      return _buildDefaultEventsContent();
+    } else {
+      return _buildDefaultUsersContent();
+    }
+  }
+
+  // Build default events content
+  Widget _buildDefaultEventsContent() {
+    if (_isLoadingDefaultEvents) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF667EEA)),
+      );
+    }
+
+    if (_defaultEvents.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.event_busy, size: 64, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text(
+                'No events found',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Try searching for specific events or check back later',
+                style: TextStyle(
+                  color: Colors.grey[500],
+                  fontSize: 14,
+                  fontFamily: 'Roboto',
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _defaultEvents.length,
+      itemBuilder: (context, index) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          child: _buildEventCard(_defaultEvents[index]),
+        );
+      },
+    );
+  }
+
+  // Build default users content
+  Widget _buildDefaultUsersContent() {
+    if (_isLoadingDefaultUsers) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF667EEA)),
+      );
+    }
+
+    if (_defaultUsers.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text(
+                'No users available',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Check back later for new users',
+                style: TextStyle(
+                  color: Colors.grey[500],
+                  fontSize: 14,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _defaultUsers.length,
+      itemBuilder: (context, index) {
+        final user = _defaultUsers[index];
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          child: GestureDetector(
+            onTap: () {
+              RouterClass.nextScreenNormal(
+                context,
+                UserProfileScreen(user: user),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withValues(alpha: 0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(25),
+                      child:
+                          user.profilePictureUrl != null &&
+                              user.profilePictureUrl!.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: user.profilePictureUrl!,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => const Center(
+                                child: CircularProgressIndicator(
+                                  color: Color(0xFF667EEA),
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => const Icon(
+                                Icons.person,
+                                color: Color(0xFF667EEA),
+                                size: 24,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.person,
+                              color: Color(0xFF667EEA),
+                              size: 24,
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user.name,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                        if (user.bio != null && user.bio!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            user.bio!,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                              fontFamily: 'Roboto',
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.grey,
+                    size: 16,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Full Screen Search
+  Widget _buildFullScreenSearch() {
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Search Header
+            Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                ),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                children: [
+                  // Header with close button
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: _toggleSearch,
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Text(
+                          'Search',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 24,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  // Search Type Toggle
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _currentSearchType = SearchType.events;
+                                _searchUsers.clear();
+                                _searchEvents.clear();
+                                _searchValue = '';
+                                _searchController.clear();
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _currentSearchType == SearchType.events
+                                    ? Colors.white.withValues(alpha: 0.3)
+                                    : Colors.transparent,
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(12),
+                                  bottomLeft: Radius.circular(12),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.event,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Events',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight:
+                                          _currentSearchType ==
+                                              SearchType.events
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      fontSize: 14,
+                                      fontFamily: 'Roboto',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () async {
+                              setState(() {
+                                _currentSearchType = SearchType.users;
+                                _searchUsers.clear();
+                                _searchEvents.clear();
+                                _searchValue = '';
+                                _searchController.clear();
+                              });
+                              _performSearch();
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _currentSearchType == SearchType.users
+                                    ? Colors.white.withValues(alpha: 0.3)
+                                    : Colors.transparent,
+                                borderRadius: const BorderRadius.only(
+                                  topRight: Radius.circular(12),
+                                  bottomRight: Radius.circular(12),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.people,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Users',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight:
+                                          _currentSearchType == SearchType.users
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      fontSize: 14,
+                                      fontFamily: 'Roboto',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Search Input
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.search,
+                          color: Colors.white.withValues(alpha: 0.8),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            focusNode: _searchFocusNode,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontFamily: 'Roboto',
+                            ),
+                            decoration: InputDecoration(
+                              hintText: _currentSearchType == SearchType.events
+                                  ? 'Search events by title...'
+                                  : 'Search users by name...',
+                              hintStyle: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.8),
+                                fontSize: 16,
+                                fontFamily: 'Roboto',
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            onChanged: (newVal) {
+                              setState(() {
+                                _searchValue = newVal;
+                              });
+                              _performSearch();
+                            },
+                          ),
+                        ),
+                        if (_searchValue.isNotEmpty)
+                          GestureDetector(
+                            onTap: () {
+                              _searchController.clear();
+                              setState(() {
+                                _searchValue = '';
+                              });
+                              _performSearch();
+                            },
+                            child: Icon(
+                              Icons.clear,
+                              color: Colors.white.withValues(alpha: 0.8),
+                              size: 20,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Search Results
+            Expanded(
+              child: _searchValue.isEmpty
+                  ? _buildDefaultContent()
+                  : _currentSearchType == SearchType.users
+                  ? _buildUsersSearchResults()
+                  : _buildEventsSearchResults(),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

@@ -128,11 +128,18 @@ service cloud.firestore {
     
     // Allow users to read/write messages in conversations they are part of
     match /Messages/{messageId} {
-      allow read, write: if request.auth != null && 
+      allow read: if request.auth != null && 
         (request.auth.uid == resource.data.senderId || 
          request.auth.uid == resource.data.receiverId);
       allow create: if request.auth != null && 
         request.auth.uid == request.resource.data.senderId;
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.senderId;
+    }
+    
+    // Allow users to read/write their own user data for FCM tokens
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
 } 

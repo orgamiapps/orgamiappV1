@@ -53,11 +53,43 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          _bodyView(),
-          AppAppBarView.appBarWithOnlyBackButton(context: context),
-        ],
+      backgroundColor: Colors.white,
+      body: Stack(children: [_bodyView(), _modernAppBar()]),
+    );
+  }
+
+  Widget _modernAppBar() {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppThemeColor.darkBlueColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppThemeColor.darkBlueColor.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => Navigator.pop(context),
+                  child: Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: AppThemeColor.darkBlueColor,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -66,7 +98,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     return Container(
       width: _screenWidth,
       height: _screenHeight,
-      decoration: const BoxDecoration(),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.white, AppThemeColor.lightBlueColor.withOpacity(0.4)],
+        ),
+      ),
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(25),
@@ -75,10 +113,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
             children: [
               Column(
                 children: [
-                  Image.asset(
-                    Images.inAppLogo,
-                    width: logoAnimation.value,
-                  ),
+                  const SizedBox(height: 60),
+                  _logoSection(),
                   const SizedBox(height: 30),
                   _labelView(),
                 ],
@@ -92,116 +128,222 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     );
   }
 
-  Widget _loginDetailsView() {
+  Widget _logoSection() {
     return Container(
-      width: _screenWidth,
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: AppThemeColor.pureWhiteColor,
-        borderRadius: BorderRadius.circular(25),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey[300]!,
-            spreadRadius: 1,
-            blurRadius: 7,
-            offset: const Offset(0, 7),
+            color: AppThemeColor.darkBlueColor.withOpacity(0.08),
+            blurRadius: 30,
+            offset: const Offset(0, 12),
+            spreadRadius: 0,
           ),
         ],
       ),
-      padding: const EdgeInsets.all(15),
-      child: Column(
-        children: [
-          Text(
-            'Enter Your valid email Address',
-            style: TextStyle(
-              color: AppThemeColor.pureBlackColor,
-              fontSize: Dimensions.fontSizeLarge,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 15),
-          TextFormField(
-            controller: _emailEdtController,
-            keyboardType: TextInputType.emailAddress,
-            decoration: InputDecoration(
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              hintText: 'example@mail.com',
-              labelText: 'Email',
-              hintStyle: const TextStyle(
-                color: AppThemeColor.lightGrayColor,
-              ),
-            ),
-          ),
-          const SizedBox(height: 25),
-          RoundedLoadingButton(
-            animateOnTap: true,
-            borderRadius: 13,
-            width: _screenWidth,
-            controller: _btnCtlr,
-            onPressed: () async {
-              _btnCtlr.start();
-              if (_emailEdtController.text.isNotEmpty) {
-                try {
-                  await FirebaseAuth.instance
-                      .sendPasswordResetEmail(email: _emailEdtController.text);
-                  _btnCtlr.success();
-                  ShowToast().showSnackBar(
-                    'Please Check Your Email!',
-                    context,
-                  );
-                  Timer(const Duration(seconds: 2), () {
-                    RouterClass().appRest(context: context);
-                  });
-                } catch (e) {
-                  _btnCtlr.error();
-                  ShowToast().showSnackBar(
-                    'Error: ${e.toString()}',
-                    context,
-                  );
-                }
-              }
-            },
-            color: AppThemeColor.darkGreenColor,
-            elevation: 0,
-            child: const Text(
-              'Recover My Password',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
-      ),
+      child: Image.asset(Images.inAppLogo, width: logoAnimation.value),
     );
   }
 
   Widget _labelView() {
     return Column(
       children: [
-        const Text(
-          'Welcome Back!',
+        Text(
+          'Forgot Password?',
           style: TextStyle(
             color: AppThemeColor.darkBlueColor,
-            fontSize: 34,
+            fontSize: 28,
             fontWeight: FontWeight.w700,
+            letterSpacing: -0.5,
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 15.0),
-          child: Text(
-            'Fill out the information below for recover your account.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppThemeColor.dullFontColor,
-              fontSize: Dimensions.fontSizeLarge,
-              fontWeight: FontWeight.w500,
-            ),
+        const SizedBox(height: 12),
+        Text(
+          'No worries! Enter your email and we\'ll send you reset instructions.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: AppThemeColor.dullFontColor,
+            fontSize: 16,
+            fontWeight: FontWeight.w400,
+            height: 1.5,
           ),
         ),
       ],
     );
+  }
+
+  Widget _loginDetailsView() {
+    return Container(
+      width: _screenWidth,
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: AppThemeColor.pureWhiteColor,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppThemeColor.darkBlueColor.withOpacity(0.06),
+            blurRadius: 40,
+            offset: const Offset(0, 8),
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Reset Password',
+            style: TextStyle(
+              color: AppThemeColor.darkBlueColor,
+              fontSize: 24,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 28),
+          _buildEmailField(),
+          const SizedBox(height: 36),
+          _buildResetButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmailField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Email Address',
+          style: TextStyle(
+            color: AppThemeColor.darkBlueColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _emailEdtController,
+          keyboardType: TextInputType.emailAddress,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+          decoration: InputDecoration(
+            hintText: 'Enter your email address',
+            hintStyle: TextStyle(
+              color: AppThemeColor.lightGrayColor,
+              fontSize: 16,
+            ),
+            filled: true,
+            fillColor: Colors.grey.withOpacity(0.04),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(
+                color: AppThemeColor.darkBlueColor,
+                width: 2,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(
+                color: Colors.grey.withOpacity(0.1),
+                width: 1,
+              ),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 18,
+            ),
+            prefixIcon: Icon(
+              Icons.email_outlined,
+              color: AppThemeColor.lightGrayColor,
+              size: 22,
+            ),
+          ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please enter your email';
+            }
+            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+              return 'Please enter a valid email address';
+            }
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildResetButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: RoundedLoadingButton(
+        animateOnTap: true,
+        borderRadius: 16,
+        controller: _btnCtlr,
+        onPressed: () {
+          _btnCtlr.start();
+          _resetPassword();
+        },
+        color: AppThemeColor.darkBlueColor,
+        elevation: 0,
+        child: const Text(
+          'Send Reset Link',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _resetPassword() async {
+    try {
+      await FirebaseAuth.instance
+          .sendPasswordResetEmail(email: _emailEdtController.text)
+          .then((value) {
+            ShowToast().showNormalToast(
+              msg: 'Password reset link sent to your email!',
+            );
+            _btnCtlr.success();
+            Timer(const Duration(seconds: 2), () {
+              Navigator.pop(context);
+            });
+          });
+    } on FirebaseAuthException catch (e) {
+      print(e.code);
+      switch (e.code) {
+        case "user-not-found":
+          ShowToast().showNormalToast(
+            msg: "No user found with this email address.",
+          );
+          break;
+        case "invalid-email":
+          ShowToast().showNormalToast(
+            msg: "Please enter a valid email address.",
+          );
+          break;
+        case "too-many-requests":
+          ShowToast().showNormalToast(
+            msg: "Too many requests. Please try again later.",
+          );
+          break;
+        default:
+          ShowToast().showNormalToast(
+            msg: "An error occurred. Please try again.",
+          );
+      }
+      _btnCtlr.reset();
+    } catch (e) {
+      _btnCtlr.reset();
+      print('Error resetting password: $e');
+      ShowToast().showNormalToast(msg: "An error occurred. Please try again.");
+    }
   }
 }

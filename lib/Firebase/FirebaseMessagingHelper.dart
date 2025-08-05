@@ -272,6 +272,7 @@ class FirebaseMessagingHelper {
       final user = _auth.currentUser;
       if (user == null) throw Exception('User not authenticated');
 
+      print('📤 Creating message data for receiver: $receiverId');
       final messageData = {
         'senderId': user.uid,
         'receiverId': receiverId,
@@ -283,9 +284,12 @@ class FirebaseMessagingHelper {
         'fileName': fileName,
       };
 
+      print('📤 Adding message to Firestore...');
       final messageRef = await _firestore
           .collection('Messages')
           .add(messageData);
+
+      print('✅ Message added with ID: ${messageRef.id}');
 
       // Update or create conversation
       await _updateConversation(
@@ -295,10 +299,89 @@ class FirebaseMessagingHelper {
         lastMessageTime: DateTime.now(),
       );
 
+      // Ensure conversation exists
+      await _ensureConversationExists(user.uid, receiverId);
+
+      // Send push notification to receiver
+      await _sendPushNotification(receiverId, content, user.uid);
+
       return messageRef.id;
     } catch (e) {
       print('❌ Error sending message: $e');
       rethrow;
+    }
+  }
+
+  Future<void> _ensureConversationExists(String userId1, String userId2) async {
+    try {
+      final conversationId = _getConversationId(userId1, userId2);
+      final conversationDoc = await _firestore
+          .collection('Conversations')
+          .doc(conversationId)
+          .get();
+
+      if (!conversationDoc.exists) {
+        print('🔧 Creating conversation $conversationId');
+        await createConversation(
+          userId: userId1,
+          otherUserId: userId2,
+          otherUserInfo: {
+            'name': 'User',
+            'profilePictureUrl': null,
+            'username': 'user',
+          },
+        );
+      }
+    } catch (e) {
+      print('❌ Error ensuring conversation exists: $e');
+    }
+  }
+
+  Future<void> _sendPushNotification(
+    String receiverId,
+    String content,
+    String senderId,
+  ) async {
+    try {
+      // Get receiver's FCM token
+      final receiverDoc = await _firestore
+          .collection('users')
+          .doc(receiverId)
+          .get();
+      if (!receiverDoc.exists) return;
+
+      final receiverData = receiverDoc.data() as Map<String, dynamic>;
+      final fcmToken = receiverData['fcmToken'] as String?;
+
+      if (fcmToken == null) return;
+
+      // Get sender's info
+      final senderDoc = await _firestore
+          .collection('Customers')
+          .doc(senderId)
+          .get();
+      if (!senderDoc.exists) return;
+
+      final senderData = senderDoc.data() as Map<String, dynamic>;
+      final senderName = senderData['name'] as String? ?? 'Someone';
+
+      // Send notification via Cloud Functions (you'll need to implement this)
+      // For now, we'll just log it
+      print(
+        '📱 Sending push notification to $receiverId: $content from $senderName',
+      );
+
+      // TODO: Implement Cloud Function call to send push notification
+      // await _firestore.collection('notifications').add({
+      //   'receiverId': receiverId,
+      //   'senderId': senderId,
+      //   'content': content,
+      //   'senderName': senderName,
+      //   'fcmToken': fcmToken,
+      //   'timestamp': FieldValue.serverTimestamp(),
+      // });
+    } catch (e) {
+      print('❌ Error sending push notification: $e');
     }
   }
 
@@ -318,9 +401,14 @@ class FirebaseMessagingHelper {
       final senderInfo = await _getUserInfo(senderId);
       final receiverInfo = await _getUserInfo(receiverId);
 
+      // Use sorted IDs for consistency
+      final sortedIds = [senderId, receiverId]..sort();
+      final participant1Id = sortedIds[0];
+      final participant2Id = sortedIds[1];
+
       final conversationData = {
-        'participant1Id': senderId,
-        'participant2Id': receiverId,
+        'participant1Id': participant1Id,
+        'participant2Id': participant2Id,
         'lastMessage': lastMessage,
         'lastMessageTime': lastMessageTime,
         'participantInfo': {
@@ -337,7 +425,9 @@ class FirebaseMessagingHelper {
         },
       };
 
+      print('💬 Updating conversation $conversationId with message: $lastMessage');
       await conversationRef.set(conversationData, SetOptions(merge: true));
+      print('✅ Conversation updated successfully');
     } catch (e) {
       print('❌ Error updating conversation: $e');
     }
@@ -434,36 +524,45 @@ class FirebaseMessagingHelper {
     try {
       print('🔧 Creating conversation between $userId and $otherUserId');
 
-      // Create conversation document
+      // Get user info for both participants
+      final userInfo = await _getUserInfo(userId);
+
+      // Create conversation document with proper ID
+      final conversationId = _getConversationId(userId, otherUserId);
       final conversationData = {
         'participant1Id': userId,
         'participant2Id': otherUserId,
-        'lastMessage': 'Hello! Welcome to the conversation.',
+        'lastMessage': '',
         'lastMessageTime': FieldValue.serverTimestamp(),
         'unreadCount': 0,
         'participantInfo': {
-          userId: {'name': 'You', 'profilePictureUrl': null, 'username': 'you'},
+          userId: {
+            'name': userInfo.name,
+            'profilePictureUrl': userInfo.profilePictureUrl,
+            'username': userInfo.username,
+          },
           otherUserId: otherUserInfo,
         },
       };
 
-      final docRef = await _firestore
+      await _firestore
           .collection('Conversations')
-          .add(conversationData);
+          .doc(conversationId)
+          .set(conversationData);
 
       // Create the conversation model
       final conversation = ConversationModel(
-        id: docRef.id,
+        id: conversationId,
         participant1Id: userId,
         participant2Id: otherUserId,
-        lastMessage: 'Hello! Welcome to the conversation.',
+        lastMessage: '',
         lastMessageTime: DateTime.now(),
         unreadCount: 0,
         participantInfo:
             conversationData['participantInfo'] as Map<String, dynamic>,
       );
 
-      print('✅ Conversation created with ID: ${docRef.id}');
+      print('✅ Conversation created with ID: $conversationId');
       return conversation;
     } catch (e) {
       print('❌ Error creating conversation: $e');
@@ -475,43 +574,40 @@ class FirebaseMessagingHelper {
     try {
       print('🔍 Getting messages for conversation: $conversationId');
 
-      // Get the conversation document to find participants
+      // Parse conversation ID to get participants
+      final participants = conversationId.split('_');
+      if (participants.length != 2) {
+        print('❌ Invalid conversation ID format: $conversationId');
+        return Stream.value([]);
+      }
+
+      final participant1Id = participants[0];
+      final participant2Id = participants[1];
+
+      print('📊 Getting messages between $participant1Id and $participant2Id');
+
+      // Get messages in both directions using separate queries
       return _firestore
-          .collection('Conversations')
-          .doc(conversationId)
+          .collection('Messages')
+          .where('senderId', isEqualTo: participant1Id)
+          .where('receiverId', isEqualTo: participant2Id)
+          .orderBy('timestamp', descending: false)
           .snapshots()
-          .asyncMap((conversationDoc) async {
-            if (!conversationDoc.exists) {
-              print('❌ Conversation not found: $conversationId');
-              return [];
-            }
+          .asyncMap((snapshot1) async {
+            final messages1 = snapshot1.docs;
 
-            final conversationData =
-                conversationDoc.data() as Map<String, dynamic>;
-            final participant1Id = conversationData['participant1Id'] as String;
-            final participant2Id = conversationData['participant2Id'] as String;
-
-            print(
-              '📊 Getting messages between $participant1Id and $participant2Id',
-            );
-
-            // Get messages in both directions
-            final messages1 = await _firestore
-                .collection('Messages')
-                .where('senderId', isEqualTo: participant1Id)
-                .where('receiverId', isEqualTo: participant2Id)
-                .orderBy('timestamp', descending: false)
-                .get();
-
-            final messages2 = await _firestore
+            // Get messages in the other direction
+            final snapshot2 = await _firestore
                 .collection('Messages')
                 .where('senderId', isEqualTo: participant2Id)
                 .where('receiverId', isEqualTo: participant1Id)
                 .orderBy('timestamp', descending: false)
                 .get();
 
-            // Combine and sort messages
-            final allMessages = [...messages1.docs, ...messages2.docs];
+            final messages2 = snapshot2.docs;
+
+            // Combine and sort all messages
+            final allMessages = [...messages1, ...messages2];
             allMessages.sort((a, b) {
               final timestampA = (a.data()['timestamp'] as Timestamp).toDate();
               final timestampB = (b.data()['timestamp'] as Timestamp).toDate();

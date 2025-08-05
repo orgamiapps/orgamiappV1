@@ -1223,3 +1223,126 @@ exports.aggregateFeedbackData = onDocumentCreated("event_feedback/{docId}",
         logger.error("Error aggregating feedback data:", error);
       }
     });
+
+/**
+ * Send push notifications for new messages
+ * Triggered when a new message is created
+ */
+exports.sendMessageNotifications = onDocumentCreated("Messages/{messageId}", async (event) => {
+  try {
+    const messageData = event.data.data();
+    const messageId = event.data.id;
+    
+    if (!messageData) {
+      return;
+    }
+
+    const senderId = messageData.senderId;
+    const receiverId = messageData.receiverId;
+    const content = messageData.content;
+
+    logger.info(`Sending message notification for message ${messageId}`);
+
+    const db = admin.firestore();
+    
+    // Get sender's info
+    const senderDoc = await db.collection("Customers").doc(senderId).get();
+    if (!senderDoc.exists) {
+      logger.warn(`Sender ${senderId} not found`);
+      return;
+    }
+
+    const senderData = senderDoc.data();
+    const senderName = senderData.name || "Someone";
+
+    // Get receiver's FCM token
+    const receiverDoc = await db.collection("users").doc(receiverId).get();
+    if (!receiverDoc.exists) {
+      logger.warn(`Receiver ${receiverId} not found`);
+      return;
+    }
+
+    const receiverData = receiverDoc.data();
+    const fcmToken = receiverData.fcmToken;
+
+    if (!fcmToken) {
+      logger.warn(`No FCM token for receiver ${receiverId}`);
+      return;
+    }
+
+    // Check receiver's notification settings
+    const settingsDoc = await db.collection("users")
+      .doc(receiverId)
+      .collection("settings")
+      .doc("notifications")
+      .get();
+
+    let shouldSendMessageNotification = true;
+
+    if (settingsDoc.exists) {
+      const settings = settingsDoc.data();
+      shouldSendMessageNotification = settings.messageNotifications !== false;
+    }
+
+    if (!shouldSendMessageNotification) {
+      logger.info(`User ${receiverId} has disabled message notifications`);
+      return;
+    }
+
+    // Send push notification
+    const messaging = admin.messaging();
+    const message = {
+      token: fcmToken,
+      notification: {
+        title: senderName,
+        body: content.length > 50 ? content.substring(0, 50) + "..." : content,
+      },
+      data: {
+        type: "new_message",
+        senderId: senderId,
+        senderName: senderName,
+        messageId: messageId,
+        conversationId: `${Math.min(senderId, receiverId)}_${Math.max(senderId, receiverId)}`,
+        click_action: "FLUTTER_NOTIFICATION_CLICK",
+      },
+      android: {
+        notification: {
+          channelId: "orgami_channel",
+          priority: "high",
+          defaultSound: true,
+          defaultVibrateTimings: true,
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: "default",
+            badge: 1,
+          },
+        },
+      },
+    };
+
+    await messaging.send(message);
+    logger.info(`Sent message notification to user ${receiverId}`);
+
+    // Save to receiver's notifications collection
+    await db.collection("users")
+      .doc(receiverId)
+      .collection("notifications")
+      .add({
+        title: senderName,
+        body: content,
+        type: "new_message",
+        senderId: senderId,
+        senderName: senderName,
+        messageId: messageId,
+        conversationId: `${Math.min(senderId, receiverId)}_${Math.max(senderId, receiverId)}`,
+        createdAt: admin.firestore.Timestamp.now(),
+        isRead: false,
+      });
+
+  } catch (error) {
+    logger.error("Error sending message notification:", error);
+  }
+});

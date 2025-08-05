@@ -66,6 +66,8 @@ dependencies:
   printing: ^5.11.1
   # HTTP for API calls
   http: ^1.1.2
+  # Date formatting
+  intl: ^0.20.2
   # Natural language processing
   # natural: ^0.2.0  # Removed due to compatibility issues
   # Theme management

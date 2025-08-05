@@ -50,8 +50,11 @@ class _LoginScreenState extends State<LoginScreen>
                   .getSingleCustomer(customerId: signInCustomer.user!.uid)
                   .then((fireStoreCustomer) async {
                     // Ensure user profile has all required fields
-                    await FirebaseFirestoreHelper().ensureUserProfileCompleteness(signInCustomer.user!.uid);
-                    
+                    await FirebaseFirestoreHelper()
+                        .ensureUserProfileCompleteness(
+                          signInCustomer.user!.uid,
+                        );
+
                     setState(() {
                       CustomerController.logeInCustomer = fireStoreCustomer;
                     });
@@ -137,11 +140,42 @@ class _LoginScreenState extends State<LoginScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          _bodyView(),
-          AppAppBarView.appBarWithOnlyBackButton(context: context),
-        ],
+      body: Stack(children: [_bodyView(), _modernAppBar()]),
+    );
+  }
+
+  Widget _modernAppBar() {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppThemeColor.darkBlueColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppThemeColor.darkBlueColor.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => Navigator.pop(context),
+                  child: Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: AppThemeColor.darkBlueColor,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -154,7 +188,7 @@ class _LoginScreenState extends State<LoginScreen>
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Colors.white, AppThemeColor.lightBlueColor.withOpacity(0.3)],
+          colors: [Colors.white, AppThemeColor.lightBlueColor.withOpacity(0.4)],
         ),
       ),
       child: SafeArea(
@@ -162,7 +196,7 @@ class _LoginScreenState extends State<LoginScreen>
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Column(
             children: [
-              const SizedBox(height: 60),
+              const SizedBox(height: 80),
               _logoSection(),
               const SizedBox(height: 40),
               _welcomeSection(),
@@ -183,15 +217,16 @@ class _LoginScreenState extends State<LoginScreen>
       child: SlideTransition(
         position: slideAnimation,
         child: Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
+                color: AppThemeColor.darkBlueColor.withOpacity(0.08),
+                blurRadius: 30,
+                offset: const Offset(0, 12),
+                spreadRadius: 0,
               ),
             ],
           ),
@@ -234,15 +269,16 @@ class _LoginScreenState extends State<LoginScreen>
   Widget _loginFormSection() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 25,
+            color: AppThemeColor.darkBlueColor.withOpacity(0.06),
+            blurRadius: 40,
             offset: const Offset(0, 8),
+            spreadRadius: 0,
           ),
         ],
       ),
@@ -259,11 +295,11 @@ class _LoginScreenState extends State<LoginScreen>
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
             _buildEmailField(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             _buildPasswordField(),
-            const SizedBox(height: 32),
+            const SizedBox(height: 36),
             _buildLoginButton(),
           ],
         ),
@@ -280,7 +316,7 @@ class _LoginScreenState extends State<LoginScreen>
           style: TextStyle(
             color: AppThemeColor.darkBlueColor,
             fontSize: 14,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
@@ -302,29 +338,36 @@ class _LoginScreenState extends State<LoginScreen>
               ),
               filled: true,
               fillColor: _isEmailFocused
-                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
-                  : Colors.grey.withOpacity(0.05),
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.15)
+                  : Colors.grey.withOpacity(0.04),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
                   color: AppThemeColor.darkBlueColor,
                   width: 2,
                 ),
               ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: Colors.grey.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
+                horizontal: 20,
+                vertical: 18,
               ),
               prefixIcon: Icon(
                 Icons.email_outlined,
                 color: _isEmailFocused
                     ? AppThemeColor.darkBlueColor
                     : AppThemeColor.lightGrayColor,
-                size: 20,
+                size: 22,
               ),
             ),
             validator: (value) {
@@ -353,7 +396,7 @@ class _LoginScreenState extends State<LoginScreen>
           style: TextStyle(
             color: AppThemeColor.darkBlueColor,
             fontSize: 14,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
@@ -375,35 +418,42 @@ class _LoginScreenState extends State<LoginScreen>
               ),
               filled: true,
               fillColor: _isPasswordFocused
-                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
-                  : Colors.grey.withOpacity(0.05),
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.15)
+                  : Colors.grey.withOpacity(0.04),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
                   color: AppThemeColor.darkBlueColor,
                   width: 2,
                 ),
               ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: Colors.grey.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
+                horizontal: 20,
+                vertical: 18,
               ),
               prefixIcon: Icon(
                 Icons.lock_outline,
                 color: _isPasswordFocused
                     ? AppThemeColor.darkBlueColor
                     : AppThemeColor.lightGrayColor,
-                size: 20,
+                size: 22,
               ),
               suffixIcon: IconButton(
                 icon: Icon(
                   _obscurePassword ? Icons.visibility_off : Icons.visibility,
                   color: AppThemeColor.lightGrayColor,
-                  size: 20,
+                  size: 22,
                 ),
                 onPressed: () {
                   setState(() {
@@ -433,7 +483,7 @@ class _LoginScreenState extends State<LoginScreen>
       height: 56,
       child: RoundedLoadingButton(
         animateOnTap: true,
-        borderRadius: 12,
+        borderRadius: 16,
         controller: _btnCtlr,
         onPressed: () {
           _btnCtlr.start();

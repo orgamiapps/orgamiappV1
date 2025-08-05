@@ -17,6 +17,7 @@ import 'package:orgami/Utils/TextFields.dart';
 import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
+import 'dart:io';
 
 class EditEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -107,36 +108,69 @@ class _EditEventScreenState extends State<EditEventScreen>
   }
 
   Future _pickImage() async {
-    final ImagePicker picker = ImagePicker();
-    XFile? image = await picker.pickImage(
-      source: ImageSource.gallery,
-      maxHeight: 600,
-      maxWidth: 1000,
-    );
-    if (image != null) {
-      setState(() {
-        _selectedImagePath = image.path;
-        thumbnailUrlCtlr.text = image.path;
-      });
+    try {
+      final ImagePicker picker = ImagePicker();
+      XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxHeight: 1200,
+        maxWidth: 1200,
+        imageQuality: 85,
+      );
+      if (image != null) {
+        setState(() {
+          _selectedImagePath = image.path;
+          thumbnailUrlCtlr.text = image.path;
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to pick image: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
   Future<String?> _uploadToFirebaseHosting() async {
     if (_selectedImagePath == null) return _currentImageUrl;
 
-    String? imageUrl;
-    Uint8List imageData = await XFile(_selectedImagePath!).readAsBytes();
-    final Reference storageReference = FirebaseStorage.instance.ref().child(
-      'events_images/${_selectedImagePath.hashCode}.png',
-    );
-    final SettableMetadata metadata = SettableMetadata(
-      contentType: 'image/png',
-    );
-    final UploadTask uploadTask = storageReference.putData(imageData, metadata);
-    await uploadTask.whenComplete(() async {
-      imageUrl = await storageReference.getDownloadURL();
-    });
-    return imageUrl;
+    try {
+      String? imageUrl;
+      Uint8List imageData = await XFile(_selectedImagePath!).readAsBytes();
+
+      // Generate unique filename with timestamp
+      final String fileName =
+          'event_${DateTime.now().millisecondsSinceEpoch}_${_selectedImagePath.hashCode}.jpg';
+      final Reference storageReference = FirebaseStorage.instance.ref().child(
+        'events_images/$fileName',
+      );
+
+      final SettableMetadata metadata = SettableMetadata(
+        contentType: 'image/jpeg',
+        cacheControl: 'public, max-age=31536000',
+      );
+
+      final UploadTask uploadTask = storageReference.putData(
+        imageData,
+        metadata,
+      );
+
+      // Show upload progress
+      uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
+        final progress = snapshot.bytesTransferred / snapshot.totalBytes;
+        // You could add a progress indicator here if needed
+      });
+
+      await uploadTask.whenComplete(() async {
+        imageUrl = await storageReference.getDownloadURL();
+      });
+
+      return imageUrl;
+    } catch (e) {
+      debugPrint('Error uploading image: $e');
+      return null;
+    }
   }
 
   void _handleSubmit() async {
@@ -366,79 +400,105 @@ class _EditEventScreenState extends State<EditEventScreen>
             ],
           ),
           const SizedBox(height: 16),
-          GestureDetector(
-            onTap: _pickImage,
-            child: DottedBorder(
-              borderType: BorderType.RRect,
-              radius: const Radius.circular(16),
-              color: const Color(0xFF667EEA),
-              strokeWidth: 2,
-              dashPattern: const [8, 4],
-              child: Container(
-                width: double.infinity,
-                height: 200,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  color: const Color(0xFFF8F9FA),
-                ),
-                child: _selectedImagePath != null || _currentImageUrl != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Image.network(
-                          _selectedImagePath ?? _currentImageUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              color: const Color(0xFFF5F7FA),
-                              child: const Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.image_not_supported,
-                                      color: Color(0xFF667EEA),
-                                      size: 48,
-                                    ),
-                                    SizedBox(height: 8),
-                                    Text(
-                                      'Image not available',
-                                      style: TextStyle(
-                                        color: Color(0xFF667EEA),
-                                        fontSize: 14,
-                                        fontFamily: 'Roboto',
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      )
-                    : const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.add_photo_alternate,
-                              color: Color(0xFF667EEA),
-                              size: 48,
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              'Tap to add event image',
-                              style: TextStyle(
-                                color: Color(0xFF667EEA),
-                                fontSize: 16,
-                                fontFamily: 'Roboto',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+          Container(
+            width: double.infinity,
+            height: 200,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF9FAFB),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: (_selectedImagePath != null || _currentImageUrl != null)
+                    ? const Color(0xFF667EEA)
+                    : Colors.grey.withOpacity(0.3),
+                width: 2,
               ),
             ),
+            child: _selectedImagePath != null || _currentImageUrl != null
+                ? _buildImagePreview()
+                : _buildUploadPlaceholder(),
           ),
+          if (_selectedImagePath != null || _currentImageUrl != null) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF667EEA).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.check_circle,
+                          color: Color(0xFF667EEA),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _selectedImagePath != null
+                                ? 'New image selected'
+                                : 'Current image',
+                            style: TextStyle(
+                              color: const Color(0xFF667EEA),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedImagePath = null;
+                      _currentImageUrl = null;
+                      thumbnailUrlCtlr.clear();
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.delete_outline,
+                          color: Colors.red,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Remove',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -819,6 +879,127 @@ class _EditEventScreenState extends State<EditEventScreen>
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImagePreview() {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: _selectedImagePath != null
+              ? Image.file(
+                  File(_selectedImagePath!),
+                  width: double.infinity,
+                  height: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      width: double.infinity,
+                      height: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        Icons.broken_image,
+                        color: Colors.grey,
+                        size: 48,
+                      ),
+                    );
+                  },
+                )
+              : Image.network(
+                  _currentImageUrl!,
+                  width: double.infinity,
+                  height: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      width: double.infinity,
+                      height: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        Icons.broken_image,
+                        color: Colors.grey,
+                        size: 48,
+                      ),
+                    );
+                  },
+                ),
+        ),
+        Positioned(
+          top: 8,
+          right: 8,
+          child: GestureDetector(
+            onTap: _pickImage,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Icon(Icons.edit, color: Colors.white, size: 18),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUploadPlaceholder() {
+    return GestureDetector(
+      onTap: _pickImage,
+      child: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(32),
+              ),
+              child: const Icon(
+                Icons.add_photo_alternate_outlined,
+                color: Color(0xFF667EEA),
+                size: 32,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Upload Event Image',
+              style: TextStyle(
+                color: const Color(0xFF1A1A1A),
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+                fontFamily: 'Roboto',
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tap to select an image from your gallery',
+              style: TextStyle(
+                color: Colors.grey.withOpacity(0.7),
+                fontSize: 14,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );

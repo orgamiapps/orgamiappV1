@@ -191,11 +191,42 @@ class _SignupScreenState extends State<SignupScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          _bodyView(),
-          AppAppBarView.appBarWithOnlyBackButton(context: context),
-        ],
+      body: Stack(children: [_bodyView(), _modernAppBar()]),
+    );
+  }
+
+  Widget _modernAppBar() {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppThemeColor.darkBlueColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppThemeColor.darkBlueColor.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => Navigator.pop(context),
+                  child: Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: AppThemeColor.darkBlueColor,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -208,7 +239,7 @@ class _SignupScreenState extends State<SignupScreen>
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Colors.white, AppThemeColor.lightBlueColor.withOpacity(0.3)],
+          colors: [Colors.white, AppThemeColor.lightBlueColor.withOpacity(0.4)],
         ),
       ),
       child: SafeArea(
@@ -216,7 +247,7 @@ class _SignupScreenState extends State<SignupScreen>
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Column(
             children: [
-              const SizedBox(height: 60),
+              const SizedBox(height: 80),
               _logoSection(),
               const SizedBox(height: 40),
               _welcomeSection(),
@@ -235,15 +266,16 @@ class _SignupScreenState extends State<SignupScreen>
       child: SlideTransition(
         position: slideAnimation,
         child: Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
+                color: AppThemeColor.darkBlueColor.withOpacity(0.08),
+                blurRadius: 30,
+                offset: const Offset(0, 12),
+                spreadRadius: 0,
               ),
             ],
           ),
@@ -286,15 +318,16 @@ class _SignupScreenState extends State<SignupScreen>
   Widget _signupFormSection() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 25,
+            color: AppThemeColor.darkBlueColor.withOpacity(0.06),
+            blurRadius: 40,
             offset: const Offset(0, 8),
+            spreadRadius: 0,
           ),
         ],
       ),
@@ -311,7 +344,7 @@ class _SignupScreenState extends State<SignupScreen>
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
 
             // Required Fields Section
             _buildSectionHeader(
@@ -319,17 +352,17 @@ class _SignupScreenState extends State<SignupScreen>
               Icons.star,
               Colors.orange,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             _buildNameField(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             _buildUsernameField(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             _buildEmailField(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             _buildPasswordField(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             _buildConfirmPasswordField(),
-            const SizedBox(height: 32),
+            const SizedBox(height: 36),
 
             // Optional Fields Section
             _buildSectionHeader(
@@ -337,23 +370,23 @@ class _SignupScreenState extends State<SignupScreen>
               Icons.info_outline,
               AppThemeColor.darkBlueColor,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             _buildPhoneField(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             _buildAgeField(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             _buildGenderField(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             _buildLocationField(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             _buildOccupationField(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             _buildCompanyField(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             _buildWebsiteField(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             _buildBioField(),
-            const SizedBox(height: 32),
+            const SizedBox(height: 36),
 
             _buildSignupButton(),
           ],
@@ -395,7 +428,7 @@ class _SignupScreenState extends State<SignupScreen>
           style: TextStyle(
             color: AppThemeColor.darkBlueColor,
             fontSize: 14,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
@@ -422,29 +455,36 @@ class _SignupScreenState extends State<SignupScreen>
               ),
               filled: true,
               fillColor: _isNameFocused
-                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
-                  : Colors.grey.withOpacity(0.05),
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.15)
+                  : Colors.grey.withOpacity(0.04),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
                   color: AppThemeColor.darkBlueColor,
                   width: 2,
                 ),
               ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: Colors.grey.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
+                horizontal: 20,
+                vertical: 18,
               ),
               prefixIcon: Icon(
                 Icons.person_outline,
                 color: _isNameFocused
                     ? AppThemeColor.darkBlueColor
                     : AppThemeColor.lightGrayColor,
-                size: 20,
+                size: 22,
               ),
             ),
             validator: (value) {
@@ -496,7 +536,7 @@ class _SignupScreenState extends State<SignupScreen>
           style: TextStyle(
             color: AppThemeColor.darkBlueColor,
             fontSize: 14,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
@@ -522,29 +562,36 @@ class _SignupScreenState extends State<SignupScreen>
               ),
               filled: true,
               fillColor: _isUsernameFocused
-                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
-                  : Colors.grey.withOpacity(0.05),
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.15)
+                  : Colors.grey.withOpacity(0.04),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
                   color: AppThemeColor.darkBlueColor,
                   width: 2,
                 ),
               ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: Colors.grey.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
+                horizontal: 20,
+                vertical: 18,
               ),
               prefixIcon: Icon(
                 Icons.alternate_email,
                 color: _isUsernameFocused
                     ? AppThemeColor.darkBlueColor
                     : AppThemeColor.lightGrayColor,
-                size: 20,
+                size: 22,
               ),
             ),
             validator: (value) {
@@ -583,7 +630,7 @@ class _SignupScreenState extends State<SignupScreen>
           style: TextStyle(
             color: AppThemeColor.darkBlueColor,
             fontSize: 14,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
@@ -605,29 +652,36 @@ class _SignupScreenState extends State<SignupScreen>
               ),
               filled: true,
               fillColor: _isEmailFocused
-                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
-                  : Colors.grey.withOpacity(0.05),
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.15)
+                  : Colors.grey.withOpacity(0.04),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
                   color: AppThemeColor.darkBlueColor,
                   width: 2,
                 ),
               ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: Colors.grey.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
+                horizontal: 20,
+                vertical: 18,
               ),
               prefixIcon: Icon(
                 Icons.email_outlined,
                 color: _isEmailFocused
                     ? AppThemeColor.darkBlueColor
                     : AppThemeColor.lightGrayColor,
-                size: 20,
+                size: 22,
               ),
             ),
             validator: (value) {
@@ -656,7 +710,7 @@ class _SignupScreenState extends State<SignupScreen>
           style: TextStyle(
             color: AppThemeColor.darkBlueColor,
             fontSize: 14,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
@@ -678,35 +732,42 @@ class _SignupScreenState extends State<SignupScreen>
               ),
               filled: true,
               fillColor: _isPasswordFocused
-                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
-                  : Colors.grey.withOpacity(0.05),
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.15)
+                  : Colors.grey.withOpacity(0.04),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
                   color: AppThemeColor.darkBlueColor,
                   width: 2,
                 ),
               ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: Colors.grey.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
+                horizontal: 20,
+                vertical: 18,
               ),
               prefixIcon: Icon(
                 Icons.lock_outline,
                 color: _isPasswordFocused
                     ? AppThemeColor.darkBlueColor
                     : AppThemeColor.lightGrayColor,
-                size: 20,
+                size: 22,
               ),
               suffixIcon: IconButton(
                 icon: Icon(
                   _obscurePassword ? Icons.visibility_off : Icons.visibility,
                   color: AppThemeColor.lightGrayColor,
-                  size: 20,
+                  size: 22,
                 ),
                 onPressed: () {
                   setState(() {
@@ -739,7 +800,7 @@ class _SignupScreenState extends State<SignupScreen>
           style: TextStyle(
             color: AppThemeColor.darkBlueColor,
             fontSize: 14,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
@@ -761,29 +822,36 @@ class _SignupScreenState extends State<SignupScreen>
               ),
               filled: true,
               fillColor: _isConfirmPasswordFocused
-                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
-                  : Colors.grey.withOpacity(0.05),
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.15)
+                  : Colors.grey.withOpacity(0.04),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
                   color: AppThemeColor.darkBlueColor,
                   width: 2,
                 ),
               ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: Colors.grey.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
+                horizontal: 20,
+                vertical: 18,
               ),
               prefixIcon: Icon(
                 Icons.lock_outline,
                 color: _isConfirmPasswordFocused
                     ? AppThemeColor.darkBlueColor
                     : AppThemeColor.lightGrayColor,
-                size: 20,
+                size: 22,
               ),
               suffixIcon: IconButton(
                 icon: Icon(
@@ -791,7 +859,7 @@ class _SignupScreenState extends State<SignupScreen>
                       ? Icons.visibility_off
                       : Icons.visibility,
                   color: AppThemeColor.lightGrayColor,
-                  size: 20,
+                  size: 22,
                 ),
                 onPressed: () {
                   setState(() {
@@ -824,7 +892,7 @@ class _SignupScreenState extends State<SignupScreen>
           style: TextStyle(
             color: AppThemeColor.darkBlueColor,
             fontSize: 14,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
@@ -846,29 +914,36 @@ class _SignupScreenState extends State<SignupScreen>
               ),
               filled: true,
               fillColor: _isPhoneFocused
-                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
-                  : Colors.grey.withOpacity(0.05),
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.15)
+                  : Colors.grey.withOpacity(0.04),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
                   color: AppThemeColor.darkBlueColor,
                   width: 2,
                 ),
               ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: Colors.grey.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
+                horizontal: 20,
+                vertical: 18,
               ),
               prefixIcon: Icon(
                 Icons.phone_outlined,
                 color: _isPhoneFocused
                     ? AppThemeColor.darkBlueColor
                     : AppThemeColor.lightGrayColor,
-                size: 20,
+                size: 22,
               ),
             ),
             validator: (value) {
@@ -894,7 +969,7 @@ class _SignupScreenState extends State<SignupScreen>
           style: TextStyle(
             color: AppThemeColor.darkBlueColor,
             fontSize: 14,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
@@ -916,29 +991,36 @@ class _SignupScreenState extends State<SignupScreen>
               ),
               filled: true,
               fillColor: _isAgeFocused
-                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
-                  : Colors.grey.withOpacity(0.05),
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.15)
+                  : Colors.grey.withOpacity(0.04),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
                   color: AppThemeColor.darkBlueColor,
                   width: 2,
                 ),
               ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: Colors.grey.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
+                horizontal: 20,
+                vertical: 18,
               ),
               prefixIcon: Icon(
                 Icons.cake_outlined,
                 color: _isAgeFocused
                     ? AppThemeColor.darkBlueColor
                     : AppThemeColor.lightGrayColor,
-                size: 20,
+                size: 22,
               ),
             ),
             validator: (value) {
@@ -969,15 +1051,15 @@ class _SignupScreenState extends State<SignupScreen>
           style: TextStyle(
             color: AppThemeColor.darkBlueColor,
             fontSize: 14,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.grey.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.withOpacity(0.2)),
+            color: Colors.grey.withOpacity(0.04),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.withOpacity(0.1)),
           ),
           child: DropdownButtonFormField<String>(
             value: _selectedGender,
@@ -989,13 +1071,13 @@ class _SignupScreenState extends State<SignupScreen>
               ),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
+                horizontal: 20,
+                vertical: 18,
               ),
               prefixIcon: Icon(
                 Icons.person_outline,
                 color: AppThemeColor.lightGrayColor,
-                size: 20,
+                size: 22,
               ),
             ),
             items: _genderOptions.map((String gender) {
@@ -1024,7 +1106,7 @@ class _SignupScreenState extends State<SignupScreen>
           style: TextStyle(
             color: AppThemeColor.darkBlueColor,
             fontSize: 14,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
@@ -1046,29 +1128,36 @@ class _SignupScreenState extends State<SignupScreen>
               ),
               filled: true,
               fillColor: _isLocationFocused
-                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
-                  : Colors.grey.withOpacity(0.05),
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.15)
+                  : Colors.grey.withOpacity(0.04),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
                   color: AppThemeColor.darkBlueColor,
                   width: 2,
                 ),
               ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: Colors.grey.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
+                horizontal: 20,
+                vertical: 18,
               ),
               prefixIcon: Icon(
                 Icons.location_on_outlined,
                 color: _isLocationFocused
                     ? AppThemeColor.darkBlueColor
                     : AppThemeColor.lightGrayColor,
-                size: 20,
+                size: 22,
               ),
             ),
           ),
@@ -1086,7 +1175,7 @@ class _SignupScreenState extends State<SignupScreen>
           style: TextStyle(
             color: AppThemeColor.darkBlueColor,
             fontSize: 14,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
@@ -1108,29 +1197,36 @@ class _SignupScreenState extends State<SignupScreen>
               ),
               filled: true,
               fillColor: _isOccupationFocused
-                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
-                  : Colors.grey.withOpacity(0.05),
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.15)
+                  : Colors.grey.withOpacity(0.04),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
                   color: AppThemeColor.darkBlueColor,
                   width: 2,
                 ),
               ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: Colors.grey.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
+                horizontal: 20,
+                vertical: 18,
               ),
               prefixIcon: Icon(
                 Icons.work_outline,
                 color: _isOccupationFocused
                     ? AppThemeColor.darkBlueColor
                     : AppThemeColor.lightGrayColor,
-                size: 20,
+                size: 22,
               ),
             ),
           ),
@@ -1148,7 +1244,7 @@ class _SignupScreenState extends State<SignupScreen>
           style: TextStyle(
             color: AppThemeColor.darkBlueColor,
             fontSize: 14,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
@@ -1170,29 +1266,36 @@ class _SignupScreenState extends State<SignupScreen>
               ),
               filled: true,
               fillColor: _isCompanyFocused
-                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
-                  : Colors.grey.withOpacity(0.05),
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.15)
+                  : Colors.grey.withOpacity(0.04),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
                   color: AppThemeColor.darkBlueColor,
                   width: 2,
                 ),
               ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: Colors.grey.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
+                horizontal: 20,
+                vertical: 18,
               ),
               prefixIcon: Icon(
                 Icons.business_outlined,
                 color: _isCompanyFocused
                     ? AppThemeColor.darkBlueColor
                     : AppThemeColor.lightGrayColor,
-                size: 20,
+                size: 22,
               ),
             ),
           ),
@@ -1210,7 +1313,7 @@ class _SignupScreenState extends State<SignupScreen>
           style: TextStyle(
             color: AppThemeColor.darkBlueColor,
             fontSize: 14,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
@@ -1232,29 +1335,36 @@ class _SignupScreenState extends State<SignupScreen>
               ),
               filled: true,
               fillColor: _isWebsiteFocused
-                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
-                  : Colors.grey.withOpacity(0.05),
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.15)
+                  : Colors.grey.withOpacity(0.04),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
                   color: AppThemeColor.darkBlueColor,
                   width: 2,
                 ),
               ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: Colors.grey.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
+                horizontal: 20,
+                vertical: 18,
               ),
               prefixIcon: Icon(
                 Icons.language_outlined,
                 color: _isWebsiteFocused
                     ? AppThemeColor.darkBlueColor
                     : AppThemeColor.lightGrayColor,
-                size: 20,
+                size: 22,
               ),
             ),
             validator: (value) {
@@ -1281,7 +1391,7 @@ class _SignupScreenState extends State<SignupScreen>
           style: TextStyle(
             color: AppThemeColor.darkBlueColor,
             fontSize: 14,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
@@ -1303,22 +1413,29 @@ class _SignupScreenState extends State<SignupScreen>
               ),
               filled: true,
               fillColor: _isBioFocused
-                  ? AppThemeColor.lightBlueColor.withOpacity(0.1)
-                  : Colors.grey.withOpacity(0.05),
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.15)
+                  : Colors.grey.withOpacity(0.04),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
                   color: AppThemeColor.darkBlueColor,
                   width: 2,
                 ),
               ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: Colors.grey.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
+                horizontal: 20,
+                vertical: 18,
               ),
               prefixIcon: Padding(
                 padding: const EdgeInsets.only(bottom: 20),
@@ -1327,7 +1444,7 @@ class _SignupScreenState extends State<SignupScreen>
                   color: _isBioFocused
                       ? AppThemeColor.darkBlueColor
                       : AppThemeColor.lightGrayColor,
-                  size: 20,
+                  size: 22,
                 ),
               ),
             ),
@@ -1344,7 +1461,7 @@ class _SignupScreenState extends State<SignupScreen>
       height: 56,
       child: RoundedLoadingButton(
         animateOnTap: true,
-        borderRadius: 12,
+        borderRadius: 16,
         controller: _btnCtlr,
         onPressed: () {
           _btnCtlr.start();

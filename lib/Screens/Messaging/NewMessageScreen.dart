@@ -100,19 +100,23 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
       final currentUser = _auth.currentUser;
       if (currentUser == null) return;
 
+      // Create conversation ID (sorted to ensure consistency)
+      final sortedIds = [currentUser.uid, user.uid]..sort();
+      final conversationId = '${sortedIds[0]}_${sortedIds[1]}';
+
       // Check if conversation already exists
-      final conversationId = await _messagingHelper.getConversationId(
+      final existingConversationId = await _messagingHelper.getConversationId(
         currentUser.uid,
         user.uid,
       );
 
-      if (conversationId != null) {
+      if (existingConversationId != null) {
         // Navigate to existing conversation
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => ChatScreen(
-              conversationId: conversationId,
+              conversationId: existingConversationId,
               otherParticipantInfo: {
                 'name': user.name,
                 'profilePictureUrl': user.profilePictureUrl,
@@ -123,7 +127,6 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
         );
       } else {
         // Create new conversation and navigate
-        final conversationId = '${currentUser.uid}_${user.uid}';
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -172,11 +175,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                       const Color(0xFF2C5A96),
                       const Color(0xFF4A90E2),
                     ]
-                  : [
-                      AppThemeColor.darkBlueColor,
-                      AppThemeColor.dullBlueColor,
-                      const Color(0xFF4A90E2),
-                    ],
+                  : [const Color(0xFF667EEA), const Color(0xFF764BA2)],
             ),
           ),
         ),
@@ -192,7 +191,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                     child: CircularProgressIndicator(
                       color: isDark
                           ? const Color(0xFF2C5A96)
-                          : AppThemeColor.darkBlueColor,
+                          : const Color(0xFF667EEA),
                     ),
                   )
                 : _searchResults.isEmpty
@@ -272,9 +271,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
-              color: isDark
-                  ? const Color(0xFF2C5A96)
-                  : AppThemeColor.darkBlueColor,
+              color: isDark ? const Color(0xFF2C5A96) : const Color(0xFF667EEA),
             ),
           ),
           const SizedBox(height: 8),
@@ -340,13 +337,13 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                       Icons.person,
                       color: isDark
                           ? const Color(0xFF2C5A96)
-                          : AppThemeColor.darkBlueColor,
+                          : const Color(0xFF667EEA),
                     ),
                     errorWidget: Icon(
                       Icons.person,
                       color: isDark
                           ? const Color(0xFF2C5A96)
-                          : AppThemeColor.darkBlueColor,
+                          : const Color(0xFF667EEA),
                     ),
                   ),
                 )
@@ -354,7 +351,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                   Icons.person,
                   color: isDark
                       ? const Color(0xFF2C5A96)
-                      : AppThemeColor.darkBlueColor,
+                      : const Color(0xFF667EEA),
                 ),
         ),
         title: Text(

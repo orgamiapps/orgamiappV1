@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:orgami/Screens/Home/HomeScreen.dart';
-import 'package:orgami/Screens/Home/SearchEventsScreen.dart';
 import 'package:orgami/Screens/Home/AccountScreen.dart';
 import 'package:orgami/Screens/Home/NotificationsScreen.dart';
-import 'package:orgami/Screens/QRScanner/QrScannerScreen.dart';
 import 'package:orgami/Screens/Messaging/MessagingScreen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -22,8 +20,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   final List<Widget> _dashBoardScreens = [
     const HomeScreen(),
-    const SearchEventsScreen(),
-    QRScannerScreen(),
     const NotificationsScreen(),
     const MessagingScreen(),
     const AccountScreen(),
@@ -43,14 +39,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         unselectedItemColor: Colors.grey,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.event, size: 20), label: ''),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search, size: 20),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(FontAwesomeIcons.qrcode, size: 20),
-            label: '',
-          ),
           BottomNavigationBarItem(
             icon: Icon(Icons.notifications, size: 20),
             label: '',
