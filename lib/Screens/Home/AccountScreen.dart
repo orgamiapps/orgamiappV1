@@ -20,6 +20,7 @@ import 'package:orgami/Utils/WebViewPage.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'dart:io';
 import 'package:orgami/Screens/MyProfile/MyProfileScreen.dart';
+import 'package:orgami/Screens/MyProfile/UserProfileScreen.dart';
 import 'package:orgami/Screens/Home/AccountDetailsScreen.dart';
 
 class AccountScreen extends StatefulWidget {
@@ -58,6 +59,8 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Widget _buildProfileHeader() {
+    final user = CustomerController.logeInCustomer;
+
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -67,111 +70,157 @@ class _AccountScreenState extends State<AccountScreen> {
           colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(24, 32, 24, 40),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       child: Column(
         children: [
-          // Profile Picture Section
-          Container(
-            margin: const EdgeInsets.only(bottom: 24),
-            child: Stack(
-              children: [
-                GestureDetector(
-                  onTap: _showImagePickerDialog,
-                  child: Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 4),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: ClipOval(
-                      child:
-                          CustomerController
-                                  .logeInCustomer
-                                  ?.profilePictureUrl !=
-                              null
-                          ? Image.network(
-                              CustomerController
-                                  .logeInCustomer!
-                                  .profilePictureUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return _buildDefaultProfilePicture();
-                              },
-                            )
-                          : _buildDefaultProfilePicture(),
-                    ),
-                  ),
-                ),
-                // Loading Overlay
-                if (_isUploading)
-                  Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.black.withValues(alpha: 0.5),
-                    ),
-                    child: const Center(
-                      child: CircularProgressIndicator(color: Colors.white),
-                    ),
-                  ),
-                // Camera Icon Button
-                if (!_isUploading)
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
+          // Compact Profile Section - Horizontal Layout
+          Row(
+            children: [
+              // Profile Picture
+              Stack(
+                children: [
+                  GestureDetector(
+                    onTap: _showImagePickerDialog,
                     child: Container(
-                      width: 36,
-                      height: 36,
+                      width: 60,
+                      height: 60,
                       decoration: BoxDecoration(
-                        color: Colors.white,
                         shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 3),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
+                            color: Colors.black.withValues(alpha: 0.15),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.camera_alt,
-                        color: Color(0xFF667EEA),
-                        size: 18,
+                      child: ClipOval(
+                        child: user?.profilePictureUrl != null
+                            ? Image.network(
+                                user!.profilePictureUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return _buildDefaultProfilePicture();
+                                },
+                              )
+                            : _buildDefaultProfilePicture(),
                       ),
                     ),
                   ),
-              ],
-            ),
-          ),
+                  // Loading Overlay
+                  if (_isUploading)
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.black.withValues(alpha: 0.5),
+                      ),
+                      child: const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      ),
+                    ),
+                  // Camera Icon Button
+                  if (!_isUploading)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt,
+                          color: Color(0xFF667EEA),
+                          size: 12,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 16),
 
-          // User Name
-          Text(
-            'Hi ${CustomerController.logeInCustomer != null ? CustomerController.logeInCustomer!.name : 'User'}',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-              fontSize: 24,
-              fontFamily: 'Roboto',
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Manage your account settings',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.8),
-              fontWeight: FontWeight.w400,
-              fontSize: 16,
-              fontFamily: 'Roboto',
-            ),
+              // User Info - Vertical Stack
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user?.name ?? 'User',
+                      style: const TextStyle(
+                        color: AppThemeColor.pureWhiteColor,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                    if (user?.username != null &&
+                        user!.username!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      GestureDetector(
+                        onTap: () {
+                          // Navigate to public profile view
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => UserProfileScreen(
+                                user: user!,
+                                isOwnProfile: true,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '@${user.username}',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14,
+                                  fontFamily: 'Roboto',
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.open_in_new,
+                                color: Colors.white.withValues(alpha: 0.7),
+                                size: 12,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -181,7 +230,7 @@ class _AccountScreenState extends State<AccountScreen> {
   Widget _buildDefaultProfilePicture() {
     return Container(
       color: const Color(0xFFE1E5E9),
-      child: const Icon(Icons.person, size: 60, color: Color(0xFF9CA3AF)),
+      child: const Icon(Icons.person, size: 30, color: Color(0xFF9CA3AF)),
     );
   }
 

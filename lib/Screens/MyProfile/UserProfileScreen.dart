@@ -579,15 +579,13 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       child: Row(
         children: [
           _buildTabButton(
-            label: '${_createdEvents.length} Created Events',
+            label: 'Created Events (${_createdEvents.length})',
             index: 0,
-            icon: Icons.add_circle_outline,
           ),
           Container(width: 1, height: 40, color: AppThemeColor.borderColor),
           _buildTabButton(
-            label: '${_attendedEvents.length} Attended',
+            label: 'Attended (${_attendedEvents.length})',
             index: 1,
-            icon: Icons.check_circle_outline,
           ),
         ],
       ),
@@ -606,7 +604,6 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   Widget _buildTabButton({
     required String label,
     required int index,
-    required IconData icon,
   }) {
     final isSelected = _tabController.index == index;
     return Expanded(
@@ -620,39 +617,24 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             color: isSelected
                 ? AppThemeColor.darkBlueColor
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                color: isSelected
-                    ? AppThemeColor.pureWhiteColor
-                    : AppThemeColor.dullIconColor,
-                size: 18,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected
-                      ? AppThemeColor.pureWhiteColor
-                      : AppThemeColor.dullFontColor,
-                  fontSize: 10,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                  fontFamily: 'Roboto',
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected
+                  ? AppThemeColor.pureWhiteColor
+                  : AppThemeColor.dullFontColor,
+              fontSize: 14,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              fontFamily: 'Roboto',
+            ),
+            textAlign: TextAlign.center,
           ),
         ),
       ),

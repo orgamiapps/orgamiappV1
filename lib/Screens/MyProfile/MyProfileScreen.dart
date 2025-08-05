@@ -456,8 +456,8 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           SliverToBoxAdapter(child: _buildBioSection()),
           // Discoverability Section
           SliverToBoxAdapter(child: _buildDiscoverabilitySection()),
-          // Stats Section
-          SliverToBoxAdapter(child: _buildStatsSection()),
+          // My Tickets Section
+          SliverToBoxAdapter(child: _buildMyTicketsSection()),
           // Tab Bar
           SliverToBoxAdapter(child: _buildTabBar()),
           // Tab Content
@@ -510,9 +510,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
               ),
               const Spacer(),
               Text(
-                isSelectionMode
-                    ? '${selectedEventIds.length} selected'
-                    : 'My Profile',
+                isSelectionMode ? '${selectedEventIds.length} selected' : '',
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
@@ -593,7 +591,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Hi ${user?.name ?? 'User'}',
+                      user?.name ?? 'User',
                       style: const TextStyle(
                         color: AppThemeColor.pureWhiteColor,
                         fontSize: 24,
@@ -949,7 +947,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     }
   }
 
-  Widget _buildStatsSection() {
+  Widget _buildMyTicketsSection() {
     return Container(
       margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       padding: const EdgeInsets.all(24),
@@ -965,220 +963,131 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.analytics, color: const Color(0xFF667EEA), size: 18),
-              const SizedBox(width: 8),
-              const Text(
-                'My Activity',
-                style: TextStyle(
-                  color: Color(0xFF1A1A1A),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  fontFamily: 'Roboto',
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFF9800).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFFF9800).withOpacity(0.3)),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MyTicketsScreen(),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatItem(
-                  icon: Icons.add_circle_outline,
-                  value: createdEvents.length.toString(),
-                  label: 'Created',
-                  color: const Color(0xFF667EEA),
+              );
+            },
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF9800).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.confirmation_number,
+                    color: Color(0xFFFF9800),
+                    size: 20,
+                  ),
                 ),
-              ),
-              Container(width: 1, height: 40, color: const Color(0xFFE1E5E9)),
-              Expanded(
-                child: _buildStatItem(
-                  icon: Icons.check_circle_outline,
-                  value: attendedEvents.length.toString(),
-                  label: 'Attended',
-                  color: const Color(0xFF10B981),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF9800).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: const Color(0xFFFF9800).withOpacity(0.3),
-              ),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const MyTicketsScreen(),
-                    ),
-                  );
-                },
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFF9800).withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(10),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'My Tickets',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1A1A1A),
+                          fontFamily: 'Roboto',
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.confirmation_number,
-                        color: Color(0xFFFF9800),
-                        size: 20,
+                      const SizedBox(height: 2),
+                      const Text(
+                        'View and manage your event tickets',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF6B7280),
+                          fontFamily: 'Roboto',
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'My Tickets',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF1A1A1A),
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          const Text(
-                            'View and manage your event tickets',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF6B7280),
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(
-                      Icons.arrow_forward_ios,
-                      color: Color(0xFFFF9800),
-                      size: 16,
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+                const Icon(
+                  Icons.arrow_forward_ios,
+                  color: Color(0xFFFF9800),
+                  size: 16,
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildStatItem({
-    required IconData icon,
-    required String value,
-    required String label,
-    required Color color,
-  }) {
-    return Column(
-      children: [
-        Icon(icon, color: color, size: 24),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
-            color: Color(0xFF1A1A1A),
-            fontFamily: 'Roboto',
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: const Color(0xFF9CA3AF),
-            fontFamily: 'Roboto',
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildTabBar() {
-    return Column(
-      children: [
-        // Action buttons row
-        Container(
-          margin: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-          child: Row(
+    return Container(
+      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      child: Column(
+        children: [
+          // Action buttons row - more compact
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              // Filter/Sort button
-              Expanded(
-                child: _buildActionButton(
-                  icon: Icons.tune,
-                  label: 'Filter/Sort',
-                  onTap: _showFilterSortModal,
-                  isActive:
-                      selectedCategories.isNotEmpty ||
-                      currentSortOption != SortOption.none,
+              _buildActionButton(
+                icon: Icons.tune,
+                label: 'Filter/Sort',
+                onTap: _showFilterSortModal,
+                isActive:
+                    selectedCategories.isNotEmpty ||
+                    currentSortOption != SortOption.none,
+              ),
+              const SizedBox(width: 8),
+              _buildActionButton(
+                icon: Icons.checklist,
+                label: 'Select',
+                onTap: _toggleSelectionMode,
+                isActive: isSelectionMode,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Tab bar
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  spreadRadius: 0,
+                  blurRadius: 20,
+                  offset: const Offset(0, 4),
                 ),
-              ),
-              const SizedBox(width: 12),
-              // Select button
-              Expanded(
-                child: _buildActionButton(
-                  icon: Icons.checklist,
-                  label: 'Select',
-                  onTap: _toggleSelectionMode,
-                  isActive: isSelectionMode,
-                ),
-              ),
-            ],
+              ],
+            ),
+            child: Row(
+              children: [
+                _buildTabButton(label: 'Created Events', index: 1),
+                Container(width: 1, height: 40, color: const Color(0xFFE1E5E9)),
+                _buildTabButton(label: 'Attended', index: 2),
+              ],
+            ),
           ),
-        ),
-        // Tab bar
-        Container(
-          margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                spreadRadius: 0,
-                blurRadius: 20,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              _buildTabButton(
-                label: 'Created Events',
-                index: 1,
-                icon: Icons.add_circle_outline,
-              ),
-              Container(width: 1, height: 40, color: const Color(0xFFE1E5E9)),
-              _buildTabButton(
-                label: 'Attended',
-                index: 2,
-                icon: Icons.check_circle_outline,
-              ),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1191,12 +1100,12 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         decoration: BoxDecoration(
           color: isActive
               ? const Color(0xFF667EEA).withOpacity(0.1)
               : Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isActive ? const Color(0xFF667EEA) : const Color(0xFFE1E5E9),
             width: 1,
@@ -1205,21 +1114,22 @@ class _MyProfileScreenState extends State<MyProfileScreen>
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
               spreadRadius: 0,
-              blurRadius: 10,
+              blurRadius: 8,
               offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: Column(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
               color: isActive
                   ? const Color(0xFF667EEA)
                   : const Color(0xFF9CA3AF),
-              size: 20,
+              size: 16,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
@@ -1237,12 +1147,10 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     );
   }
 
-  Widget _buildTabButton({
-    required String label,
-    required int index,
-    required IconData icon,
-  }) {
+  Widget _buildTabButton({required String label, required int index}) {
     bool isSelected = selectedTab == index;
+    int eventCount = index == 1 ? createdEvents.length : attendedEvents.length;
+
     return Expanded(
       child: GestureDetector(
         onTap: () {
@@ -1252,29 +1160,20 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             color: isSelected ? const Color(0xFF667EEA) : Colors.transparent,
             borderRadius: BorderRadius.circular(20),
           ),
-          child: Column(
-            children: [
-              Icon(
-                icon,
-                color: isSelected ? Colors.white : const Color(0xFF9CA3AF),
-                size: 20,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : const Color(0xFF9CA3AF),
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                  fontFamily: 'Roboto',
-                ),
-              ),
-            ],
+          child: Text(
+            '$label ($eventCount)',
+            style: TextStyle(
+              color: isSelected ? Colors.white : const Color(0xFF9CA3AF),
+              fontSize: 14,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              fontFamily: 'Roboto',
+            ),
+            textAlign: TextAlign.center,
           ),
         ),
       ),
@@ -1514,7 +1413,10 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           ),
           child: Stack(
             children: [
-              SingleEventListViewItem(eventModel: event),
+              SingleEventListViewItem(
+                eventModel: event,
+                disableTap: isSelectionMode,
+              ),
               // Selection checkbox overlay
               if (isSelectionMode)
                 Positioned(

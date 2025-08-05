@@ -10,7 +10,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 class SingleEventListViewItem extends StatelessWidget {
   final EventModel eventModel;
-  const SingleEventListViewItem({super.key, required this.eventModel});
+  final bool disableTap;
+  const SingleEventListViewItem({
+    super.key,
+    required this.eventModel,
+    this.disableTap = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +23,7 @@ class SingleEventListViewItem extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () {
+        onTap: disableTap ? null : () {
           print('Tapped event: ${eventModel.id}');
           RouterClass.nextScreenNormal(
             context,
