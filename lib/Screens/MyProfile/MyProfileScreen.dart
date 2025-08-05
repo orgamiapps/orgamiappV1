@@ -35,8 +35,9 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   final TextEditingController _bioController = TextEditingController();
   List<EventModel> createdEvents = [];
   List<EventModel> attendedEvents = [];
+  List<EventModel> savedEvents = [];
   bool isLoading = true;
-  int selectedTab = 1; // 1 = Created, 2 = Attended
+  int selectedTab = 1; // 1 = Created, 2 = Attended, 3 = Saved
   bool isDiscoverable = true; // User discoverability setting
 
   // Selection state
@@ -91,6 +92,29 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     super.dispose();
   }
 
+  Future<void> _refreshSavedEvents() async {
+    try {
+      // Check if user is logged in
+      if (CustomerController.logeInCustomer == null) {
+        return;
+      }
+
+      // Fetch only saved events
+      final saved = await FirebaseFirestoreHelper().getFavoritedEvents(
+        userId: CustomerController.logeInCustomer!.uid,
+      );
+      print('Updated saved events count: ${saved.length}');
+
+      if (mounted) {
+        setState(() {
+          savedEvents = saved;
+        });
+      }
+    } catch (e) {
+      print('Error refreshing saved events: $e');
+    }
+  }
+
   Future<void> _loadProfileData() async {
     setState(() {
       isLoading = true;
@@ -123,10 +147,17 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       );
       print('Attended events count: ${attended.length}');
 
+      // Fetch saved events
+      final saved = await FirebaseFirestoreHelper().getFavoritedEvents(
+        userId: CustomerController.logeInCustomer!.uid,
+      );
+      print('Saved events count: ${saved.length}');
+
       if (mounted) {
         setState(() {
           createdEvents = created;
           attendedEvents = attended;
+          savedEvents = saved;
           bio = CustomerController.logeInCustomer?.bio ?? '';
           _bioController.text = bio ?? '';
           isDiscoverable =
@@ -1042,10 +1073,21 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       child: Column(
         children: [
-          // Action buttons row - more compact
+          // Title and Action buttons row
           Row(
-            mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              // Events title
+              const Text(
+                'Events',
+                style: TextStyle(
+                  color: Color(0xFF1A1A1A),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+              const Spacer(),
+              // Action buttons
               _buildActionButton(
                 icon: Icons.tune,
                 label: 'Filter/Sort',
@@ -1080,9 +1122,11 @@ class _MyProfileScreenState extends State<MyProfileScreen>
             ),
             child: Row(
               children: [
-                _buildTabButton(label: 'Created Events', index: 1),
+                _buildTabButton(label: 'Created', index: 1),
                 Container(width: 1, height: 40, color: const Color(0xFFE1E5E9)),
                 _buildTabButton(label: 'Attended', index: 2),
+                Container(width: 1, height: 40, color: const Color(0xFFE1E5E9)),
+                _buildTabButton(label: 'Saved', index: 3),
               ],
             ),
           ),
@@ -1149,7 +1193,14 @@ class _MyProfileScreenState extends State<MyProfileScreen>
 
   Widget _buildTabButton({required String label, required int index}) {
     bool isSelected = selectedTab == index;
-    int eventCount = index == 1 ? createdEvents.length : attendedEvents.length;
+    int eventCount;
+    if (index == 1) {
+      eventCount = createdEvents.length;
+    } else if (index == 2) {
+      eventCount = attendedEvents.length;
+    } else {
+      eventCount = savedEvents.length;
+    }
 
     return Expanded(
       child: GestureDetector(
@@ -1181,13 +1232,21 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   }
 
   Widget _buildTabContent() {
-    final events = selectedTab == 1 ? createdEvents : attendedEvents;
+    final events = selectedTab == 1
+        ? createdEvents
+        : selectedTab == 2
+        ? attendedEvents
+        : savedEvents;
     final emptyMessage = selectedTab == 1
         ? 'You haven\'t created any events yet'
-        : 'You haven\'t attended any events yet';
+        : selectedTab == 2
+        ? 'You haven\'t attended any events yet'
+        : 'You haven\'t saved any events yet';
     final emptyIcon = selectedTab == 1
         ? FontAwesomeIcons.plus
-        : FontAwesomeIcons.calendarCheck;
+        : selectedTab == 2
+        ? FontAwesomeIcons.calendarCheck
+        : FontAwesomeIcons.bookmark;
 
     print('Building tab content - Selected tab: $selectedTab');
     print('Created events: ${createdEvents.length}');
@@ -1416,6 +1475,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
               SingleEventListViewItem(
                 eventModel: event,
                 disableTap: isSelectionMode,
+                onFavoriteChanged: _refreshSavedEvents,
               ),
               // Selection checkbox overlay
               if (isSelectionMode)
@@ -1459,8 +1519,13 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           events.sort(
             (a, b) => b.eventGenerateTime.compareTo(a.eventGenerateTime),
           );
-        } else {
+        } else if (selectedTab == 2) {
           // Attended events - sort by event date (most recent first)
+          events.sort(
+            (a, b) => b.selectedDateTime.compareTo(a.selectedDateTime),
+          );
+        } else {
+          // Favorited events - sort by event date (most recent first)
           events.sort(
             (a, b) => b.selectedDateTime.compareTo(a.selectedDateTime),
           );
@@ -1500,9 +1565,13 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   String _getSortOptionText(SortOption option) {
     switch (option) {
       case SortOption.none:
-        return selectedTab == 1
-            ? 'Most Recent Created'
-            : 'Most Recent Attended';
+        if (selectedTab == 1) {
+          return 'Most Recent Created';
+        } else if (selectedTab == 2) {
+          return 'Most Recent Attended';
+        } else {
+          return 'Most Recent Favorited';
+        }
       case SortOption.dateAddedAsc:
         return 'Date Added (Oldest First)';
       case SortOption.dateAddedDesc:
@@ -1982,9 +2051,13 @@ class _FilterSortModalState extends State<_FilterSortModal> {
   String _getSortOptionText(SortOption option) {
     switch (option) {
       case SortOption.none:
-        return widget.selectedTab == 1
-            ? 'Most Recent Created'
-            : 'Most Recent Attended';
+        if (widget.selectedTab == 1) {
+          return 'Most Recent Created';
+        } else if (widget.selectedTab == 2) {
+          return 'Most Recent Attended';
+        } else {
+          return 'Most Recent Favorited';
+        }
       case SortOption.dateAddedAsc:
         return 'Date Added (Oldest First)';
       case SortOption.dateAddedDesc:

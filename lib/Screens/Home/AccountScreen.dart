@@ -73,151 +73,57 @@ class _AccountScreenState extends State<AccountScreen> {
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       child: Column(
         children: [
-          // Compact Profile Section - Horizontal Layout
+          // Header Row with Title and Profile Picture
           Row(
             children: [
-              // Profile Picture
-              Stack(
-                children: [
-                  GestureDetector(
-                    onTap: _showImagePickerDialog,
-                    child: Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 3),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.15),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: ClipOval(
-                        child: user?.profilePictureUrl != null
-                            ? Image.network(
-                                user!.profilePictureUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return _buildDefaultProfilePicture();
-                                },
-                              )
-                            : _buildDefaultProfilePicture(),
-                      ),
-                    ),
-                  ),
-                  // Loading Overlay
-                  if (_isUploading)
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.black.withValues(alpha: 0.5),
-                      ),
-                      child: const Center(
-                        child: CircularProgressIndicator(color: Colors.white),
-                      ),
-                    ),
-                  // Camera Icon Button
-                  if (!_isUploading)
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 1),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.camera_alt,
-                          color: Color(0xFF667EEA),
-                          size: 12,
-                        ),
-                      ),
-                    ),
-                ],
+              // Account Title
+              const Text(
+                'Account',
+                style: TextStyle(
+                  color: AppThemeColor.pureWhiteColor,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Roboto',
+                ),
               ),
-              const SizedBox(width: 16),
-
-              // User Info - Vertical Stack
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      user?.name ?? 'User',
-                      style: const TextStyle(
-                        color: AppThemeColor.pureWhiteColor,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'Roboto',
-                      ),
+              const Spacer(),
+              // Profile Picture
+              GestureDetector(
+                onTap: () {
+                  // Navigate to UserProfileScreen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          UserProfileScreen(user: user!, isOwnProfile: true),
                     ),
-                    if (user?.username != null &&
-                        user!.username!.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      GestureDetector(
-                        onTap: () {
-                          // Navigate to public profile view
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => UserProfileScreen(
-                                user: user!,
-                                isOwnProfile: true,
-                              ),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.3),
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                '@${user.username}',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 14,
-                                  fontFamily: 'Roboto',
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Icon(
-                                Icons.open_in_new,
-                                color: Colors.white.withValues(alpha: 0.7),
-                                size: 12,
-                              ),
-                            ],
-                          ),
-                        ),
+                  );
+                },
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.15),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
                     ],
-                  ],
+                  ),
+                  child: ClipOval(
+                    child: user?.profilePictureUrl != null
+                        ? Image.network(
+                            user!.profilePictureUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return _buildDefaultProfilePicture();
+                            },
+                          )
+                        : _buildDefaultProfilePicture(),
+                  ),
                 ),
               ),
             ],
@@ -230,7 +136,7 @@ class _AccountScreenState extends State<AccountScreen> {
   Widget _buildDefaultProfilePicture() {
     return Container(
       color: const Color(0xFFE1E5E9),
-      child: const Icon(Icons.person, size: 30, color: Color(0xFF9CA3AF)),
+      child: const Icon(Icons.person, size: 25, color: Color(0xFF9CA3AF)),
     );
   }
 
@@ -251,7 +157,6 @@ class _AccountScreenState extends State<AccountScreen> {
       ),
       child: Column(
         children: [
-          _buildSettingsHeader(),
           _buildSettingsItem(
             icon: Icons.person,
             title: 'My Profile',

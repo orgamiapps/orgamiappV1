@@ -7,6 +7,8 @@ import 'package:orgami/Utils/dimensions.dart';
 import 'package:orgami/Utils/cached_image.dart';
 import 'package:orgami/Screens/Messaging/ChatScreen.dart';
 import 'package:orgami/Utils/Toast.dart';
+import 'package:orgami/Utils/ThemeProvider.dart';
+import 'package:provider/provider.dart';
 
 class NewMessageScreen extends StatefulWidget {
   const NewMessageScreen({super.key});
@@ -19,7 +21,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseMessagingHelper _messagingHelper = FirebaseMessagingHelper();
   final TextEditingController _searchController = TextEditingController();
-  
+
   List<CustomerModel> _searchResults = [];
   List<CustomerModel> _allUsers = [];
   bool _isLoading = false;
@@ -81,7 +83,10 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
       final currentUser = _auth.currentUser;
       if (currentUser == null) return;
 
-      final results = await _messagingHelper.searchUsers(query, currentUser.uid);
+      final results = await _messagingHelper.searchUsers(
+        query,
+        currentUser.uid,
+      );
       setState(() {
         _searchResults = results;
       });
@@ -141,31 +146,41 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: AppThemeColor.backGroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'New Message',
           style: TextStyle(
-            color: Colors.white,
+            color: theme.appBarTheme.foregroundColor,
             fontWeight: FontWeight.bold,
             fontSize: 20,
           ),
         ),
         flexibleSpace: Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                AppThemeColor.darkBlueColor,
-                AppThemeColor.dullBlueColor,
-                Color(0xFF4A90E2),
-              ],
+              colors: isDark
+                  ? [
+                      const Color(0xFF1E3A5F),
+                      const Color(0xFF2C5A96),
+                      const Color(0xFF4A90E2),
+                    ]
+                  : [
+                      AppThemeColor.darkBlueColor,
+                      AppThemeColor.dullBlueColor,
+                      const Color(0xFF4A90E2),
+                    ],
             ),
           ),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: theme.appBarTheme.foregroundColor),
         elevation: 0,
       ),
       body: Column(
@@ -173,14 +188,16 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
           _buildSearchBar(),
           Expanded(
             child: _isLoading
-                ? const Center(
+                ? Center(
                     child: CircularProgressIndicator(
-                      color: AppThemeColor.darkBlueColor,
+                      color: isDark
+                          ? const Color(0xFF2C5A96)
+                          : AppThemeColor.darkBlueColor,
                     ),
                   )
                 : _searchResults.isEmpty
-                    ? _buildEmptyState()
-                    : _buildUsersList(),
+                ? _buildEmptyState()
+                : _buildUsersList(),
           ),
         ],
       ),
@@ -188,15 +205,21 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
   }
 
   Widget _buildSearchBar() {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+    final theme = Theme.of(context);
+
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -204,22 +227,20 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
       ),
       child: TextField(
         controller: _searchController,
+        style: TextStyle(color: theme.textTheme.bodyLarge?.color),
         decoration: InputDecoration(
           hintText: 'Search users...',
           hintStyle: TextStyle(
-            color: AppThemeColor.dullFontColor,
+            color: theme.textTheme.bodyMedium?.color,
             fontSize: 16,
           ),
           border: InputBorder.none,
-          icon: Icon(
-            Icons.search,
-            color: AppThemeColor.dullFontColor,
-          ),
+          icon: Icon(Icons.search, color: theme.textTheme.bodyMedium?.color),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
                   icon: Icon(
                     Icons.clear,
-                    color: AppThemeColor.dullFontColor,
+                    color: theme.textTheme.bodyMedium?.color,
                   ),
                   onPressed: () {
                     _searchController.clear();
@@ -227,12 +248,15 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                 )
               : null,
         ),
-        style: const TextStyle(fontSize: 16),
       ),
     );
   }
 
   Widget _buildEmptyState() {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+    final theme = Theme.of(context);
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -240,7 +264,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
           Icon(
             _isSearching ? Icons.search_off : Icons.people_outline,
             size: 80,
-            color: AppThemeColor.dullFontColor.withValues(alpha: 0.5),
+            color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           Text(
@@ -248,7 +272,9 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
-              color: AppThemeColor.darkBlueColor,
+              color: isDark
+                  ? const Color(0xFF2C5A96)
+                  : AppThemeColor.darkBlueColor,
             ),
           ),
           const SizedBox(height: 8),
@@ -258,7 +284,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                 : 'There are no other users to message',
             style: TextStyle(
               fontSize: 16,
-              color: AppThemeColor.dullFontColor,
+              color: theme.textTheme.bodyMedium?.color,
             ),
             textAlign: TextAlign.center,
           ),
@@ -279,14 +305,20 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
   }
 
   Widget _buildUserTile(CustomerModel user) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+    final theme = Theme.of(context);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -296,33 +328,41 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
         contentPadding: const EdgeInsets.all(16),
         leading: CircleAvatar(
           radius: 25,
-          backgroundColor: AppThemeColor.lightBlueColor,
+          backgroundColor: isDark
+              ? const Color(0xFF4A90E2)
+              : AppThemeColor.lightBlueColor,
           child: user.profilePictureUrl != null
               ? ClipOval(
                   child: SafeNetworkImage(
                     imageUrl: user.profilePictureUrl!,
                     fit: BoxFit.cover,
-                    placeholder: const Icon(
+                    placeholder: Icon(
                       Icons.person,
-                      color: AppThemeColor.darkBlueColor,
+                      color: isDark
+                          ? const Color(0xFF2C5A96)
+                          : AppThemeColor.darkBlueColor,
                     ),
-                    errorWidget: const Icon(
+                    errorWidget: Icon(
                       Icons.person,
-                      color: AppThemeColor.darkBlueColor,
+                      color: isDark
+                          ? const Color(0xFF2C5A96)
+                          : AppThemeColor.darkBlueColor,
                     ),
                   ),
                 )
-              : const Icon(
+              : Icon(
                   Icons.person,
-                  color: AppThemeColor.darkBlueColor,
+                  color: isDark
+                      ? const Color(0xFF2C5A96)
+                      : AppThemeColor.darkBlueColor,
                 ),
         ),
         title: Text(
           user.name,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Colors.black87,
+            color: theme.textTheme.titleMedium?.color,
           ),
         ),
         subtitle: Column(
@@ -333,7 +373,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                 '@${user.username}',
                 style: TextStyle(
                   fontSize: 14,
-                  color: AppThemeColor.dullFontColor,
+                  color: theme.textTheme.bodyMedium?.color,
                 ),
               ),
               const SizedBox(height: 4),
@@ -343,7 +383,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                 user.bio!,
                 style: TextStyle(
                   fontSize: 14,
-                  color: AppThemeColor.dullFontColor,
+                  color: theme.textTheme.bodyMedium?.color,
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -352,9 +392,11 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
           ],
         ),
         trailing: IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.message_outlined,
-            color: AppThemeColor.darkBlueColor,
+            color: isDark
+                ? const Color(0xFF2C5A96)
+                : AppThemeColor.darkBlueColor,
           ),
           onPressed: () => _startConversation(user),
         ),
@@ -362,4 +404,4 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
       ),
     );
   }
-} 
+}

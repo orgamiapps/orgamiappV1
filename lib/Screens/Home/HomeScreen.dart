@@ -21,6 +21,10 @@ import 'package:carousel_slider/carousel_slider.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:orgami/Screens/Events/Widget/SingleEventListViewItem.dart';
+import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
+import 'package:orgami/Controller/CustomerController.dart';
+import 'package:orgami/Utils/Toast.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -401,49 +405,46 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(24, 32, 24, 40),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Discover',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w300,
-                      fontSize: 28,
-                      fontFamily: 'Roboto',
-                    ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Discover',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w300,
+                    fontSize: 20,
+                    fontFamily: 'Roboto',
                   ),
-                  const Text(
-                    'Amazing Events',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 32,
-                      fontFamily: 'Roboto',
-                    ),
+                ),
+                const Text(
+                  'Amazing Events',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 24,
+                    fontFamily: 'Roboto',
                   ),
-                ],
-              ),
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(30),
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(30),
-                  child: Image.asset(Images.inAppLogo, width: 50, height: 50),
-                ),
-              ),
-            ],
+              ],
+            ),
+          ),
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Image.asset(Images.inAppLogo, width: 40, height: 40),
+            ),
           ),
         ],
       ),
@@ -779,6 +780,314 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildFeaturedCard(EventModel event) {
+    return _FeaturedEventCard(event: event);
+  }
+
+  Widget _buildSkeletonLoading() {
+    return Column(
+      children: [
+        // Featured skeleton
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Shimmer.fromColors(
+            baseColor: const Color(0xFFE1E5E9),
+            highlightColor: Colors.white,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  height: 24,
+                  width: 150,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        // Events skeleton
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            children: List.generate(
+              3,
+              (index) => Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Shimmer.fromColors(
+                  baseColor: const Color(0xFFE1E5E9),
+                  highlightColor: Colors.white,
+                  child: Container(
+                    height: 280,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(40),
+              ),
+              child: Icon(
+                Icons.error_outline,
+                size: 40,
+                color: const Color(0xFF667EEA),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Something went wrong',
+              style: TextStyle(
+                color: Color(0xFF1A1A1A),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Check your connection and try again',
+              style: TextStyle(
+                color: const Color(0xFF6B7280),
+                fontSize: 16,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: () {
+                if (mounted) setState(() {});
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF667EEA),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(40),
+              ),
+              child: Icon(
+                Icons.event_busy,
+                size: 40,
+                color: const Color(0xFF667EEA),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'No events found',
+              style: TextStyle(
+                color: Color(0xFF1A1A1A),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try adjusting your filters or check back later',
+              style: TextStyle(
+                color: const Color(0xFF6B7280),
+                fontSize: 16,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEventsList(List<EventModel> events) {
+    if (events.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: events.length,
+      itemBuilder: (context, index) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          child: _buildEventCard(events[index]),
+        );
+      },
+    );
+  }
+
+  Widget _buildEventCard(EventModel event) {
+    return SingleEventListViewItem(eventModel: event);
+  }
+}
+
+class _FeaturedEventCard extends StatefulWidget {
+  final EventModel event;
+
+  const _FeaturedEventCard({required this.event});
+
+  @override
+  State<_FeaturedEventCard> createState() => _FeaturedEventCardState();
+}
+
+class _FeaturedEventCardState extends State<_FeaturedEventCard>
+    with SingleTickerProviderStateMixin {
+  bool _isFavorited = false;
+  bool _isLoadingFavorite = false;
+  late AnimationController _favoriteController;
+  late Animation<double> _favoriteScaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _favoriteController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _favoriteScaleAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
+      CurvedAnimation(parent: _favoriteController, curve: Curves.elasticOut),
+    );
+
+    _checkFavoriteStatus();
+  }
+
+  @override
+  void dispose() {
+    _favoriteController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _checkFavoriteStatus() async {
+    if (CustomerController.logeInCustomer == null) return;
+
+    try {
+      final isFavorited = await FirebaseFirestoreHelper().isEventFavorited(
+        userId: CustomerController.logeInCustomer!.uid,
+        eventId: widget.event.id,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isFavorited = isFavorited;
+        });
+      }
+    } catch (e) {
+      print('Error checking favorite status: $e');
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (CustomerController.logeInCustomer == null) {
+      ShowToast().showNormalToast(msg: 'Please log in to save events');
+      return;
+    }
+
+    setState(() {
+      _isLoadingFavorite = true;
+    });
+
+    try {
+      bool success;
+      if (_isFavorited) {
+        success = await FirebaseFirestoreHelper().removeFromFavorites(
+          userId: CustomerController.logeInCustomer!.uid,
+          eventId: widget.event.id,
+        );
+      } else {
+        success = await FirebaseFirestoreHelper().addToFavorites(
+          userId: CustomerController.logeInCustomer!.uid,
+          eventId: widget.event.id,
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          _isFavorited = !_isFavorited;
+          _isLoadingFavorite = false;
+        });
+
+        // Trigger animation
+        _favoriteController.forward().then((_) {
+          _favoriteController.reverse();
+        });
+
+        if (success) {
+          ShowToast().showNormalToast(
+            msg: _isFavorited ? 'Event saved!' : 'Event removed from saved!',
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingFavorite = false;
+        });
+      }
+      ShowToast().showNormalToast(msg: 'Failed to update saved events');
+      print('Error toggling favorite: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -786,7 +1095,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         onTap: () {
           RouterClass.nextScreenNormal(
             context,
-            SingleEventScreen(eventModel: event),
+            SingleEventScreen(eventModel: widget.event),
           );
         },
         child: Container(
@@ -813,7 +1122,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: CachedNetworkImage(
-                      imageUrl: event.imageUrl,
+                      imageUrl: widget.event.imageUrl,
                       fit: BoxFit.cover,
                       width: double.infinity,
                       height: 240,
@@ -868,6 +1177,73 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
+                // Favorite button
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: AnimatedBuilder(
+                    animation: _favoriteController,
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _favoriteScaleAnimation.value,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: _isLoadingFavorite
+                                  ? null
+                                  : () {
+                                      _toggleFavorite();
+                                    },
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: _isFavorited
+                                      ? const Color(0xFFE53E3E)
+                                      : Colors.white.withValues(alpha: 0.9),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: _isLoadingFavorite
+                                    ? const Center(
+                                        child: SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      )
+                                    : Icon(
+                                        _isFavorited
+                                            ? Icons.bookmark
+                                            : Icons.bookmark_border,
+                                        color: _isFavorited
+                                            ? Colors.white
+                                            : const Color(0xFF667EEA),
+                                        size: 20,
+                                      ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
                 // Content
                 Padding(
                   padding: const EdgeInsets.all(20),
@@ -912,7 +1288,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            event.title,
+                            widget.event.title,
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -924,7 +1300,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            event.groupName,
+                            widget.event.groupName,
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.9),
                               fontSize: 16,
@@ -951,7 +1327,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 child: Text(
                                   DateFormat(
                                     'MMM dd, KK:mm a',
-                                  ).format(event.selectedDateTime),
+                                  ).format(widget.event.selectedDateTime),
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w600,
@@ -1013,247 +1389,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildEventCard(EventModel event) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () {
-          RouterClass.nextScreenNormal(
-            context,
-            SingleEventScreen(eventModel: event),
-          );
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                spreadRadius: 0,
-                blurRadius: 20,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Image section
-              ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
-                ),
-                child: Stack(
-                  children: [
-                    AspectRatio(
-                      aspectRatio: 16 / 9,
-                      child: CachedNetworkImage(
-                        imageUrl: event.imageUrl,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          color: const Color(0xFFF5F7FA),
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              color: Color(0xFF667EEA),
-                            ),
-                          ),
-                        ),
-                        errorWidget: (context, url, error) => Container(
-                          color: const Color(0xFFF5F7FA),
-                          child: const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.image_not_supported,
-                                  color: Color(0xFF667EEA),
-                                  size: 32,
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Image not available',
-                                  style: TextStyle(
-                                    color: Color(0xFF667EEA),
-                                    fontSize: 12,
-                                    fontFamily: 'Roboto',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (event.isFeatured)
-                      Positioned(
-                        top: 12,
-                        right: 12,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFF9800),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.star, color: Colors.white, size: 12),
-                              SizedBox(width: 4),
-                              Text(
-                                'Featured',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 10,
-                                  fontFamily: 'Roboto',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              // Content section
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      event.title,
-                      style: const TextStyle(
-                        color: Color(0xFF1A1A1A),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                        fontFamily: 'Roboto',
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.group,
-                          color: const Color(0xFF667EEA),
-                          size: 16,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          event.groupName,
-                          style: const TextStyle(
-                            color: Color(0xFF6B7280),
-                            fontSize: 14,
-                            fontFamily: 'Roboto',
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on,
-                          color: const Color(0xFF667EEA),
-                          size: 16,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            event.location,
-                            style: const TextStyle(
-                              color: Color(0xFF6B7280),
-                              fontSize: 14,
-                              fontFamily: 'Roboto',
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      event.description,
-                      style: const TextStyle(
-                        color: Color(0xFF4B5563),
-                        fontSize: 14,
-                        fontFamily: 'Roboto',
-                        height: 1.5,
-                      ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(
-                                0xFF667EEA,
-                              ).withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              DateFormat(
-                                'MMM dd, yyyy\nKK:mm a',
-                              ).format(event.selectedDateTime),
-                              style: const TextStyle(
-                                color: Color(0xFF667EEA),
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
-                                fontFamily: 'Roboto',
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Text(
-                            'View Details',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    return SingleEventListViewItem(eventModel: event);
   }
 
   Widget _buildSkeletonLoading() {

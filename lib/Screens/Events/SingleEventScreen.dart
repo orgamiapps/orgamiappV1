@@ -92,6 +92,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   int usedTicketsCount = 0;
   bool isLoadingSummary = false;
 
+  // Favorite functionality
+  bool _isFavorited = false;
+  bool _isLoadingFavorite = false;
+
   Future<void> getPreRegisterCount() async {
     await FirebaseFirestoreHelper()
         .getPreRegisterAttendanceCount(eventId: eventModel.id)
@@ -1159,6 +1163,76 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     getPreRegisterCount();
     checkUserTicket();
     loadEventSummary();
+
+    // Check if event is favorited
+    _checkFavoriteStatus();
+  }
+
+  // Favorite functionality methods
+  Future<void> _checkFavoriteStatus() async {
+    if (CustomerController.logeInCustomer == null) return;
+
+    try {
+      final isFavorited = await FirebaseFirestoreHelper().isEventFavorited(
+        userId: CustomerController.logeInCustomer!.uid,
+        eventId: eventModel.id,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isFavorited = isFavorited;
+        });
+      }
+    } catch (e) {
+      print('Error checking favorite status: $e');
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (CustomerController.logeInCustomer == null) {
+      ShowToast().showNormalToast(msg: 'Please log in to save events');
+      return;
+    }
+
+    setState(() {
+      _isLoadingFavorite = true;
+    });
+
+    try {
+      bool success;
+      if (_isFavorited) {
+        success = await FirebaseFirestoreHelper().removeFromFavorites(
+          userId: CustomerController.logeInCustomer!.uid,
+          eventId: eventModel.id,
+        );
+      } else {
+        success = await FirebaseFirestoreHelper().addToFavorites(
+          userId: CustomerController.logeInCustomer!.uid,
+          eventId: eventModel.id,
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          _isFavorited = !_isFavorited;
+          _isLoadingFavorite = false;
+        });
+
+        if (success) {
+          ShowToast().showNormalToast(
+            msg: _isFavorited ? 'Event saved!' : 'Event removed from saved!',
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingFavorite = false;
+        });
+      }
+      ShowToast().showNormalToast(msg: 'Failed to update saved events');
+      print('Error toggling favorite: $e');
+    }
   }
 
   @override
@@ -1534,6 +1608,51 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                     ),
                     const SizedBox(width: 12),
                     Tooltip(
+                      message: _isFavorited
+                          ? 'Remove from Saved'
+                          : 'Add to Saved',
+                      child: GestureDetector(
+                        onTap: _isLoadingFavorite ? null : _toggleFavorite,
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: _isFavorited
+                                ? Colors.red.withOpacity(0.2)
+                                : Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: _isFavorited
+                                  ? Colors.red.withOpacity(0.3)
+                                  : Colors.white.withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: _isLoadingFavorite
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                              : Icon(
+                                  _isFavorited
+                                      ? Icons.bookmark
+                                      : Icons.bookmark_border,
+                                  color: _isFavorited
+                                      ? Colors.red
+                                      : Colors.white,
+                                  size: 20,
+                                ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Tooltip(
                       message: 'Share Event',
                       child: GestureDetector(
                         onTap: () => _showQuickShareOptions(),
@@ -1559,7 +1678,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                   ],
                 )
               else
-                // Calendar and Share buttons for non-creators
+                // Calendar, Favorite, and Share buttons for non-creators
                 Row(
                   children: [
                     Tooltip(
@@ -1582,6 +1701,51 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                             color: Colors.white,
                             size: 20,
                           ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Tooltip(
+                      message: _isFavorited
+                          ? 'Remove from Saved'
+                          : 'Add to Saved',
+                      child: GestureDetector(
+                        onTap: _isLoadingFavorite ? null : _toggleFavorite,
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: _isFavorited
+                                ? Colors.red.withOpacity(0.2)
+                                : Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: _isFavorited
+                                  ? Colors.red.withOpacity(0.3)
+                                  : Colors.white.withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: _isLoadingFavorite
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                              : Icon(
+                                  _isFavorited
+                                      ? Icons.bookmark
+                                      : Icons.bookmark_border,
+                                  color: _isFavorited
+                                      ? Colors.red
+                                      : Colors.white,
+                                  size: 20,
+                                ),
                         ),
                       ),
                     ),

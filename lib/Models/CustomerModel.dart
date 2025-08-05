@@ -15,6 +15,7 @@ class CustomerModel {
   String? website;
   String? socialMediaLinks;
   bool isDiscoverable; // New field for user search privacy
+  List<String> favorites; // New field for saved events
   DateTime createdAt;
 
   CustomerModel({
@@ -33,6 +34,7 @@ class CustomerModel {
     this.website,
     this.socialMediaLinks,
     this.isDiscoverable = true, // Default to discoverable
+    this.favorites = const [], // Default to empty list for saved events
     required this.createdAt,
   });
 
@@ -57,6 +59,7 @@ class CustomerModel {
       isDiscoverable:
           d['isDiscoverable'] ??
           true, // Default to true for backward compatibility
+      favorites: List<String>.from(d['favorites'] ?? []), // Saved events field
       createdAt: (d['createdAt'] as Timestamp).toDate(),
     );
   }
@@ -78,6 +81,7 @@ class CustomerModel {
       'website': d.website,
       'socialMediaLinks': d.socialMediaLinks,
       'isDiscoverable': d.isDiscoverable,
+      'favorites': d.favorites, // Saved events field
       'createdAt': d.createdAt,
     };
   }

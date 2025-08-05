@@ -2,11 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:orgami/Models/MessageModel.dart';
+import 'package:provider/provider.dart';
 
 import 'package:orgami/Firebase/FirebaseMessagingHelper.dart';
 import 'package:orgami/Utils/Colors.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:orgami/Utils/cached_image.dart';
+import 'package:orgami/Utils/ThemeProvider.dart';
 import 'package:orgami/Screens/Messaging/ChatScreen.dart';
 import 'package:orgami/Screens/Messaging/NewMessageScreen.dart';
 import 'package:intl/intl.dart';
@@ -176,31 +178,41 @@ class _MessagingScreenState extends State<MessagingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+    final theme = Theme.of(context);
+    
     return Scaffold(
-      backgroundColor: AppThemeColor.backGroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Messages',
           style: TextStyle(
-            color: Colors.white,
+            color: theme.appBarTheme.foregroundColor,
             fontWeight: FontWeight.bold,
             fontSize: 20,
           ),
         ),
         flexibleSpace: Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                AppThemeColor.darkBlueColor,
-                AppThemeColor.dullBlueColor,
-                Color(0xFF4A90E2),
-              ],
+              colors: isDark 
+                ? [
+                    const Color(0xFF1E3A5F),
+                    const Color(0xFF2C5A96),
+                    const Color(0xFF4A90E2),
+                  ]
+                : [
+                    AppThemeColor.darkBlueColor,
+                    AppThemeColor.dullBlueColor,
+                    const Color(0xFF4A90E2),
+                  ],
             ),
           ),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: theme.appBarTheme.foregroundColor),
         elevation: 0,
         actions: [
           IconButton(
@@ -222,24 +234,30 @@ class _MessagingScreenState extends State<MessagingScreen> {
             MaterialPageRoute(builder: (context) => const NewMessageScreen()),
           );
         },
-        backgroundColor: AppThemeColor.darkBlueColor,
-        child: const Icon(Icons.message, color: Colors.white),
+        backgroundColor: isDark ? const Color(0xFF2C5A96) : AppThemeColor.darkBlueColor,
+        child: Icon(Icons.message, color: Colors.white),
       ),
     );
   }
 
   Widget _buildBody() {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+    final theme = Theme.of(context);
+    
     if (_isLoading) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(color: AppThemeColor.darkBlueColor),
-            SizedBox(height: 16),
+            CircularProgressIndicator(
+              color: isDark ? const Color(0xFF2C5A96) : AppThemeColor.darkBlueColor,
+            ),
+            const SizedBox(height: 16),
             Text(
               'Loading messages...',
               style: TextStyle(
-                color: AppThemeColor.dullFontColor,
+                color: theme.textTheme.bodyMedium?.color,
                 fontSize: 16,
               ),
             ),
@@ -256,7 +274,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
             Icon(
               Icons.error_outline,
               size: 80,
-              color: AppThemeColor.dullFontColor.withValues(alpha: 0.5),
+              color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
@@ -264,7 +282,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
-                color: AppThemeColor.darkBlueColor,
+                color: isDark ? const Color(0xFF2C5A96) : AppThemeColor.darkBlueColor,
               ),
             ),
             const SizedBox(height: 8),
@@ -272,7 +290,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
               _errorMessage!,
               style: TextStyle(
                 fontSize: 16,
-                color: AppThemeColor.dullFontColor,
+                color: theme.textTheme.bodyMedium?.color,
               ),
               textAlign: TextAlign.center,
             ),
@@ -280,7 +298,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
             ElevatedButton(
               onPressed: _retryLoading,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppThemeColor.darkBlueColor,
+                backgroundColor: isDark ? const Color(0xFF2C5A96) : AppThemeColor.darkBlueColor,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 32,
                   vertical: 12,
@@ -311,6 +329,9 @@ class _MessagingScreenState extends State<MessagingScreen> {
   }
 
   Widget _buildEmptyState() {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+    final theme = Theme.of(context);
     final isSearching = _isSearching && _searchController.text.isNotEmpty;
 
     return Center(
@@ -320,7 +341,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
           Icon(
             isSearching ? Icons.search_off : Icons.message_outlined,
             size: 80,
-            color: AppThemeColor.dullFontColor.withValues(alpha: 0.5),
+            color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           Text(
@@ -328,7 +349,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
-              color: AppThemeColor.darkBlueColor,
+              color: isDark ? const Color(0xFF2C5A96) : AppThemeColor.darkBlueColor,
             ),
           ),
           const SizedBox(height: 8),
@@ -336,7 +357,10 @@ class _MessagingScreenState extends State<MessagingScreen> {
             isSearching
                 ? 'Try adjusting your search terms or start a new conversation'
                 : 'Start a conversation with other users',
-            style: TextStyle(fontSize: 16, color: AppThemeColor.dullFontColor),
+            style: TextStyle(
+              fontSize: 16, 
+              color: theme.textTheme.bodyMedium?.color,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
@@ -351,7 +375,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
                 );
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppThemeColor.darkBlueColor,
+                backgroundColor: isDark ? const Color(0xFF2C5A96) : AppThemeColor.darkBlueColor,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 32,
                   vertical: 12,
@@ -375,13 +399,19 @@ class _MessagingScreenState extends State<MessagingScreen> {
   }
 
   Widget _buildSearchBar() {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+    final theme = Theme.of(context);
+    
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: isDark 
+              ? Colors.black.withValues(alpha: 0.3)
+              : Colors.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -390,17 +420,21 @@ class _MessagingScreenState extends State<MessagingScreen> {
       child: TextField(
         controller: _searchController,
         onChanged: _onSearchChanged,
+        style: TextStyle(color: theme.textTheme.bodyLarge?.color),
         decoration: InputDecoration(
           hintText: 'Search conversations...',
-          prefixIcon: const Icon(
+          hintStyle: TextStyle(
+            color: theme.textTheme.bodyMedium?.color,
+          ),
+          prefixIcon: Icon(
             Icons.search,
-            color: AppThemeColor.dullFontColor,
+            color: theme.textTheme.bodyMedium?.color,
           ),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.clear,
-                    color: AppThemeColor.dullFontColor,
+                    color: theme.textTheme.bodyMedium?.color,
                   ),
                   onPressed: () {
                     _searchController.clear();
@@ -410,13 +444,21 @@ class _MessagingScreenState extends State<MessagingScreen> {
               : null,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-            borderSide: BorderSide(color: AppThemeColor.lightBlueColor),
+            borderSide: BorderSide(
+              color: isDark ? const Color(0xFF4A90E2) : AppThemeColor.lightBlueColor,
+            ),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
             borderSide: BorderSide(
-              color: AppThemeColor.darkBlueColor,
+              color: isDark ? const Color(0xFF2C5A96) : AppThemeColor.darkBlueColor,
               width: 2,
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+            borderSide: BorderSide(
+              color: isDark ? const Color(0xFF4A90E2) : AppThemeColor.lightBlueColor,
             ),
           ),
           contentPadding: const EdgeInsets.symmetric(
@@ -445,6 +487,10 @@ class _MessagingScreenState extends State<MessagingScreen> {
     ConversationModel conversation,
     Map<String, dynamic> otherParticipantInfo,
   ) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+    final theme = Theme.of(context);
+    
     final name = otherParticipantInfo['name'] ?? 'Unknown User';
     final profilePictureUrl = otherParticipantInfo['profilePictureUrl'];
     final username = otherParticipantInfo['username'];
@@ -453,11 +499,13 @@ class _MessagingScreenState extends State<MessagingScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: isDark 
+              ? Colors.black.withValues(alpha: 0.3)
+              : Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -467,23 +515,26 @@ class _MessagingScreenState extends State<MessagingScreen> {
         contentPadding: const EdgeInsets.all(16),
         leading: CircleAvatar(
           radius: 25,
-          backgroundColor: AppThemeColor.lightBlueColor,
+          backgroundColor: isDark ? const Color(0xFF4A90E2) : AppThemeColor.lightBlueColor,
           child: profilePictureUrl != null
               ? ClipOval(
                   child: SafeNetworkImage(
                     imageUrl: profilePictureUrl,
                     fit: BoxFit.cover,
-                    placeholder: const Icon(
+                    placeholder: Icon(
                       Icons.person,
-                      color: AppThemeColor.darkBlueColor,
+                      color: isDark ? const Color(0xFF2C5A96) : AppThemeColor.darkBlueColor,
                     ),
-                    errorWidget: const Icon(
+                    errorWidget: Icon(
                       Icons.person,
-                      color: AppThemeColor.darkBlueColor,
+                      color: isDark ? const Color(0xFF2C5A96) : AppThemeColor.darkBlueColor,
                     ),
                   ),
                 )
-              : const Icon(Icons.person, color: AppThemeColor.darkBlueColor),
+              : Icon(
+                  Icons.person, 
+                  color: isDark ? const Color(0xFF2C5A96) : AppThemeColor.darkBlueColor,
+                ),
         ),
         title: Row(
           children: [
@@ -494,8 +545,8 @@ class _MessagingScreenState extends State<MessagingScreen> {
                   fontSize: 16,
                   fontWeight: hasUnread ? FontWeight.w600 : FontWeight.w500,
                   color: hasUnread
-                      ? AppThemeColor.darkBlueColor
-                      : Colors.black87,
+                      ? (isDark ? const Color(0xFF2C5A96) : AppThemeColor.darkBlueColor)
+                      : theme.textTheme.titleMedium?.color,
                 ),
               ),
             ),
@@ -503,7 +554,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppThemeColor.darkBlueColor,
+                  color: isDark ? const Color(0xFF2C5A96) : AppThemeColor.darkBlueColor,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -525,7 +576,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
                 '@$username',
                 style: TextStyle(
                   fontSize: 14,
-                  color: AppThemeColor.dullFontColor,
+                  color: theme.textTheme.bodyMedium?.color,
                 ),
               ),
               const SizedBox(height: 4),
@@ -535,8 +586,8 @@ class _MessagingScreenState extends State<MessagingScreen> {
               style: TextStyle(
                 fontSize: 14,
                 color: hasUnread
-                    ? AppThemeColor.darkBlueColor
-                    : AppThemeColor.dullFontColor,
+                    ? (isDark ? const Color(0xFF2C5A96) : AppThemeColor.darkBlueColor)
+                    : theme.textTheme.bodyMedium?.color,
                 fontWeight: hasUnread ? FontWeight.w500 : FontWeight.normal,
               ),
               maxLines: 1,
@@ -547,7 +598,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
               DateFormat('MMM d, h:mm a').format(conversation.lastMessageTime),
               style: TextStyle(
                 fontSize: 12,
-                color: AppThemeColor.dullFontColor,
+                color: theme.textTheme.bodyMedium?.color,
               ),
             ),
           ],

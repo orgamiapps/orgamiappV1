@@ -7,15 +7,131 @@ import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/Utils/cached_image.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
+import 'package:orgami/Controller/CustomerController.dart';
+import 'package:orgami/Utils/Toast.dart';
 
-class SingleEventListViewItem extends StatelessWidget {
+class SingleEventListViewItem extends StatefulWidget {
   final EventModel eventModel;
   final bool disableTap;
+  final VoidCallback? onFavoriteChanged;
+
   const SingleEventListViewItem({
     super.key,
     required this.eventModel,
     this.disableTap = false,
+    this.onFavoriteChanged,
   });
+
+  @override
+  State<SingleEventListViewItem> createState() =>
+      _SingleEventListViewItemState();
+}
+
+class _SingleEventListViewItemState extends State<SingleEventListViewItem>
+    with SingleTickerProviderStateMixin {
+  bool _isFavorited = false;
+  bool _isLoadingFavorite = false;
+  late AnimationController _favoriteController;
+  late Animation<double> _favoriteScaleAnimation;
+  late Animation<double> _favoriteOpacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _favoriteController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _favoriteScaleAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
+      CurvedAnimation(parent: _favoriteController, curve: Curves.elasticOut),
+    );
+    _favoriteOpacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _favoriteController, curve: Curves.easeInOut),
+    );
+
+    _checkFavoriteStatus();
+  }
+
+  @override
+  void dispose() {
+    _favoriteController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _checkFavoriteStatus() async {
+    if (CustomerController.logeInCustomer == null) return;
+
+    try {
+      final isFavorited = await FirebaseFirestoreHelper().isEventFavorited(
+        userId: CustomerController.logeInCustomer!.uid,
+        eventId: widget.eventModel.id,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isFavorited = isFavorited;
+        });
+      }
+    } catch (e) {
+      print('Error checking favorite status: $e');
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (CustomerController.logeInCustomer == null) {
+      ShowToast().showNormalToast(msg: 'Please log in to save events');
+      return;
+    }
+
+    setState(() {
+      _isLoadingFavorite = true;
+    });
+
+    try {
+      bool success;
+      if (_isFavorited) {
+        success = await FirebaseFirestoreHelper().removeFromFavorites(
+          userId: CustomerController.logeInCustomer!.uid,
+          eventId: widget.eventModel.id,
+        );
+      } else {
+        success = await FirebaseFirestoreHelper().addToFavorites(
+          userId: CustomerController.logeInCustomer!.uid,
+          eventId: widget.eventModel.id,
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          _isFavorited = !_isFavorited;
+          _isLoadingFavorite = false;
+        });
+
+        // Trigger animation
+        _favoriteController.forward().then((_) {
+          _favoriteController.reverse();
+        });
+
+        if (success) {
+          ShowToast().showNormalToast(
+            msg: _isFavorited ? 'Event saved!' : 'Event removed from saved!',
+          );
+
+          // Notify parent widget if callback is provided
+          widget.onFavoriteChanged?.call();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingFavorite = false;
+        });
+      }
+      ShowToast().showNormalToast(msg: 'Failed to update saved events');
+      print('Error toggling favorite: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,13 +139,15 @@ class SingleEventListViewItem extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: disableTap ? null : () {
-          print('Tapped event: ${eventModel.id}');
-          RouterClass.nextScreenNormal(
-            context,
-            SingleEventScreen(eventModel: eventModel),
-          );
-        },
+        onTap: widget.disableTap
+            ? null
+            : () {
+                print('Tapped event: ${widget.eventModel.id}');
+                RouterClass.nextScreenNormal(
+                  context,
+                  SingleEventScreen(eventModel: widget.eventModel),
+                );
+              },
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -57,7 +175,7 @@ class SingleEventListViewItem extends StatelessWidget {
                     AspectRatio(
                       aspectRatio: 16 / 9,
                       child: SafeNetworkImage(
-                        imageUrl: eventModel.imageUrl,
+                        imageUrl: widget.eventModel.imageUrl,
                         fit: BoxFit.cover,
                         placeholder: Container(
                           color: const Color(0xFFF5F7FA),
@@ -93,10 +211,77 @@ class SingleEventListViewItem extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (eventModel.isFeatured)
+                    // Favorite button
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: AnimatedBuilder(
+                        animation: _favoriteController,
+                        builder: (context, child) {
+                          return Transform.scale(
+                            scale: _favoriteScaleAnimation.value,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.1),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(20),
+                                  onTap: _isLoadingFavorite
+                                      ? null
+                                      : () {
+                                          _toggleFavorite();
+                                        },
+                                  child: Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: _isFavorited
+                                          ? const Color(0xFFE53E3E)
+                                          : Colors.white.withValues(alpha: 0.9),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: _isLoadingFavorite
+                                        ? const Center(
+                                            child: SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Color(0xFF667EEA),
+                                              ),
+                                            ),
+                                          )
+                                        : Icon(
+                                            _isFavorited
+                                                ? Icons.bookmark
+                                                : Icons.bookmark_border,
+                                            color: _isFavorited
+                                                ? Colors.white
+                                                : const Color(0xFF667EEA),
+                                            size: 20,
+                                          ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    if (widget.eventModel.isFeatured)
                       Positioned(
                         top: 12,
-                        right: 12,
+                        left: 12,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -134,7 +319,7 @@ class SingleEventListViewItem extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      eventModel.title,
+                      widget.eventModel.title,
                       style: const TextStyle(
                         color: Color(0xFF1A1A1A),
                         fontWeight: FontWeight.bold,
@@ -154,7 +339,7 @@ class SingleEventListViewItem extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          eventModel.groupName,
+                          widget.eventModel.groupName,
                           style: const TextStyle(
                             color: Color(0xFF6B7280),
                             fontSize: 14,
@@ -174,7 +359,7 @@ class SingleEventListViewItem extends StatelessWidget {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            eventModel.location,
+                            widget.eventModel.location,
                             style: const TextStyle(
                               color: Color(0xFF6B7280),
                               fontSize: 14,
@@ -188,7 +373,7 @@ class SingleEventListViewItem extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      eventModel.description,
+                      widget.eventModel.description,
                       style: const TextStyle(
                         color: Color(0xFF4B5563),
                         fontSize: 14,
@@ -217,7 +402,7 @@ class SingleEventListViewItem extends StatelessWidget {
                             child: Text(
                               DateFormat(
                                 'MMM dd, yyyy\nKK:mm a',
-                              ).format(eventModel.selectedDateTime),
+                              ).format(widget.eventModel.selectedDateTime),
                               style: const TextStyle(
                                 color: Color(0xFF667EEA),
                                 fontWeight: FontWeight.w600,

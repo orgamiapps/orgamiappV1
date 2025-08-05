@@ -2208,4 +2208,163 @@ class FirebaseFirestoreHelper {
       return false;
     }
   }
+
+  // Saved Events functionality
+  Future<bool> addToFavorites({
+    required String userId,
+    required String eventId,
+  }) async {
+    try {
+      // Get current user data
+      final userDoc = await _firestore
+          .collection(CustomerModel.firebaseKey)
+          .doc(userId)
+          .get();
+
+      if (!userDoc.exists) {
+        print('User not found: $userId');
+        return false;
+      }
+
+      final userData = userDoc.data()!;
+      List<String> favorites = List<String>.from(userData['favorites'] ?? []);
+
+      // Check if event is already saved
+      if (favorites.contains(eventId)) {
+        print('Event already saved: $eventId');
+        return true; // Already saved, consider it successful
+      }
+
+      // Add event to saved events
+      favorites.add(eventId);
+
+      // Update user document
+      await _firestore.collection(CustomerModel.firebaseKey).doc(userId).update(
+        {'favorites': favorites},
+      );
+
+      print('Event added to saved events: $eventId for user: $userId');
+      return true;
+    } catch (e) {
+      print('Error adding event to saved events: $e');
+      return false;
+    }
+  }
+
+  Future<bool> removeFromFavorites({
+    required String userId,
+    required String eventId,
+  }) async {
+    try {
+      // Get current user data
+      final userDoc = await _firestore
+          .collection(CustomerModel.firebaseKey)
+          .doc(userId)
+          .get();
+
+      if (!userDoc.exists) {
+        print('User not found: $userId');
+        return false;
+      }
+
+      final userData = userDoc.data()!;
+      List<String> favorites = List<String>.from(userData['favorites'] ?? []);
+
+      // Check if event is in saved events
+      if (!favorites.contains(eventId)) {
+        print('Event not in saved events: $eventId');
+        return true; // Not in saved events, consider it successful
+      }
+
+      // Remove event from saved events
+      favorites.remove(eventId);
+
+      // Update user document
+      await _firestore.collection(CustomerModel.firebaseKey).doc(userId).update(
+        {'favorites': favorites},
+      );
+
+      print('Event removed from saved events: $eventId for user: $userId');
+      return true;
+    } catch (e) {
+      print('Error removing event from saved events: $e');
+      return false;
+    }
+  }
+
+  Future<bool> isEventFavorited({
+    required String userId,
+    required String eventId,
+  }) async {
+    try {
+      // Get current user data
+      final userDoc = await _firestore
+          .collection(CustomerModel.firebaseKey)
+          .doc(userId)
+          .get();
+
+      if (!userDoc.exists) {
+        print('User not found: $userId');
+        return false;
+      }
+
+      final userData = userDoc.data()!;
+      List<String> favorites = List<String>.from(userData['favorites'] ?? []);
+
+      return favorites.contains(eventId);
+    } catch (e) {
+      print('Error checking if event is saved: $e');
+      return false;
+    }
+  }
+
+  Future<List<EventModel>> getFavoritedEvents({required String userId}) async {
+    try {
+      // Get current user data
+      final userDoc = await _firestore
+          .collection(CustomerModel.firebaseKey)
+          .doc(userId)
+          .get();
+
+      if (!userDoc.exists) {
+        print('User not found: $userId');
+        return [];
+      }
+
+      final userData = userDoc.data()!;
+      List<String> favoriteEventIds = List<String>.from(
+        userData['favorites'] ?? [],
+      );
+
+      if (favoriteEventIds.isEmpty) {
+        return [];
+      }
+
+      // Get all saved events
+      List<EventModel> favoritedEvents = [];
+      for (String eventId in favoriteEventIds) {
+        try {
+          final eventDoc = await _firestore
+              .collection(EventModel.firebaseKey)
+              .doc(eventId)
+              .get();
+
+          if (eventDoc.exists) {
+            final eventData = eventDoc.data()!;
+            eventData['id'] = eventId; // Add the document ID
+            favoritedEvents.add(EventModel.fromJson(eventData));
+          }
+        } catch (e) {
+          print('Error fetching saved event: $eventId - $e');
+          // Continue with other events even if one fails
+        }
+      }
+
+      print('Saved events count: ${favoritedEvents.length}');
+      return favoritedEvents;
+    } catch (e) {
+      print('Error getting saved events: $e');
+      return [];
+    }
+  }
 }
