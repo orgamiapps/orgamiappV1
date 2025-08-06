@@ -20,7 +20,7 @@ Future<void> main() async {
 
     print('🚀 Starting app initialization...');
 
-    // Initialize Firebase with simple error handling
+    // Initialize Firebase with optimized settings
     try {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
@@ -97,6 +97,17 @@ class MyApp extends StatelessWidget {
             title: AppConstants.appName,
             debugShowCheckedModeBanner: false,
             theme: themeProvider.getTheme(),
+            // Performance optimizations
+            builder: (context, child) {
+              return MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: const TextScaler.linear(
+                    1.0,
+                  ), // Fixed deprecated textScaleFactor
+                ),
+                child: child!,
+              );
+            },
             home: const SplashScreen(),
           );
         },

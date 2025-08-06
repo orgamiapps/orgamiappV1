@@ -14,7 +14,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 class FirebaseFirestoreHelper {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Retrieves a single customer from Firestore
+  // Cache for frequently accessed data
+  static final Map<String, dynamic> _cache = {};
+  static const Duration _cacheExpiry = Duration(minutes: 5);
+
+  /// Retrieves a single customer from Firestore with caching
   ///
   /// IMPORTANT: Ensure Firestore security rules allow read access for authenticated users:
   /// match /Customers/{customerId} {
@@ -24,6 +28,19 @@ class FirebaseFirestoreHelper {
   /// This method handles PERMISSION_DENIED errors gracefully by returning null
   /// instead of throwing exceptions, allowing the app to continue functioning.
   Future<CustomerModel?> getSingleCustomer({required String customerId}) async {
+    // Check cache first
+    final cacheKey = 'customer_$customerId';
+    final cachedData = _cache[cacheKey];
+    if (cachedData != null && cachedData['timestamp'] != null) {
+      final cacheTime = DateTime.fromMillisecondsSinceEpoch(
+        cachedData['timestamp'],
+      );
+      if (DateTime.now().difference(cacheTime) < _cacheExpiry) {
+        print('📦 Using cached customer data for: $customerId');
+        return cachedData['data'] as CustomerModel?;
+      }
+    }
+
     CustomerModel? customerModel;
     try {
       await _firestore
@@ -33,6 +50,12 @@ class FirebaseFirestoreHelper {
           .then((singleCustomerData) {
             if (singleCustomerData.exists) {
               customerModel = CustomerModel.fromFirestore(singleCustomerData);
+
+              // Cache the result
+              _cache[cacheKey] = {
+                'data': customerModel,
+                'timestamp': DateTime.now().millisecondsSinceEpoch,
+              };
             }
           });
     } catch (e) {
@@ -56,6 +79,19 @@ class FirebaseFirestoreHelper {
   }
 
   Future<List<AttendanceModel>> getAttendance({required String eventId}) async {
+    // Check cache first
+    final cacheKey = 'attendance_$eventId';
+    final cachedData = _cache[cacheKey];
+    if (cachedData != null && cachedData['timestamp'] != null) {
+      final cacheTime = DateTime.fromMillisecondsSinceEpoch(
+        cachedData['timestamp'],
+      );
+      if (DateTime.now().difference(cacheTime) < _cacheExpiry) {
+        print('📦 Using cached attendance data for event: $eventId');
+        return cachedData['data'] as List<AttendanceModel>;
+      }
+    }
+
     QuerySnapshot querySnapshot = await _firestore
         .collection(AttendanceModel.firebaseKey)
         .where('eventId', isEqualTo: eventId)
@@ -63,6 +99,13 @@ class FirebaseFirestoreHelper {
     List<AttendanceModel> list = querySnapshot.docs.map((doc) {
       return AttendanceModel.fromJson(doc);
     }).toList();
+
+    // Cache the result
+    _cache[cacheKey] = {
+      'data': list,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    };
+
     print('list Data length is ${list.length}');
     return list;
   }
@@ -70,6 +113,19 @@ class FirebaseFirestoreHelper {
   Future<List<AttendanceModel>> getRegisterAttendance({
     required String eventId,
   }) async {
+    // Check cache first
+    final cacheKey = 'register_attendance_$eventId';
+    final cachedData = _cache[cacheKey];
+    if (cachedData != null && cachedData['timestamp'] != null) {
+      final cacheTime = DateTime.fromMillisecondsSinceEpoch(
+        cachedData['timestamp'],
+      );
+      if (DateTime.now().difference(cacheTime) < _cacheExpiry) {
+        print('📦 Using cached register attendance data for event: $eventId');
+        return cachedData['data'] as List<AttendanceModel>;
+      }
+    }
+
     QuerySnapshot querySnapshot = await _firestore
         .collection(AttendanceModel.registerFirebaseKey)
         .where('eventId', isEqualTo: eventId)
@@ -77,6 +133,13 @@ class FirebaseFirestoreHelper {
     List<AttendanceModel> list = querySnapshot.docs.map((doc) {
       return AttendanceModel.fromJson(doc);
     }).toList();
+
+    // Cache the result
+    _cache[cacheKey] = {
+      'data': list,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    };
+
     print('list Data length is ${list.length}');
     return list;
   }
@@ -84,6 +147,19 @@ class FirebaseFirestoreHelper {
   Future<List<EventQuestionModel>> getEventQuestions({
     required String eventId,
   }) async {
+    // Check cache first
+    final cacheKey = 'event_questions_$eventId';
+    final cachedData = _cache[cacheKey];
+    if (cachedData != null && cachedData['timestamp'] != null) {
+      final cacheTime = DateTime.fromMillisecondsSinceEpoch(
+        cachedData['timestamp'],
+      );
+      if (DateTime.now().difference(cacheTime) < _cacheExpiry) {
+        print('📦 Using cached event questions for event: $eventId');
+        return cachedData['data'] as List<EventQuestionModel>;
+      }
+    }
+
     List<EventQuestionModel> list = [];
     try {
       QuerySnapshot querySnapshot = await _firestore
@@ -94,6 +170,13 @@ class FirebaseFirestoreHelper {
       list = querySnapshot.docs.map((doc) {
         return EventQuestionModel.fromJson(doc);
       }).toList();
+
+      // Cache the result
+      _cache[cacheKey] = {
+        'data': list,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      };
+
       print('list Data length is ${list.length}');
     } catch (e) {
       // Handle permission denied and other Firestore errors

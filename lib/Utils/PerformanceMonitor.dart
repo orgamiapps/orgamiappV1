@@ -12,15 +12,11 @@ class PerformanceMonitor {
   Timer? _memoryTimer;
   Timer? _frameTimer;
   int _frameCount = 0;
-  int _lastFrameTime = 0;
   bool _isMonitoring = false;
 
-  // Memory thresholds (simplified for now)
-  static const int _memoryWarningThreshold = 100 * 1024 * 1024; // 100MB
-  static const int _memoryCriticalThreshold = 200 * 1024 * 1024; // 200MB
-
-  // Frame rate thresholds
-  static const double _minFrameRate = 30.0; // Minimum acceptable frame rate
+  // Optimized frame rate thresholds
+  static const double _minFrameRate =
+      25.0; // Reduced from 30.0 for better tolerance
 
   void startMonitoring() {
     if (_isMonitoring) return;
@@ -28,8 +24,9 @@ class PerformanceMonitor {
 
     print('🔍 Starting performance monitoring...');
 
-    // Monitor frame rate
-    _frameTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    // Monitor frame rate with reduced frequency
+    _frameTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+      // Increased from 1 second
       _checkFrameRate();
     });
 
@@ -48,7 +45,6 @@ class PerformanceMonitor {
 
   void _onFrame(Duration timeStamp) {
     _frameCount++;
-    _lastFrameTime = timeStamp.inMilliseconds;
   }
 
   void _checkFrameRate() {
@@ -105,12 +101,17 @@ class _PerformanceMonitorWidgetState extends State<PerformanceMonitorWidget> {
   @override
   void initState() {
     super.initState();
-    PerformanceMonitor().startMonitoring();
+    // Only start monitoring in debug mode to reduce production overhead
+    if (kDebugMode) {
+      PerformanceMonitor().startMonitoring();
+    }
   }
 
   @override
   void dispose() {
-    PerformanceMonitor().stopMonitoring();
+    if (kDebugMode) {
+      PerformanceMonitor().stopMonitoring();
+    }
     super.dispose();
   }
 

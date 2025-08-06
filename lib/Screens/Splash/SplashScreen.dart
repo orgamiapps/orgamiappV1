@@ -25,7 +25,7 @@ class _SplashScreenState extends State<SplashScreen>
   _handleAnimation() {
     logoAnimation = AnimationController(
       upperBound: 500,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 1000), // Reduced from 1500ms
       vsync: this,
     );
     logoAnimation.forward();
@@ -41,11 +41,11 @@ class _SplashScreenState extends State<SplashScreen>
       if (firebaseUser != null) {
         print('🔍 User found: ${firebaseUser.uid}');
 
-        // Add timeout to prevent infinite loading
+        // Reduced timeout from 10 to 5 seconds for faster failure detection
         final userData = await FirebaseFirestoreHelper()
             .getSingleCustomer(customerId: firebaseUser.uid)
             .timeout(
-              const Duration(seconds: 10),
+              const Duration(seconds: 5), // Reduced from 10 seconds
               onTimeout: () {
                 print('⏰ Timeout getting user data');
                 return null;
@@ -64,7 +64,8 @@ class _SplashScreenState extends State<SplashScreen>
         }
       } else {
         print('🔍 No user found, navigating to second splash');
-        Timer(const Duration(seconds: 2), () {
+        // Reduced delay from 2 to 1 second
+        Timer(const Duration(seconds: 1), () {
           RouterClass().secondSplashScreenRoute(context: context);
         });
       }
@@ -111,14 +112,15 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
     _handleAnimation();
 
-    // Add a timeout to prevent infinite loading
-    Timer(const Duration(seconds: 15), () {
+    // Reduced timeout from 15 to 8 seconds for faster navigation
+    Timer(const Duration(seconds: 8), () {
       if (mounted) {
         print('⏰ Splash screen timeout - forcing navigation');
         RouterClass().secondSplashScreenRoute(context: context);
       }
     });
 
+    // Start user loading immediately
     _getUser();
   }
 
@@ -143,7 +145,13 @@ class _SplashScreenState extends State<SplashScreen>
       child: Container(
         padding: const EdgeInsets.all(25),
         alignment: Alignment.center,
-        child: Image.asset(Images.inAppLogo, width: logoAnimation.value),
+        child: Image.asset(
+          Images.inAppLogo,
+          width: logoAnimation.value,
+          // Add cache optimization
+          cacheWidth: 200,
+          cacheHeight: 200,
+        ),
       ),
     );
   }

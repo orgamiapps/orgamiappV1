@@ -1,6 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:orgami/Utils/PerformanceConfig.dart';
 
 class CustomCacheImage extends StatelessWidget {
   final String? imageUrl;
@@ -42,10 +42,11 @@ class CustomCacheImage extends StatelessWidget {
         fit: fit ?? BoxFit.cover,
         width: width ?? double.infinity,
         height: height ?? MediaQuery.of(context).size.height,
-        memCacheWidth: 400, // Optimize memory usage
-        memCacheHeight: 300,
-        maxWidthDiskCache: 800, // Limit disk cache size
-        maxHeightDiskCache: 600,
+        // Use performance config settings
+        memCacheWidth: PerformanceConfig.maxImageMemoryWidth,
+        memCacheHeight: PerformanceConfig.maxImageMemoryHeight,
+        maxWidthDiskCache: PerformanceConfig.maxImageCacheWidth,
+        maxHeightDiskCache: PerformanceConfig.maxImageCacheHeight,
         placeholder: (context, url) =>
             placeholder ??
             Container(
@@ -55,14 +56,17 @@ class CustomCacheImage extends StatelessWidget {
               ),
             ),
         errorWidget: (context, url, error) {
-          print('Image loading error for URL: $url, Error: $error');
+          if (PerformanceConfig.enableDetailedLogging) {
+            print('Image loading error for URL: $url, Error: $error');
+          }
           return errorWidget ?? _buildErrorContainer();
         },
-        fadeInDuration: const Duration(milliseconds: 300),
-        fadeOutDuration: const Duration(milliseconds: 300),
-        // Add retry mechanism and better error handling
+        // Use performance config animation duration
+        fadeInDuration: PerformanceConfig.fastAnimationDuration,
+        fadeOutDuration: PerformanceConfig.fastAnimationDuration,
+        // Optimized headers for faster loading
         httpHeaders: const {
-          'Cache-Control': 'max-age=3600',
+          'Cache-Control': 'max-age=7200',
           'User-Agent': 'OrgamiApp/1.0',
         },
       ),
@@ -89,7 +93,7 @@ class CustomCacheImage extends StatelessWidget {
   }
 }
 
-// Enhanced image widget with better error handling
+// Enhanced image widget with better error handling and performance
 class SafeNetworkImage extends StatelessWidget {
   final String imageUrl;
   final BoxFit fit;
@@ -115,10 +119,11 @@ class SafeNetworkImage extends StatelessWidget {
       fit: fit,
       width: width,
       height: height,
-      memCacheWidth: 400,
-      memCacheHeight: 300,
-      maxWidthDiskCache: 800,
-      maxHeightDiskCache: 600,
+      // Use performance config settings
+      memCacheWidth: PerformanceConfig.maxImageMemoryWidth,
+      memCacheHeight: PerformanceConfig.maxImageMemoryHeight,
+      maxWidthDiskCache: PerformanceConfig.maxImageCacheWidth,
+      maxHeightDiskCache: PerformanceConfig.maxImageCacheHeight,
       placeholder: (context, url) =>
           placeholder ??
           Container(
@@ -128,13 +133,17 @@ class SafeNetworkImage extends StatelessWidget {
             ),
           ),
       errorWidget: (context, url, error) {
-        print('SafeNetworkImage error for URL: $url, Error: $error');
+        if (PerformanceConfig.enableDetailedLogging) {
+          print('SafeNetworkImage error for URL: $url, Error: $error');
+        }
         return errorWidget ?? _buildDefaultErrorWidget();
       },
-      fadeInDuration: const Duration(milliseconds: 300),
-      fadeOutDuration: const Duration(milliseconds: 300),
+      // Use performance config animation duration
+      fadeInDuration: PerformanceConfig.fastAnimationDuration,
+      fadeOutDuration: PerformanceConfig.fastAnimationDuration,
+      // Optimized headers
       httpHeaders: const {
-        'Cache-Control': 'max-age=3600',
+        'Cache-Control': 'max-age=7200',
         'User-Agent': 'OrgamiApp/1.0',
       },
     );
