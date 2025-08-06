@@ -22,6 +22,7 @@ import 'dart:io';
 import 'package:orgami/Screens/MyProfile/MyProfileScreen.dart';
 import 'package:orgami/Screens/MyProfile/UserProfileScreen.dart';
 import 'package:orgami/Screens/Home/AccountDetailsScreen.dart';
+import 'package:orgami/Screens/Home/AttendeeNotificationScreen.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -180,6 +181,16 @@ class _AccountScreenState extends State<AccountScreen> {
             onTap: () => RouterClass.nextScreenNormal(
               context,
               const AnalyticsDashboardScreen(),
+            ),
+          ),
+          _buildDivider(),
+          _buildSettingsItem(
+            icon: Icons.sms_rounded,
+            title: 'Send Notifications',
+            subtitle: 'Send SMS notifications to previous attendees',
+            onTap: () => RouterClass.nextScreenNormal(
+              context,
+              const AttendeeNotificationScreen(),
             ),
           ),
           _buildDivider(),

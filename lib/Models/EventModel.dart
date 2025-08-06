@@ -66,8 +66,14 @@ class EventModel {
       imageUrl: data['imageUrl'],
       customerUid: data['customerUid'],
       status: data['status'],
-      selectedDateTime: (data['selectedDateTime'] as Timestamp).toDate(),
-      eventGenerateTime: (data['eventGenerateTime'] as Timestamp).toDate(),
+      selectedDateTime: data['selectedDateTime'] is Timestamp
+          ? (data['selectedDateTime'] as Timestamp).toDate()
+          : DateTime.tryParse(data['selectedDateTime'].toString()) ??
+                DateTime.now(),
+      eventGenerateTime: data['eventGenerateTime'] is Timestamp
+          ? (data['eventGenerateTime'] as Timestamp).toDate()
+          : DateTime.tryParse(data['eventGenerateTime'].toString()) ??
+                DateTime.now(),
       private: data['private'],
       getLocation: data['getLocation'] ?? false,
       latitude: data['latitude'] ?? 0.0,

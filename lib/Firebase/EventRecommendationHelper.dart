@@ -80,13 +80,19 @@ class EventRecommendationHelper {
     List<String>? categories,
   ) async {
     try {
+      // Create a Timestamp for the comparison (3 hours ago)
+      final threeHoursAgo = Timestamp.fromDate(
+        DateTime.now().subtract(const Duration(hours: 3)),
+      );
+
+      print(
+        'DEBUG: EventRecommendationHelper - Loading events with cutoff time: ${threeHoursAgo.toDate()}',
+      );
+
       Query query = FirebaseFirestore.instance
           .collection(EventModel.firebaseKey)
           .where('private', isEqualTo: false)
-          .where(
-            'selectedDateTime',
-            isGreaterThan: DateTime.now().subtract(const Duration(hours: 3)),
-          );
+          .where('selectedDateTime', isGreaterThan: threeHoursAgo);
 
       // Apply search filter if provided
       if (searchQuery.isNotEmpty) {
@@ -101,9 +107,36 @@ class EventRecommendationHelper {
 
       QuerySnapshot snapshot = await query.get();
 
+      print(
+        'DEBUG: EventRecommendationHelper - Found ${snapshot.docs.length} events from Firestore query',
+      );
+
       List<EventModel> events = snapshot.docs
           .map((doc) => EventModel.fromJson(doc.data() as Map<String, dynamic>))
           .toList();
+
+      // Additional client-side filtering to ensure no past events slip through
+      // Filter out events that ended more than 2 hours ago
+      final beforeFilterCount = events.length;
+      events = events.where((event) {
+        final eventEndTime = event.selectedDateTime.add(
+          Duration(hours: event.eventDuration),
+        );
+        final cutoffTime = DateTime.now().subtract(const Duration(hours: 2));
+        final shouldInclude = eventEndTime.isAfter(cutoffTime);
+
+        if (!shouldInclude) {
+          print(
+            'DEBUG: EventRecommendationHelper - Filtering out past event: ${event.title} (${event.selectedDateTime}) - End time: $eventEndTime, Cutoff: $cutoffTime',
+          );
+        }
+
+        return shouldInclude;
+      }).toList();
+
+      print(
+        'DEBUG: EventRecommendationHelper - After client-side filtering: ${events.length} events (filtered out ${beforeFilterCount - events.length})',
+      );
 
       // Apply search filter in memory if needed
       if (searchQuery.isNotEmpty) {

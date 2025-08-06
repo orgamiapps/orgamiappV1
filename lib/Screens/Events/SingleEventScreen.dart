@@ -13,6 +13,7 @@ import 'package:orgami/Controller/CustomerController.dart';
 import 'package:orgami/Firebase/DwellTimeTracker.dart';
 import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Models/AttendanceModel.dart';
+import 'package:orgami/Models/CustomerModel.dart';
 import 'package:orgami/Models/EventModel.dart';
 import 'package:orgami/Models/EventQuestionModel.dart';
 import 'package:orgami/Screens/Events/AddQuestionsToEventScreen.dart';
@@ -28,6 +29,7 @@ import 'package:orgami/Screens/Events/EventAnalyticsScreen.dart';
 import 'package:orgami/Screens/Events/EventFeedbackScreen.dart';
 import 'package:orgami/Screens/Events/EventFeedbackManagementScreen.dart';
 import 'package:orgami/Screens/MyProfile/MyTicketsScreen.dart';
+import 'package:orgami/Screens/MyProfile/UserProfileScreen.dart';
 import 'package:orgami/Screens/QRScanner/AnsQuestionsToSignInEventScreen.dart';
 import 'package:orgami/Screens/QRScanner/QrScannerScreenForLogedIn.dart';
 import 'package:orgami/Screens/QRScanner/QRScannerFlowScreen.dart';
@@ -94,6 +96,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   // Favorite functionality
   bool _isFavorited = false;
   bool _isLoadingFavorite = false;
+
+  // Attendees dropdown state
+  bool _isAttendeesExpanded = false;
 
   Future<void> getPreRegisterCount() async {
     await FirebaseFirestoreHelper()
@@ -763,6 +768,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         _btnCtlr.reset();
         // Refresh attendance status with a longer delay to ensure Firestore write is committed
         getAttendance();
+        getActualAttendanceCount();
         // Reset the flag after a delay
         Future.delayed(const Duration(seconds: 3), () {
           setState(() {
@@ -1254,6 +1260,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     // Refresh attendance data when app becomes active
     if (state == AppLifecycleState.resumed) {
       getAttendance();
+      getActualAttendanceCount();
       checkUserTicket(updateUI: true); // Also refresh ticket status
     }
   }
@@ -1268,6 +1275,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted) {
           getAttendance();
+          getActualAttendanceCount();
           checkUserTicket(updateUI: true); // Also refresh ticket status
         }
       });
@@ -1566,19 +1574,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                 ),
               ),
               const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  eventModel.title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Roboto',
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
+              const Expanded(child: SizedBox()),
               if (eventModel.hasManagementPermissions(
                 FirebaseAuth.instance.currentUser!.uid,
               ))
@@ -1779,17 +1775,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
             ],
           ),
           const SizedBox(height: 12),
-          // Subtitle
-          Text(
-            eventModel.groupName,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontFamily: 'Roboto',
-              height: 1.4,
-            ),
-            textAlign: TextAlign.center,
-          ),
+          // Subtitle removed
         ],
       ),
     );
@@ -1825,8 +1811,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
             ))
               _buildTabbedContentSection(),
 
-            // Attendees List (for everyone)
-            AttendeesHorizontalList(eventModel: eventModel),
+            // Attendees List (for everyone) - Now as dropdown
+            _buildAttendeesDropdown(),
             const SizedBox(height: 24),
 
             // Comments Section (for everyone)
@@ -4905,6 +4891,483 @@ This looks like a great event!
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildAttendeesDropdown() {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            spreadRadius: 0,
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Dropdown Header Button
+          InkWell(
+            onTap: () {
+              setState(() {
+                _isAttendeesExpanded = !_isAttendeesExpanded;
+              });
+            },
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.people,
+                      color: Color(0xFF10B981),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Attendees (${actualAttendanceCount})',
+                          style: const TextStyle(
+                            color: Color(0xFF1A1A1A),
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                        Text(
+                          'Tap to see attendees',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 14,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: _isAttendeesExpanded ? 0.5 : 0.0,
+                    duration: const Duration(milliseconds: 300),
+                    child: const Icon(
+                      Icons.keyboard_arrow_down,
+                      color: Color(0xFF10B981),
+                      size: 24,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Dropdown Content
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            height: _isAttendeesExpanded ? null : 0,
+            child: _isAttendeesExpanded
+                ? Container(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                    child: _buildAttendeesContent(),
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttendeesContent() {
+    return FutureBuilder<List<AttendanceModel>>(
+      future: FirebaseFirestoreHelper().getAttendance(eventId: eventModel.id),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 100,
+            child: Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFF10B981),
+                strokeWidth: 2,
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.hasError || !snapshot.hasData) {
+          return const SizedBox(
+            height: 100,
+            child: Center(
+              child: Text(
+                'No attendees yet',
+                style: TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontSize: 14,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ),
+          );
+        }
+
+        final attendees = snapshot.data!;
+
+        return Column(
+          children: [
+            // See All Button Row
+            if (attendees.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    GestureDetector(
+                      onTap: () => _showAllAttendeesPopup(attendees),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFF10B981),
+                            width: 1,
+                          ),
+                        ),
+                        child: const Text(
+                          'See All',
+                          style: TextStyle(
+                            color: Color(0xFF10B981),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            // Horizontal Attendees List
+            SizedBox(
+              height: 100,
+              child: attendees.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No attendees yet',
+                        style: TextStyle(
+                          color: Colors.grey[500],
+                          fontSize: 14,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: attendees.length > 5 ? 5 : attendees.length,
+                      itemBuilder: (context, index) {
+                        final attendee = attendees[index];
+                        final isAnon = attendee.isAnonymous;
+
+                        return GestureDetector(
+                          onTap: () {
+                            if (!isAnon) {
+                              // Navigate to user profile if not anonymous
+                              FirebaseFirestoreHelper()
+                                  .getSingleCustomer(
+                                    customerId: attendee.customerUid,
+                                  )
+                                  .then((customer) {
+                                    if (customer != null) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              UserProfileScreen(user: customer),
+                                        ),
+                                      );
+                                    }
+                                  });
+                            }
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 16),
+                            child: Column(
+                              children: [
+                                // Profile Picture
+                                Container(
+                                  width: 56,
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: isAnon
+                                        ? const LinearGradient(
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                            colors: [
+                                              Color(0xFF6B7280),
+                                              Color(0xFF9CA3AF),
+                                            ],
+                                          )
+                                        : const LinearGradient(
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                            colors: [
+                                              Color(0xFF10B981),
+                                              Color(0xFF059669),
+                                            ],
+                                          ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: isAnon
+                                            ? const Color(
+                                                0xFF6B7280,
+                                              ).withOpacity(0.3)
+                                            : const Color(
+                                                0xFF10B981,
+                                              ).withOpacity(0.3),
+                                        spreadRadius: 0,
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      isAnon
+                                          ? 'A'
+                                          : attendee.userName.isNotEmpty
+                                          ? attendee.userName[0].toUpperCase()
+                                          : 'U',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'Roboto',
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                // Name
+                                Text(
+                                  isAnon ? 'Anonymous' : attendee.userName,
+                                  style: const TextStyle(
+                                    color: Color(0xFF1A1A1A),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    fontFamily: 'Roboto',
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showAllAttendeesPopup(List<AttendanceModel> attendees) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            constraints: const BoxConstraints(maxHeight: 500),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.people,
+                        color: Color(0xFF10B981),
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'All Attendees',
+                            style: TextStyle(
+                              color: Color(0xFF1A1A1A),
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                          Text(
+                            '${attendees.length} people signed in',
+                            style: const TextStyle(
+                              color: Color(0xFF6B7280),
+                              fontSize: 14,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close, color: Color(0xFF6B7280)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: attendees.length,
+                    itemBuilder: (context, index) {
+                      final attendee = attendees[index];
+                      final isAnon = attendee.isAnonymous;
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey.withOpacity(0.1),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            // Avatar
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: isAnon
+                                    ? const LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          Color(0xFF6B7280),
+                                          Color(0xFF9CA3AF),
+                                        ],
+                                      )
+                                    : const LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          Color(0xFF10B981),
+                                          Color(0xFF059669),
+                                        ],
+                                      ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: isAnon
+                                        ? const Color(
+                                            0xFF6B7280,
+                                          ).withOpacity(0.3)
+                                        : const Color(
+                                            0xFF10B981,
+                                          ).withOpacity(0.3),
+                                    spreadRadius: 0,
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: Text(
+                                  isAnon
+                                      ? 'A'
+                                      : attendee.userName.isNotEmpty
+                                      ? attendee.userName[0].toUpperCase()
+                                      : 'U',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'Roboto',
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isAnon
+                                        ? 'Anonymous User'
+                                        : attendee.userName,
+                                    style: const TextStyle(
+                                      color: Color(0xFF1A1A1A),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: 'Roboto',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    isAnon
+                                        ? 'Anonymous sign-in'
+                                        : 'Registered user',
+                                    style: const TextStyle(
+                                      color: Color(0xFF6B7280),
+                                      fontSize: 14,
+                                      fontFamily: 'Roboto',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

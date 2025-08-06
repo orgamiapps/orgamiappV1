@@ -900,9 +900,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         List<EventModel> neededEventList = [];
 
         for (var element in eventsList) {
-          if (!element.selectedDateTime
-              .add(const Duration(hours: 2))
-              .isBefore(DateTime.now())) {
+          // Filter out events that ended more than 2 hours ago
+          final eventEndTime = element.selectedDateTime.add(Duration(hours: element.eventDuration));
+          final cutoffTime = DateTime.now().subtract(const Duration(hours: 2));
+          if (eventEndTime.isAfter(cutoffTime)) {
             neededEventList.add(element);
           }
         }

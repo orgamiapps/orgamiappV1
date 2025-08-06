@@ -28,10 +28,18 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
   final TextEditingController _nameController = TextEditingController();
   bool _isAnonymousSignIn = false;
   bool _isLoading = false;
+  late PageController _pageController;
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(initialPage: _currentStep);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   void _nextStep() {
@@ -39,6 +47,11 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
       setState(() {
         _currentStep++;
       });
+      _pageController.animateToPage(
+        _currentStep,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
     }
   }
 
@@ -47,6 +60,11 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
       setState(() {
         _currentStep--;
       });
+      _pageController.animateToPage(
+        _currentStep,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
     }
   }
 
@@ -58,9 +76,22 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
         child: Column(
           children: [
             _buildHeader(),
-            Expanded(child: _buildStepContent()),
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentStep = index;
+                  });
+                },
+                children: [
+                  _buildWelcomeStep(),
+                  _buildMethodSelectionStep(),
+                  _buildManualEntryStep(),
+                ],
+              ),
+            ),
             _buildStepIndicator(),
-            _buildNavigationButtons(),
           ],
         ),
       ),
@@ -75,7 +106,14 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
           GestureDetector(
             onTap: () {
               if (_currentStep > 0) {
-                _previousStep();
+                _pageController.animateToPage(
+                  _currentStep - 1,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
+                setState(() {
+                  _currentStep--;
+                });
               } else {
                 Navigator.of(context).pop();
               }
@@ -109,21 +147,8 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
     );
   }
 
-  Widget _buildStepContent() {
-    switch (_currentStep) {
-      case 0:
-        return _buildWelcomeStep();
-      case 1:
-        return _buildMethodSelectionStep();
-      case 2:
-        return _buildManualEntryStep();
-      default:
-        return _buildWelcomeStep();
-    }
-  }
-
   Widget _buildWelcomeStep() {
-    return Container(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(30),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -281,7 +306,14 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
                     // Handle return from QR scanner
                     if (result != null && result is String) {
                       _codeController.text = result;
-                      _nextStep(); // Go to manual entry step
+                      _pageController.animateToPage(
+                        2, // Go to manual entry step
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                      setState(() {
+                        _currentStep = 2;
+                      });
                     }
                   },
                 ),
@@ -291,7 +323,16 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
                   title: 'Enter Code Manually',
                   subtitle: 'Type the event code directly',
                   description: 'Enter the event code manually if you have it',
-                  onTap: _nextStep,
+                  onTap: () {
+                    _pageController.animateToPage(
+                      2, // Go directly to manual entry step
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                    );
+                    setState(() {
+                      _currentStep = 2;
+                    });
+                  },
                 ),
               ],
             ),
@@ -614,7 +655,7 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
 
   Widget _buildStepIndicator() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 30),
       child: Column(
         children: [
           // Step labels
@@ -697,93 +738,6 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildNavigationButtons() {
-    return Container(
-      padding: const EdgeInsets.all(30),
-      child: Row(
-        children: [
-          if (_currentStep > 0) ...[
-            Expanded(
-              child: GestureDetector(
-                onTap: _previousStep,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  decoration: BoxDecoration(
-                    color: AppThemeColor.pureWhiteColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(15),
-                    border: Border.all(
-                      color: AppThemeColor.pureWhiteColor.withOpacity(0.3),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.arrow_back_ios,
-                        color: AppThemeColor.pureWhiteColor,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Back',
-                        style: TextStyle(
-                          color: AppThemeColor.pureWhiteColor,
-                          fontSize: Dimensions.fontSizeDefault,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 15),
-          ],
-          if (_currentStep == 0) ...[
-            Expanded(
-              child: GestureDetector(
-                onTap: _nextStep,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  decoration: BoxDecoration(
-                    gradient: AppThemeColor.buttonGradient,
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppThemeColor.darkBlueColor.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Get Started',
-                        style: TextStyle(
-                          color: AppThemeColor.pureWhiteColor,
-                          fontSize: Dimensions.fontSizeDefault,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Icon(
-                        Icons.arrow_forward_ios,
-                        color: AppThemeColor.pureWhiteColor,
-                        size: 18,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
     );
   }
 

@@ -20,8 +20,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   final List<Widget> _dashBoardScreens = [
     const HomeScreen(),
-    const NotificationsScreen(),
     const MessagingScreen(),
+    const NotificationsScreen(),
     const AccountScreen(),
   ];
 
@@ -40,11 +40,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.event, size: 20), label: ''),
           BottomNavigationBarItem(
-            icon: Icon(Icons.notifications, size: 20),
+            icon: Icon(Icons.message, size: 20),
             label: '',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.message, size: 20),
+            icon: Icon(Icons.notifications, size: 20),
             label: '',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.menu, size: 20), label: ''),
