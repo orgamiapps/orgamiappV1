@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:orgami/Controller/CustomerController.dart';
 import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Models/AttendanceModel.dart';
+import 'package:orgami/Models/EventModel.dart';
 import 'package:orgami/Permissions/PermssionsHelper.dart';
 import 'package:orgami/Screens/QRScanner/AnsQuestionsToSignInEventScreen.dart';
 import 'package:orgami/Utils/AppAppBarView.dart';
@@ -763,9 +764,15 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
             : null,
       );
 
-      final eventExist = await FirebaseFirestoreHelper().getSingleEvent(
+      // Try to find event by ID or manual code
+      EventModel? eventExist = await FirebaseFirestoreHelper().getSingleEvent(
         newAttendanceModel.eventId,
       );
+      
+      // If not found by ID, try to find by manual code
+      if (eventExist == null) {
+        eventExist = await _findEventByManualCode(newAttendanceModel.eventId);
+      }
 
       if (eventExist != null) {
         // Check for sign-in prompts
@@ -778,7 +785,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
           RouterClass.nextScreenAndReplacement(
             context,
             AnsQuestionsToSignInEventScreen(
-              eventModel: eventExist,
+              eventModel: eventExist!,
               newAttendance: newAttendanceModel,
               nextPageRoute: 'modernQrScanner',
             ),
@@ -796,7 +803,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
           Future.delayed(const Duration(seconds: 1), () {
             RouterClass.nextScreenAndReplacement(
               context,
-              SingleEventScreen(eventModel: eventExist),
+              SingleEventScreen(eventModel: eventExist!),
             );
           });
         }
@@ -836,5 +843,22 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
       controller?.pauseCamera();
     }
     controller?.resumeCamera();
+  }
+
+  Future<EventModel?> _findEventByManualCode(String manualCode) async {
+    try {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection(EventModel.firebaseKey)
+          .where('manualCode', isEqualTo: manualCode)
+          .get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        return EventModel.fromJson(querySnapshot.docs.first.data());
+      }
+      return null;
+    } catch (e) {
+      print('Error finding event by manual code: $e');
+      return null;
+    }
   }
 }

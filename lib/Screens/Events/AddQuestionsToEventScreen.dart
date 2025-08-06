@@ -4,17 +4,22 @@ import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Models/EventModel.dart';
 import 'package:orgami/Models/EventQuestionModel.dart';
 import 'package:orgami/Screens/Events/Widget/AddQuestionPopup.dart';
+import 'package:orgami/Screens/Events/CreateEventScreen.dart';
 import 'package:orgami/Utils/Colors.dart';
+import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
 class AddQuestionsToEventScreen extends StatefulWidget {
   final EventModel eventModel;
   final VoidCallback? onBackPressed;
+  final Map<String, dynamic>? eventCreationData;
+
   const AddQuestionsToEventScreen({
     super.key,
     required this.eventModel,
     this.onBackPressed,
+    this.eventCreationData,
   });
 
   @override
@@ -38,43 +43,63 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
   late AnimationController _slideController;
   late Animation<Offset> _slideAnimation;
 
-  // Pre-built question templates
+  // Pre-built question templates - Professional questions that event hosts actually want to ask
   final List<Map<String, dynamic>> _questionTemplates = [
     {
       'title': 'How did you hear about this event?',
       'category': 'Marketing',
       'icon': Icons.campaign,
       'color': Color(0xFF667EEA),
+      'description': 'Track your marketing effectiveness',
     },
     {
-      'title': 'What brings you to this event today?',
+      'title': 'What is your primary reason for attending today?',
       'category': 'Engagement',
       'icon': Icons.psychology,
       'color': Color(0xFF10B981),
+      'description': 'Understand attendee motivations',
     },
     {
-      'title': 'How would you rate your experience so far?',
-      'category': 'Feedback',
-      'icon': Icons.star,
+      'title': 'Do you have any dietary restrictions or allergies?',
+      'category': 'Logistics',
+      'icon': Icons.restaurant,
       'color': Color(0xFFFF9800),
+      'description': 'Ensure proper catering arrangements',
     },
     {
       'title': 'Would you like to receive updates about future events?',
       'category': 'Communication',
       'icon': Icons.notifications,
       'color': Color(0xFF8B5CF6),
+      'description': 'Build your email list',
     },
     {
-      'title': 'What topics interest you most?',
+      'title': 'What topics or sessions interest you most?',
       'category': 'Preferences',
       'icon': Icons.favorite,
       'color': Color(0xFFEF4444),
+      'description': 'Tailor content to your audience',
     },
     {
       'title': 'How many people are you attending with?',
       'category': 'Logistics',
       'icon': Icons.people,
       'color': Color(0xFF06B6D4),
+      'description': 'Plan seating and materials',
+    },
+    {
+      'title': 'Do you require any accessibility accommodations?',
+      'category': 'Accessibility',
+      'icon': Icons.accessibility,
+      'color': Color(0xFF059669),
+      'description': 'Ensure inclusive experience',
+    },
+    {
+      'title': 'What industry or field do you work in?',
+      'category': 'Networking',
+      'icon': Icons.business,
+      'color': Color(0xFF7C3AED),
+      'description': 'Facilitate meaningful connections',
     },
   ];
 
@@ -131,24 +156,15 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
   }
 
   Future<void> _addTemplateQuestion(Map<String, dynamic> template) async {
-    String newId = FirebaseFirestore.instance
-        .collection(EventQuestionModel.firebaseKey)
-        .doc()
-        .id;
-
-    EventQuestionModel newQuestion = EventQuestionModel(
-      id: newId,
-      questionTitle: template['title'],
-      required: false,
-    );
-
-    try {
-      await FirebaseFirestore.instance
-          .collection(EventModel.firebaseKey)
-          .doc(widget.eventModel.id)
-          .collection(EventQuestionModel.firebaseKey)
-          .doc(newQuestion.id)
-          .set(newQuestion.toJson());
+    // During event creation, we don't have a real event ID yet
+    // So we'll add the question to the local list and it will be saved when the event is created
+    if (widget.eventModel.id.isEmpty) {
+      // Create a temporary question for event creation flow
+      EventQuestionModel newQuestion = EventQuestionModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(), // Temporary ID
+        questionTitle: template['title'],
+        required: false,
+      );
 
       setState(() {
         questionsList.add(newQuestion);
@@ -156,7 +172,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Question added successfully'),
+          content: Text('Question "${template['title']}" added successfully'),
           backgroundColor: Colors.green,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -164,17 +180,53 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
           ),
         ),
       );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to add question'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
+    } else {
+      // For existing events, save to Firestore
+      String newId = FirebaseFirestore.instance
+          .collection(EventQuestionModel.firebaseKey)
+          .doc()
+          .id;
+
+      EventQuestionModel newQuestion = EventQuestionModel(
+        id: newId,
+        questionTitle: template['title'],
+        required: false,
       );
+
+      try {
+        await FirebaseFirestore.instance
+            .collection(EventModel.firebaseKey)
+            .doc(widget.eventModel.id)
+            .collection(EventQuestionModel.firebaseKey)
+            .doc(newQuestion.id)
+            .set(newQuestion.toJson());
+
+        setState(() {
+          questionsList.add(newQuestion);
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Question "${template['title']}" added successfully'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to add question: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -204,6 +256,11 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
     _fadeController.forward();
     _slideController.forward();
 
+    // Show templates by default during event creation
+    if (widget.eventModel.id.isEmpty) {
+      _showTemplates = true;
+    }
+
     _getQuestions();
   }
 
@@ -221,34 +278,39 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
       body: SafeArea(
         child: FadeTransition(opacity: _fadeAnimation, child: _bodyView()),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await showDialog(
-            context: context,
-            builder: (BuildContext context) {
-              return AddQuestionPopup(eventModel: widget.eventModel);
-            },
-          ).then((newQuestion) {
-            if (newQuestion != null) {
-              setState(() {
-                questionsList.add(newQuestion);
-              });
-            }
-          });
-        },
-        backgroundColor: const Color(0xFF667EEA),
-        foregroundColor: Colors.white,
-        elevation: 8,
-        icon: const Icon(Icons.add, size: 24),
-        label: const Text(
-          'Add Custom Question',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-            fontFamily: 'Roboto',
-          ),
-        ),
-      ),
+      floatingActionButton: widget.eventModel.id.isEmpty
+          ? null // Hide FAB during event creation, use bottom button instead
+          : FloatingActionButton.extended(
+              onPressed: () async {
+                await showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AddQuestionPopup(eventModel: widget.eventModel);
+                  },
+                ).then((newQuestion) {
+                  if (newQuestion != null) {
+                    setState(() {
+                      questionsList.add(newQuestion);
+                    });
+                  }
+                });
+              },
+              backgroundColor: const Color(0xFF667EEA),
+              foregroundColor: Colors.white,
+              elevation: 8,
+              icon: const Icon(Icons.add, size: 24),
+              label: const Text(
+                'Add Custom Question',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ),
+      bottomNavigationBar: widget.eventModel.id.isEmpty
+          ? _buildContinueButton()
+          : null,
     );
   }
 
@@ -282,13 +344,8 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
             children: [
               GestureDetector(
                 onTap: () {
+                  // Simply pop back to the previous screen (AddQuestionsPromptScreen)
                   Navigator.pop(context);
-                  // Call the callback to show Event Management popup again
-                  if (widget.onBackPressed != null) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      widget.onBackPressed!();
-                    });
-                  }
                 },
                 child: Container(
                   width: 40,
@@ -347,7 +404,8 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
             const SizedBox(height: 24),
             // Current Questions Section
             _buildCurrentQuestionsSection(),
-            const SizedBox(height: 100), // Space for FAB
+            // Add bottom padding for the continue button during event creation
+            SizedBox(height: widget.eventModel.id.isEmpty ? 140 : 100),
           ],
         ),
       ),
@@ -430,7 +488,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
           ),
           const SizedBox(height: 12),
           const Text(
-            'Choose from pre-built questions to get started quickly',
+            'Choose from professional templates designed for real event needs',
             style: TextStyle(
               color: Color(0xFF6B7280),
               fontSize: 14,
@@ -446,7 +504,8 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
                 crossAxisCount: 2,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: 1.2,
+                childAspectRatio:
+                    1.1, // Slightly taller to accommodate description
               ),
               itemCount: _questionTemplates.length,
               itemBuilder: (context, index) {
@@ -495,19 +554,37 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
                 fontFamily: 'Roboto',
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              template['title'],
-              style: const TextStyle(
-                color: Color(0xFF1A1A1A),
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                fontFamily: 'Roboto',
+            const SizedBox(height: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    template['title'],
+                    style: const TextStyle(
+                      color: Color(0xFF1A1A1A),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Roboto',
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    template['description'] ?? '',
+                    style: const TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontSize: 10,
+                      fontFamily: 'Roboto',
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
             ),
-            const Spacer(),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Icon(
@@ -805,5 +882,139 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
         );
       },
     );
+  }
+
+  Widget _buildContinueButton() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            spreadRadius: 0,
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Add Custom Question Button
+            Container(
+              width: double.infinity,
+              height: 56,
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF667EEA), width: 2),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () async {
+                    await showDialog(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return AddQuestionPopup(eventModel: widget.eventModel);
+                      },
+                    ).then((newQuestion) {
+                      if (newQuestion != null) {
+                        setState(() {
+                          questionsList.add(newQuestion);
+                        });
+                      }
+                    });
+                  },
+                  child: Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.add,
+                          color: const Color(0xFF667EEA),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Add Custom Question',
+                          style: TextStyle(
+                            color: const Color(0xFF667EEA),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Continue to Event Creation Button
+            Container(
+              width: double.infinity,
+              height: 56,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF667EEA).withOpacity(0.3),
+                    spreadRadius: 0,
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: _continueToEventCreation,
+                  child: Center(
+                    child: Text(
+                      'Continue to Event Creation',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _continueToEventCreation() {
+    if (widget.eventCreationData != null) {
+      // Navigate to CreateEventScreen with the questions
+      RouterClass.nextScreenNormal(
+        context,
+        CreateEventScreen(
+          selectedDateTime: widget.eventCreationData!['selectedDateTime'],
+          selectedLocation: widget.eventCreationData!['selectedLocation'],
+          radios: widget.eventCreationData!['radios'],
+          selectedSignInMethods:
+              widget.eventCreationData!['selectedSignInMethods'],
+          manualCode: widget.eventCreationData!['manualCode'],
+          questions: questionsList, // Pass the questions to CreateEventScreen
+        ),
+      );
+    }
   }
 }

@@ -2,13 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:orgami/Screens/Events/CreateEventScreen.dart';
+import 'package:orgami/Screens/Events/AddQuestionsPromptScreen.dart';
 import 'package:orgami/Utils/Colors.dart';
 import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/Utils/dimensions.dart';
 
 class ChoseLocationInMapScreen extends StatefulWidget {
   final DateTime selectedDateTime;
-  const ChoseLocationInMapScreen({super.key, required this.selectedDateTime});
+  final List<String>? selectedSignInMethods;
+  final String? manualCode;
+
+  const ChoseLocationInMapScreen({
+    super.key,
+    required this.selectedDateTime,
+    this.selectedSignInMethods,
+    this.manualCode,
+  });
 
   @override
   State<ChoseLocationInMapScreen> createState() =>
@@ -52,25 +61,21 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
     if (permission == LocationPermission.deniedForever) {
       // Permissions are denied forever, handle appropriately.
       return Future.error(
-          'Location permissions are permanently denied, we cannot request permissions.');
+        'Location permissions are permanently denied, we cannot request permissions.',
+      );
     }
 
     await Geolocator.getCurrentPosition().then((value) {
-      LatLng newLatLng = LatLng(
-        value.latitude,
-        value.longitude,
-      );
+      LatLng newLatLng = LatLng(value.latitude, value.longitude);
       mapController.animateCamera(
         CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: newLatLng,
-            zoom: 15,
-          ),
+          CameraPosition(target: newLatLng, zoom: 15),
         ),
       );
       _addMarker(newLatLng);
       print(
-          'Current Location is ${value.latitude} and ${value.longitude} and ${value.floor}');
+        'Current Location is ${value.latitude} and ${value.longitude} and ${value.floor}',
+      );
     });
   }
 
@@ -78,17 +83,15 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
     setState(() {
       markers.clear(); // Clear existing markers
       circles.clear(); // Clear existing circles
-      
+
       markers.add(
         Marker(
           markerId: const MarkerId('selected-location'),
           position: latLng,
-          infoWindow: const InfoWindow(
-            title: 'Selected Location',
-          ),
+          infoWindow: const InfoWindow(title: 'Selected Location'),
         ),
       );
-      
+
       // Add circle to show radius
       circles.add(
         Circle(
@@ -100,7 +103,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
           strokeWidth: 2,
         ),
       );
-      
+
       selectedLocation = latLng;
     });
   }
@@ -133,9 +136,10 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
 
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 600),
@@ -164,10 +168,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFFAFBFC),
       body: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: _bodyView(),
-        ),
+        child: FadeTransition(opacity: _fadeAnimation, child: _bodyView()),
       ),
     );
   }
@@ -193,10 +194,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF667EEA),
-            Color(0xFF764BA2),
-          ],
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
         ),
       ),
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
@@ -330,9 +328,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
                           topRight: Radius.circular(12),
                         ),
                         onTap: () {
-                          mapController.animateCamera(
-                            CameraUpdate.zoomIn(),
-                          );
+                          mapController.animateCamera(CameraUpdate.zoomIn());
                         },
                         child: Container(
                           width: 48,
@@ -358,9 +354,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
                           bottomRight: Radius.circular(12),
                         ),
                         onTap: () {
-                          mapController.animateCamera(
-                            CameraUpdate.zoomOut(),
-                          );
+                          mapController.animateCamera(CameraUpdate.zoomOut());
                         },
                         child: Container(
                           width: 48,
@@ -437,7 +431,10 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF667EEA).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
@@ -483,10 +480,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF667EEA),
-                    Color(0xFF764BA2),
-                  ],
+                  colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
                 ),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
@@ -508,10 +502,14 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
 
                     RouterClass.nextScreenNormal(
                       context,
-                      CreateEventScreen(
+                      AddQuestionsPromptScreen(
                         selectedDateTime: widget.selectedDateTime,
                         selectedLocation: selectedLocation!,
                         radios: radius,
+                        selectedSignInMethods:
+                            widget.selectedSignInMethods ??
+                            ['qr_code', 'manual_code'],
+                        manualCode: widget.manualCode,
                       ),
                     );
                   },

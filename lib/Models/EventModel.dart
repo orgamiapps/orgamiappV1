@@ -21,6 +21,10 @@ class EventModel {
   int issuedTickets;
   int eventDuration; // Duration in hours
   List<String> coHosts; // Array of user IDs who are co-hosts
+  
+  // Sign-in methods configuration
+  List<String> signInMethods; // ['qr_code', 'manual_code', 'geofence']
+  String? manualCode; // Custom manual code for the event
 
   LatLng getLatLngOfEvent() {
     return LatLng(latitude, longitude);
@@ -50,6 +54,8 @@ class EventModel {
     this.issuedTickets = 0,
     this.eventDuration = 2, // Default 2 hours
     this.coHosts = const [],
+    this.signInMethods = const ['qr_code', 'manual_code'], // Default methods
+    this.manualCode,
   });
 
   factory EventModel.fromJson(dynamic parsedJson) {
@@ -95,6 +101,10 @@ class EventModel {
       coHosts: (data.containsKey('coHosts') && data['coHosts'] != null)
           ? List<String>.from(data['coHosts'])
           : [],
+      signInMethods: (data.containsKey('signInMethods') && data['signInMethods'] != null)
+          ? List<String>.from(data['signInMethods'])
+          : ['qr_code', 'manual_code'],
+      manualCode: data['manualCode'],
     );
   }
 
@@ -141,6 +151,20 @@ class EventModel {
     return customerUid == userId || coHosts.contains(userId);
   }
 
+  /// Check if a specific sign-in method is enabled
+  bool isSignInMethodEnabled(String method) {
+    return signInMethods.contains(method);
+  }
+
+  /// Get the manual code for the event (generates one if not set)
+  String getManualCode() {
+    if (manualCode != null && manualCode!.isNotEmpty) {
+      return manualCode!;
+    }
+    // Generate a code based on event ID if not set
+    return id.length >= 6 ? id.substring(0, 6).toUpperCase() : id.toUpperCase();
+  }
+
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
 
@@ -167,6 +191,8 @@ class EventModel {
     data['issuedTickets'] = issuedTickets;
     data['eventDuration'] = eventDuration;
     data['coHosts'] = coHosts;
+    data['signInMethods'] = signInMethods;
+    if (manualCode != null) data['manualCode'] = manualCode;
     return data;
   }
 }

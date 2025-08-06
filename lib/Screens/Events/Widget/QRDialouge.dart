@@ -40,7 +40,7 @@ class _ShareQRDialogState extends State<ShareQRDialog>
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
 
-  String get qrData => 'orgami_app_code_${singleEvent.id}';
+  String get qrData => 'orgami_app_code_${singleEvent.isSignInMethodEnabled('manual_code') ? singleEvent.getManualCode() : singleEvent.id}';
   String get uniqueId => singleEvent.displayId;
   String get rawUniqueId => singleEvent.rawId;
   String get eventTitle => singleEvent.title;

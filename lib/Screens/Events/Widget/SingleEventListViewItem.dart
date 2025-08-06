@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:orgami/Models/EventModel.dart';
 import 'package:orgami/Screens/Events/SingleEventScreen.dart';
+import 'package:orgami/Screens/Events/EventLocationViewScreen.dart';
 import 'package:orgami/Utils/Colors.dart';
 import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/Utils/cached_image.dart';
@@ -373,6 +374,39 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        // Globe icon button for map view
+                        if (widget.eventModel.latitude != 0 &&
+                            widget.eventModel.longitude != 0)
+                          Container(
+                            width: 24,
+                            height: 24,
+                            margin: const EdgeInsets.only(left: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF667EEA).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(6),
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          EventLocationViewScreen(
+                                            eventModel: widget.eventModel,
+                                          ),
+                                    ),
+                                  );
+                                },
+                                child: const Icon(
+                                  Icons.public,
+                                  color: Color(0xFF667EEA),
+                                  size: 14,
+                                ),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 12),

@@ -21,6 +21,7 @@ import 'package:orgami/Screens/Events/Attendance/AttendanceSheetScreen.dart';
 import 'package:orgami/Screens/Events/Widget/AttendeesHorizontalList.dart';
 import 'package:orgami/Screens/Events/Widget/CoHostManagementWidget.dart';
 import 'package:orgami/Screens/Events/Widget/CommentsSection.dart';
+import 'package:orgami/Screens/Events/Widget/SignInMethodsDisplay.dart';
 // DeleteEventDialouge import removed - no longer needed in SingleEventScreen
 import 'package:orgami/Screens/Events/Widget/QRDialouge.dart';
 import 'package:orgami/Screens/Events/TicketManagementScreen.dart';
@@ -42,6 +43,7 @@ import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
 import 'package:orgami/Screens/Events/FeatureEventScreen.dart';
 import 'package:orgami/Screens/Events/EditEventScreen.dart';
+import 'package:orgami/Screens/Events/EventLocationViewScreen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -1801,6 +1803,18 @@ class _SingleEventScreenState extends State<SingleEventScreen>
             _buildEventDetailsCard(),
             const SizedBox(height: 24),
 
+            // Sign-In Methods Display
+            SignInMethodsDisplay(
+              eventModel: eventModel,
+              isEventCreator: eventModel.hasManagementPermissions(
+                FirebaseAuth.instance.currentUser!.uid,
+              ),
+              onCopyCode: () {
+                ShowToast().showNormalToast(msg: 'Code copied to clipboard');
+              },
+            ),
+            const SizedBox(height: 24),
+
             // Categories
             if (eventModel.categories.isNotEmpty) _buildCategoriesCard(),
             if (eventModel.categories.isNotEmpty) const SizedBox(height: 24),
@@ -2032,11 +2046,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
             value: DateFormat('KK:mm a').format(eventModel.selectedDateTime),
           ),
           const SizedBox(height: 16),
-          _buildDetailItem(
-            icon: Icons.location_on,
-            label: 'Location',
-            value: eventModel.location,
-          ),
+          _buildLocationItem(),
           const SizedBox(height: 16),
           // Ticket Quantity Display
           if (eventModel.ticketsEnabled) _buildTicketQuantityItem(),
@@ -2114,6 +2124,81 @@ class _SingleEventScreenState extends State<SingleEventScreen>
             ],
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildLocationItem() {
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: const Color(0xFF667EEA).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Icon(
+            Icons.location_on,
+            color: Color(0xFF667EEA),
+            size: 20,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Location',
+                style: const TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontSize: 12,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                eventModel.location,
+                style: const TextStyle(
+                  color: Color(0xFF1A1A1A),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Globe icon button for map view
+        if (eventModel.latitude != 0 && eventModel.longitude != 0)
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFF667EEA).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          EventLocationViewScreen(eventModel: eventModel),
+                    ),
+                  );
+                },
+                child: const Icon(
+                  Icons.public,
+                  color: Color(0xFF667EEA),
+                  size: 20,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -3172,112 +3257,130 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                           title: 'Event Management',
                           color: const Color(0xFF667EEA),
                           children: [
-                            _buildManagementOption(
-                              icon: Icons.question_answer,
-                              title: 'Add Prompts',
-                              subtitle:
-                                  'Create sign-in questions for attendees',
-                              onTap: () {
-                                Navigator.pop(context);
-                                RouterClass.nextScreenNormal(
-                                  context,
-                                  AddQuestionsToEventScreen(
-                                    eventModel: eventModel,
-                                    onBackPressed: () =>
-                                        _showEventManagementModal(),
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            _buildManagementOption(
-                              icon: Icons.people,
-                              title: 'View Attendance',
-                              subtitle: 'See who has signed in to your event',
-                              onTap: () {
-                                Navigator.pop(context);
-                                RouterClass.nextScreenNormal(
-                                  context,
-                                  AttendanceSheetScreen(
-                                    eventModel: eventModel,
-                                    onBackPressed: () =>
-                                        _showEventManagementModal(),
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            _buildManagementOption(
-                              icon: Icons.confirmation_number,
-                              title: 'Manage Tickets',
-                              subtitle: 'Create and track event tickets',
-                              onTap: () {
-                                Navigator.pop(context);
-                                RouterClass.nextScreenNormal(
-                                  context,
-                                  TicketManagementScreen(
-                                    eventModel: eventModel,
-                                    onBackPressed: () =>
-                                        _showEventManagementModal(),
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            _buildManagementOption(
-                              icon: Icons.star,
-                              title: 'Event Feedback',
-                              subtitle:
-                                  'View and manage event ratings and comments',
-                              onTap: () {
-                                Navigator.pop(context);
-                                RouterClass.nextScreenNormal(
-                                  context,
-                                  EventFeedbackManagementScreen(
-                                    eventModel: eventModel,
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            _buildManagementOption(
-                              icon: Icons.qr_code_scanner,
-                              title: 'Scan Tickets',
-                              subtitle:
-                                  'Scan attendee ticket QR codes for validation',
-                              onTap: () async {
-                                Navigator.pop(context);
-                                final result = await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => TicketScannerScreen(
-                                      eventId: eventModel.id,
-                                      eventTitle: eventModel.title,
-                                    ),
-                                  ),
-                                );
-
-                                // Show success message if ticket was validated
-                                if (result == true) {
-                                  ShowToast().showNormalToast(
-                                    msg: 'Ticket validated successfully!',
+                            if (eventModel.signInMethods.isEmpty) ...[
+                              _buildManagementOption(
+                                icon: Icons.login,
+                                title: 'Enable Sign-In Methods',
+                                subtitle:
+                                    'Add QR code, manual code, or geofence tracking',
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  RouterClass.nextScreenNormal(
+                                    context,
+                                    EditEventScreen(eventModel: eventModel),
                                   );
-                                }
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            _buildManagementOption(
-                              icon: Icons.analytics,
-                              title: 'Event Analytics',
-                              subtitle: 'View event performance and insights',
-                              onTap: () {
-                                Navigator.pop(context);
-                                RouterClass.nextScreenNormal(
-                                  context,
-                                  EventAnalyticsScreen(eventId: eventModel.id),
-                                );
-                              },
-                            ),
+                                },
+                              ),
+                            ] else ...[
+                              _buildManagementOption(
+                                icon: Icons.question_answer,
+                                title: 'Add Prompts',
+                                subtitle:
+                                    'Create sign-in questions for attendees',
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  RouterClass.nextScreenNormal(
+                                    context,
+                                    AddQuestionsToEventScreen(
+                                      eventModel: eventModel,
+                                      onBackPressed: () =>
+                                          _showEventManagementModal(),
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              _buildManagementOption(
+                                icon: Icons.people,
+                                title: 'View Attendance',
+                                subtitle: 'See who has signed in to your event',
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  RouterClass.nextScreenNormal(
+                                    context,
+                                    AttendanceSheetScreen(
+                                      eventModel: eventModel,
+                                      onBackPressed: () =>
+                                          _showEventManagementModal(),
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              _buildManagementOption(
+                                icon: Icons.confirmation_number,
+                                title: 'Manage Tickets',
+                                subtitle: 'Create and track event tickets',
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  RouterClass.nextScreenNormal(
+                                    context,
+                                    TicketManagementScreen(
+                                      eventModel: eventModel,
+                                      onBackPressed: () =>
+                                          _showEventManagementModal(),
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              _buildManagementOption(
+                                icon: Icons.star,
+                                title: 'Event Feedback',
+                                subtitle:
+                                    'View and manage event ratings and comments',
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  RouterClass.nextScreenNormal(
+                                    context,
+                                    EventFeedbackManagementScreen(
+                                      eventModel: eventModel,
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              _buildManagementOption(
+                                icon: Icons.qr_code_scanner,
+                                title: 'Scan Tickets',
+                                subtitle:
+                                    'Scan attendee ticket QR codes for validation',
+                                onTap: () async {
+                                  Navigator.pop(context);
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => TicketScannerScreen(
+                                        eventId: eventModel.id,
+                                        eventTitle: eventModel.title,
+                                      ),
+                                    ),
+                                  );
+
+                                  // Show success message if ticket was validated
+                                  if (result == true) {
+                                    ShowToast().showNormalToast(
+                                      msg: 'Ticket validated successfully!',
+                                    );
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              _buildManagementOption(
+                                icon: Icons.analytics,
+                                title: 'Event Analytics',
+                                subtitle: 'View event performance and insights',
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  RouterClass.nextScreenNormal(
+                                    context,
+                                    EventAnalyticsScreen(
+                                      eventId: eventModel.id,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
                           ],
                         ),
                         const SizedBox(height: 20),
@@ -4942,7 +5045,9 @@ This looks like a great event!
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Attendees (${actualAttendanceCount})',
+                          eventModel.signInMethods.isEmpty
+                              ? 'No Attendance Tracking'
+                              : 'Attendees (${actualAttendanceCount})',
                           style: const TextStyle(
                             color: Color(0xFF1A1A1A),
                             fontSize: 18,
@@ -4951,7 +5056,9 @@ This looks like a great event!
                           ),
                         ),
                         Text(
-                          'Tap to see attendees',
+                          eventModel.signInMethods.isEmpty
+                              ? 'No sign-in methods enabled'
+                              : 'Tap to see attendees',
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 14,
@@ -4981,10 +5088,84 @@ This looks like a great event!
             child: _isAttendeesExpanded
                 ? Container(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                    child: _buildAttendeesContent(),
+                    child: eventModel.signInMethods.isEmpty
+                        ? _buildNoAttendanceTrackingContent()
+                        : _buildAttendeesContent(),
                   )
                 : const SizedBox.shrink(),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoAttendanceTrackingContent() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF6B7280).withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF6B7280).withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.info_outline, color: const Color(0xFF6B7280), size: 48),
+          const SizedBox(height: 16),
+          const Text(
+            'No Attendance Tracking',
+            style: TextStyle(
+              color: Color(0xFF1A1A1A),
+              fontWeight: FontWeight.w600,
+              fontSize: 18,
+              fontFamily: 'Roboto',
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'This event doesn\'t require attendees to sign in. Anyone can join without tracking their attendance.',
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 14,
+              fontFamily: 'Roboto',
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          if (eventModel.hasManagementPermissions(
+            FirebaseAuth.instance.currentUser!.uid,
+          ))
+            Container(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  RouterClass.nextScreenNormal(
+                    context,
+                    EditEventScreen(eventModel: eventModel),
+                  );
+                },
+                icon: const Icon(Icons.edit, size: 18),
+                label: const Text(
+                  'Enable Sign-In Methods',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF667EEA),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

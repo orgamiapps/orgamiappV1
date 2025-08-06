@@ -69,29 +69,46 @@ class _AddQuestionPopupState extends State<AddQuestionPopup>
     });
 
     try {
-      String newId = FirebaseFirestore.instance
-          .collection(EventQuestionModel.firebaseKey)
-          .doc()
-          .id;
+      // During event creation, we don't have a real event ID yet
+      // So we'll create a temporary question that will be saved when the event is created
+      if (widget.eventModel.id.isEmpty) {
+        EventQuestionModel newQuestion = EventQuestionModel(
+          id: DateTime.now().millisecondsSinceEpoch.toString(), // Temporary ID
+          questionTitle: _textController.text.trim(),
+          required: _isRequired,
+        );
 
-      EventQuestionModel newQuestion = EventQuestionModel(
-        id: newId,
-        questionTitle: _textController.text.trim(),
-        required: _isRequired,
-      );
+        setState(() {
+          _isLoading = false;
+        });
 
-      await FirebaseFirestore.instance
-          .collection(EventModel.firebaseKey)
-          .doc(widget.eventModel.id)
-          .collection(EventQuestionModel.firebaseKey)
-          .doc(newQuestion.id)
-          .set(newQuestion.toJson());
+        Navigator.of(context).pop(newQuestion);
+      } else {
+        // For existing events, save to Firestore
+        String newId = FirebaseFirestore.instance
+            .collection(EventQuestionModel.firebaseKey)
+            .doc()
+            .id;
 
-      setState(() {
-        _isLoading = false;
-      });
+        EventQuestionModel newQuestion = EventQuestionModel(
+          id: newId,
+          questionTitle: _textController.text.trim(),
+          required: _isRequired,
+        );
 
-      Navigator.of(context).pop(newQuestion);
+        await FirebaseFirestore.instance
+            .collection(EventModel.firebaseKey)
+            .doc(widget.eventModel.id)
+            .collection(EventQuestionModel.firebaseKey)
+            .doc(newQuestion.id)
+            .set(newQuestion.toJson());
+
+        setState(() {
+          _isLoading = false;
+        });
+
+        Navigator.of(context).pop(newQuestion);
+      }
     } catch (e) {
       setState(() {
         _isLoading = false;

@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:orgami/Screens/Events/ChoseLocationInMapScreen.dart';
+import 'package:orgami/Screens/Events/ChoseSignInMethodsScreen.dart';
 import 'package:orgami/Utils/Colors.dart';
 import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/Utils/dimensions.dart';
 
 class ChoseDateTimeScreen extends StatefulWidget {
-  const ChoseDateTimeScreen({
-    super.key,
-  });
+  const ChoseDateTimeScreen({super.key});
 
   @override
   State<ChoseDateTimeScreen> createState() => _ChoseDateTimeScreenState();
@@ -90,9 +89,10 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
 
     // Initialize slide animation
     _slideController = AnimationController(
@@ -120,10 +120,7 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFFAFBFC),
       body: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: _bodyView(),
-        ),
+        child: FadeTransition(opacity: _fadeAnimation, child: _bodyView()),
       ),
     );
   }
@@ -148,10 +145,7 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF667EEA),
-            Color(0xFF764BA2),
-          ],
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
         ),
       ),
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
@@ -217,7 +211,9 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
             // Date Selection Card
             _buildSelectionCard(
               icon: Icons.calendar_month_rounded,
-              title: selectedDate != null ? 'Selected Date' : 'Choose Your Date',
+              title: selectedDate != null
+                  ? 'Selected Date'
+                  : 'Choose Your Date',
               subtitle: selectedDate != null
                   ? DateFormat('EEEE, MMMM dd, yyyy').format(selectedDate!)
                   : 'Tap to select a date',
@@ -228,7 +224,9 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
             // Time Selection Card
             _buildSelectionCard(
               icon: Icons.access_time_rounded,
-              title: selectedTime != null ? 'Selected Time' : 'Choose Your Time',
+              title: selectedTime != null
+                  ? 'Selected Time'
+                  : 'Choose Your Time',
               subtitle: selectedTime != null
                   ? DateFormat('KK:mm a').format(
                       DateTime(
@@ -297,7 +295,10 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
                     end: Alignment.bottomRight,
                     colors: isSelected
                         ? const [Color(0xFF667EEA), Color(0xFF764BA2)]
-                        : [Colors.grey.withOpacity(0.1), Colors.grey.withOpacity(0.1)],
+                        : [
+                            Colors.grey.withOpacity(0.1),
+                            Colors.grey.withOpacity(0.1),
+                          ],
                   ),
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -315,7 +316,9 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
                     Text(
                       title,
                       style: TextStyle(
-                        color: isSelected ? const Color(0xFF1A1A1A) : const Color(0xFF6B7280),
+                        color: isSelected
+                            ? const Color(0xFF1A1A1A)
+                            : const Color(0xFF6B7280),
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
                         fontFamily: 'Roboto',
@@ -325,7 +328,9 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
                     Text(
                       subtitle,
                       style: TextStyle(
-                        color: isSelected ? const Color(0xFF667EEA) : const Color(0xFF9CA3AF),
+                        color: isSelected
+                            ? const Color(0xFF667EEA)
+                            : const Color(0xFF9CA3AF),
                         fontSize: 14,
                         fontFamily: 'Roboto',
                       ),
@@ -335,7 +340,9 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
               ),
               Icon(
                 Icons.arrow_forward_ios,
-                color: isSelected ? const Color(0xFF667EEA) : const Color(0xFF9CA3AF),
+                color: isSelected
+                    ? const Color(0xFF667EEA)
+                    : const Color(0xFF9CA3AF),
                 size: 16,
               ),
             ],
@@ -353,10 +360,7 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF667EEA),
-            Color(0xFF764BA2),
-          ],
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
@@ -383,7 +387,7 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
 
             RouterClass.nextScreenNormal(
               context,
-              ChoseLocationInMapScreen(selectedDateTime: selectedDateAndTime),
+              ChoseSignInMethodsScreen(selectedDateTime: selectedDateAndTime),
             );
           },
           child: const Center(

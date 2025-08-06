@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:orgami/Controller/CustomerController.dart';
 import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Models/AttendanceModel.dart';
+import 'package:orgami/Models/EventModel.dart';
 import 'package:orgami/Permissions/PermssionsHelper.dart';
 import 'package:orgami/Screens/QRScanner/AnsQuestionsToSignInEventScreen.dart';
 import 'package:orgami/Utils/AppAppBarView.dart';
@@ -202,8 +203,17 @@ class _QrScannerScreenForLogedInState extends State<QrScannerScreenForLogedIn> {
                         : null,
                   );
 
-                  final eventExist = await FirebaseFirestoreHelper()
+                  // Try to find event by ID or manual code
+                  EventModel? eventExist = await FirebaseFirestoreHelper()
                       .getSingleEvent(newAttendanceModel.eventId);
+
+                  // If not found by ID, try to find by manual code
+                  if (eventExist == null) {
+                    eventExist = await _findEventByManualCode(
+                      newAttendanceModel.eventId,
+                    );
+                  }
+
                   if (eventExist != null) {
                     // Check for sign-in prompts
                     final questions = await FirebaseFirestoreHelper()
@@ -213,7 +223,7 @@ class _QrScannerScreenForLogedInState extends State<QrScannerScreenForLogedIn> {
                       RouterClass.nextScreenAndReplacement(
                         context,
                         AnsQuestionsToSignInEventScreen(
-                          eventModel: eventExist,
+                          eventModel: eventExist!,
                           newAttendance: newAttendanceModel,
                           nextPageRoute: 'qrScannerForLogedIn',
                         ),
@@ -241,7 +251,7 @@ class _QrScannerScreenForLogedInState extends State<QrScannerScreenForLogedIn> {
                         Future.delayed(const Duration(seconds: 1), () {
                           RouterClass.nextScreenAndReplacement(
                             context,
-                            SingleEventScreen(eventModel: eventExist),
+                            SingleEventScreen(eventModel: eventExist!),
                           );
                         });
                       } catch (firestoreError) {
@@ -339,5 +349,22 @@ class _QrScannerScreenForLogedInState extends State<QrScannerScreenForLogedIn> {
   void dispose() {
     controller?.dispose();
     super.dispose();
+  }
+
+  Future<EventModel?> _findEventByManualCode(String manualCode) async {
+    try {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection(EventModel.firebaseKey)
+          .where('manualCode', isEqualTo: manualCode)
+          .get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        return EventModel.fromJson(querySnapshot.docs.first.data());
+      }
+      return null;
+    } catch (e) {
+      print('Error finding event by manual code: $e');
+      return null;
+    }
   }
 }

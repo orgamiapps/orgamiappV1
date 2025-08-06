@@ -17,6 +17,8 @@ import 'package:orgami/Utils/TextFields.dart';
 import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
+import 'package:orgami/Screens/Events/Widget/SignInMethodsSelector.dart';
+import 'package:orgami/Screens/Events/GeofenceSetupScreen.dart';
 import 'dart:io';
 
 class EditEventScreen extends StatefulWidget {
@@ -51,6 +53,10 @@ class _EditEventScreenState extends State<EditEventScreen>
 
   String? _selectedImagePath;
   String? _currentImageUrl;
+
+  // Sign-in methods
+  List<String> _selectedSignInMethods = ['qr_code', 'manual_code'];
+  String? _manualCode;
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -98,6 +104,8 @@ class _EditEventScreenState extends State<EditEventScreen>
     _currentImageUrl = event.imageUrl;
     _selectedCategories = List.from(event.categories);
     privateEvent = event.private;
+    _selectedSignInMethods = List.from(event.signInMethods);
+    _manualCode = event.manualCode;
   }
 
   @override
@@ -203,6 +211,8 @@ class _EditEventScreenState extends State<EditEventScreen>
             eventGenerateTime: widget.eventModel.eventGenerateTime,
             latitude: widget.eventModel.latitude,
             longitude: widget.eventModel.longitude,
+            signInMethods: _selectedSignInMethods,
+            manualCode: _manualCode,
           );
 
           // Update in Firestore
@@ -336,6 +346,10 @@ class _EditEventScreenState extends State<EditEventScreen>
 
           // Categories
           _buildCategoriesSection(),
+          const SizedBox(height: 24),
+
+          // Sign-In Methods
+          _buildSignInMethodsSection(),
           const SizedBox(height: 24),
 
           // Privacy Settings
@@ -710,6 +724,36 @@ class _EditEventScreenState extends State<EditEventScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSignInMethodsSection() {
+    return SignInMethodsSelector(
+      selectedMethods: _selectedSignInMethods,
+      onMethodsChanged: (methods) {
+        setState(() {
+          _selectedSignInMethods = methods;
+        });
+
+        // Check if geofence was just enabled
+        if (methods.contains('geofence') &&
+            !widget.eventModel.signInMethods.contains('geofence')) {
+          // Geofence was just enabled, navigate to setup screen
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            RouterClass.nextScreenNormal(
+              context,
+              GeofenceSetupScreen(eventModel: widget.eventModel),
+            );
+          });
+        }
+      },
+      manualCode: _manualCode,
+      onManualCodeChanged: (code) {
+        setState(() {
+          _manualCode = code;
+        });
+      },
+      isEditing: true,
     );
   }
 

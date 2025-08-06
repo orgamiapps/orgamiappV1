@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:orgami/Firebase/FirebaseFirestoreHelper.dart';
 import 'package:orgami/Models/EventModel.dart';
+import 'package:orgami/Models/EventQuestionModel.dart';
 import 'package:orgami/Screens/Events/SingleEventScreen.dart';
 import 'package:orgami/Screens/Home/DashboardScreen.dart';
 import 'package:orgami/Utils/Colors.dart';
@@ -16,18 +17,25 @@ import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/Utils/TextFields.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
+import 'package:orgami/Screens/Events/Widget/SignInMethodsSelector.dart';
 import 'dart:io';
 
 class CreateEventScreen extends StatefulWidget {
   final DateTime selectedDateTime;
   final LatLng selectedLocation;
   final double radios;
+  final List<String>? selectedSignInMethods;
+  final String? manualCode;
+  final List<EventQuestionModel>? questions;
 
   const CreateEventScreen({
     super.key,
     required this.selectedDateTime,
     required this.selectedLocation,
     required this.radios,
+    this.selectedSignInMethods,
+    this.manualCode,
+    this.questions,
   });
 
   @override
@@ -56,6 +64,10 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       TextEditingController();
 
   String? _selectedImagePath;
+
+  // Sign-in methods
+  late List<String> _selectedSignInMethods;
+  String? _manualCode;
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -177,6 +189,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           latitude: widget.selectedLocation.latitude,
           private: privateEvent,
           categories: _selectedCategories,
+          signInMethods: _selectedSignInMethods,
+          manualCode: _manualCode,
         );
 
         Map<String, dynamic> data = newEvent.toJson();
@@ -185,6 +199,30 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             .collection(EventModel.firebaseKey)
             .doc(docId)
             .set(data);
+
+        // Save questions if provided
+        if (widget.questions != null && widget.questions!.isNotEmpty) {
+          for (EventQuestionModel question in widget.questions!) {
+            // Generate a new ID for each question
+            String questionId = FirebaseFirestore.instance
+                .collection(EventQuestionModel.firebaseKey)
+                .doc()
+                .id;
+
+            EventQuestionModel questionToSave = EventQuestionModel(
+              id: questionId,
+              questionTitle: question.questionTitle,
+              required: question.required,
+            );
+
+            await FirebaseFirestore.instance
+                .collection(EventModel.firebaseKey)
+                .doc(docId)
+                .collection(EventQuestionModel.firebaseKey)
+                .doc(questionId)
+                .set(questionToSave.toJson());
+          }
+        }
 
         debugPrint('Event Uploaded!');
         _btnCtlr.success();
@@ -195,7 +233,6 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         RouterClass.nextScreenNormal(
           context,
           SingleEventScreen(eventModel: newEvent),
-          // AddQuestionsToEventScreen(eventModel: newEvent),
         );
       });
     } catch (e) {
@@ -214,6 +251,11 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   @override
   void initState() {
     super.initState();
+
+    // Initialize sign-in methods
+    _selectedSignInMethods =
+        widget.selectedSignInMethods ?? ['qr_code', 'manual_code'];
+    _manualCode = widget.manualCode;
 
     // Initialize animations
     _fadeController = AnimationController(
