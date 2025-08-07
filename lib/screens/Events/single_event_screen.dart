@@ -57,6 +57,7 @@ class SingleEventScreen extends StatefulWidget {
 class _SingleEventScreenState extends State<SingleEventScreen>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   late EventModel eventModel;
+  StreamSubscription<DocumentSnapshot>? _eventSubscription;
   late final double _screenWidth = MediaQuery.of(context).size.width;
   late final double _screenHeight = MediaQuery.of(context).size.height;
   bool? signedIn;
@@ -690,50 +691,42 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   Future<void> _performSignIn(AttendanceModel attendanceModel) async {
     try {
       Logger.debug('Saving attendance to Firestore...');
-      Logger.debug('Collection: ${AttendanceModel.firebaseKey}');
-      Logger.debug('Document ID: ${attendanceModel.id}');
-      Logger.debug('Data: ${attendanceModel.toJson()}');
-
       await FirebaseFirestore.instance
           .collection(AttendanceModel.firebaseKey)
           .doc(attendanceModel.id)
           .set(attendanceModel.toJson());
 
       Logger.debug('Attendance saved successfully!');
-      _btnCtlr.success(); // Show success state
+      _btnCtlr.success();
       ShowToast().showNormalToast(msg: 'Signed In Successfully!');
 
-      // Set flag to prevent showing sign-in dialog immediately after sign-in
+      // Pop the sign-in dialog
+      if (Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      // Refresh event details to update UI
+
       setState(() {
         _justSignedIn = true;
       });
 
-      // Refresh attendance status and stay on the same screen
+      // Reset the button and the flag after a delay
       Future.delayed(const Duration(seconds: 2), () {
         _btnCtlr.reset();
-        // Refresh attendance status with a longer delay to ensure Firestore write is committed
-        getAttendance();
-        getActualAttendanceCount();
-        // Reset the flag after a delay
-        Future.delayed(const Duration(seconds: 3), () {
-          setState(() {
-            _justSignedIn = false;
-          });
-        });
-        // Refresh the current screen to show updated sign-in status
         setState(() {
-          // Trigger a rebuild to show the updated UI
+          _justSignedIn = false;
         });
-
-        // Show privacy dialog for dwell tracking if event has location enabled
-        if (eventModel.getLocation && !_hasShownPrivacyDialog) {
-          Future.delayed(const Duration(seconds: 4), () {
-            if (mounted) {
-              _showPrivacyDialog();
-            }
-          });
-        }
       });
+
+      // Show privacy dialog for dwell tracking if event has location enabled
+      if (eventModel.getLocation && !_hasShownPrivacyDialog) {
+        Future.delayed(const Duration(seconds: 4), () {
+          if (mounted) {
+            _showPrivacyDialog();
+          }
+        });
+      }
     } catch (firestoreError) {
       Logger.error('Firestore error during sign-in: $firestoreError');
       _btnCtlr.error();
@@ -1085,6 +1078,21 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     // Initialize event model
     eventModel = widget.eventModel;
 
+    // Set up the event stream listener
+    _eventSubscription = FirebaseFirestore.instance
+        .collection(EventModel.firebaseKey)
+        .doc(widget.eventModel.id)
+        .snapshots()
+        .listen((snapshot) {
+          if (snapshot.exists) {
+            if (mounted) {
+              setState(() {
+                eventModel = EventModel.fromJson(snapshot.data()!);
+              });
+            }
+          }
+        });
+
     // Add lifecycle observer
     WidgetsBinding.instance.addObserver(this);
 
@@ -1199,6 +1207,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
     _fadeController.dispose();
     _slideController.dispose();
+    _eventSubscription?.cancel();
 
     super.dispose();
   }
@@ -2027,36 +2036,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
           ? _buildFloatingActionButton()
           : null,
       body: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: StreamBuilder<DocumentSnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection(EventModel.firebaseKey)
-                .doc(widget.eventModel.id)
-                .snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.hasData && snapshot.data!.exists) {
-                // Update the eventModel with real-time data
-                final updatedEventModel = EventModel.fromJson(
-                  snapshot.data!.data() as Map<String, dynamic>,
-                );
-
-                // Update the eventModel immediately
-                eventModel = updatedEventModel;
-
-                return _bodyView();
-              } else if (snapshot.hasError) {
-                // Fallback to the original eventModel if there's an error
-                eventModel = widget.eventModel;
-                return _bodyView();
-              } else {
-                // Show loading or fallback to original eventModel
-                eventModel = widget.eventModel;
-                return _bodyView();
-              }
-            },
-          ),
-        ),
+        child: FadeTransition(opacity: _fadeAnimation, child: _bodyView()),
       ),
     );
   }

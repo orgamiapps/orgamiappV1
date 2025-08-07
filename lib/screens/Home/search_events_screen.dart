@@ -5,12 +5,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
+import 'package:orgami/utils/colors.dart';
 import 'package:orgami/firebase/engagement_predictor.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/firebase/recommendation_analytics.dart';
 import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/models/event_model.dart';
-import 'package:orgami/utils/colors.dart';
 import 'package:shimmer/shimmer.dart';
 
 enum SearchType { events, users }
@@ -36,8 +36,9 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         setState(() {
-          _currentTab =
-              _tabController.index == 0 ? SearchType.events : SearchType.users;
+          _currentTab = _tabController.index == 0
+              ? SearchType.events
+              : SearchType.users;
         });
       }
     });
@@ -75,7 +76,7 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
             controller: _tabController,
             children: [
               EventsDefaultList(searchQuery: _searchQuery),
-              UsersDefaultList(searchQuery: _searchQuery)
+              UsersDefaultList(searchQuery: _searchQuery),
             ],
           ),
         ),
@@ -126,8 +127,10 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
-          contentPadding:
-              const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 16.0,
+            horizontal: 20.0,
+          ),
           fillColor: const Color(0xFFF5F7FA),
           filled: true,
           border: OutlineInputBorder(
@@ -146,10 +149,7 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
                 )
               : null,
         ),
-        style: const TextStyle(
-          color: Colors.black87,
-          fontFamily: 'Roboto',
-        ),
+        style: const TextStyle(color: Colors.black87, fontFamily: 'Roboto'),
       ),
     );
   }
@@ -179,15 +179,16 @@ class TabBarDelegate extends SliverPersistentHeaderDelegate {
         child: TabBar(
           controller: tabController,
           indicator: BoxDecoration(
-              color: const Color(0xFF667EEA),
-              borderRadius: BorderRadius.circular(15),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF667EEA).withOpacity(0.4),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                )
-              ]),
+            color: const Color(0xFF667EEA),
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF667EEA).withOpacity(0.4),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
           indicatorSize: TabBarIndicatorSize.tab,
           dividerColor: Colors.transparent,
           labelColor: Colors.white,
@@ -304,7 +305,7 @@ class _EventsDefaultListState extends State<EventsDefaultList> {
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Error loading events: $e');
+        print('Error loading events: $e');
       }
       if (mounted) {
         setState(() {
@@ -350,9 +351,10 @@ class _EventsDefaultListState extends State<EventsDefaultList> {
             const Text(
               'No Events Found',
               style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black54),
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.black54,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -381,7 +383,7 @@ class _EventsDefaultListState extends State<EventsDefaultList> {
                 'view',
               ).catchError((e) {
                 if (kDebugMode) {
-                  debugPrint('Error tracking engagement: $e');
+                  print('Error tracking engagement: $e');
                 }
               });
               RecommendationAnalytics.trackRecommendationInteraction(
@@ -390,7 +392,7 @@ class _EventsDefaultListState extends State<EventsDefaultList> {
                 position: index + 1,
               ).catchError((e) {
                 if (kDebugMode) {
-                  debugPrint('Error tracking recommendation interaction: $e');
+                  print('Error tracking recommendation interaction: $e');
                 }
               });
             },
@@ -456,7 +458,7 @@ class _UsersDefaultListState extends State<UsersDefaultList> {
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Error loading users: $e');
+        print('Error loading users: $e');
       }
       if (mounted) {
         setState(() {
@@ -470,7 +472,8 @@ class _UsersDefaultListState extends State<UsersDefaultList> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Center(
-          child: CircularProgressIndicator(color: Color(0xFF667EEA)));
+        child: CircularProgressIndicator(color: Color(0xFF667EEA)),
+      );
     }
 
     if (_users.isEmpty) {
@@ -483,9 +486,10 @@ class _UsersDefaultListState extends State<UsersDefaultList> {
             const Text(
               'No Users Found',
               style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black54),
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.black54,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -510,8 +514,9 @@ class _UsersDefaultListState extends State<UsersDefaultList> {
             elevation: 4,
             shadowColor: Colors.black.withOpacity(0.05),
             margin: const EdgeInsets.only(bottom: 16),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
             child: InkWell(
               borderRadius: BorderRadius.circular(15),
               onTap: () => Navigator.push(
@@ -526,13 +531,14 @@ class _UsersDefaultListState extends State<UsersDefaultList> {
                   children: [
                     CircleAvatar(
                       radius: 30,
-                      backgroundColor:
-                          const Color(0xFF667EEA).withOpacity(0.1),
-                      backgroundImage: user.profilePictureUrl != null &&
+                      backgroundColor: const Color(0xFF667EEA).withOpacity(0.1),
+                      backgroundImage:
+                          user.profilePictureUrl != null &&
                               user.profilePictureUrl!.isNotEmpty
                           ? CachedNetworkImageProvider(user.profilePictureUrl!)
                           : null,
-                      child: user.profilePictureUrl == null ||
+                      child:
+                          user.profilePictureUrl == null ||
                               user.profilePictureUrl!.isEmpty
                           ? Text(
                               user.name.isNotEmpty

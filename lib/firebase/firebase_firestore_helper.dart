@@ -1429,6 +1429,24 @@ class FirebaseFirestoreHelper {
     }
   }
 
+  Stream<EventModel> getEventStream(String eventId) {
+    return _firestore
+        .collection(EventModel.firebaseKey)
+        .doc(eventId)
+        .snapshots()
+        .map((snapshot) => EventModel.fromJson(snapshot.data()!));
+  }
+
+  Stream<List<TicketModel>> getTicketsStream(String eventId) {
+    return _firestore
+        .collection(TicketModel.firebaseKey)
+        .where('eventId', isEqualTo: eventId)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => TicketModel.fromJson(doc.data()))
+            .toList());
+  }
+
   /// Deletes an event from Firestore
   ///
   /// This method deletes the event document and all related data
@@ -1442,7 +1460,7 @@ class FirebaseFirestoreHelper {
           .collection(AttendanceModel.firebaseKey)
           .where('eventId', isEqualTo: eventId)
           .get();
-
+      
       for (var doc in attendanceQuery.docs) {
         await doc.reference.delete();
       }
@@ -1472,7 +1490,7 @@ class FirebaseFirestoreHelper {
           .collection(CommentModel.firebaseKey)
           .where('eventId', isEqualTo: eventId)
           .get();
-
+      
       for (var doc in commentsQuery.docs) {
         await doc.reference.delete();
       }
