@@ -2199,6 +2199,27 @@ class FirebaseFirestoreHelper {
     }
   }
 
+  // Method to update event location
+  static Future<void> updateEventLocation(
+    String eventId,
+    double latitude,
+    double longitude,
+  ) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection(EventModel.firebaseKey)
+          .doc(eventId)
+          .update({
+        'latitude': latitude,
+        'longitude': longitude,
+      });
+      Logger.success('Event location updated successfully for event: $eventId');
+    } catch (e) {
+      Logger.error('Error updating event location: $e');
+      rethrow;
+    }
+  }
+
   // Co-host management methods
   Future<bool> addCoHost({
     required String eventId,

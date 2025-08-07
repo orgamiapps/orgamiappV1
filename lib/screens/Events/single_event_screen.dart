@@ -39,6 +39,7 @@ import 'package:orgami/utils/logger.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
+import 'package:orgami/Screens/Events/chose_location_in_map_screen.dart';
 import 'package:orgami/Screens/Events/feature_event_screen.dart';
 import 'package:orgami/Screens/Events/edit_event_screen.dart';
 import 'package:orgami/Screens/Events/event_location_view_screen.dart';
@@ -1381,19 +1382,44 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                       );
                                     },
                             ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        // Attendance Management Section
+                        _buildManagementSection(
+                          icon: Icons.people,
+                          title: 'Attendance Management',
+                          color: const Color(0xFFEC4899),
+                          children: [
                             _buildManagementOption(
-                              icon: Icons.edit,
-                              title: 'Edit Event',
-                              subtitle: 'Modify event details and settings',
+                              icon: Icons.people,
+                              title: 'Attendance Sheet',
+                              subtitle: 'View and manage attendance records',
+                              onTap: () {
+                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => AttendanceSheetScreen(
+                                      eventModel: eventModel,
+                                    ),
+                                  ),
+                                ).then((_) => _showEventManagementModal());
+                              },
+                            ),
+                            _buildManagementOption(
+                              icon: Icons.notifications,
+                              title: 'Send Notifications',
+                              subtitle: 'Notify attendees about updates',
                               onTap: () {
                                 Navigator.pop(context);
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) =>
-                                        EditEventScreen(eventModel: eventModel),
+                                        const AttendeeNotificationScreen(),
                                   ),
-                                );
+                                ).then((_) => _showEventManagementModal());
                               },
                             ),
                           ],
@@ -1418,7 +1444,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                       eventId: eventModel.id,
                                     ),
                                   ),
-                                );
+                                ).then((_) => _showEventManagementModal());
                               },
                             ),
                             _buildManagementOption(
@@ -1435,24 +1461,35 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                           eventModel: eventModel,
                                         ),
                                   ),
-                                );
+                                ).then((_) => _showEventManagementModal());
                               },
                             ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        // Location Management Section
+                        _buildManagementSection(
+                          icon: Icons.location_on,
+                          title: 'Location Management',
+                          color: const Color(0xFF3B82F6),
+                          children: [
                             _buildManagementOption(
-                              icon: Icons.location_on,
-                              title: 'Location Management',
-                              subtitle: 'Manage event location and geofencing',
+                              icon: Icons.map,
+                              title: 'Edit Event Location',
+                              subtitle:
+                                  'Update the event\'s location or geofence',
                               onTap: () {
                                 Navigator.pop(context);
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) =>
-                                        EventLocationViewScreen(
-                                          eventModel: eventModel,
+                                        ChoseLocationInMapScreen(
+                                          selectedDateTime:
+                                              eventModel.selectedDateTime,
                                         ),
                                   ),
-                                );
+                                ).then((_) => _showEventManagementModal());
                               },
                             ),
                           ],
@@ -1479,7 +1516,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                           eventModel: eventModel,
                                         ),
                                   ),
-                                );
+                                ).then((_) => _showEventManagementModal());
                               },
                             ),
                             _buildManagementOption(
@@ -1496,52 +1533,11 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                       eventTitle: eventModel.title,
                                     ),
                                   ),
-                                );
+                                ).then((_) => _showEventManagementModal());
                               },
                             ),
                           ],
                         ),
-                        const SizedBox(height: 24),
-                        // Attendance Management Section
-                        _buildManagementSection(
-                          icon: Icons.people,
-                          title: 'Attendance Management',
-                          color: const Color(0xFFEC4899),
-                          children: [
-                            _buildManagementOption(
-                              icon: Icons.people,
-                              title: 'Attendance Sheet',
-                              subtitle: 'View and manage attendance records',
-                              onTap: () {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => AttendanceSheetScreen(
-                                      eventModel: eventModel,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                            _buildManagementOption(
-                              icon: Icons.notifications,
-                              title: 'Send Notifications',
-                              subtitle: 'Notify attendees about updates',
-                              onTap: () {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const AttendeeNotificationScreen(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
                       ],
                     ),
                   ),
@@ -2161,6 +2157,41 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                     ),
                     const SizedBox(width: 12),
                     Tooltip(
+                      message: 'View Event Location',
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => EventLocationViewScreen(
+                                eventModel: eventModel,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withAlpha((0.2 * 255).round()),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withAlpha(
+                                (0.3 * 255).round(),
+                              ),
+                              width: 1,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.public,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Tooltip(
                       message: 'Share Event',
                       child: GestureDetector(
                         onTap: () => _showQuickShareOptions(),
@@ -2258,6 +2289,41 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                                       : Colors.white,
                                   size: 20,
                                 ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Tooltip(
+                      message: 'View Event Location',
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => EventLocationViewScreen(
+                                eventModel: eventModel,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withAlpha((0.2 * 255).round()),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withAlpha(
+                                (0.3 * 255).round(),
+                              ),
+                              width: 1,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.public,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                         ),
                       ),
                     ),
