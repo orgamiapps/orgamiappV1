@@ -1,0 +1,12 @@
+Analyzing orgamiappV1-main-2...                                 
+
+   info • Don't use 'BuildContext's across async gaps • lib/Screens/Events/single_event_screen.dart:4067:41 • use_build_context_synchronously
+  error • Target of URI doesn't exist: 'package:orgami/Screens/Home/DashboardScreen.dart' • lib/Utils/router.dart:2:8 • uri_does_not_exist
+  error • Target of URI doesn't exist: 'package:orgami/Screens/Splash/SecondSplashScreen.dart' • lib/Utils/router.dart:3:8 • uri_does_not_exist
+  error • The name 'SecondSplashScreen' isn't a class • lib/Utils/router.dart:21:51 • creation_with_non_type
+  error • The name 'SecondSplashScreen' isn't a class • lib/Utils/router.dart:29:45 • creation_with_non_type
+  error • The name 'DashboardScreen' isn't a class • lib/Utils/router.dart:35:61 • creation_with_non_type
+warning • The value of the local variable 'updatedCount' isn't used • tools/migrate_add_categories.dart:14:7 • unused_local_variable
+warning • The value of the local variable 'updatedCount' isn't used • tools/update_users.dart:13:9 • unused_local_variable
+   info • Empty catch block • tools/update_users.dart:49:15 • empty_catches
+

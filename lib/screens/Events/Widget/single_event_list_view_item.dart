@@ -1,0 +1,487 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:orgami/models/event_model.dart';
+import 'package:orgami/Screens/Events/single_event_screen.dart';
+import 'package:orgami/Screens/Events/event_location_view_screen.dart';
+import 'package:orgami/Utils/router.dart';
+import 'package:orgami/Utils/cached_image.dart';
+import 'package:orgami/firebase/firebase_firestore_helper.dart';
+import 'package:orgami/controller/customer_controller.dart';
+import 'package:orgami/Utils/toast.dart';
+
+class SingleEventListViewItem extends StatefulWidget {
+  final EventModel eventModel;
+  final bool disableTap;
+  final VoidCallback? onFavoriteChanged;
+  final VoidCallback? onTap;
+
+  const SingleEventListViewItem({
+    super.key,
+    required this.eventModel,
+    this.disableTap = false,
+    this.onFavoriteChanged,
+    this.onTap,
+  });
+
+  @override
+  State<SingleEventListViewItem> createState() =>
+      _SingleEventListViewItemState();
+}
+
+class _SingleEventListViewItemState extends State<SingleEventListViewItem>
+    with SingleTickerProviderStateMixin {
+  bool _isFavorited = false;
+  bool _isLoadingFavorite = false;
+  late AnimationController _favoriteController;
+  late Animation<double> _favoriteScaleAnimation;
+  // late Animation<double> _favoriteOpacityAnimation; // Unused field
+
+  @override
+  void initState() {
+    super.initState();
+    _favoriteController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _favoriteScaleAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
+      CurvedAnimation(parent: _favoriteController, curve: Curves.elasticOut),
+    );
+    // _favoriteOpacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+    //   CurvedAnimation(parent: _favoriteController, curve: Curves.easeInOut),
+    // ); // Unused assignment
+
+    _checkFavoriteStatus();
+  }
+
+  @override
+  void dispose() {
+    _favoriteController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _checkFavoriteStatus() async {
+    if (CustomerController.logeInCustomer == null) return;
+
+    try {
+      final isFavorited = await FirebaseFirestoreHelper().isEventFavorited(
+        userId: CustomerController.logeInCustomer!.uid,
+        eventId: widget.eventModel.id,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isFavorited = isFavorited;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking favorite status: $e');
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (CustomerController.logeInCustomer == null) {
+      ShowToast().showNormalToast(msg: 'Please log in to save events');
+      return;
+    }
+
+    setState(() {
+      _isLoadingFavorite = true;
+    });
+
+    try {
+      bool success;
+      if (_isFavorited) {
+        success = await FirebaseFirestoreHelper().removeFromFavorites(
+          userId: CustomerController.logeInCustomer!.uid,
+          eventId: widget.eventModel.id,
+        );
+      } else {
+        success = await FirebaseFirestoreHelper().addToFavorites(
+          userId: CustomerController.logeInCustomer!.uid,
+          eventId: widget.eventModel.id,
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          _isFavorited = !_isFavorited;
+          _isLoadingFavorite = false;
+        });
+
+        // Trigger animation
+        _favoriteController.forward().then((_) {
+          _favoriteController.reverse();
+        });
+
+        if (success) {
+          ShowToast().showNormalToast(
+            msg: _isFavorited ? 'Event saved!' : 'Event removed from saved!',
+          );
+
+          // Notify parent widget if callback is provided
+          widget.onFavoriteChanged?.call();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingFavorite = false;
+        });
+      }
+      ShowToast().showNormalToast(msg: 'Failed to update saved events');
+      debugPrint('Error toggling favorite: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: widget.disableTap
+            ? null
+            : () {
+                debugPrint('Tapped event: ${widget.eventModel.id}');
+                // Call the optional onTap callback if provided
+                widget.onTap?.call();
+                RouterClass.nextScreenNormal(
+                  context,
+                  SingleEventScreen(eventModel: widget.eventModel),
+                );
+              },
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                spreadRadius: 0,
+                blurRadius: 20,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Image section
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+                child: Stack(
+                  children: [
+                    AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: SafeNetworkImage(
+                        imageUrl: widget.eventModel.imageUrl,
+                        fit: BoxFit.cover,
+                        placeholder: Container(
+                          color: const Color(0xFFF5F7FA),
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFF667EEA),
+                            ),
+                          ),
+                        ),
+                        errorWidget: Container(
+                          color: const Color(0xFFF5F7FA),
+                          child: const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.image_not_supported,
+                                  color: Color(0xFF667EEA),
+                                  size: 32,
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Image not available',
+                                  style: TextStyle(
+                                    color: Color(0xFF667EEA),
+                                    fontSize: 12,
+                                    fontFamily: 'Roboto',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Favorite button
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: AnimatedBuilder(
+                        animation: _favoriteController,
+                        builder: (context, child) {
+                          return Transform.scale(
+                            scale: _favoriteScaleAnimation.value,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.1),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(20),
+                                  onTap: _isLoadingFavorite
+                                      ? null
+                                      : () {
+                                          _toggleFavorite();
+                                        },
+                                  child: Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: _isFavorited
+                                          ? const Color(0xFFE53E3E)
+                                          : Colors.white.withValues(alpha: 0.9),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: _isLoadingFavorite
+                                        ? const Center(
+                                            child: SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Color(0xFF667EEA),
+                                              ),
+                                            ),
+                                          )
+                                        : Icon(
+                                            _isFavorited
+                                                ? Icons.bookmark
+                                                : Icons.bookmark_border,
+                                            color: _isFavorited
+                                                ? Colors.white
+                                                : const Color(0xFF667EEA),
+                                            size: 20,
+                                          ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    if (widget.eventModel.isFeatured)
+                      Positioned(
+                        top: 12,
+                        left: 12,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF9800),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.star, color: Colors.white, size: 12),
+                              SizedBox(width: 4),
+                              Text(
+                                'Featured',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                  fontFamily: 'Roboto',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              // Content section
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.eventModel.title,
+                      style: const TextStyle(
+                        color: Color(0xFF1A1A1A),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                        fontFamily: 'Roboto',
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.group,
+                          color: const Color(0xFF667EEA),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          widget.eventModel.groupName,
+                          style: const TextStyle(
+                            color: Color(0xFF6B7280),
+                            fontSize: 14,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          color: const Color(0xFF667EEA),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            widget.eventModel.location,
+                            style: const TextStyle(
+                              color: Color(0xFF6B7280),
+                              fontSize: 14,
+                              fontFamily: 'Roboto',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        // Globe icon button for map view
+                        if (widget.eventModel.latitude != 0 &&
+                            widget.eventModel.longitude != 0)
+                          Container(
+                            width: 24,
+                            height: 24,
+                            margin: const EdgeInsets.only(left: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(
+                                0xFF667EEA,
+                              ).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(6),
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          EventLocationViewScreen(
+                                            eventModel: widget.eventModel,
+                                          ),
+                                    ),
+                                  );
+                                },
+                                child: const Icon(
+                                  Icons.public,
+                                  color: Color(0xFF667EEA),
+                                  size: 14,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      widget.eventModel.description,
+                      style: const TextStyle(
+                        color: Color(0xFF4B5563),
+                        fontSize: 14,
+                        fontFamily: 'Roboto',
+                        height: 1.5,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(
+                                0xFF667EEA,
+                              ).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              DateFormat(
+                                'MMM dd, yyyy\nKK:mm a',
+                              ).format(widget.eventModel.selectedDateTime),
+                              style: const TextStyle(
+                                color: Color(0xFF667EEA),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                                fontFamily: 'Roboto',
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'View Details',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
