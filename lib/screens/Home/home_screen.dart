@@ -28,6 +28,9 @@ import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/controller/customer_controller.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:orgami/Screens/QRScanner/qr_scanner_flow_screen.dart';
+import 'package:orgami/Screens/Messaging/messaging_screen.dart';
+import 'package:orgami/Screens/Home/notifications_screen.dart';
+import 'package:orgami/Screens/Home/account_screen.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -511,6 +514,44 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ),
             ),
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        currentIndex: 0, // Home is always selected when in HomeScreen
+        selectedItemColor: const Color(0xFF667EEA),
+        unselectedItemColor: Colors.grey,
+        onTap: (index) {
+          // Navigate to different screens based on index
+          switch (index) {
+            case 0:
+              // Already on home, do nothing
+              break;
+            case 1:
+              RouterClass.nextScreenNormal(context, const MessagingScreen());
+              break;
+            case 2:
+              RouterClass.nextScreenNormal(
+                context,
+                const NotificationsScreen(),
+              );
+              break;
+            case 3:
+              RouterClass.nextScreenNormal(context, const AccountScreen());
+              break;
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.event, size: 20), label: ''),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.message, size: 20),
+            label: '',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notifications, size: 20),
+            label: '',
+          ),
+          BottomNavigationBarItem(icon: Icon(Icons.menu, size: 20), label: ''),
+        ],
+      ),
       body: _isSearchExpanded
           ? _buildFullScreenSearch()
           : SafeArea(child: _bodyView()),

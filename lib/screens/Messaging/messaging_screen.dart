@@ -15,6 +15,10 @@ import 'package:intl/intl.dart';
 import 'package:orgami/models/customer_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/Utils/logger.dart';
+import 'package:orgami/Utils/router.dart';
+import 'package:orgami/Screens/Home/home_screen.dart';
+import 'package:orgami/Screens/Home/notifications_screen.dart';
+import 'package:orgami/Screens/Home/account_screen.dart';
 
 class MessagingScreen extends StatefulWidget {
   const MessagingScreen({super.key});
@@ -261,6 +265,47 @@ class _MessagingScreenState extends State<MessagingScreen> {
             ? const Color(0xFF2C5A96)
             : const Color(0xFF667EEA),
         child: Icon(Icons.message, color: Colors.white),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        currentIndex: 1, // Messaging is selected when in MessagingScreen
+        selectedItemColor: const Color(0xFF667EEA),
+        unselectedItemColor: Colors.grey,
+        onTap: (index) {
+          // Navigate to different screens based on index
+          switch (index) {
+            case 0:
+              RouterClass.nextScreenAndReplacementAndRemoveUntil(
+                context: context,
+                page: const HomeScreen(),
+              );
+              break;
+            case 1:
+              // Already on messaging, do nothing
+              break;
+            case 2:
+              RouterClass.nextScreenNormal(
+                context,
+                const NotificationsScreen(),
+              );
+              break;
+            case 3:
+              RouterClass.nextScreenNormal(context, const AccountScreen());
+              break;
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.event, size: 20), label: ''),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.message, size: 20),
+            label: '',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notifications, size: 20),
+            label: '',
+          ),
+          BottomNavigationBarItem(icon: Icon(Icons.menu, size: 20), label: ''),
+        ],
       ),
     );
   }
