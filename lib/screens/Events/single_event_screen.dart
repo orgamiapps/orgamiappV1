@@ -779,9 +779,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppThemeColor.dullBlueColor.withAlpha(
-                  (0.3 * 255).round(),
-                ),
+                color: AppThemeColor.dullBlueColor.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -795,9 +793,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: AppThemeColor.darkBlueColor.withAlpha(
-                        (0.1 * 255).round(),
-                      ),
+                      color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -865,7 +861,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withAlpha((0.02 * 255).round()),
+                            color: Colors.black.withValues(alpha: 0.02),
                             spreadRadius: 0,
                             blurRadius: 4,
                             offset: const Offset(0, 2),
@@ -963,15 +959,14 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                             decoration: InputDecoration(
                               hintText: 'Type your answer here...',
                               hintStyle: TextStyle(
-                                color: AppThemeColor.dullFontColor.withAlpha(
-                                  153,
+                                color: AppThemeColor.dullFontColor.withValues(
+                                  alpha: 153,
                                 ),
                                 fontFamily: 'Roboto',
                               ),
                               filled: true,
-                              fillColor: AppThemeColor.lightBlueColor.withAlpha(
-                                (0.1 * 255).round(),
-                              ),
+                              fillColor: AppThemeColor.lightBlueColor
+                                  .withValues(alpha: 0.1),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
@@ -1029,7 +1024,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withAlpha((0.05 * 255).round()),
+                    color: Colors.black.withValues(alpha: 0.05),
                     spreadRadius: 0,
                     blurRadius: 10,
                     offset: const Offset(0, -2),
@@ -1681,9 +1676,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         ),
         child: SafeArea(
           child: DraggableScrollableSheet(
-            initialChildSize: 0.6,
-            minChildSize: 0.4,
-            maxChildSize: 0.8,
+            initialChildSize: 0.5,
+            minChildSize: 0.5,
+            maxChildSize: 0.5,
             builder: (context, scrollController) => Column(
               children: [
                 // Handle bar
@@ -1742,16 +1737,6 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                     child: Column(
                       children: [
                         _buildShareOption(
-                          icon: Icons.calendar_today,
-                          title: 'Add to Calendar',
-                          subtitle: 'Add event to your calendar',
-                          onTap: () {
-                            Navigator.pop(context);
-                            _addToCalendar();
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        _buildShareOption(
                           icon: Icons.share,
                           title: 'Share Event Details',
                           subtitle: 'Share event information with others',
@@ -1762,12 +1747,12 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                         ),
                         const SizedBox(height: 12),
                         _buildShareOption(
-                          icon: Icons.copy,
-                          title: 'Copy Event ID',
-                          subtitle: 'Copy event ID to clipboard',
+                          icon: Icons.calendar_today,
+                          title: 'Add to Calendar',
+                          subtitle: 'Add event to your calendar',
                           onTap: () {
                             Navigator.pop(context);
-                            _copyEventId();
+                            _addToCalendar();
                           },
                         ),
                       ],
@@ -1874,11 +1859,6 @@ Join us at: $eventUrl
 ''';
 
     SharePlus.instance.share(ShareParams(text: shareText));
-  }
-
-  void _copyEventId() {
-    Clipboard.setData(ClipboardData(text: eventModel.id));
-    ShowToast().showNormalToast(msg: 'Event ID copied to clipboard');
   }
 
   void _addToCalendar() async {
@@ -2155,32 +2135,6 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               ))
                 Row(
                   children: [
-                    Tooltip(
-                      message: 'Event Management',
-                      child: GestureDetector(
-                        onTap: () => _showEventManagementModal(),
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withAlpha((0.2 * 255).round()),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: Colors.white.withAlpha(
-                                (0.3 * 255).round(),
-                              ),
-                              width: 1,
-                            ),
-                          ),
-                          child: const Icon(
-                            Icons.dashboard,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
                     Tooltip(
                       message: _isFavorited
                           ? 'Remove from Saved'
@@ -2723,7 +2677,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFFF9800).withAlpha((0.3 * 255).round()),
+            color: const Color(0xFFFF9800).withValues(alpha: 0.3),
             spreadRadius: 0,
             blurRadius: 8,
             offset: const Offset(0, 2),
@@ -2798,9 +2752,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(
-                            0xFF667EEA,
-                          ).withAlpha((0.1 * 255).round()),
+                          color: const Color(0xFF667EEA).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: const Color(0xFF667EEA),
