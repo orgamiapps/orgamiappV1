@@ -181,7 +181,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    selectedCategories = ['Featured']; // Default to showing featured events
+    selectedCategories =
+        []; // Start with no category filters to show all events
     getCurrentLocation();
 
     // Initialize scroll controller
@@ -219,13 +220,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _loadDefaultEvents();
     _loadDefaultUsers();
 
-    // Simulate loading
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
+    // Remove the artificial loading delay - let StreamBuilder handle loading state
+    // Future.delayed(const Duration(seconds: 2), () {
+    //   if (mounted) {
+    //     setState(() {
+    //       isLoading = false;
+    //     });
+    //   }
+    // });
+
+    // Set loading to false immediately since StreamBuilder will handle the loading state
+    setState(() {
+      isLoading = false;
     });
   }
 
@@ -562,14 +568,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return RefreshIndicator(
       onRefresh: _onRefresh,
       color: const Color(0xFF667EEA),
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        controller: _scrollController,
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: Column(
-            children: [_headerView(), _filterSection(), _eventsView()],
-          ),
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: Column(
+          children: [
+            _headerView(),
+            _filterSection(),
+            Expanded(child: _eventsView()),
+          ],
         ),
       ),
     );
@@ -853,29 +859,56 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return _buildSearchEmptyState();
     }
 
+    return _buildFirestoreStream();
+  }
+
+  Widget _buildFirestoreStream() {
     // Create a stream for the Firestore query
-    Stream<QuerySnapshot> eventsStream = FirebaseFirestore.instance
-        .collection(EventModel.firebaseKey)
-        .where('private', isEqualTo: false)
-        .orderBy('selectedDateTime', descending: false)
-        .snapshots();
+    // Start with the simplest possible query
+    Stream<QuerySnapshot> eventsStream;
+
+    try {
+      eventsStream = FirebaseFirestore.instance
+          .collection(EventModel.firebaseKey)
+          .snapshots();
+    } catch (e) {
+      // Fallback: return simple error widget if stream creation fails
+      if (kDebugMode) {
+        debugPrint('Failed to create Firestore stream: $e');
+      }
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
+            Text('Failed to connect to database: $e'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => setState(() {}),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
 
     return StreamBuilder<QuerySnapshot>(
       stream: eventsStream,
       builder: (context, snapshot) {
         // Show loading state
-        if (snapshot.connectionState == ConnectionState.waiting && isLoading) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return _buildSkeletonLoading();
         }
 
-        // Show error state with retry button
+        // Show error state
         if (snapshot.hasError) {
-          return _buildErrorState();
+          return _buildDetailedErrorState(snapshot.error.toString());
         }
 
         // Show empty state
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyState();
+          return _buildEmptyStateWithDebug();
         }
 
         // Process events data
@@ -921,15 +954,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         // Featured events will still be visually distinguished in the UI
         List<EventModel> allEventsInChronologicalOrder = [...filtered];
 
+        // Show empty state if no events after filtering
+        if (allEventsInChronologicalOrder.isEmpty) {
+          return _buildEmptyStateWithFilters();
+        }
+
         return Column(
           children: [
-            // Featured Events Carousel - only show if Featured filter is selected
-            if (selectedCategories.contains('Featured') &&
-                featuredEvents.isNotEmpty)
+            // Featured Events Carousel - show if there are featured events (regardless of filter)
+            if (featuredEvents.isNotEmpty)
               _buildFeaturedCarousel(featuredEvents),
-
             // All Events List - show events in chronological order
-            _buildEventsList(allEventsInChronologicalOrder),
+            Expanded(child: _buildEventsList(allEventsInChronologicalOrder)),
           ],
         );
       },
@@ -994,128 +1030,55 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildSkeletonLoading() {
-    return Column(
+    return ListView(
+      padding: const EdgeInsets.all(24),
       children: [
         // Featured skeleton
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Shimmer.fromColors(
-            baseColor: const Color(0xFFE1E5E9),
-            highlightColor: Colors.white,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  height: 24,
-                  width: 150,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+        Shimmer.fromColors(
+          baseColor: const Color(0xFFE1E5E9),
+          highlightColor: Colors.white,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 24,
+                width: 150,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 16),
-                Container(
-                  height: 200,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                height: 200,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 24),
         // Events skeleton
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            children: List.generate(
-              3,
-              (index) => Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Shimmer.fromColors(
-                  baseColor: const Color(0xFFE1E5E9),
-                  highlightColor: Colors.white,
-                  child: Container(
-                    height: 280,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
+        ...List.generate(
+          3,
+          (index) => Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Shimmer.fromColors(
+              baseColor: const Color(0xFFE1E5E9),
+              highlightColor: Colors.white,
+              child: Container(
+                height: 280,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
                 ),
               ),
             ),
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildErrorState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(40),
-              ),
-              child: Icon(
-                Icons.error_outline,
-                size: 40,
-                color: const Color(0xFF667EEA),
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Something went wrong',
-              style: TextStyle(
-                color: Color(0xFF1A1A1A),
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Roboto',
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Check your connection and try again',
-              style: TextStyle(
-                color: const Color(0xFF6B7280),
-                fontSize: 16,
-                fontFamily: 'Roboto',
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: () {
-                if (mounted) setState(() {});
-              },
-              icon: const Icon(Icons.refresh),
-              label: const Text('Try Again'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF667EEA),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -1151,14 +1114,84 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
+            const Text(
+              'No events are currently available in the database',
+              style: TextStyle(
+                color: Color(0xFF6B7280),
+                fontSize: 16,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyStateWithFilters() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(40),
+              ),
+              child: Icon(
+                Icons.filter_alt_off,
+                size: 40,
+                color: const Color(0xFF667EEA),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'No events match your filters',
+              style: TextStyle(
+                color: Color(0xFF1A1A1A),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
             Text(
-              'Try adjusting your filters or check back later',
+              'Try adjusting your filters or distance settings',
               style: TextStyle(
                 color: const Color(0xFF6B7280),
                 fontSize: 16,
                 fontFamily: 'Roboto',
               ),
               textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                setState(() {
+                  selectedCategories = ['Featured'];
+                  radiusInMiles = 0;
+                  currentSortOption = SortOption.none;
+                });
+              },
+              icon: const Icon(Icons.clear_all),
+              label: const Text('Clear Filters'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF667EEA),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
             ),
           ],
         ),
@@ -1172,12 +1205,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       itemCount: events.length,
       itemBuilder: (context, index) {
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          padding: const EdgeInsets.only(bottom: 16),
           child: _buildEventCard(events[index]),
         );
       },
@@ -1199,8 +1231,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(vertical: 0),
       itemCount: _searchEvents.length,
       itemBuilder: (context, index) {
         return Padding(
@@ -1221,8 +1253,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(vertical: 0),
       itemCount: _searchUsers.length,
       itemBuilder: (context, index) {
         return Padding(
@@ -1527,8 +1559,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(vertical: 0),
       itemCount: _defaultEvents.length,
       itemBuilder: (context, index) {
         return Padding(
@@ -1581,8 +1613,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(vertical: 0),
       itemCount: _defaultUsers.length,
       itemBuilder: (context, index) {
         final user = _defaultUsers[index];
@@ -1935,6 +1967,262 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   : _buildEventsSearchResults(),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailedErrorState(String error) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            const Text(
+              'Firestore Connection Error',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Error Details:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    error.length > 200
+                        ? '${error.substring(0, 200)}...'
+                        : error,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                if (mounted) setState(() {});
+              },
+              child: const Text('Retry Connection'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyStateWithDebug() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.info_outline, size: 64, color: Colors.blue),
+            const SizedBox(height: 16),
+            const Text(
+              'Firestore Connected Successfully',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.green,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Collection: ${EventModel.firebaseKey}',
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.yellow.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange),
+              ),
+              child: const Column(
+                children: [
+                  Text(
+                    '🎯 No Events Found',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'The database connection is working, but there are currently no events in the "Events" collection.',
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                RouterClass.nextScreenNormal(
+                  context,
+                  const ChoseDateTimeScreen(),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF667EEA),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Create First Event'),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                // Show sample static events for testing
+                _showSampleEvents();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Show Sample Events (Test UI)'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSampleEvents() {
+    // Create sample events to test UI components
+    List<EventModel> sampleEvents = [
+      EventModel(
+        id: 'sample1',
+        groupName: 'Tech Meetup',
+        title: 'Flutter Development Workshop',
+        description: 'Learn Flutter development basics',
+        location: 'Community Center',
+        customerUid: 'sample-user',
+        imageUrl:
+            'https://via.placeholder.com/300x200/667EEA/FFFFFF?text=Flutter+Workshop',
+        selectedDateTime: DateTime.now().add(const Duration(days: 1)),
+        eventGenerateTime: DateTime.now(),
+        status: 'active',
+        private: false,
+        getLocation: true,
+        radius: 100,
+        latitude: 37.7749,
+        longitude: -122.4194,
+        categories: ['Educational'],
+        isFeatured: true,
+        featureEndDate: DateTime.now().add(const Duration(days: 30)),
+        ticketsEnabled: true,
+        maxTickets: 50,
+        issuedTickets: 12,
+        eventDuration: 3,
+        coHosts: [],
+        signInMethods: ['qr_code'],
+        manualCode: null,
+      ),
+      EventModel(
+        id: 'sample2',
+        groupName: 'Business Network',
+        title: 'Networking Event',
+        description: 'Professional networking opportunity',
+        location: 'Downtown Office',
+        customerUid: 'sample-user',
+        imageUrl:
+            'https://via.placeholder.com/300x200/764BA2/FFFFFF?text=Networking',
+        selectedDateTime: DateTime.now().add(const Duration(days: 3)),
+        eventGenerateTime: DateTime.now(),
+        status: 'active',
+        private: false,
+        getLocation: true,
+        radius: 200,
+        latitude: 37.7849,
+        longitude: -122.4094,
+        categories: ['Professional'],
+        isFeatured: false,
+        featureEndDate: null,
+        ticketsEnabled: false,
+        maxTickets: 0,
+        issuedTickets: 0,
+        eventDuration: 2,
+        coHosts: [],
+        signInMethods: ['manual_code'],
+        manualCode: 'NET123',
+      ),
+    ];
+
+    // Navigate to a new screen showing sample events
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.8,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    const Text(
+                      'Sample Events (UI Test)',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: sampleEvents.length,
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _buildEventCard(sampleEvents[index]),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

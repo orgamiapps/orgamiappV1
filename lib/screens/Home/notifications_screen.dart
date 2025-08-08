@@ -508,7 +508,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'new_event':
         // Navigate to events list
         // Navigator.push(context, MaterialPageRoute(
-        //   builder: (context) => SearchEventsScreen(),
+        //   builder: (context) => SearchScreen(),
         // ));
         break;
       case 'ticket_update':

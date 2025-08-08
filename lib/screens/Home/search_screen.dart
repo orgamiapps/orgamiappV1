@@ -13,17 +13,18 @@ import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:shimmer/shimmer.dart';
 
-class SearchEventsScreen extends StatefulWidget {
-  const SearchEventsScreen({super.key});
+class SearchScreen extends StatefulWidget {
+  const SearchScreen({super.key});
 
   @override
-  State<SearchEventsScreen> createState() => _SearchEventsScreenState();
+  State<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchEventsScreenState extends State<SearchEventsScreen>
+class _SearchScreenState extends State<SearchScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   String _searchQuery = '';
   Timer? _debounceTimer;
 
@@ -38,6 +39,7 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _scrollController.dispose();
     _debounceTimer?.cancel();
     super.dispose();
   }
@@ -62,7 +64,15 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
         children: [
           _buildSearchBar(),
           _buildTabBar(),
-          Expanded(child: _buildTabBarView()),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                EventsList(searchQuery: _searchQuery),
+                UsersList(searchQuery: _searchQuery),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -208,16 +218,6 @@ class _SearchEventsScreenState extends State<SearchEventsScreen>
       ),
     );
   }
-
-  Widget _buildTabBarView() {
-    return TabBarView(
-      controller: _tabController,
-      children: [
-        EventsList(searchQuery: _searchQuery),
-        UsersList(searchQuery: _searchQuery),
-      ],
-    );
-  }
 }
 
 class EventsList extends StatefulWidget {
@@ -236,7 +236,6 @@ class _EventsListState extends State<EventsList>
   bool _hasMore = true;
   final ScrollController _scrollController = ScrollController();
   static const int _pageSize = 10;
-  int _lastDocumentIndex = 0;
 
   @override
   bool get wantKeepAlive => true;
@@ -326,7 +325,6 @@ class _EventsListState extends State<EventsList>
           _filteredEvents = List.from(_allEvents);
           _isLoading = false;
           _hasMore = events.length == _pageSize;
-          _lastDocumentIndex = events.length;
         });
         _filterEvents();
       }
@@ -387,7 +385,6 @@ class _EventsListState extends State<EventsList>
   }
 
   Future<void> _refreshEvents() async {
-    _lastDocumentIndex = 0;
     _hasMore = true;
     await _loadEvents();
   }
@@ -409,9 +406,7 @@ class _EventsListState extends State<EventsList>
       color: const Color(0xFF667EEA),
       child: ListView.builder(
         controller: _scrollController,
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: ClampingScrollPhysics(),
-        ),
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         itemCount:
             _filteredEvents.length +
@@ -453,7 +448,7 @@ class _EventsListState extends State<EventsList>
 
   Widget _buildLoadingState() {
     return ListView.builder(
-      physics: const ClampingScrollPhysics(),
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       itemCount: 3,
       itemBuilder: (context, index) {
@@ -476,12 +471,14 @@ class _EventsListState extends State<EventsList>
   }
 
   Widget _buildEmptyState() {
-    return Center(
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            const SizedBox(height: 100),
             Container(
               width: 120,
               height: 120,
@@ -519,23 +516,6 @@ class _EventsListState extends State<EventsList>
               ),
               textAlign: TextAlign.center,
             ),
-            if (widget.searchQuery.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: () {
-                  // Clear search would be handled by parent widget
-                },
-                icon: const Icon(Icons.clear, size: 18),
-                label: const Text('Clear Search'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF667EEA),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ],
           ],
         ),
       ),
@@ -650,9 +630,7 @@ class _UsersListState extends State<UsersList>
       color: const Color(0xFF667EEA),
       child: ListView.builder(
         controller: _scrollController,
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: ClampingScrollPhysics(),
-        ),
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         itemCount: _users.length,
         itemBuilder: (context, index) {
@@ -777,8 +755,8 @@ class _UsersListState extends State<UsersList>
                 Container(
                   width: 36,
                   height: 36,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF1F5F9),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -796,12 +774,14 @@ class _UsersListState extends State<UsersList>
   }
 
   Widget _buildEmptyState() {
-    return Center(
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            const SizedBox(height: 100),
             Container(
               width: 120,
               height: 120,
