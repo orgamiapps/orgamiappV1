@@ -181,7 +181,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    selectedCategories = ['Featured']; // Default to showing featured events
+    selectedCategories = []; // Start with no category filters to show all events
     getCurrentLocation();
 
     // Initialize scroll controller
@@ -219,13 +219,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _loadDefaultEvents();
     _loadDefaultUsers();
 
-    // Simulate loading
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
+    // Remove the artificial loading delay - let StreamBuilder handle loading state
+    // Future.delayed(const Duration(seconds: 2), () {
+    //   if (mounted) {
+    //     setState(() {
+    //       isLoading = false;
+    //     });
+    //   }
+    // });
+    
+    // Set loading to false immediately since StreamBuilder will handle the loading state
+    setState(() {
+      isLoading = false;
     });
   }
 
@@ -478,6 +483,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    if (kDebugMode) {
+      debugPrint('HomeScreen build - isLoading: $isLoading, isSearchExpanded: $_isSearchExpanded');
+    }
+    
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       floatingActionButton: _isSearchExpanded
@@ -854,23 +863,48 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     // Create a stream for the Firestore query
-    Stream<QuerySnapshot> eventsStream = FirebaseFirestore.instance
-        .collection(EventModel.firebaseKey)
-        .where('private', isEqualTo: false)
-        .orderBy('selectedDateTime', descending: false)
-        .snapshots();
+    // Try with orderBy first, but have a fallback without it in case of index issues
+    Stream<QuerySnapshot> eventsStream;
+    try {
+      eventsStream = FirebaseFirestore.instance
+          .collection(EventModel.firebaseKey)
+          .where('private', isEqualTo: false)
+          .orderBy('selectedDateTime', descending: false)
+          .snapshots();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('OrderBy query failed, falling back to simple query: $e');
+      }
+      // Fallback query without orderBy in case of missing index
+      eventsStream = FirebaseFirestore.instance
+          .collection(EventModel.firebaseKey)
+          .where('private', isEqualTo: false)
+          .snapshots();
+    }
 
     return StreamBuilder<QuerySnapshot>(
       stream: eventsStream,
       builder: (context, snapshot) {
-        // Show loading state
-        if (snapshot.connectionState == ConnectionState.waiting && isLoading) {
+        if (kDebugMode) {
+          debugPrint('StreamBuilder state: ${snapshot.connectionState}');
+          debugPrint('Has data: ${snapshot.hasData}');
+          debugPrint('Has error: ${snapshot.hasError}');
+          if (snapshot.hasError) {
+            debugPrint('Error: ${snapshot.error}');
+          }
+          if (snapshot.hasData) {
+            debugPrint('Docs count: ${snapshot.data!.docs.length}');
+          }
+        }
+
+        // Show loading state - simplified condition
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return _buildSkeletonLoading();
         }
 
         // Show error state with retry button
         if (snapshot.hasError) {
-          return _buildErrorState();
+          return _buildErrorState(error: snapshot.error.toString());
         }
 
         // Show empty state
@@ -882,6 +916,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         List<EventModel> eventsList = snapshot.data!.docs
             .map((e) => EventModel.fromJson(e.data() as Map<String, dynamic>))
             .toList();
+
+        if (kDebugMode) {
+          debugPrint('Total events from Firestore: ${eventsList.length}');
+        }
 
         List<EventModel> neededEventList = [];
 
@@ -896,7 +934,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           }
         }
 
+        if (kDebugMode) {
+          debugPrint('Events after time filter: ${neededEventList.length}');
+        }
+
         List<EventModel> filtered = filterEvents(neededEventList);
+
+        if (kDebugMode) {
+          debugPrint('Events after category/distance filter: ${filtered.length}');
+          debugPrint('Selected categories: $selectedCategories');
+          debugPrint('Radius in miles: $radiusInMiles');
+        }
 
         // Apply sorting
         filtered = _sortEvents(filtered);
@@ -917,15 +965,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               );
 
+        if (kDebugMode) {
+          debugPrint('Featured events: ${featuredEvents.length}');
+        }
+
         // Create a combined list that maintains chronological order
         // Featured events will still be visually distinguished in the UI
         List<EventModel> allEventsInChronologicalOrder = [...filtered];
 
+        // Show empty state if no events after filtering
+        if (allEventsInChronologicalOrder.isEmpty) {
+          return _buildEmptyStateWithFilters();
+        }
+
         return Column(
           children: [
-            // Featured Events Carousel - only show if Featured filter is selected
-            if (selectedCategories.contains('Featured') &&
-                featuredEvents.isNotEmpty)
+            // Featured Events Carousel - show if there are featured events (regardless of filter)
+            if (featuredEvents.isNotEmpty)
               _buildFeaturedCarousel(featuredEvents),
 
             // All Events List - show events in chronological order
@@ -1053,7 +1109,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildErrorState() {
+  Widget _buildErrorState({String? error}) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40),
@@ -1086,7 +1142,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
             const SizedBox(height: 8),
             Text(
-              'Check your connection and try again',
+              error ?? 'Check your connection and try again',
               style: TextStyle(
                 color: const Color(0xFF6B7280),
                 fontSize: 16,
@@ -1094,6 +1150,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
               textAlign: TextAlign.center,
             ),
+            if (kDebugMode && error != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  'Debug: $error',
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 32),
             ElevatedButton.icon(
               onPressed: () {
@@ -1151,14 +1226,84 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
+            const Text(
+              'No events are currently available in the database',
+              style: TextStyle(
+                color: Color(0xFF6B7280),
+                fontSize: 16,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyStateWithFilters() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(40),
+              ),
+              child: Icon(
+                Icons.filter_alt_off,
+                size: 40,
+                color: const Color(0xFF667EEA),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'No events match your filters',
+              style: TextStyle(
+                color: Color(0xFF1A1A1A),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
             Text(
-              'Try adjusting your filters or check back later',
+              'Try adjusting your filters or distance settings',
               style: TextStyle(
                 color: const Color(0xFF6B7280),
                 fontSize: 16,
                 fontFamily: 'Roboto',
               ),
               textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                setState(() {
+                  selectedCategories = ['Featured'];
+                  radiusInMiles = 0;
+                  currentSortOption = SortOption.none;
+                });
+              },
+              icon: const Icon(Icons.clear_all),
+              label: const Text('Clear Filters'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF667EEA),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
             ),
           ],
         ),
