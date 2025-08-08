@@ -101,13 +101,17 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   bool _isAttendeesExpanded = false;
 
   Future<void> getPreRegisterCount() async {
-    await FirebaseFirestoreHelper()
-        .getPreRegisterAttendanceCount(eventId: eventModel.id)
-        .then((countValue) {
-          setState(() {
-            preRegisteredCount = countValue;
-          });
+    try {
+      final countValue = await FirebaseFirestoreHelper()
+          .getPreRegisterAttendanceCount(eventId: eventModel.id);
+      if (mounted) {
+        setState(() {
+          preRegisteredCount = countValue;
         });
+      }
+    } catch (e) {
+      Logger.error('Error getting pre-register count: $e');
+    }
   }
 
   Future<void> getActualAttendanceCount() async {
@@ -115,9 +119,11 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       final attendanceList = await FirebaseFirestoreHelper().getAttendance(
         eventId: eventModel.id,
       );
-      setState(() {
-        actualAttendanceCount = attendanceList.length;
-      });
+      if (mounted) {
+        setState(() {
+          actualAttendanceCount = attendanceList.length;
+        });
+      }
     } catch (e) {
       if (kDebugMode) {
         Logger.error('Error getting actual attendance: $e');
@@ -131,9 +137,11 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         eventId: eventModel.id,
       );
       final usedTickets = ticketsList.where((ticket) => ticket.isUsed).length;
-      setState(() {
-        usedTicketsCount = usedTickets;
-      });
+      if (mounted) {
+        setState(() {
+          usedTicketsCount = usedTickets;
+        });
+      }
     } catch (e) {
       if (kDebugMode) {
         Logger.error('Error getting used tickets: $e');
@@ -142,9 +150,11 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   }
 
   Future<void> loadEventSummary() async {
-    setState(() {
-      isLoadingSummary = true;
-    });
+    if (mounted) {
+      setState(() {
+        isLoadingSummary = true;
+      });
+    }
 
     await Future.wait([
       getPreRegisterCount(),
@@ -152,9 +162,11 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       getUsedTicketsCount(),
     ]);
 
-    setState(() {
-      isLoadingSummary = false;
-    });
+    if (mounted) {
+      setState(() {
+        isLoadingSummary = false;
+      });
+    }
   }
 
   bool isInInRadius(LatLng center, double radiusInFeet, LatLng point) {
@@ -176,13 +188,15 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   }
 
   Future<void> getAttendance() async {
-    await FirebaseFirestoreHelper().checkIfUserIsSignedIn(eventModel.id).then((
-      value,
-    ) {
+    try {
+      final value = await FirebaseFirestoreHelper().checkIfUserIsSignedIn(eventModel.id);
       Logger.debug('Exist value is $value');
-      setState(() {
-        signedIn = value;
-      });
+      
+      if (mounted) {
+        setState(() {
+          signedIn = value;
+        });
+      }
 
       // Only show sign-in dialog if user is not signed in and meets all conditions
       // and hasn't just signed in (to prevent showing dialog immediately after sign-in)
@@ -198,7 +212,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       if (signedIn! && CustomerController.logeInCustomer != null) {
         _checkDwellTrackingStatus();
       }
-    });
+    } catch (e) {
+      Logger.error('Error checking user attendance: $e');
+    }
   }
 
   /// Checks if dwell tracking is active for the current user
@@ -702,22 +718,25 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       ShowToast().showNormalToast(msg: 'Signed In Successfully!');
 
       // Pop the sign-in dialog
-      if (Navigator.canPop(context)) {
+      if (mounted && Navigator.canPop(context)) {
         Navigator.of(context).pop();
       }
 
       // Refresh event details to update UI
-
-      setState(() {
-        _justSignedIn = true;
-      });
+      if (mounted) {
+        setState(() {
+          _justSignedIn = true;
+        });
+      }
 
       // Reset the button and the flag after a delay
       Future.delayed(const Duration(seconds: 2), () {
         _btnCtlr.reset();
-        setState(() {
-          _justSignedIn = false;
-        });
+        if (mounted) {
+          setState(() {
+            _justSignedIn = false;
+          });
+        }
       });
 
       // Show privacy dialog for dwell tracking if event has location enabled
@@ -1160,9 +1179,11 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       return;
     }
 
-    setState(() {
-      _isLoadingFavorite = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoadingFavorite = true;
+      });
+    }
 
     try {
       bool success;
@@ -1968,9 +1989,11 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       return;
     }
 
-    setState(() {
-      _isGettingTicket = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isGettingTicket = true;
+      });
+    }
 
     try {
       await FirebaseFirestoreHelper().issueTicket(
@@ -3955,25 +3978,26 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                         final isAnon = attendee.isAnonymous;
 
                         return GestureDetector(
-                          onTap: () {
+                          onTap: () async {
                             if (!isAnon) {
                               // Navigate to user profile if not anonymous
-                              FirebaseFirestoreHelper()
-                                  .getSingleCustomer(
-                                    customerId: attendee.customerUid,
-                                  )
-                                  .then((customer) {
-                                    if (customer != null) {
-                                      if (!mounted) return;
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              UserProfileScreen(user: customer),
-                                        ),
-                                      );
-                                    }
-                                  });
+                              try {
+                                final customer = await FirebaseFirestoreHelper()
+                                    .getSingleCustomer(
+                                      customerId: attendee.customerUid,
+                                    );
+                                if (customer != null && mounted) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          UserProfileScreen(user: customer),
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                Logger.error('Error getting customer: $e');
+                              }
                             }
                           },
                           child: Container(
