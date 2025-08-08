@@ -186,6 +186,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.initState();
     selectedCategories =
         []; // Start with no category filters to show all events
+    radiusInMiles = 0; // Start with no distance filter to show all events
     getCurrentLocation();
 
     // Initialize scroll controller
@@ -438,48 +439,81 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   List<EventModel> filterEvents(List<EventModel> events) {
     List<EventModel> filteredEvents = events;
 
+    if (kDebugMode) {
+      debugPrint('Starting filterEvents with ${events.length} events');
+      debugPrint('Selected categories: $selectedCategories');
+      debugPrint('Radius in miles: $radiusInMiles');
+      debugPrint('Current location: $currentLocation');
+    }
+
     // Filter by categories (excluding Featured - Featured filter only controls carousel visibility)
     List<String> nonFeaturedCategories = selectedCategories
         .where((category) => category != 'Featured')
         .toList();
 
     if (nonFeaturedCategories.isNotEmpty) {
+      final beforeCount = filteredEvents.length;
       filteredEvents = filteredEvents.where((event) {
         // Check if any selected category matches the event
         return nonFeaturedCategories.any((category) {
           return event.categories.contains(category);
         });
       }).toList();
+      
+      if (kDebugMode) {
+        debugPrint('After category filtering ($nonFeaturedCategories): ${filteredEvents.length}/${beforeCount} events remain');
+      }
     }
 
     // Filter by distance if location and radius are set
     if (currentLocation != null && radiusInMiles > 0) {
+      final beforeCount = filteredEvents.length;
       filteredEvents =
           filteredEvents
               .where(
-                (event) => isInRadius(
-                  currentLocation!,
-                  radiusInMiles,
-                  event.getLatLng(),
-                ),
+                (event) {
+                  try {
+                    return isInRadius(
+                      currentLocation!,
+                      radiusInMiles,
+                      event.getLatLng(),
+                    );
+                  } catch (e) {
+                    if (kDebugMode) {
+                      debugPrint('Error checking radius for event "${event.title}": $e');
+                    }
+                    // Include events with location errors to be safe
+                    return true;
+                  }
+                },
               )
-              .toList()
-            ..sort((a, b) {
-              double distanceA = calculateDistance(
-                currentLocation!,
-                a.getLatLng(),
-              );
-              double distanceB = calculateDistance(
-                currentLocation!,
-                b.getLatLng(),
-              );
+              .toList();
+      
+      if (kDebugMode) {
+        debugPrint('After distance filtering (${radiusInMiles} miles): ${filteredEvents.length}/${beforeCount} events remain');
+      }
+      
+      // Sort by distance after filtering
+      filteredEvents.sort((a, b) {
+        double distanceA = calculateDistance(
+          currentLocation!,
+          a.getLatLng(),
+        );
+        double distanceB = calculateDistance(
+          currentLocation!,
+          b.getLatLng(),
+        );
 
-              if (distanceA == distanceB) {
-                return a.selectedDateTime.compareTo(b.selectedDateTime);
-              } else {
-                return distanceA.compareTo(distanceB);
-              }
-            });
+        if (distanceA == distanceB) {
+          return a.selectedDateTime.compareTo(b.selectedDateTime);
+        } else {
+          return distanceA.compareTo(distanceB);
+        }
+      });
+    }
+
+    if (kDebugMode) {
+      debugPrint('Final filtered events count: ${filteredEvents.length}');
     }
 
     return filteredEvents;
@@ -894,6 +928,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     try {
       eventsStream = FirebaseFirestore.instance
           .collection(EventModel.firebaseKey)
+          .where('private', isEqualTo: false)  // Filter out private events
           .snapshots();
     } catch (e) {
       // Fallback: return simple error widget if stream creation fails
@@ -959,17 +994,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
         List<EventModel> neededEventList = [];
         final now = DateTime.now();
-        final cutoffTime = now.subtract(const Duration(hours: 2));
+        final cutoffTime = now.subtract(const Duration(hours: 6)); // Extended from 2 to 6 hours for better visibility
+
+        if (kDebugMode) {
+          debugPrint('Processing ${eventsList.length} events from Firestore');
+          debugPrint('Cutoff time: $cutoffTime');
+        }
 
         try {
           for (var element in eventsList) {
-            // Filter out events that ended more than 2 hours ago with error handling
+            // Filter out events that ended more than 6 hours ago with error handling
             try {
               final eventEndTime = element.selectedDateTime.add(
                 Duration(hours: element.eventDuration),
               );
               if (eventEndTime.isAfter(cutoffTime)) {
                 neededEventList.add(element);
+              } else {
+                if (kDebugMode) {
+                  debugPrint('Filtered out event "${element.title}" - ended at $eventEndTime (before cutoff $cutoffTime)');
+                }
               }
             } catch (e) {
               Logger.error('Error processing event time: $e');
@@ -981,11 +1025,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           return _buildDetailedErrorState('Error processing events: $e');
         }
 
+        if (kDebugMode) {
+          debugPrint('After time filtering: ${neededEventList.length} events remain');
+        }
+
         List<EventModel> filtered = [];
         try {
           filtered = filterEvents(neededEventList);
           // Apply sorting with error handling
           filtered = _sortEvents(filtered);
+          
+          if (kDebugMode) {
+            debugPrint('After filterEvents and sorting: ${filtered.length} events remain');
+          }
         } catch (e) {
           Logger.error('Error filtering/sorting events: $e');
           return _buildDetailedErrorState('Error processing events: $e');
@@ -1231,7 +1283,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ElevatedButton.icon(
               onPressed: () {
                 setState(() {
-                  selectedCategories = ['Featured'];
+                  selectedCategories = [];
                   radiusInMiles = 0;
                   currentSortOption = SortOption.none;
                 });
@@ -1250,6 +1302,41 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ),
             ),
+            if (kDebugMode) ...[
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () {
+                  // Show debug info in a dialog
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Debug Info'),
+                      content: SingleChildScrollView(
+                        child: Text(
+                          'Selected categories: $selectedCategories\n'
+                          'Radius: $radiusInMiles miles\n'
+                          'Sort option: $currentSortOption\n'
+                          'Current location: $currentLocation',
+                          style: const TextStyle(fontFamily: 'monospace'),
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Close'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.bug_report),
+                label: const Text('Debug Info'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
           ],
         ),
       ),
