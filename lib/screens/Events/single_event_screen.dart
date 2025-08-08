@@ -3266,6 +3266,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 48,
@@ -3311,10 +3312,14 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               ],
             ),
           ),
-          // Hyper-realistic globe button for map view
+          // Hyper-realistic globe button for map view - with better spacing
           if (eventModel.latitude != 0 && eventModel.longitude != 0) ...[
-            const SizedBox(width: 12),
-            _buildHyperRealisticGlobeButton(),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 48, // Constraining the button size to prevent overflow
+              height: 48,
+              child: _buildHyperRealisticGlobeButton(),
+            ),
           ],
         ],
       ),
@@ -3334,14 +3339,17 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             ),
           ),
           const SizedBox(width: 8),
-          Text(
-            'Loading address...',
-            style: TextStyle(
-              color: _mediumText,
-              fontWeight: FontWeight.w500,
-              fontSize: 15,
-              fontFamily: 'Roboto',
-              fontStyle: FontStyle.italic,
+          Expanded(
+            child: Text(
+              'Loading address...',
+              style: TextStyle(
+                color: _mediumText,
+                fontWeight: FontWeight.w500,
+                fontSize: 15,
+                fontFamily: 'Roboto',
+                fontStyle: FontStyle.italic,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -3363,6 +3371,9 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             fontFamily: 'Roboto',
             letterSpacing: -0.2,
           ),
+          maxLines: 3, // Allow up to 3 lines for long addresses
+          overflow: TextOverflow.ellipsis,
+          softWrap: true,
         ),
         // Show additional info if address was resolved from coordinates
         if (_resolvedAddress != null &&
@@ -3385,15 +3396,18 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                   color: _addressLookupFailed ? _orange : _primaryBlue,
                 ),
                 const SizedBox(width: 4),
-                Text(
-                  _addressLookupFailed
-                      ? 'Approximate location'
-                      : 'Resolved from coordinates',
-                  style: TextStyle(
-                    color: _addressLookupFailed ? _orange : _primaryBlue,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    fontFamily: 'Roboto',
+                Flexible(
+                  child: Text(
+                    _addressLookupFailed
+                        ? 'Approximate location'
+                        : 'Resolved from coordinates',
+                    style: TextStyle(
+                      color: _addressLookupFailed ? _orange : _primaryBlue,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Roboto',
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -4738,8 +4752,8 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         return Transform.scale(
           scale: 0.85 + (0.15 * animationValue),
           child: Container(
-            width: 52,
-            height: 52,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               // Enhanced 3D gradient for more realistic sphere effect
@@ -4789,7 +4803,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                borderRadius: BorderRadius.circular(26),
+                borderRadius: BorderRadius.circular(24),
                 splashColor: const Color(0xFF60A5FA).withValues(alpha: 0.3),
                 highlightColor: const Color(0xFF93C5FD).withValues(alpha: 0.2),
                 onTap: () {
@@ -4807,8 +4821,8 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                   children: [
                     // Base globe surface
                     Container(
-                      width: 48,
-                      height: 48,
+                      width: 44,
+                      height: 44,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
@@ -4830,19 +4844,19 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           pi /
                           12, // Slower, more realistic rotation
                       child: CustomPaint(
-                        size: const Size(44, 44),
+                        size: const Size(40, 40),
                         painter: EnhancedContinentPainter(animationValue),
                       ),
                     ),
                     // Enhanced grid system
                     CustomPaint(
-                      size: const Size(46, 46),
+                      size: const Size(42, 42),
                       painter: RealisticGridPainter(animationValue),
                     ),
                     // Atmospheric glow effect
                     Container(
-                      width: 46,
-                      height: 46,
+                      width: 42,
+                      height: 42,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
