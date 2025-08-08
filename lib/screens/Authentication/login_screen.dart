@@ -68,33 +68,41 @@ class _LoginScreenState extends State<LoginScreen>
       Logger.warning('Firebase Auth Exception: ${e.code}');
       switch (e.code) {
         case "invalid-credential":
-          ShowToast().showNormalToast(msg: "Your Credentials are invalid.");
+          ShowToast().showNormalToast(msg: "Invalid email or password. Please check your credentials.");
+          break;
+        case "network-request-failed":
+          ShowToast().showNormalToast(msg: "Network error. Please check your internet connection and try again.");
           break;
         case "ERROR_WRONG_PASSWORD":
+        case "wrong-password":
           ShowToast().showNormalToast(msg: "Your password is wrong.");
           break;
         case "ERROR_USER_NOT_FOUND":
+        case "user-not-found":
           ShowToast().showNormalToast(
             msg: "User with this email doesn't exist.",
           );
           break;
         case "ERROR_USER_DISABLED":
+        case "user-disabled":
           ShowToast().showNormalToast(
             msg: "User with this email has been disabled.",
           );
           break;
         case "ERROR_TOO_MANY_REQUESTS":
+        case "too-many-requests":
           ShowToast().showNormalToast(
             msg: "Too many requests. Try again later.",
           );
           break;
         case "ERROR_OPERATION_NOT_ALLOWED":
+        case "operation-not-allowed":
           ShowToast().showNormalToast(
             msg: "Signing in with Email and Password is not enabled.",
           );
           break;
         default:
-          ShowToast().showNormalToast(msg: "An undefined Error happened.");
+          ShowToast().showNormalToast(msg: "Login failed: ${e.message ?? 'An undefined error happened.'}");
       }
       _btnCtlr.reset();
     } catch (e) {
