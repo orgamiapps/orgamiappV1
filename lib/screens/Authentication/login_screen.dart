@@ -186,14 +186,7 @@ class _LoginScreenState extends State<LoginScreen>
       width: _screenWidth,
       height: _screenHeight,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.white,
-            AppThemeColor.lightBlueColor.withValues(alpha: 0.4),
-          ],
-        ),
+        color: Theme.of(context).scaffoldBackgroundColor,
       ),
       child: SafeArea(
         child: SingleChildScrollView(
@@ -223,11 +216,11 @@ class _LoginScreenState extends State<LoginScreen>
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: AppThemeColor.darkBlueColor.withValues(alpha: 0.08),
+                color: Theme.of(context).shadowColor.withValues(alpha: 0.08),
                 blurRadius: 30,
                 offset: const Offset(0, 12),
                 spreadRadius: 0,

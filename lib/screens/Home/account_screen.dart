@@ -347,11 +347,11 @@ class _AccountScreenState extends State<AccountScreen> {
           fontFamily: 'Roboto',
         ),
       ),
-      trailing: Icon(
-        Icons.arrow_forward_ios,
-        color: const Color(0xFF9CA3AF),
-        size: 16,
-      ),
+                trailing: Icon(
+            Icons.arrow_forward_ios,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            size: 16,
+          ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
     );
   }
@@ -360,7 +360,7 @@ class _AccountScreenState extends State<AccountScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       height: 1,
-      color: const Color(0xFFE1E5E9),
+      color: Theme.of(context).dividerColor,
     );
   }
 
@@ -372,12 +372,12 @@ class _AccountScreenState extends State<AccountScreen> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               _getThemeIcon(themeProvider.isDarkMode),
-              color: const Color(0xFF667EEA),
+              color: Theme.of(context).colorScheme.primary,
               size: 20,
             ),
           ),
@@ -394,15 +394,15 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
           subtitle: Text(
             _getThemeModeText(themeProvider.isDarkMode),
-            style: const TextStyle(
-              color: Color(0xFF9CA3AF),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               fontSize: 14,
               fontFamily: 'Roboto',
             ),
           ),
           trailing: Icon(
             Icons.arrow_forward_ios,
-            color: const Color(0xFF9CA3AF),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             size: 16,
           ),
           onTap: () => _showThemeSelector(context, themeProvider),
@@ -443,7 +443,7 @@ class _AccountScreenState extends State<AccountScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
