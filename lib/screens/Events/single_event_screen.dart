@@ -20,7 +20,7 @@ import 'package:orgami/models/event_question_model.dart';
 import 'package:orgami/Screens/Events/Attendance/attendance_sheet_screen.dart';
 
 import 'package:orgami/Screens/Events/Widget/comments_section.dart';
-import 'package:orgami/Screens/Events/Widget/sign_in_methods_display.dart';
+
 import 'package:orgami/Screens/Events/ticket_management_screen.dart';
 import 'package:orgami/Screens/Events/ticket_scanner_screen.dart';
 import 'package:orgami/Screens/Events/event_analytics_screen.dart';
@@ -2355,18 +2355,6 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
 
             // Event Details Card
             _buildEventDetailsCard(),
-            const SizedBox(height: 24),
-
-            // Sign-In Methods Display
-            SignInMethodsDisplay(
-              eventModel: eventModel,
-              isEventCreator: eventModel.hasManagementPermissions(
-                FirebaseAuth.instance.currentUser!.uid,
-              ),
-              onCopyCode: () {
-                ShowToast().showNormalToast(msg: 'Code copied to clipboard');
-              },
-            ),
             const SizedBox(height: 24),
 
             // Categories
