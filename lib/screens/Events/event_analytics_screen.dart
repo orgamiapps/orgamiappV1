@@ -27,11 +27,15 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
   late TabController _tabController;
   String _selectedDateFilter = 'all'; // 'all', 'week', 'month'
   bool _isAuthorized = false;
-  // String? _eventHostUid; // Unused field
+  String? _eventHostUid;
   List<AttendanceModel> _attendeesList = [];
   bool _isLoadingAttendees = false;
   AIInsights? _aiInsights;
   bool _isLoadingAI = false;
+  String _attendeesViewFilter = 'all'; // 'all' | 'new' | 'repeat'
+
+  // Repeat-attendance cache keyed by attendee customerUid
+  final Map<String, _AttendeeHostHistory> _attendeeHistoryByUid = {};
 
   @override
   void initState() {
@@ -74,7 +78,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
 
       setState(() {
         _isAuthorized = currentUser.uid == eventHostUid;
-        // _eventHostUid = eventHostUid; // Unused assignment
+        _eventHostUid = eventHostUid;
       });
 
       if (!_isAuthorized) {
@@ -87,7 +91,9 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
         Navigator.pop(context);
       } else {
         // Load attendees data if authorized
-        _loadAttendeesData();
+        await _loadAttendeesData();
+        // Build repeat-attendance history for Users tab
+        await _buildAttendeeRepeatHistory();
         _loadAIInsights();
       }
     } catch (e) {
@@ -120,6 +126,84 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
         _isLoadingAttendees = false;
       });
       // debugPrint('Error loading attendees: $e'); // Replace with proper logging
+    }
+  }
+
+  // Build a map of attendee -> events (by this host) they have attended
+  Future<void> _buildAttendeeRepeatHistory() async {
+    try {
+      if (_eventHostUid == null || _attendeesList.isEmpty) return;
+
+      // Fetch all events created by this host
+      final eventsQuery = await FirebaseFirestore.instance
+          .collection('Events')
+          .where('customerUid', isEqualTo: _eventHostUid)
+          .get();
+
+      if (eventsQuery.docs.isEmpty) return;
+
+      final Map<String, Map<String, dynamic>> hostEventIdToData = {};
+      for (final doc in eventsQuery.docs) {
+        hostEventIdToData[doc.id] = doc.data();
+      }
+      final hostEventIds = hostEventIdToData.keys.toList();
+
+      // Build set of unique attendee customerUids for this event
+      final Set<String> uniqueCustomerUids = {
+        for (final a in _attendeesList)
+          if (a.customerUid.isNotEmpty && a.customerUid != 'manual') a.customerUid
+      };
+
+      // For each attendee, query Attendance across host's events in chunks of 10 ids (Firestore 'in' limit)
+      final Map<String, _AttendeeHostHistory> computed = {};
+      for (final uid in uniqueCustomerUids) {
+        final Set<String> attendedEventIdsByHost = {};
+        for (final chunk in _chunkList(hostEventIds, 10)) {
+          final snap = await FirebaseFirestore.instance
+              .collection('Attendance')
+              .where('customerUid', isEqualTo: uid)
+              .where('eventId', whereIn: chunk)
+              .get();
+          for (final doc in snap.docs) {
+            final data = doc.data();
+            final eventId = data['eventId'] as String?;
+            if (eventId != null && eventId.isNotEmpty) {
+              attendedEventIdsByHost.add(eventId);
+            }
+          }
+        }
+
+        // Build event summaries
+        final List<_EventSummary> summaries = attendedEventIdsByHost.map((eventId) {
+          final map = hostEventIdToData[eventId] ?? {};
+          final title = (map['title'] ?? 'Untitled').toString();
+          final ts = map['selectedDateTime'];
+          DateTime? when;
+          if (ts is Timestamp) when = ts.toDate();
+          return _EventSummary(eventId: eventId, title: title, when: when);
+        }).toList()
+          ..sort((a, b) {
+            final aTime = a.when ?? DateTime.fromMillisecondsSinceEpoch(0);
+            final bTime = b.when ?? DateTime.fromMillisecondsSinceEpoch(0);
+            return bTime.compareTo(aTime);
+          });
+
+        computed[uid] = _AttendeeHostHistory(
+          totalEventsByHost: attendedEventIdsByHost.length,
+          attendedEventIdsByHost: attendedEventIdsByHost,
+          eventSummaries: summaries,
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          _attendeeHistoryByUid.clear();
+          _attendeeHistoryByUid.addAll(computed);
+        });
+      }
+    } catch (e) {
+      // Swallow errors; UI will simply omit repeat details
+      Logger.error('Failed to build attendee repeat history: $e');
     }
   }
 
@@ -1095,14 +1179,38 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
       );
     }
 
-    // Calculate repeat vs new attendees
-    final repeatAttendees = _attendeesList.where((attendee) {
-      // This is a simplified calculation - in a real app you'd check against previous events
-      return attendee.customerUid != 'manual' &&
-          attendee.customerUid.isNotEmpty;
-    }).length;
-
+    // Calculate repeat vs new attendees based on history across this host's events
+    int repeatAttendees = 0;
+    for (final attendee in _attendeesList) {
+      final uid = attendee.customerUid;
+      if (uid.isEmpty || uid == 'manual') {
+        continue;
+      }
+      final history = _attendeeHistoryByUid[uid];
+      if (history == null) continue;
+      final priorEventsCount = history.attendedEventIdsByHost.contains(widget.eventId)
+          ? history.totalEventsByHost - 1
+          : history.totalEventsByHost;
+      if (priorEventsCount > 0) repeatAttendees += 1;
+    }
     final newAttendees = _attendeesList.length - repeatAttendees;
+
+    // Filtered view for Attendees List
+    final List<AttendanceModel> filtered = _attendeesList.where((a) {
+      if (_attendeesViewFilter == 'all') return true;
+      final uid = a.customerUid;
+      if (uid.isEmpty || uid == 'manual') {
+        return _attendeesViewFilter == 'new';
+      }
+      final history = _attendeeHistoryByUid[uid];
+      final priorEventsCount = (history == null)
+          ? 0
+          : (history.attendedEventIdsByHost.contains(widget.eventId)
+              ? history.totalEventsByHost - 1
+              : history.totalEventsByHost);
+      final isRepeat = priorEventsCount > 0;
+      return _attendeesViewFilter == 'repeat' ? isRepeat : !isRepeat;
+    }).toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -1190,12 +1298,43 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                   ),
                 ),
                 const SizedBox(height: 16),
+                // Filter chips for All / New / Repeat
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('All'),
+                      selected: _attendeesViewFilter == 'all',
+                      onSelected: (_) => setState(() => _attendeesViewFilter = 'all'),
+                    ),
+                    ChoiceChip(
+                      label: const Text('New'),
+                      selected: _attendeesViewFilter == 'new',
+                      onSelected: (_) => setState(() => _attendeesViewFilter = 'new'),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Repeat'),
+                      selected: _attendeesViewFilter == 'repeat',
+                      onSelected: (_) => setState(() => _attendeesViewFilter = 'repeat'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _attendeesList.length,
+                  itemCount: filtered.length,
                   itemBuilder: (context, index) {
-                    final attendee = _attendeesList[index];
+                    final attendee = filtered[index];
+                    final uid = attendee.customerUid;
+                    final history = _attendeeHistoryByUid[uid];
+                    final totalByHost = history?.totalEventsByHost ?? 0;
+                    final priorEventsCount = (history == null)
+                        ? 0
+                        : (history.attendedEventIdsByHost.contains(widget.eventId)
+                            ? history.totalEventsByHost - 1
+                            : history.totalEventsByHost);
+                    final isRepeat = priorEventsCount > 0;
                     return ListTile(
                       leading: CircleAvatar(
                         backgroundColor: const Color(0xFF4CAF50),
@@ -1209,13 +1348,28 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                           ),
                         ),
                       ),
-                      title: Text(
-                        _getDisplayName(attendee),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'Roboto',
-                        ),
+                      title: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _getDisplayName(attendee),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Roboto',
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isRepeat && totalByHost > 0)
+                            TextButton(
+                              onPressed: () => _showAttendeeHistoryDialog(
+                                attendee,
+                                history!,
+                              ),
+                              child: Text('($totalByHost)'),
+                            ),
+                        ],
                       ),
                       subtitle: Text(
                         'Signed in at ${_formatTimestamp(attendee.attendanceDateTime)}',
@@ -2058,5 +2212,73 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
       if (!mounted) return;
       ShowToast().showSnackBar('Error exporting data: $e', context);
     }
+  }
+}
+
+// Helper types to store repeat-attendance info
+class _EventSummary {
+  final String eventId;
+  final String title;
+  final DateTime? when;
+  _EventSummary({required this.eventId, required this.title, required this.when});
+}
+
+class _AttendeeHostHistory {
+  final int totalEventsByHost;
+  final Set<String> attendedEventIdsByHost;
+  final List<_EventSummary> eventSummaries;
+  _AttendeeHostHistory({
+    required this.totalEventsByHost,
+    required this.attendedEventIdsByHost,
+    required this.eventSummaries,
+  });
+}
+
+List<List<T>> _chunkList<T>(List<T> list, int chunkSize) {
+  final List<List<T>> chunks = [];
+  for (var i = 0; i < list.length; i += chunkSize) {
+    chunks.add(list.sublist(i, i + chunkSize > list.length ? list.length : i + chunkSize));
+  }
+  return chunks;
+}
+
+extension _AttendeeHistoryDialogs on _EventAnalyticsScreenState {
+  void _showAttendeeHistoryDialog(
+    AttendanceModel attendee,
+    _AttendeeHostHistory history,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Events attended by ${_getDisplayName(attendee)}'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: history.eventSummaries.isEmpty
+                ? const Text('No history available')
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: history.eventSummaries.length,
+                    itemBuilder: (context, index) {
+                      final es = history.eventSummaries[index];
+                      final whenText = es.when == null
+                          ? 'Unknown date'
+                          : '${es.when!.day}/${es.when!.month}/${es.when!.year}';
+                      return ListTile(
+                        title: Text(es.title),
+                        subtitle: Text(whenText),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

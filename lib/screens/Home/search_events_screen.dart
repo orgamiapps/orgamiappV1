@@ -319,7 +319,10 @@ class _EventsDefaultListState extends State<EventsDefaultList> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return ListView.builder(
-        physics: const AlwaysScrollableScrollPhysics(),
+        primary: false,
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
         padding: const EdgeInsets.all(20),
         itemCount: 3,
         itemBuilder: (context, index) {
@@ -371,7 +374,10 @@ class _EventsDefaultListState extends State<EventsDefaultList> {
       onRefresh: _loadEvents,
       color: const Color(0xFF667EEA),
       child: ListView.builder(
-        physics: const AlwaysScrollableScrollPhysics(),
+        primary: false,
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
         padding: const EdgeInsets.all(20),
         itemCount: _filteredEvents.length,
         itemBuilder: (context, index) {
@@ -506,6 +512,10 @@ class _UsersDefaultListState extends State<UsersDefaultList> {
       onRefresh: _loadUsers,
       color: const Color(0xFF667EEA),
       child: ListView.builder(
+        primary: false,
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
         padding: const EdgeInsets.all(20),
         itemCount: _users.length,
         itemBuilder: (context, index) {

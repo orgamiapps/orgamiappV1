@@ -627,6 +627,14 @@ class FirebaseFirestoreHelper {
           .doc(attendance.id)
           .set(attendance.toJson());
       Logger.success('Manual attendance added: ${attendance.userName}');
+
+      // Invalidate cached attendance for this event so UI refresh picks up the new record
+      try {
+        final cacheKey = 'attendance_${attendance.eventId}';
+        _cache.remove(cacheKey);
+      } catch (_) {
+        // Ignore cache errors
+      }
     } catch (e) {
       Logger.error('Error adding manual attendance: $e', e);
       rethrow;
@@ -1442,9 +1450,11 @@ class FirebaseFirestoreHelper {
         .collection(TicketModel.firebaseKey)
         .where('eventId', isEqualTo: eventId)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => TicketModel.fromJson(doc.data()))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => TicketModel.fromJson(doc.data()))
+              .toList(),
+        );
   }
 
   /// Deletes an event from Firestore
@@ -1460,7 +1470,7 @@ class FirebaseFirestoreHelper {
           .collection(AttendanceModel.firebaseKey)
           .where('eventId', isEqualTo: eventId)
           .get();
-      
+
       for (var doc in attendanceQuery.docs) {
         await doc.reference.delete();
       }
@@ -1490,7 +1500,7 @@ class FirebaseFirestoreHelper {
           .collection(CommentModel.firebaseKey)
           .where('eventId', isEqualTo: eventId)
           .get();
-      
+
       for (var doc in commentsQuery.docs) {
         await doc.reference.delete();
       }
@@ -2209,10 +2219,7 @@ class FirebaseFirestoreHelper {
       await FirebaseFirestore.instance
           .collection(EventModel.firebaseKey)
           .doc(eventId)
-          .update({
-        'latitude': latitude,
-        'longitude': longitude,
-      });
+          .update({'latitude': latitude, 'longitude': longitude});
       Logger.success('Event location updated successfully for event: $eventId');
     } catch (e) {
       Logger.error('Error updating event location: $e');
