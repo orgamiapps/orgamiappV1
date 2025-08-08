@@ -41,8 +41,13 @@ class _AccountScreenState extends State<AccountScreen> {
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: 3, // Account is selected when in AccountScreen
-        selectedItemColor: const Color(0xFF667EEA),
-        unselectedItemColor: Colors.grey,
+        selectedItemColor: Theme.of(context).colorScheme.primary,
+        unselectedItemColor: Theme.of(
+          context,
+        ).colorScheme.onSurface.withValues(alpha: 0.6),
+        backgroundColor: Theme.of(
+          context,
+        ).bottomNavigationBarTheme.backgroundColor,
         onTap: (index) {
           // Navigate to different screens based on index
           switch (index) {
@@ -394,15 +399,19 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
           subtitle: Text(
             _getThemeModeText(themeProvider.isDarkMode),
-            style: const TextStyle(
-              color: Color(0xFF9CA3AF),
+            style: TextStyle(
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.6),
               fontSize: 14,
               fontFamily: 'Roboto',
             ),
           ),
           trailing: Icon(
             Icons.arrow_forward_ios,
-            color: const Color(0xFF9CA3AF),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.6),
             size: 16,
           ),
           onTap: () => _showThemeSelector(context, themeProvider),
@@ -443,7 +452,9 @@ class _AccountScreenState extends State<AccountScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -497,13 +508,15 @@ class _AccountScreenState extends State<AccountScreen> {
         height: 40,
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF667EEA)
-              : const Color(0xFF667EEA).withValues(alpha: 0.1),
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
           icon,
-          color: isSelected ? Colors.white : const Color(0xFF667EEA),
+          color: isSelected
+              ? Theme.of(context).colorScheme.onPrimary
+              : Theme.of(context).colorScheme.primary,
           size: 20,
         ),
       ),
@@ -511,9 +524,8 @@ class _AccountScreenState extends State<AccountScreen> {
         title,
         style: TextStyle(
           color: isSelected
-              ? const Color(0xFF667EEA)
-              : Theme.of(context).textTheme.titleMedium?.color ??
-                    const Color(0xFF1A1A1A),
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.onSurface,
           fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
           fontSize: 16,
           fontFamily: 'Roboto',
@@ -530,7 +542,11 @@ class _AccountScreenState extends State<AccountScreen> {
         ),
       ),
       trailing: isSelected
-          ? const Icon(Icons.check, color: Color(0xFF667EEA), size: 20)
+          ? Icon(
+              Icons.check,
+              color: Theme.of(context).colorScheme.primary,
+              size: 20,
+            )
           : null,
       onTap: () {
         themeProvider.setTheme(isDark);

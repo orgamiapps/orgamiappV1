@@ -31,6 +31,8 @@ import 'package:orgami/Screens/QRScanner/qr_scanner_flow_screen.dart';
 import 'package:orgami/Screens/Messaging/messaging_screen.dart';
 import 'package:orgami/Screens/Home/notifications_screen.dart';
 import 'package:orgami/Screens/Home/account_screen.dart';
+import 'package:orgami/Utils/theme_provider.dart';
+import 'package:provider/provider.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -523,8 +525,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: 0, // Home is always selected when in HomeScreen
-        selectedItemColor: const Color(0xFF667EEA),
-        unselectedItemColor: Colors.grey,
+        selectedItemColor: Theme.of(context).colorScheme.primary,
+        unselectedItemColor: Theme.of(
+          context,
+        ).colorScheme.onSurface.withValues(alpha: 0.6),
+        backgroundColor: Theme.of(
+          context,
+        ).bottomNavigationBarTheme.backgroundColor,
         onTap: (index) {
           // Navigate to different screens based on index
           switch (index) {
@@ -582,13 +589,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _headerView() {
+    final themeProvider = Provider.of<ThemeProvider>(context);
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+          colors: themeProvider.getGradientColors(context),
         ),
       ),
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -712,6 +720,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _filterSection() {
+    final themeProvider = Provider.of<ThemeProvider>(context);
     return Container(
       margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       padding: const EdgeInsets.all(24),
@@ -720,7 +729,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: themeProvider.isDarkMode
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.05),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -738,7 +749,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 children: [
                   Icon(
                     Icons.location_on,
-                    color: const Color(0xFF667EEA),
+                    color: Theme.of(context).colorScheme.primary,
                     size: 18,
                   ),
                   const SizedBox(width: 8),

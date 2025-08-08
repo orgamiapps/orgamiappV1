@@ -229,13 +229,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: isDark
-                  ? [
-                      const Color(0xFF1E3A5F),
-                      const Color(0xFF2C5A96),
-                      const Color(0xFF4A90E2),
-                    ]
-                  : [const Color(0xFF667EEA), const Color(0xFF764BA2)],
+              colors: themeProvider.getGradientColors(context),
             ),
           ),
         ),
@@ -261,16 +255,22 @@ class _MessagingScreenState extends State<MessagingScreen> {
             MaterialPageRoute(builder: (context) => const NewMessageScreen()),
           );
         },
-        backgroundColor: isDark
-            ? const Color(0xFF2C5A96)
-            : const Color(0xFF667EEA),
-        child: Icon(Icons.message, color: Colors.white),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        child: Icon(
+          Icons.message,
+          color: Theme.of(context).colorScheme.onPrimary,
+        ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: 1, // Messaging is selected when in MessagingScreen
-        selectedItemColor: const Color(0xFF667EEA),
-        unselectedItemColor: Colors.grey,
+        selectedItemColor: Theme.of(context).colorScheme.primary,
+        unselectedItemColor: Theme.of(
+          context,
+        ).colorScheme.onSurface.withValues(alpha: 0.6),
+        backgroundColor: Theme.of(
+          context,
+        ).bottomNavigationBarTheme.backgroundColor,
         onTap: (index) {
           // Navigate to different screens based on index
           switch (index) {

@@ -201,13 +201,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: isDark
-                  ? [
-                      const Color(0xFF1E3A5F),
-                      const Color(0xFF2C5A96),
-                      const Color(0xFF4A90E2),
-                    ]
-                  : [const Color(0xFF667EEA), const Color(0xFF764BA2)],
+              colors: themeProvider.getGradientColors(context),
             ),
           ),
         ),
@@ -221,9 +215,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
             child: _isLoading
                 ? Center(
                     child: CircularProgressIndicator(
-                      color: isDark
-                          ? const Color(0xFF2C5A96)
-                          : const Color(0xFF667EEA),
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   )
                 : _searchResults.isEmpty
