@@ -75,7 +75,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        currentIndex: 2, // Notifications is selected when in NotificationsScreen
+        currentIndex:
+            2, // Notifications is selected when in NotificationsScreen
         selectedItemColor: const Color(0xFF667EEA),
         unselectedItemColor: Colors.grey,
         onTap: (index) {
@@ -248,14 +249,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             vertical: 12,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(
-                              0xFF667EEA,
-                            ).withAlpha(25),
+                            color: const Color(0xFF667EEA).withAlpha(25),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: const Color(
-                                0xFF667EEA,
-                              ).withAlpha(76),
+                              color: const Color(0xFF667EEA).withAlpha(76),
                               width: 1,
                             ),
                           ),

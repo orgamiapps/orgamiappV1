@@ -777,7 +777,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
       );
 
       // If not found by ID, try to find by manual code
-        eventExist ??= await _findEventByManualCode(newAttendanceModel.eventId);
+      eventExist ??= await _findEventByManualCode(newAttendanceModel.eventId);
 
       if (eventExist != null) {
         // Check for sign-in prompts

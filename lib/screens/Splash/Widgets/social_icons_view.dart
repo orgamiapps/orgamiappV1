@@ -25,7 +25,7 @@ class _SocialLoginViewState extends State<SocialLoginView> {
     return GestureDetector(
       onTap: () async {
         try {
-                    if (!_googleBtnLoading) {
+          if (!_googleBtnLoading) {
             setState(() {
               _googleBtnLoading = true;
             });
@@ -37,26 +37,28 @@ class _SocialLoginViewState extends State<SocialLoginView> {
                 await FirebaseFirestoreHelper()
                     .getSingleCustomer(customerId: googleFirebaseUser.uid)
                     .then((userData) {
-                  if (userData != null) {
-                    setState(() {
-                      CustomerController.logeInCustomer = userData;
-                      _googleBtnLoading = false;
+                      if (userData != null) {
+                        setState(() {
+                          CustomerController.logeInCustomer = userData;
+                          _googleBtnLoading = false;
+                        });
+                        if (!mounted) return;
+                        RouterClass().homeScreenRoute(
+                          context: navigator.context,
+                        );
+                      } else {
+                        CustomerModel newCustomerModel = CustomerModel(
+                          uid: googleFirebaseUser.uid,
+                          name: googleFirebaseUser.displayName ?? '',
+                          email: googleFirebaseUser.email!,
+                          createdAt: DateTime.now(),
+                        );
+                        _createNewUser(
+                          newCustomerModel: newCustomerModel,
+                          loading: _googleBtnLoading,
+                        );
+                      }
                     });
-                    if (!mounted) return;
-                    RouterClass().homeScreenRoute(context: navigator.context);
-                  } else {
-                    CustomerModel newCustomerModel = CustomerModel(
-                      uid: googleFirebaseUser.uid,
-                      name: googleFirebaseUser.displayName ?? '',
-                      email: googleFirebaseUser.email!,
-                      createdAt: DateTime.now(),
-                    );
-                    _createNewUser(
-                      newCustomerModel: newCustomerModel,
-                      loading: _googleBtnLoading,
-                    );
-                  }
-                });
               } else {
                 setState(() {
                   _googleBtnLoading = false;

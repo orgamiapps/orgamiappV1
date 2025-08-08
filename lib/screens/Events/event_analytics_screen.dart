@@ -151,7 +151,8 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
       // Build set of unique attendee customerUids for this event
       final Set<String> uniqueCustomerUids = {
         for (final a in _attendeesList)
-          if (a.customerUid.isNotEmpty && a.customerUid != 'manual') a.customerUid
+          if (a.customerUid.isNotEmpty && a.customerUid != 'manual')
+            a.customerUid,
       };
 
       // For each attendee, query Attendance across host's events in chunks of 10 ids (Firestore 'in' limit)
@@ -174,19 +175,19 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
         }
 
         // Build event summaries
-        final List<_EventSummary> summaries = attendedEventIdsByHost.map((eventId) {
-          final map = hostEventIdToData[eventId] ?? {};
-          final title = (map['title'] ?? 'Untitled').toString();
-          final ts = map['selectedDateTime'];
-          DateTime? when;
-          if (ts is Timestamp) when = ts.toDate();
-          return _EventSummary(eventId: eventId, title: title, when: when);
-        }).toList()
-          ..sort((a, b) {
-            final aTime = a.when ?? DateTime.fromMillisecondsSinceEpoch(0);
-            final bTime = b.when ?? DateTime.fromMillisecondsSinceEpoch(0);
-            return bTime.compareTo(aTime);
-          });
+        final List<_EventSummary> summaries =
+            attendedEventIdsByHost.map((eventId) {
+              final map = hostEventIdToData[eventId] ?? {};
+              final title = (map['title'] ?? 'Untitled').toString();
+              final ts = map['selectedDateTime'];
+              DateTime? when;
+              if (ts is Timestamp) when = ts.toDate();
+              return _EventSummary(eventId: eventId, title: title, when: when);
+            }).toList()..sort((a, b) {
+              final aTime = a.when ?? DateTime.fromMillisecondsSinceEpoch(0);
+              final bTime = b.when ?? DateTime.fromMillisecondsSinceEpoch(0);
+              return bTime.compareTo(aTime);
+            });
 
         computed[uid] = _AttendeeHostHistory(
           totalEventsByHost: attendedEventIdsByHost.length,
@@ -1188,7 +1189,8 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
       }
       final history = _attendeeHistoryByUid[uid];
       if (history == null) continue;
-      final priorEventsCount = history.attendedEventIdsByHost.contains(widget.eventId)
+      final priorEventsCount =
+          history.attendedEventIdsByHost.contains(widget.eventId)
           ? history.totalEventsByHost - 1
           : history.totalEventsByHost;
       if (priorEventsCount > 0) repeatAttendees += 1;
@@ -1206,8 +1208,8 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
       final priorEventsCount = (history == null)
           ? 0
           : (history.attendedEventIdsByHost.contains(widget.eventId)
-              ? history.totalEventsByHost - 1
-              : history.totalEventsByHost);
+                ? history.totalEventsByHost - 1
+                : history.totalEventsByHost);
       final isRepeat = priorEventsCount > 0;
       return _attendeesViewFilter == 'repeat' ? isRepeat : !isRepeat;
     }).toList();
@@ -1305,17 +1307,20 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                     ChoiceChip(
                       label: const Text('All'),
                       selected: _attendeesViewFilter == 'all',
-                      onSelected: (_) => setState(() => _attendeesViewFilter = 'all'),
+                      onSelected: (_) =>
+                          setState(() => _attendeesViewFilter = 'all'),
                     ),
                     ChoiceChip(
                       label: const Text('New'),
                       selected: _attendeesViewFilter == 'new',
-                      onSelected: (_) => setState(() => _attendeesViewFilter = 'new'),
+                      onSelected: (_) =>
+                          setState(() => _attendeesViewFilter = 'new'),
                     ),
                     ChoiceChip(
                       label: const Text('Repeat'),
                       selected: _attendeesViewFilter == 'repeat',
-                      onSelected: (_) => setState(() => _attendeesViewFilter = 'repeat'),
+                      onSelected: (_) =>
+                          setState(() => _attendeesViewFilter = 'repeat'),
                     ),
                   ],
                 ),
@@ -1331,9 +1336,11 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                     final totalByHost = history?.totalEventsByHost ?? 0;
                     final priorEventsCount = (history == null)
                         ? 0
-                        : (history.attendedEventIdsByHost.contains(widget.eventId)
-                            ? history.totalEventsByHost - 1
-                            : history.totalEventsByHost);
+                        : (history.attendedEventIdsByHost.contains(
+                                widget.eventId,
+                              )
+                              ? history.totalEventsByHost - 1
+                              : history.totalEventsByHost);
                     final isRepeat = priorEventsCount > 0;
                     return ListTile(
                       leading: CircleAvatar(
@@ -2220,7 +2227,11 @@ class _EventSummary {
   final String eventId;
   final String title;
   final DateTime? when;
-  _EventSummary({required this.eventId, required this.title, required this.when});
+  _EventSummary({
+    required this.eventId,
+    required this.title,
+    required this.when,
+  });
 }
 
 class _AttendeeHostHistory {
@@ -2237,7 +2248,12 @@ class _AttendeeHostHistory {
 List<List<T>> _chunkList<T>(List<T> list, int chunkSize) {
   final List<List<T>> chunks = [];
   for (var i = 0; i < list.length; i += chunkSize) {
-    chunks.add(list.sublist(i, i + chunkSize > list.length ? list.length : i + chunkSize));
+    chunks.add(
+      list.sublist(
+        i,
+        i + chunkSize > list.length ? list.length : i + chunkSize,
+      ),
+    );
   }
   return chunks;
 }

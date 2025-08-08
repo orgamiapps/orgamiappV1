@@ -11,7 +11,6 @@ Future<void> main() async {
 
   final snapshot = await eventsCollection.get();
 
-  
   for (final doc in snapshot.docs) {
     final data = doc.data();
     if (!data.containsKey('categories')) {

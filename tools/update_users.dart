@@ -10,7 +10,6 @@ void main() async {
     final firestore = FirebaseFirestore.instance;
     final querySnapshot = await firestore.collection('Customers').get();
 
-    
     for (var doc in querySnapshot.docs) {
       final data = doc.data();
       Map<String, dynamic> updates = {};
@@ -48,4 +47,3 @@ void main() async {
     debugPrint('Error updating users: $e');
   }
 }
-

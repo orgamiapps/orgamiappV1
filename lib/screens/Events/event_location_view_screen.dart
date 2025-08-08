@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/Utils/Toast.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -30,6 +31,10 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
   Set<Marker> markers = {};
   Set<Circle> circles = {};
 
+  // Address lookup state
+  String? _resolvedAddress;
+  bool _isLoadingAddress = false;
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +62,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
     _slideController.forward();
 
     _initializeMap();
+    _getAddressFromCoordinates();
   }
 
   void _initializeMap() {
@@ -383,15 +389,41 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    widget.eventModel.location,
-                    style: const TextStyle(
-                      color: Color(0xFF1A1A1A),
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                      fontFamily: 'Roboto',
-                    ),
-                  ),
+                  _isLoadingAddress
+                      ? Row(
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Color(0xFF667EEA),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Loading exact address...',
+                              style: TextStyle(
+                                color: Color(0xFF6B7280),
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                                fontFamily: 'Roboto',
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Text(
+                          _resolvedAddress ?? widget.eventModel.location,
+                          style: const TextStyle(
+                            color: Color(0xFF1A1A1A),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
                 ],
               ),
             ),
@@ -529,6 +561,79 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
 
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
+  }
+
+  /// Gets the address from latitude and longitude coordinates using reverse geocoding
+  Future<void> _getAddressFromCoordinates() async {
+    // Only attempt if coordinates are available
+    if (widget.eventModel.latitude == 0 || widget.eventModel.longitude == 0) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingAddress = true;
+    });
+
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        widget.eventModel.latitude,
+        widget.eventModel.longitude,
+      );
+
+      if (placemarks.isNotEmpty && mounted) {
+        Placemark place = placemarks[0];
+
+        // Build a formatted address from placemark components
+        List<String> addressParts = [];
+
+        if (place.street?.isNotEmpty == true) {
+          addressParts.add(place.street!);
+        }
+        if (place.locality?.isNotEmpty == true) {
+          addressParts.add(place.locality!);
+        }
+        if (place.administrativeArea?.isNotEmpty == true) {
+          addressParts.add(place.administrativeArea!);
+        }
+        if (place.postalCode?.isNotEmpty == true) {
+          addressParts.add(place.postalCode!);
+        }
+        if (place.country?.isNotEmpty == true) {
+          addressParts.add(place.country!);
+        }
+
+        String formattedAddress;
+        if (addressParts.isNotEmpty) {
+          formattedAddress = addressParts.join(', ');
+        } else {
+          // Fallback to name or locality if no detailed address is available
+          if (place.name?.isNotEmpty == true) {
+            formattedAddress = place.name!;
+          } else if (place.locality?.isNotEmpty == true) {
+            formattedAddress = place.locality!;
+          } else {
+            formattedAddress =
+                'Location coordinates: ${widget.eventModel.latitude.toStringAsFixed(6)}, ${widget.eventModel.longitude.toStringAsFixed(6)}';
+          }
+        }
+
+        setState(() {
+          _resolvedAddress = formattedAddress;
+          _isLoadingAddress = false;
+        });
+      } else {
+        throw Exception('No address found for coordinates');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingAddress = false;
+          // Fallback to coordinates display
+          _resolvedAddress =
+              'Coordinates: ${widget.eventModel.latitude.toStringAsFixed(6)}, ${widget.eventModel.longitude.toStringAsFixed(6)}';
+        });
+      }
+    }
   }
 
   void _openInMaps() async {

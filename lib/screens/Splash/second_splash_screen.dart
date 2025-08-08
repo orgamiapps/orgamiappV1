@@ -192,10 +192,8 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
     return SlideTransition(
       position: _slideUpAnimation,
       child: GestureDetector(
-        onTap: () => RouterClass.nextScreenNormal(
-          context,
-          const QRScannerFlowScreen(),
-        ),
+        onTap: () =>
+            RouterClass.nextScreenNormal(context, const QRScannerFlowScreen()),
         child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(

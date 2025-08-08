@@ -58,7 +58,6 @@ class _TestConnectivityScreenState extends State<TestConnectivityScreen> {
           details += 'Document ID: ${querySnapshot.docs.first.id}';
         });
       }
-
     } catch (e) {
       setState(() {
         status = '❌ Connection Failed';
@@ -82,28 +81,25 @@ class _TestConnectivityScreenState extends State<TestConnectivityScreen> {
           children: [
             Text(
               'Connection Status:',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               status,
               style: TextStyle(
                 fontSize: 16,
-                color: status.startsWith('✅') ? Colors.green : 
-                       status.startsWith('❌') ? Colors.red : Colors.orange,
+                color: status.startsWith('✅')
+                    ? Colors.green
+                    : status.startsWith('❌')
+                    ? Colors.red
+                    : Colors.orange,
                 fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 24),
             Text(
               'Details:',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Expanded(

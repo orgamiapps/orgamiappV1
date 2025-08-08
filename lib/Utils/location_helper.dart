@@ -10,7 +10,7 @@ class LocationHelper {
   static DateTime? _lastLocationUpdate;
   static bool _isRequestingLocation = false;
   static const Duration _cacheExpiry = Duration(minutes: 5);
-  
+
   /// Get current location with proper error handling and caching
   static Future<Position?> getCurrentLocation({
     bool showErrorDialog = false,
@@ -23,15 +23,18 @@ class LocationHelper {
     }
 
     // Return cached position if still valid
-    if (_cachedPosition != null && 
+    if (_cachedPosition != null &&
         _lastLocationUpdate != null &&
-        DateTime.now().difference(_lastLocationUpdate!).compareTo(_cacheExpiry) < 0) {
+        DateTime.now()
+                .difference(_lastLocationUpdate!)
+                .compareTo(_cacheExpiry) <
+            0) {
       Logger.debug('Returning cached location');
       return _cachedPosition;
     }
 
     _isRequestingLocation = true;
-    
+
     try {
       // Check if location service is enabled
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -45,11 +48,11 @@ class LocationHelper {
 
       // Check permission status
       LocationPermission permission = await Geolocator.checkPermission();
-      
+
       if (permission == LocationPermission.denied) {
         Logger.debug('Requesting location permission');
         permission = await Geolocator.requestPermission();
-        
+
         if (permission == LocationPermission.denied) {
           Logger.warning('Location permission denied');
           if (showErrorDialog && context != null && context.mounted) {
@@ -77,10 +80,11 @@ class LocationHelper {
       // Cache the position
       _cachedPosition = position;
       _lastLocationUpdate = DateTime.now();
-      
-      Logger.success('Location retrieved successfully: ${position.latitude}, ${position.longitude}');
+
+      Logger.success(
+        'Location retrieved successfully: ${position.latitude}, ${position.longitude}',
+      );
       return position;
-      
     } catch (e) {
       Logger.error('Error getting location: $e');
       if (showErrorDialog && context != null && context.mounted) {
@@ -102,8 +106,8 @@ class LocationHelper {
   static Future<bool> hasLocationPermission() async {
     try {
       LocationPermission permission = await Geolocator.checkPermission();
-      return permission == LocationPermission.always || 
-             permission == LocationPermission.whileInUse;
+      return permission == LocationPermission.always ||
+          permission == LocationPermission.whileInUse;
     } catch (e) {
       Logger.error('Error checking location permission: $e');
       return false;
@@ -121,7 +125,11 @@ class LocationHelper {
   }
 
   /// Check if location is within radius
-  static bool isWithinRadius(LatLng center, double radiusInMeters, LatLng point) {
+  static bool isWithinRadius(
+    LatLng center,
+    double radiusInMeters,
+    LatLng point,
+  ) {
     double distance = calculateDistance(center, point);
     return distance <= radiusInMeters;
   }
@@ -138,7 +146,9 @@ class LocationHelper {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Location Services Disabled'),
-        content: const Text('Please enable location services in your device settings to use location-based features.'),
+        content: const Text(
+          'Please enable location services in your device settings to use location-based features.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -154,7 +164,9 @@ class LocationHelper {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Location Permission Required'),
-        content: const Text('Location access is needed to find events near you. Please grant location permission.'),
+        content: const Text(
+          'Location access is needed to find events near you. Please grant location permission.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -177,7 +189,9 @@ class LocationHelper {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Location Permission Permanently Denied'),
-        content: const Text('Location permission has been permanently denied. Please enable it in app settings to use location features.'),
+        content: const Text(
+          'Location permission has been permanently denied. Please enable it in app settings to use location features.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),

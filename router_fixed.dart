@@ -5,9 +5,7 @@ import 'package:orgami/screens/Splash/second_splash_screen.dart';
 
 class RouterClass {
   static late BuildContext splashContext;
-  appLogout({
-    required BuildContext context,
-  }) =>
+  appLogout({required BuildContext context}) =>
       Navigator.of(context, rootNavigator: false).pushAndRemoveUntil(
         CupertinoPageRoute(
           builder: (BuildContext context) {
@@ -18,10 +16,10 @@ class RouterClass {
       );
 
   appRest({required BuildContext context}) => Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const SecondSplashScreen()),
-        (route) => false,
-      );
+    context,
+    MaterialPageRoute(builder: (context) => const SecondSplashScreen()),
+    (route) => false,
+  );
 
   secondSplashScreenRoute({required BuildContext context}) =>
       Navigator.pushReplacement(
@@ -33,7 +31,9 @@ class RouterClass {
   homeScreenRoute({required BuildContext context}) =>
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (splashContext) => const AnalyticsDashboardScreen()),
+        MaterialPageRoute(
+          builder: (splashContext) => const AnalyticsDashboardScreen(),
+        ),
         (route) => false,
       );
 
@@ -51,11 +51,9 @@ class RouterClass {
   static nextScreenAndReplacementAndRemoveUntil({
     required BuildContext context,
     required Widget page,
-  }) =>
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => page),
-        (route) => false,
-      );
+  }) => Navigator.pushAndRemoveUntil(
+    context,
+    MaterialPageRoute(builder: (context) => page),
+    (route) => false,
+  );
 }
-

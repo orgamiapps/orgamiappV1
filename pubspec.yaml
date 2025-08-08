@@ -50,15 +50,15 @@ dependencies:
   excel: ^4.0.6
   syncfusion_flutter_xlsio: ^29.2.11
   google_maps_flutter: ^2.10.0
-  geolocator: ^11.1.0
-  geocoding: ^3.0.0
+  geolocator: ^14.0.2
+  geocoding: ^4.0.0
   permission_handler: ^12.0.0+1
   webview_flutter: ^4.7.0
   url_launcher: ^6.3.0
   carousel_slider: ^5.1.1
   shimmer: ^3.0.0
-  fl_chart: ^0.66.2
-  csv: ^5.1.1
+  fl_chart: ^1.0.0
+  csv: ^6.0.0
   # AI and ML dependencies
   # firebase_ml_kit: ^0.16.3  # Removed due to compatibility issues
   # firebase_ml_model_downloader: ^0.2.3+8  # Removed due to compatibility issues
@@ -74,7 +74,7 @@ dependencies:
   # Theme management
   shared_preferences: ^2.2.2
   provider: ^6.1.1
-  mobile_scanner: ^5.2.3
+  mobile_scanner: ^7.0.1
 
 dev_dependencies:
   flutter_test:

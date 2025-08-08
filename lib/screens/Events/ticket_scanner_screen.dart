@@ -415,16 +415,18 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                     final List<Barcode> barcodes = capture.barcodes;
                     for (final barcode in barcodes) {
                       if (barcode.rawValue != null) {
-                        final qrData =
-                            TicketModel.parseQRCodeData(barcode.rawValue!);
+                        final qrData = TicketModel.parseQRCodeData(
+                          barcode.rawValue!,
+                        );
                         if (qrData != null) {
                           final ticketCode = qrData['ticketCode'];
                           if (ticketCode != null) {
                             _processTicketCode(ticketCode);
                           }
                         } else {
-                          ShowToast()
-                              .showNormalToast(msg: 'Invalid QR code format');
+                          ShowToast().showNormalToast(
+                            msg: 'Invalid QR code format',
+                          );
                         }
                       }
                     }

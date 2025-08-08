@@ -320,7 +320,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             .get();
 
         final allEvents = eventsQuery.docs
-            .map((e) => EventModel.fromJson(e.data()))
+            .map((doc) {
+              final data = doc.data();
+              data['id'] = doc.id; // Ensure document ID is included
+              return EventModel.fromJson(data);
+            })
             .where(
               (event) => event.title.toLowerCase().contains(
                 _searchValue.toLowerCase(),
@@ -454,32 +458,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     // Filter by distance if location and radius are set
     if (currentLocation != null && radiusInMiles > 0) {
-      filteredEvents =
-          filteredEvents
-              .where(
-                (event) => isInRadius(
-                  currentLocation!,
-                  radiusInMiles,
-                  event.getLatLng(),
-                ),
-              )
-              .toList()
-            ..sort((a, b) {
-              double distanceA = calculateDistance(
-                currentLocation!,
-                a.getLatLng(),
-              );
-              double distanceB = calculateDistance(
-                currentLocation!,
-                b.getLatLng(),
-              );
+      filteredEvents = filteredEvents
+          .where(
+            (event) =>
+                isInRadius(currentLocation!, radiusInMiles, event.getLatLng()),
+          )
+          .toList();
 
-              if (distanceA == distanceB) {
-                return a.selectedDateTime.compareTo(b.selectedDateTime);
-              } else {
-                return distanceA.compareTo(distanceB);
-              }
-            });
+      // Sort by distance after filtering
+      filteredEvents.sort((a, b) {
+        double distanceA = calculateDistance(currentLocation!, a.getLatLng());
+        double distanceB = calculateDistance(currentLocation!, b.getLatLng());
+
+        if (distanceA == distanceB) {
+          return a.selectedDateTime.compareTo(b.selectedDateTime);
+        } else {
+          return distanceA.compareTo(distanceB);
+        }
+      });
     }
 
     return filteredEvents;
@@ -892,8 +888,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     Stream<QuerySnapshot> eventsStream;
 
     try {
+      // Filter events to show only those that haven't ended more than 3 hours ago
+      final threeHoursAgo = DateTime.now().subtract(const Duration(hours: 3));
+
       eventsStream = FirebaseFirestore.instance
           .collection(EventModel.firebaseKey)
+          .where('private', isEqualTo: false) // Filter out private events
+          .where(
+            'selectedDateTime',
+            isGreaterThan: Timestamp.fromDate(threeHoursAgo),
+          ) // Show recent events
           .snapshots();
     } catch (e) {
       // Fallback: return simple error widget if stream creation fails
@@ -945,6 +949,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             try {
               final data = doc.data() as Map<String, dynamic>?;
               if (data != null) {
+                // Ensure the document ID is included in the data
+                data['id'] = doc.id;
                 eventsList.add(EventModel.fromJson(data));
               }
             } catch (e) {
@@ -1509,9 +1515,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           .get();
 
       if (mounted) {
-        List<EventModel> events = querySnapshot.docs
-            .map((doc) => EventModel.fromJson(doc.data()))
-            .toList();
+        List<EventModel> events = querySnapshot.docs.map((doc) {
+          final data = doc.data();
+          data['id'] = doc.id; // Ensure document ID is included
+          return EventModel.fromJson(data);
+        }).toList();
 
         // Include all events (past and present) for search screen
         // Sort by event date (most recent first) on the client side
