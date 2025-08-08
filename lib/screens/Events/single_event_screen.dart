@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:intl/intl.dart';
 import 'package:orgami/controller/customer_controller.dart';
 import 'package:orgami/firebase/dwell_time_tracker.dart';
@@ -103,6 +104,11 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
   // Attendees dropdown state
   bool _isAttendeesExpanded = false;
+
+  // Address lookup state
+  String? _resolvedAddress;
+  bool _isLoadingAddress = false;
+  bool _addressLookupFailed = false;
 
   // Modern color palette
   static const Color _primaryBlue = Color(0xFF667EEA);
@@ -1167,6 +1173,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         checkUserTicket(updateUI: true);
       }
     });
+
+    // Get address from coordinates if available
+    _getAddressFromCoordinates();
   }
 
   // Favorite functionality methods
@@ -2054,6 +2063,93 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         }
 
         ShowToast().showNormalToast(msg: errorMessage);
+      }
+    }
+  }
+
+  /// Gets the address from latitude and longitude coordinates using reverse geocoding
+  Future<void> _getAddressFromCoordinates() async {
+    // Only attempt if coordinates are available and address hasn't been resolved yet
+    if (eventModel.latitude == 0 || eventModel.longitude == 0 || _resolvedAddress != null) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingAddress = true;
+      _addressLookupFailed = false;
+    });
+
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        eventModel.latitude,
+        eventModel.longitude,
+      );
+
+      if (placemarks.isNotEmpty && mounted) {
+        Placemark place = placemarks[0];
+        
+        // Build a formatted address from placemark components
+        List<String> addressParts = [];
+        
+        // Add street number and name
+        if (place.subThoroughfare?.isNotEmpty == true) {
+          addressParts.add(place.subThoroughfare!);
+        }
+        if (place.thoroughfare?.isNotEmpty == true) {
+          addressParts.add(place.thoroughfare!);
+        }
+        
+        // Add locality (city/town)
+        if (place.locality?.isNotEmpty == true) {
+          addressParts.add(place.locality!);
+        }
+        
+        // Add administrative area (state/province) 
+        if (place.administrativeArea?.isNotEmpty == true) {
+          addressParts.add(place.administrativeArea!);
+        }
+        
+        // Add postal code
+        if (place.postalCode?.isNotEmpty == true) {
+          addressParts.add(place.postalCode!);
+        }
+        
+        // Add country
+        if (place.country?.isNotEmpty == true) {
+          addressParts.add(place.country!);
+        }
+
+        String formattedAddress = addressParts.join(', ');
+        
+        // If we couldn't build a good address, fall back to name or description
+        if (formattedAddress.isEmpty) {
+          if (place.name?.isNotEmpty == true) {
+            formattedAddress = place.name!;
+          } else if (place.locality?.isNotEmpty == true) {
+            formattedAddress = place.locality!;
+          } else {
+            formattedAddress = 'Location coordinates: ${eventModel.latitude.toStringAsFixed(6)}, ${eventModel.longitude.toStringAsFixed(6)}';
+          }
+        }
+
+        setState(() {
+          _resolvedAddress = formattedAddress;
+          _isLoadingAddress = false;
+        });
+
+        Logger.debug('Address resolved: $formattedAddress');
+      } else {
+        throw Exception('No address found for coordinates');
+      }
+    } catch (e) {
+      Logger.error('Error getting address from coordinates: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingAddress = false;
+          _addressLookupFailed = true;
+          // Fallback to coordinates display
+          _resolvedAddress = 'Coordinates: ${eventModel.latitude.toStringAsFixed(6)}, ${eventModel.longitude.toStringAsFixed(6)}';
+        });
       }
     }
   }
@@ -3203,16 +3299,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  eventModel.location,
-                  style: TextStyle(
-                    color: _darkText,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 17,
-                    fontFamily: 'Roboto',
-                    letterSpacing: -0.2,
-                  ),
-                ),
+                _buildLocationText(),
               ],
             ),
           ),
@@ -3222,6 +3309,93 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             _buildHyperRealisticGlobeButton(),
           ],
         ],
+      ),
+    );
+  }
+
+  /// Builds the location text widget with loading and error states
+  Widget _buildLocationText() {
+    // If we have resolved address, show it
+    if (_resolvedAddress != null) {
+      return Row(
+        children: [
+          Expanded(
+            child: Text(
+              _resolvedAddress!,
+              style: TextStyle(
+                color: _darkText,
+                fontWeight: FontWeight.w700,
+                fontSize: 17,
+                fontFamily: 'Roboto',
+                letterSpacing: -0.2,
+              ),
+            ),
+          ),
+          // Show success indicator if address was resolved from coordinates
+          if (eventModel.latitude != 0 && eventModel.longitude != 0 && !_addressLookupFailed) ...[
+            const SizedBox(width: 8),
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.check,
+                color: Color(0xFF10B981),
+                size: 12,
+              ),
+            ),
+          ],
+        ],
+      );
+    }
+
+    // If currently loading address
+    if (_isLoadingAddress) {
+      return Row(
+        children: [
+          SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: _primaryBlue,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            'Getting address...',
+            style: TextStyle(
+              color: _mediumText,
+              fontSize: 15,
+              fontStyle: FontStyle.italic,
+              fontFamily: 'Roboto',
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Fallback to original location text if available, otherwise show placeholder
+    String locationText = eventModel.location;
+    if (locationText.isEmpty || locationText.toLowerCase() == 'locccc') {
+      if (eventModel.latitude != 0 && eventModel.longitude != 0) {
+        locationText = 'Coordinates: ${eventModel.latitude.toStringAsFixed(4)}, ${eventModel.longitude.toStringAsFixed(4)}';
+      } else {
+        locationText = 'Location not specified';
+      }
+    }
+
+    return Text(
+      locationText,
+      style: TextStyle(
+        color: _darkText,
+        fontWeight: FontWeight.w700,
+        fontSize: 17,
+        fontFamily: 'Roboto',
+        letterSpacing: -0.2,
       ),
     );
   }
