@@ -2157,41 +2157,6 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                     ),
                     const SizedBox(width: 12),
                     Tooltip(
-                      message: 'View Event Location',
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => EventLocationViewScreen(
-                                eventModel: eventModel,
-                              ),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withAlpha((0.2 * 255).round()),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: Colors.white.withAlpha(
-                                (0.3 * 255).round(),
-                              ),
-                              width: 1,
-                            ),
-                          ),
-                          child: const Icon(
-                            Icons.public,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Tooltip(
                       message: 'Share Event',
                       child: GestureDetector(
                         onTap: () => _showQuickShareOptions(),
@@ -2289,41 +2254,6 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                                       : Colors.white,
                                   size: 20,
                                 ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Tooltip(
-                      message: 'View Event Location',
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => EventLocationViewScreen(
-                                eventModel: eventModel,
-                              ),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withAlpha((0.2 * 255).round()),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: Colors.white.withAlpha(
-                                (0.3 * 255).round(),
-                              ),
-                              width: 1,
-                            ),
-                          ),
-                          child: const Icon(
-                            Icons.public,
-                            color: Colors.white,
-                            size: 20,
-                          ),
                         ),
                       ),
                     ),
