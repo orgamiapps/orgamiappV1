@@ -32,6 +32,8 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
   List<EventQuestionModel> questionsList = [];
   bool _isLoading = true;
   bool _showTemplates = false;
+  String _selectedTemplateCategory = 'All'; // New category filter
+  final TextEditingController _searchController = TextEditingController(); // New search functionality
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -41,63 +43,225 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
 
   // Pre-built question templates - Professional questions that event hosts actually want to ask
   final List<Map<String, dynamic>> _questionTemplates = [
+    // Marketing & Discovery
     {
       'title': 'How did you hear about this event?',
       'category': 'Marketing',
       'icon': Icons.campaign,
       'color': Color(0xFF667EEA),
-      'description': 'Track your marketing effectiveness',
+      'description': 'Track marketing effectiveness and ROI',
     },
     {
-      'title': 'What is your primary reason for attending today?',
-      'category': 'Engagement',
+      'title': 'Which social media platform led you here?',
+      'category': 'Marketing',
+      'icon': Icons.share,
+      'color': Color(0xFF667EEA),
+      'description': 'Identify top-performing channels',
+    },
+    
+    // Attendee Experience & Engagement
+    {
+      'title': 'What is your primary reason for attending?',
+      'category': 'Experience',
       'icon': Icons.psychology,
       'color': Color(0xFF10B981),
       'description': 'Understand attendee motivations',
     },
     {
-      'title': 'Do you have any dietary restrictions or allergies?',
-      'category': 'Logistics',
-      'icon': Icons.restaurant,
-      'color': Color(0xFFFF9800),
-      'description': 'Ensure proper catering arrangements',
+      'title': 'What are you most excited to learn about today?',
+      'category': 'Experience',
+      'icon': Icons.lightbulb,
+      'color': Color(0xFF10B981),
+      'description': 'Tailor content to audience interests',
     },
+    {
+      'title': 'Is this your first time attending our events?',
+      'category': 'Experience',
+      'icon': Icons.history,
+      'color': Color(0xFF10B981),
+      'description': 'Customize experience for new vs returning attendees',
+    },
+
+    // Professional & Networking
+    {
+      'title': 'What industry or field do you work in?',
+      'category': 'Professional',
+      'icon': Icons.business,
+      'color': Color(0xFF7C3AED),
+      'description': 'Enable targeted networking opportunities',
+    },
+    {
+      'title': 'What is your current role or job title?',
+      'category': 'Professional',
+      'icon': Icons.work,
+      'color': Color(0xFF7C3AED),
+      'description': 'Facilitate peer-to-peer connections',
+    },
+    {
+      'title': 'How many years of experience do you have in your field?',
+      'category': 'Professional',
+      'icon': Icons.timeline,
+      'color': Color(0xFF7C3AED),
+      'description': 'Group participants by experience level',
+    },
+
+    // Logistics & Planning
+    {
+      'title': 'Do you have any dietary restrictions or food allergies?',
+      'category': 'Logistics',
+      'icon': Icons.restaurant_menu,
+      'color': Color(0xFFFF9800),
+      'description': 'Ensure safe and inclusive catering',
+    },
+    {
+      'title': 'How many people are in your group today?',
+      'category': 'Logistics',
+      'icon': Icons.groups,
+      'color': Color(0xFFFF9800),
+      'description': 'Plan seating arrangements and materials',
+    },
+    {
+      'title': 'Do you require any accessibility accommodations?',
+      'category': 'Logistics',
+      'icon': Icons.accessibility_new,
+      'color': Color(0xFFFF9800),
+      'description': 'Provide inclusive experience for all attendees',
+    },
+    {
+      'title': 'Are you planning to stay for the entire event?',
+      'category': 'Logistics',
+      'icon': Icons.schedule,
+      'color': Color(0xFFFF9800),
+      'description': 'Manage capacity and resource allocation',
+    },
+
+    // Communication & Follow-up
     {
       'title': 'Would you like to receive updates about future events?',
       'category': 'Communication',
-      'icon': Icons.notifications,
+      'icon': Icons.email,
       'color': Color(0xFF8B5CF6),
-      'description': 'Build your email list',
+      'description': 'Build your mailing list with permission',
     },
+    {
+      'title': 'How would you prefer to receive event updates?',
+      'category': 'Communication',
+      'icon': Icons.notifications_active,
+      'color': Color(0xFF8B5CF6),
+      'description': 'Optimize communication preferences',
+    },
+
+    // Feedback & Preferences
     {
       'title': 'What topics or sessions interest you most?',
       'category': 'Preferences',
       'icon': Icons.favorite,
       'color': Color(0xFFEF4444),
-      'description': 'Tailor content to your audience',
+      'description': 'Personalize content recommendations',
     },
     {
-      'title': 'How many people are you attending with?',
-      'category': 'Logistics',
-      'icon': Icons.people,
-      'color': Color(0xFF06B6D4),
-      'description': 'Plan seating and materials',
-    },
-    {
-      'title': 'Do you require any accessibility accommodations?',
-      'category': 'Accessibility',
-      'icon': Icons.accessibility,
-      'color': Color(0xFF059669),
-      'description': 'Ensure inclusive experience',
-    },
-    {
-      'title': 'What industry or field do you work in?',
-      'category': 'Networking',
-      'icon': Icons.business,
-      'color': Color(0xFF7C3AED),
+      'title': 'What type of networking opportunities are you seeking?',
+      'category': 'Preferences',
+      'icon': Icons.people_alt,
+      'color': Color(0xFFEF4444),
       'description': 'Facilitate meaningful connections',
     },
+    {
+      'title': 'Rate your current knowledge level on today\'s topics',
+      'category': 'Preferences',
+      'icon': Icons.star,
+      'color': Color(0xFFEF4444),
+      'description': 'Match content complexity to audience level',
+    },
+
+    // Demographics & Analytics
+    {
+      'title': 'What is your age range?',
+      'category': 'Demographics',
+      'icon': Icons.cake,
+      'color': Color(0xFF06B6D4),
+      'description': 'Understand audience demographics',
+    },
+    {
+      'title': 'Which city or region are you from?',
+      'category': 'Demographics',
+      'icon': Icons.location_city,
+      'color': Color(0xFF06B6D4),
+      'description': 'Track geographical reach',
+    },
+
+    // Event-Specific Contexts
+    {
+      'title': 'Are you attending as part of a company or organization?',
+      'category': 'Context',
+      'icon': Icons.corporate_fare,
+      'color': Color(0xFF059669),
+      'description': 'Identify corporate vs individual attendees',
+    },
+    {
+      'title': 'What are your main goals for today\'s event?',
+      'category': 'Context',
+      'icon': Icons.flag,
+      'color': Color(0xFF059669),
+      'description': 'Align event delivery with attendee objectives',
+    },
+    {
+      'title': 'How did you first learn about our organization?',
+      'category': 'Context',
+      'icon': Icons.explore,
+      'color': Color(0xFF059669),
+      'description': 'Track brand awareness and discovery paths',
+    },
+
+    // Health & Safety (Post-pandemic considerations)
+    {
+      'title': 'Do you have any health considerations we should be aware of?',
+      'category': 'Safety',
+      'icon': Icons.health_and_safety,
+      'color': Color(0xFFDC2626),
+      'description': 'Ensure safe event environment',
+    },
+
+    // Technology & Digital
+    {
+      'title': 'Would you like to connect on our event app or platform?',
+      'category': 'Technology',
+      'icon': Icons.smartphone,
+      'color': Color(0xFF7E22CE),
+      'description': 'Drive digital engagement and app adoption',
+    },
   ];
+
+  // Get unique categories for filtering
+  List<String> get _templateCategories {
+    final categories = _questionTemplates.map((template) => template['category'] as String).toSet().toList();
+    categories.sort();
+    categories.insert(0, 'All');
+    return categories;
+  }
+
+  // Filter templates based on category and search
+  List<Map<String, dynamic>> get _filteredTemplates {
+    List<Map<String, dynamic>> filtered = _questionTemplates;
+    
+    // Filter by category
+    if (_selectedTemplateCategory != 'All') {
+      filtered = filtered.where((template) => template['category'] == _selectedTemplateCategory).toList();
+    }
+    
+    // Filter by search term
+    final searchTerm = _searchController.text.toLowerCase();
+    if (searchTerm.isNotEmpty) {
+      filtered = filtered.where((template) {
+        final title = (template['title'] as String).toLowerCase();
+        final description = (template['description'] as String).toLowerCase();
+        final category = (template['category'] as String).toLowerCase();
+        return title.contains(searchTerm) || description.contains(searchTerm) || category.contains(searchTerm);
+      }).toList();
+    }
+    
+    return filtered;
+  }
 
   Future<void> _getQuestions() async {
     setState(() {
@@ -156,6 +320,27 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
   }
 
   Future<void> _addTemplateQuestion(Map<String, dynamic> template) async {
+    // Check for duplicates first
+    final questionTitle = template['title'] as String;
+    final isDuplicate = questionsList.any((question) => 
+        question.questionTitle.toLowerCase().trim() == questionTitle.toLowerCase().trim());
+    
+    if (isDuplicate) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Question "${template['title']}" already exists'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
     // During event creation, we don't have a real event ID yet
     // So we'll add the question to the local list and it will be saved when the event is created
     if (widget.eventModel.id.isEmpty) {
@@ -276,6 +461,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
   void dispose() {
     _fadeController.dispose();
     _slideController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -439,6 +625,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header with toggle
           Row(
             children: [
               Container(
@@ -456,163 +643,421 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
               ),
               const SizedBox(width: 16),
               const Expanded(
-                child: Text(
-                  'Quick Templates',
-                  style: TextStyle(
-                    color: Color(0xFF1A1A1A),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 18,
-                    fontFamily: 'Roboto',
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Professional Question Templates',
+                      style: TextStyle(
+                        color: Color(0xFF1A1A1A),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 18,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Pre-built questions for real event scenarios',
+                      style: TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontSize: 13,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
                 ),
               ),
               GestureDetector(
                 onTap: () {
                   setState(() {
                     _showTemplates = !_showTemplates;
+                    if (!_showTemplates) {
+                      // Reset filters when hiding templates
+                      _selectedTemplateCategory = 'All';
+                      _searchController.clear();
+                    }
                   });
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                    color: _showTemplates 
+                        ? const Color(0xFF667EEA).withValues(alpha: 0.1)
+                        : const Color(0xFFF3F4F6),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(
-                    _showTemplates ? 'Hide' : 'Show',
-                    style: const TextStyle(
-                      color: Color(0xFF667EEA),
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                      fontFamily: 'Roboto',
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _showTemplates ? Icons.expand_less : Icons.expand_more,
+                        color: _showTemplates ? const Color(0xFF667EEA) : const Color(0xFF6B7280),
+                        size: 16,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _showTemplates ? 'Hide' : 'Show',
+                        style: TextStyle(
+                          color: _showTemplates ? const Color(0xFF667EEA) : const Color(0xFF6B7280),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          const Text(
-            'Choose from professional templates designed for real event needs',
-            style: TextStyle(
-              color: Color(0xFF6B7280),
-              fontSize: 14,
-              fontFamily: 'Roboto',
-            ),
-          ),
+          
           if (_showTemplates) ...[
-            const SizedBox(height: 16),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio:
-                    1.1, // Slightly taller to accommodate description
-              ),
-              itemCount: _questionTemplates.length,
-              itemBuilder: (context, index) {
-                final template = _questionTemplates[index];
-                return _buildTemplateCard(template);
-              },
+            const SizedBox(height: 20),
+            
+            // Search and category filters
+            Row(
+              children: [
+                // Search field
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      hintText: 'Search templates...',
+                      hintStyle: const TextStyle(
+                        color: Color(0xFF9CA3AF),
+                        fontSize: 14,
+                        fontFamily: 'Roboto',
+                      ),
+                      prefixIcon: const Icon(Icons.search, color: Color(0xFF6B7280), size: 20),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, color: Color(0xFF6B7280), size: 18),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {});
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: const Color(0xFFF9FAFB),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF667EEA), width: 2),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    style: const TextStyle(fontSize: 14, fontFamily: 'Roboto'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                
+                // Category dropdown
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF9FAFB),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedTemplateCategory,
+                        isExpanded: true,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontFamily: 'Roboto',
+                          color: Color(0xFF1A1A1A),
+                        ),
+                        icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF6B7280)),
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            _selectedTemplateCategory = newValue!;
+                          });
+                        },
+                        items: _templateCategories.map<DropdownMenuItem<String>>((String category) {
+                          return DropdownMenuItem<String>(
+                            value: category,
+                            child: Text(
+                              category,
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
+            
+            const SizedBox(height: 16),
+            
+            // Results count and category info
+            if (_filteredTemplates.isNotEmpty) ...[
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${_filteredTemplates.length} template${_filteredTemplates.length != 1 ? 's' : ''}',
+                      style: const TextStyle(
+                        color: Color(0xFF10B981),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ),
+                  if (_selectedTemplateCategory != 'All') ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      'in $_selectedTemplateCategory',
+                      style: const TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontSize: 12,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
+            
+            // Templates grid or empty state
+            if (_filteredTemplates.isEmpty) 
+              _buildEmptyTemplatesState()
+            else
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 1.0, // More square for better layout
+                ),
+                itemCount: _filteredTemplates.length,
+                itemBuilder: (context, index) {
+                  final template = _filteredTemplates[index];
+                  return _buildTemplateCard(template);
+                },
+              ),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildTemplateCard(Map<String, dynamic> template) {
-    return GestureDetector(
-      onTap: () => _addTemplateQuestion(template),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: template['color'].withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: template['color'].withValues(alpha: 0.3),
-            width: 1,
+  Widget _buildEmptyTemplatesState() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: const Color(0xFF6B7280).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: const Icon(
+              Icons.search_off,
+              color: Color(0xFF6B7280),
+              size: 30,
+            ),
           ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: template['color'],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(template['icon'], color: Colors.white, size: 20),
+          const SizedBox(height: 12),
+          const Text(
+            'No templates found',
+            style: TextStyle(
+              color: Color(0xFF1A1A1A),
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Roboto',
             ),
-            const SizedBox(height: 12),
-            Text(
-              template['category'],
-              style: TextStyle(
-                color: template['color'],
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Roboto',
-              ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _searchController.text.isNotEmpty 
+                ? 'Try different search terms or change category'
+                : 'Try selecting a different category',
+            style: const TextStyle(
+              color: Color(0xFF6B7280),
+              fontSize: 14,
+              fontFamily: 'Roboto',
             ),
-            const SizedBox(height: 6),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTemplateCard(Map<String, dynamic> template) {
+    final questionTitle = template['title'] as String;
+    final isAlreadyAdded = questionsList.any((question) => 
+        question.questionTitle.toLowerCase().trim() == questionTitle.toLowerCase().trim());
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _addTemplateQuestion(template),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isAlreadyAdded 
+                ? const Color(0xFFF3F4F6)
+                : template['color'].withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isAlreadyAdded 
+                  ? const Color(0xFFE5E7EB)
+                  : template['color'].withValues(alpha: 0.2),
+              width: 1.5,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Category tag and icon
+              Row(
                 children: [
-                  Text(
-                    template['title'],
-                    style: const TextStyle(
-                      color: Color(0xFF1A1A1A),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      fontFamily: 'Roboto',
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: isAlreadyAdded 
+                          ? const Color(0xFF6B7280)
+                          : template['color'],
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
+                    child: Icon(
+                      isAlreadyAdded ? Icons.check : template['icon'], 
+                      color: Colors.white, 
+                      size: 16,
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    template['description'] ?? '',
-                    style: const TextStyle(
-                      color: Color(0xFF6B7280),
-                      fontSize: 10,
-                      fontFamily: 'Roboto',
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: isAlreadyAdded 
+                            ? const Color(0xFFF3F4F6)
+                            : template['color'].withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        isAlreadyAdded ? 'Added' : template['category'],
+                        style: TextStyle(
+                          color: isAlreadyAdded 
+                              ? const Color(0xFF6B7280)
+                              : template['color'],
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Roboto',
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(
-                  Icons.add_circle_outline,
-                  color: template['color'],
-                  size: 16,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'Add',
+              const SizedBox(height: 10),
+              
+              // Question title
+              Expanded(
+                child: Text(
+                  template['title'],
                   style: TextStyle(
-                    color: template['color'],
+                    color: isAlreadyAdded 
+                        ? const Color(0xFF6B7280)
+                        : const Color(0xFF1A1A1A),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     fontFamily: 'Roboto',
+                    height: 1.3,
+                    decoration: isAlreadyAdded 
+                        ? TextDecoration.lineThrough
+                        : TextDecoration.none,
                   ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
-            ),
-          ],
+              ),
+              const SizedBox(height: 8),
+              
+              // Description
+              Text(
+                template['description'] ?? '',
+                style: TextStyle(
+                  color: isAlreadyAdded 
+                      ? const Color(0xFF9CA3AF)
+                      : const Color(0xFF6B7280),
+                  fontSize: 9,
+                  fontFamily: 'Roboto',
+                  height: 1.2,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 10),
+              
+              // Add button
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                decoration: BoxDecoration(
+                  color: isAlreadyAdded 
+                      ? const Color(0xFFF3F4F6)
+                      : template['color'].withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isAlreadyAdded ? Icons.check_circle : Icons.add_circle_outline,
+                      color: isAlreadyAdded 
+                          ? const Color(0xFF6B7280)
+                          : template['color'],
+                      size: 14,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isAlreadyAdded ? 'Already Added' : 'Add Question',
+                      style: TextStyle(
+                        color: isAlreadyAdded 
+                            ? const Color(0xFF6B7280)
+                            : template['color'],
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
