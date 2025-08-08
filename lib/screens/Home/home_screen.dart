@@ -572,14 +572,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return RefreshIndicator(
       onRefresh: _onRefresh,
       color: const Color(0xFF667EEA),
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        controller: _scrollController,
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: Column(
-            children: [_headerView(), _filterSection(), _eventsView()],
-          ),
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: Column(
+          children: [
+            _headerView(), 
+            _filterSection(), 
+            Expanded(child: _eventsView()),
+          ],
         ),
       ),
     );
@@ -863,7 +863,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return _buildSearchEmptyState();
     }
 
-    // Add immediate debug info widget
+    // Always show debug info in debug mode, otherwise show clean UI
     if (kDebugMode) {
       return Column(
         children: [
@@ -922,9 +922,33 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildFirestoreStream() {
     // Create a stream for the Firestore query
     // Start with the simplest possible query
-    Stream<QuerySnapshot> eventsStream = FirebaseFirestore.instance
-        .collection(EventModel.firebaseKey)
-        .snapshots();
+    Stream<QuerySnapshot> eventsStream;
+    
+    try {
+      eventsStream = FirebaseFirestore.instance
+          .collection(EventModel.firebaseKey)
+          .snapshots();
+    } catch (e) {
+      // Fallback: return simple error widget if stream creation fails
+      if (kDebugMode) {
+        debugPrint('Failed to create Firestore stream: $e');
+      }
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
+            Text('Failed to connect to database: $e'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => setState(() {}),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
 
           return StreamBuilder<QuerySnapshot>(
         stream: eventsStream,
@@ -1053,23 +1077,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
         // Show empty state if no events after filtering
         if (allEventsInChronologicalOrder.isEmpty) {
-          return _buildEmptyStateWithFilters();
+          return Column(
+            children: [
+              debugWidget,
+              Expanded(child: _buildEmptyStateWithFilters()),
+            ],
+          );
         }
 
         return Column(
           children: [
             debugWidget,
+            // Featured Events Carousel - show if there are featured events (regardless of filter)
+            if (featuredEvents.isNotEmpty)
+              _buildFeaturedCarousel(featuredEvents),
+            // All Events List - show events in chronological order
             Expanded(
-              child: Column(
-                children: [
-                  // Featured Events Carousel - show if there are featured events (regardless of filter)
-                  if (featuredEvents.isNotEmpty)
-                    _buildFeaturedCarousel(featuredEvents),
-
-                  // All Events List - show events in chronological order
-                  Expanded(child: _buildEventsList(allEventsInChronologicalOrder)),
-                ],
-              ),
+              child: _buildEventsList(allEventsInChronologicalOrder),
             ),
           ],
         );
@@ -1135,56 +1159,49 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildSkeletonLoading() {
-    return Column(
+    return ListView(
+      padding: const EdgeInsets.all(24),
       children: [
         // Featured skeleton
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Shimmer.fromColors(
-            baseColor: const Color(0xFFE1E5E9),
-            highlightColor: Colors.white,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  height: 24,
-                  width: 150,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+        Shimmer.fromColors(
+          baseColor: const Color(0xFFE1E5E9),
+          highlightColor: Colors.white,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 24,
+                width: 150,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 16),
-                Container(
-                  height: 200,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                height: 200,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 24),
         // Events skeleton
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            children: List.generate(
-              3,
-              (index) => Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Shimmer.fromColors(
-                  baseColor: const Color(0xFFE1E5E9),
-                  highlightColor: Colors.white,
-                  child: Container(
-                    height: 280,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
+        ...List.generate(
+          3,
+          (index) => Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Shimmer.fromColors(
+              baseColor: const Color(0xFFE1E5E9),
+              highlightColor: Colors.white,
+              child: Container(
+                height: 280,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
                 ),
               ),
             ),
@@ -1402,12 +1419,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       itemCount: events.length,
       itemBuilder: (context, index) {
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          padding: const EdgeInsets.only(bottom: 16),
           child: _buildEventCard(events[index]),
         );
       },
