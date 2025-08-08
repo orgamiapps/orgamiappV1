@@ -83,6 +83,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   late Animation<double> _fadeAnimation;
   late AnimationController _slideController;
   late Animation<Offset> _slideAnimation;
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+  late AnimationController _glowController;
+  late Animation<double> _glowAnimation;
 
   double radians(double degrees) {
     return degrees * pi / 180.0;
@@ -99,6 +103,19 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
   // Attendees dropdown state
   bool _isAttendeesExpanded = false;
+
+  // Modern color palette
+  static const Color _primaryBlue = Color(0xFF667EEA);
+  static const Color _primaryPurple = Color(0xFF764BA2);
+  static const Color _accentBlue = Color(0xFF4338CA);
+
+  static const Color _orange = Color(0xFFFF9800);
+  static const Color _darkText = Color(0xFF1F2937);
+  static const Color _mediumText = Color(0xFF4B5563);
+  static const Color _lightText = Color(0xFF6B7280);
+  static const Color _backgroundColor = Color(0xFFF8FAFC);
+  static const Color _cardBackground = Color(0xFFFFFFFF);
+  static const Color _borderColor = Color(0xFFE2E8F0);
 
   Future<void> getPreRegisterCount() async {
     await FirebaseFirestoreHelper()
@@ -1116,8 +1133,26 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOut));
 
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    _glowController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _glowAnimation = Tween<double>(begin: 1.0, end: 1.5).animate(
+      CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
+    );
+
     _fadeController.forward();
     _slideController.forward();
+    _pulseController.forward();
+    _glowController.forward();
 
     getAttendance();
     getPreRegisterCount();
@@ -1208,6 +1243,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
     _fadeController.dispose();
     _slideController.dispose();
+    _pulseController.dispose();
+    _glowController.dispose();
     _eventSubscription?.cancel();
 
     super.dispose();
@@ -2024,7 +2061,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: _backgroundColor,
       floatingActionButton:
           eventModel.hasManagementPermissions(
             FirebaseAuth.instance.currentUser!.uid,
@@ -2038,21 +2075,67 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
   }
 
   Widget _buildFloatingActionButton() {
-    return Container(
-      margin: const EdgeInsets.only(
-        bottom: 20,
-      ), // Reduced margin since no bottom buttons
-      child: FloatingActionButton.extended(
-        onPressed: () => _showEventManagementModal(),
-        backgroundColor: const Color(0xFF667EEA),
-        foregroundColor: Colors.white,
-        elevation: 8,
-        icon: const Icon(Icons.dashboard),
-        label: const Text(
-          'Manage Event',
-          style: TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Roboto'),
-        ),
-      ),
+    return AnimatedBuilder(
+      animation: _pulseAnimation,
+      builder: (context, child) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 24),
+          child: FloatingActionButton.extended(
+            onPressed: () => _showEventManagementModal(),
+            backgroundColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            extendedPadding: const EdgeInsets.symmetric(horizontal: 24),
+            icon: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(
+                Icons.dashboard_outlined,
+                size: 18,
+                color: Colors.white,
+              ),
+            ),
+            label: const Text(
+              'Manage Event',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Roboto',
+                fontSize: 16,
+                letterSpacing: 0.2,
+              ),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
+            ),
+          ),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [_primaryBlue, _primaryPurple],
+            ),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: _primaryBlue.withValues(alpha: 0.4),
+                spreadRadius: 0,
+                blurRadius: 15,
+                offset: const Offset(0, 6),
+              ),
+              BoxShadow(
+                color: _primaryPurple.withValues(alpha: 0.3),
+                spreadRadius: 0,
+                blurRadius: 25,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -2073,223 +2156,183 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
   }
 
   Widget _headerView() {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-      child: Column(
-        children: [
-          // Back button, title, and action buttons
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withAlpha((0.2 * 255).round()),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    Icons.arrow_back_ios_new,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
+    return AnimatedBuilder(
+      animation: _glowAnimation,
+      builder: (context, child) {
+        return Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [_primaryBlue, _primaryPurple, _accentBlue],
+              stops: const [0.0, 0.6, 1.0],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: _primaryBlue.withValues(alpha: 0.3),
+                spreadRadius: 0,
+                blurRadius: 20 * _glowAnimation.value,
+                offset: const Offset(0, 10),
               ),
-              const SizedBox(width: 16),
-              const Expanded(child: SizedBox()),
-              if (eventModel.hasManagementPermissions(
-                FirebaseAuth.instance.currentUser!.uid,
-              ))
-                Row(
-                  children: [
-                    Tooltip(
-                      message: _isFavorited
-                          ? 'Remove from Saved'
-                          : 'Add to Saved',
-                      child: GestureDetector(
-                        onTap: _isLoadingFavorite ? null : _toggleFavorite,
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: _isFavorited
-                                ? Colors.red.withAlpha((0.2 * 255).round())
-                                : Colors.white.withAlpha((0.2 * 255).round()),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: _isFavorited
-                                  ? Colors.red.withAlpha((0.3 * 255).round())
-                                  : Colors.white.withAlpha((0.3 * 255).round()),
-                              width: 1,
-                            ),
-                          ),
-                          child: _isLoadingFavorite
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
-                                    ),
-                                  ),
-                                )
-                              : Icon(
-                                  _isFavorited
-                                      ? Icons.bookmark
-                                      : Icons.bookmark_border,
-                                  color: _isFavorited
-                                      ? Colors.red
-                                      : Colors.white,
-                                  size: 20,
-                                ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Tooltip(
-                      message: 'Share Event',
-                      child: GestureDetector(
-                        onTap: () => _showQuickShareOptions(),
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withAlpha((0.2 * 255).round()),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: Colors.white.withAlpha(
-                                (0.3 * 255).round(),
-                              ),
-                              width: 1,
-                            ),
-                          ),
-                          child: const Icon(
-                            Icons.share_rounded,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-              else
-                // Calendar, Favorite, and Share buttons for non-creators
-                Row(
-                  children: [
-                    Tooltip(
-                      message: 'Add to Calendar',
-                      child: GestureDetector(
-                        onTap: () => _addToCalendar(),
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withAlpha((0.2 * 255).round()),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: Colors.white.withAlpha(
-                                (0.3 * 255).round(),
-                              ),
-                              width: 1,
-                            ),
-                          ),
-                          child: const Icon(
-                            Icons.calendar_today,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Tooltip(
-                      message: _isFavorited
-                          ? 'Remove from Saved'
-                          : 'Add to Saved',
-                      child: GestureDetector(
-                        onTap: _isLoadingFavorite ? null : _toggleFavorite,
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: _isFavorited
-                                ? Colors.red.withAlpha((0.2 * 255).round())
-                                : Colors.white.withAlpha((0.2 * 255).round()),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: _isFavorited
-                                  ? Colors.red.withAlpha((0.3 * 255).round())
-                                  : Colors.white.withAlpha((0.3 * 255).round()),
-                              width: 1,
-                            ),
-                          ),
-                          child: _isLoadingFavorite
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
-                                    ),
-                                  ),
-                                )
-                              : Icon(
-                                  _isFavorited
-                                      ? Icons.bookmark
-                                      : Icons.bookmark_border,
-                                  color: _isFavorited
-                                      ? Colors.red
-                                      : Colors.white,
-                                  size: 20,
-                                ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Tooltip(
-                      message: 'Share Event',
-                      child: GestureDetector(
-                        onTap: () => _shareEventDetails(),
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withAlpha((0.2 * 255).round()),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: Colors.white.withAlpha(
-                                (0.3 * 255).round(),
-                              ),
-                              width: 1,
-                            ),
-                          ),
-                          child: const Icon(
-                            Icons.share_rounded,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              BoxShadow(
+                color: _primaryPurple.withValues(alpha: 0.2),
+                spreadRadius: 0,
+                blurRadius: 30 * _glowAnimation.value,
+                offset: const Offset(0, 20),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          // Subtitle removed
-        ],
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withValues(alpha: 0.05),
+                ],
+              ),
+            ),
+            padding: const EdgeInsets.fromLTRB(28, 24, 28, 32),
+            child: Column(
+              children: [
+                // Back button, title, and action buttons
+                Row(
+                  children: [
+                    _buildModernButton(
+                      icon: Icons.arrow_back_ios_new,
+                      onTap: () => Navigator.pop(context),
+                      tooltip: 'Back',
+                    ),
+                    const SizedBox(width: 20),
+                    const Expanded(child: SizedBox()),
+                    if (eventModel.hasManagementPermissions(
+                      FirebaseAuth.instance.currentUser!.uid,
+                    ))
+                      Row(
+                        children: [
+                          _buildModernButton(
+                            icon: _isFavorited
+                                ? Icons.bookmark
+                                : Icons.bookmark_border,
+                            onTap: _isLoadingFavorite ? null : _toggleFavorite,
+                            tooltip: _isFavorited
+                                ? 'Remove from Saved'
+                                : 'Add to Saved',
+                            isLoading: _isLoadingFavorite,
+                            isActive: _isFavorited,
+                          ),
+                          const SizedBox(width: 16),
+                          _buildModernButton(
+                            icon: Icons.share_rounded,
+                            onTap: () => _showQuickShareOptions(),
+                            tooltip: 'Share Event',
+                          ),
+                        ],
+                      )
+                    else
+                      // Calendar, Favorite, and Share buttons for non-creators
+                      Row(
+                        children: [
+                          _buildModernButton(
+                            icon: Icons.calendar_today,
+                            onTap: () => _addToCalendar(),
+                            tooltip: 'Add to Calendar',
+                          ),
+                          const SizedBox(width: 16),
+                          _buildModernButton(
+                            icon: _isFavorited
+                                ? Icons.bookmark
+                                : Icons.bookmark_border,
+                            onTap: _isLoadingFavorite ? null : _toggleFavorite,
+                            tooltip: _isFavorited
+                                ? 'Remove from Saved'
+                                : 'Add to Saved',
+                            isLoading: _isLoadingFavorite,
+                            isActive: _isFavorited,
+                          ),
+                          const SizedBox(width: 16),
+                          _buildModernButton(
+                            icon: Icons.share_rounded,
+                            onTap: () => _shareEventDetails(),
+                            tooltip: 'Share Event',
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildModernButton({
+    required IconData icon,
+    required VoidCallback? onTap,
+    required String tooltip,
+    bool isLoading = false,
+    bool isActive = false,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: AnimatedBuilder(
+        animation: _pulseAnimation,
+        builder: (context, child) {
+          return GestureDetector(
+            onTap: onTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: isActive
+                    ? Colors.white.withValues(alpha: 0.25)
+                    : Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: isActive
+                      ? Colors.white.withValues(alpha: 0.4)
+                      : Colors.white.withValues(alpha: 0.2),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    spreadRadius: 0,
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                  if (isActive)
+                    BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      spreadRadius: 0,
+                      blurRadius: 12,
+                      offset: const Offset(0, 0),
+                    ),
+                ],
+              ),
+              child: isLoading
+                  ? const Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Icon(icon, color: Colors.white, size: 22),
+            ),
+          );
+        },
       ),
     );
   }
@@ -2298,7 +2341,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     return SlideTransition(
       position: _slideAnimation,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
         physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
@@ -2587,240 +2630,442 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
   }
 
   Widget _buildEventImage() {
-    return Container(
-      width: double.infinity,
-      height: 200,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha((0.1 * 255).round()),
-            spreadRadius: 0,
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+    return AnimatedBuilder(
+      animation: _pulseAnimation,
+      builder: (context, child) {
+        return Container(
+          width: double.infinity,
+          height: 220,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                spreadRadius: 0,
+                blurRadius: 25,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: _primaryBlue.withValues(alpha: 0.1),
+                spreadRadius: 0,
+                blurRadius: 40,
+                offset: const Offset(0, 16),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: CachedNetworkImage(
-          imageUrl: eventModel.imageUrl,
-          fit: BoxFit.cover,
-          placeholder: (context, url) => Container(
-            color: const Color(0xFFF5F7FA),
-            child: const Center(
-              child: CircularProgressIndicator(color: Color(0xFF667EEA)),
-            ),
-          ),
-          errorWidget: (context, url, error) => Container(
-            color: const Color(0xFFF5F7FA),
-            child: const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.image_not_supported,
-                    color: Color(0xFF667EEA),
-                    size: 48,
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Image not available',
-                    style: TextStyle(
-                      color: Color(0xFF667EEA),
-                      fontSize: 14,
-                      fontFamily: 'Roboto',
+          child: Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: CachedNetworkImage(
+                  imageUrl: eventModel.imageUrl,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: 220,
+                  placeholder: (context, url) => Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [_backgroundColor, _borderColor],
+                      ),
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            color: _primaryBlue,
+                            strokeWidth: 3,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Loading image...',
+                            style: TextStyle(
+                              color: _lightText,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ],
+                  errorWidget: (context, url, error) => Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [_backgroundColor, _borderColor],
+                      ),
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              color: _primaryBlue.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(32),
+                            ),
+                            child: Icon(
+                              Icons.image_not_supported_outlined,
+                              color: _primaryBlue,
+                              size: 32,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Image not available',
+                            style: TextStyle(
+                              color: _mediumText,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Unable to load event image',
+                            style: TextStyle(
+                              color: _lightText,
+                              fontSize: 14,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
+              // Gradient overlay for better text readability if needed
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.02),
+                    ],
+                  ),
+                ),
+              ),
+              // Subtle border
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    width: 1,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
   Widget _buildFeaturedBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFFF9800), Color(0xFFFF5722)],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFFF9800).withValues(alpha: 0.3),
-            spreadRadius: 0,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.star, color: Colors.white, size: 16),
-          SizedBox(width: 8),
-          Text(
-            'Featured Event',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-              fontFamily: 'Roboto',
+    return AnimatedBuilder(
+      animation: _pulseAnimation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: 1.0 + (0.05 * sin(_pulseAnimation.value * 2 * pi)),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  _orange,
+                  const Color(0xFFFF5722),
+                  const Color(0xFFE65100),
+                ],
+                stops: const [0.0, 0.6, 1.0],
+              ),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: _orange.withValues(alpha: 0.4),
+                  spreadRadius: 0,
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+                BoxShadow(
+                  color: _orange.withValues(alpha: 0.2),
+                  spreadRadius: 0,
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.2),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.star_rounded,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Text(
+                  'Featured Event',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    fontFamily: 'Roboto',
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   Widget _buildEventDetailsCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha((0.08 * 255).round()),
-            spreadRadius: 0,
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Title and Edit/Delete Buttons (for creators)
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  eventModel.title,
-                  style: const TextStyle(
-                    color: Color(0xFF1A1A1A),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 24,
-                    fontFamily: 'Roboto',
-                  ),
-                ),
+    return AnimatedBuilder(
+      animation: _fadeAnimation,
+      builder: (context, child) {
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            color: _cardBackground,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                spreadRadius: 0,
+                blurRadius: 30,
+                offset: const Offset(0, 8),
               ),
-              if (eventModel.hasManagementPermissions(
-                FirebaseAuth.instance.currentUser!.uid,
-              ))
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () => RouterClass.nextScreenNormal(
-                        context,
-                        EditEventScreen(eventModel: eventModel),
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF667EEA).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: const Color(0xFF667EEA),
-                            width: 1,
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.edit,
-                              color: Color(0xFF667EEA),
-                              size: 16,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              'Edit',
-                              style: TextStyle(
-                                color: Color(0xFF667EEA),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                fontFamily: 'Roboto',
-                              ),
-                            ),
-                          ],
-                        ),
+              BoxShadow(
+                color: _primaryBlue.withValues(alpha: 0.08),
+                spreadRadius: 0,
+                blurRadius: 40,
+                offset: const Offset(0, 16),
+              ),
+            ],
+            border: Border.all(
+              color: _borderColor.withValues(alpha: 0.5),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Title and Edit/Delete Buttons (for creators)
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      eventModel.title,
+                      style: TextStyle(
+                        color: _darkText,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 28,
+                        fontFamily: 'Roboto',
+                        letterSpacing: -0.5,
+                        height: 1.2,
                       ),
                     ),
-                    // Delete button moved to EditEventScreen
+                  ),
+                  if (eventModel.hasManagementPermissions(
+                    FirebaseAuth.instance.currentUser!.uid,
+                  ))
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => RouterClass.nextScreenNormal(
+                            context,
+                            EditEventScreen(eventModel: eventModel),
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(
+                                0xFF667EEA,
+                              ).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFF667EEA),
+                                width: 1,
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.edit,
+                                  color: Color(0xFF667EEA),
+                                  size: 16,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Edit',
+                                  style: TextStyle(
+                                    color: Color(0xFF667EEA),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'Roboto',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        // Delete button moved to EditEventScreen
+                      ],
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Organizer
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: _primaryBlue.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _primaryBlue.withValues(alpha: 0.15),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.group_outlined, color: _primaryBlue, size: 16),
+                    const SizedBox(width: 6),
+                    Text(
+                      eventModel.groupName,
+                      style: TextStyle(
+                        color: _primaryBlue,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 20),
+              // Event Details
+              _buildDetailItem(
+                icon: Icons.calendar_month_rounded,
+                label: 'Date',
+                value: DateFormat(
+                  'EEEE, MMMM dd, yyyy',
+                ).format(eventModel.selectedDateTime),
+              ),
+              const SizedBox(height: 20),
+              _buildDetailItem(
+                icon: Icons.access_time_rounded,
+                label: 'Time',
+                value: DateFormat(
+                  'KK:mm a',
+                ).format(eventModel.selectedDateTime),
+              ),
+              const SizedBox(height: 20),
+              _buildLocationItem(),
+              const SizedBox(height: 20),
+              // Ticket Quantity Display
+              if (eventModel.ticketsEnabled) _buildTicketQuantityItem(),
+              const SizedBox(height: 20),
+              // Description
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: _backgroundColor,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: _borderColor, width: 1),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: _primaryBlue.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            Icons.description_outlined,
+                            color: _primaryBlue,
+                            size: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Description',
+                          style: TextStyle(
+                            color: _darkText,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 18,
+                            fontFamily: 'Roboto',
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      eventModel.description,
+                      style: TextStyle(
+                        color: _mediumText,
+                        fontSize: 16,
+                        fontFamily: 'Roboto',
+                        height: 1.6,
+                        letterSpacing: 0.1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Feedback Button (for attendees only)
+              if (!eventModel.hasManagementPermissions(
+                FirebaseAuth.instance.currentUser!.uid,
+              ))
+                _buildFeedbackButton(),
             ],
           ),
-          const SizedBox(height: 8),
-          // Organizer
-          Text(
-            eventModel.groupName,
-            style: const TextStyle(
-              color: Color(0xFF6B7280),
-              fontSize: 16,
-              fontFamily: 'Roboto',
-            ),
-          ),
-          const SizedBox(height: 20),
-          // Event Details
-          _buildDetailItem(
-            icon: Icons.calendar_month_rounded,
-            label: 'Date',
-            value: DateFormat(
-              'EEEE, MMMM dd, yyyy',
-            ).format(eventModel.selectedDateTime),
-          ),
-          const SizedBox(height: 16),
-          _buildDetailItem(
-            icon: Icons.access_time_rounded,
-            label: 'Time',
-            value: DateFormat('KK:mm a').format(eventModel.selectedDateTime),
-          ),
-          const SizedBox(height: 16),
-          _buildLocationItem(),
-          const SizedBox(height: 16),
-          // Ticket Quantity Display
-          if (eventModel.ticketsEnabled) _buildTicketQuantityItem(),
-          const SizedBox(height: 20),
-          // Description
-          Text(
-            'Description',
-            style: const TextStyle(
-              color: Color(0xFF1A1A1A),
-              fontWeight: FontWeight.w600,
-              fontSize: 16,
-              fontFamily: 'Roboto',
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            eventModel.description,
-            style: const TextStyle(
-              color: Color(0xFF4B5563),
-              fontSize: 16,
-              fontFamily: 'Roboto',
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 20),
-          // Feedback Button (for attendees only)
-          if (!eventModel.hasManagementPermissions(
-            FirebaseAuth.instance.currentUser!.uid,
-          ))
-            _buildFeedbackButton(),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -2829,93 +3074,155 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     required String label,
     required String value,
   }) {
-    return Row(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: const Color(0xFF667EEA).withAlpha((0.1 * 255).round()),
-            borderRadius: BorderRadius.circular(12),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _backgroundColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _borderColor, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            spreadRadius: 0,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          child: Icon(icon, color: const Color(0xFF667EEA), size: 20),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Color(0xFF6B7280),
-                  fontSize: 12,
-                  fontFamily: 'Roboto',
-                ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  _primaryBlue.withValues(alpha: 0.15),
+                  _primaryBlue.withValues(alpha: 0.08),
+                ],
               ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: const TextStyle(
-                  color: Color(0xFF1A1A1A),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  fontFamily: 'Roboto',
-                ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: _primaryBlue.withValues(alpha: 0.2),
+                width: 1,
               ),
-            ],
+            ),
+            child: Icon(icon, color: _primaryBlue, size: 24),
           ),
-        ),
-      ],
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: _lightText,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    fontFamily: 'Roboto',
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: _darkText,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 17,
+                    fontFamily: 'Roboto',
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildLocationItem() {
-    return Row(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: const Color(0xFF667EEA).withAlpha((0.1 * 255).round()),
-            borderRadius: BorderRadius.circular(12),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _backgroundColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _borderColor, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            spreadRadius: 0,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          child: const Icon(
-            Icons.location_on,
-            color: Color(0xFF667EEA),
-            size: 20,
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Location',
-                style: const TextStyle(
-                  color: Color(0xFF6B7280),
-                  fontSize: 12,
-                  fontFamily: 'Roboto',
-                ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  _primaryBlue.withValues(alpha: 0.15),
+                  _primaryBlue.withValues(alpha: 0.08),
+                ],
               ),
-              const SizedBox(height: 2),
-              Text(
-                eventModel.location,
-                style: const TextStyle(
-                  color: Color(0xFF1A1A1A),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  fontFamily: 'Roboto',
-                ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: _primaryBlue.withValues(alpha: 0.2),
+                width: 1,
               ),
-            ],
+            ),
+            child: Icon(
+              Icons.location_on_outlined,
+              color: _primaryBlue,
+              size: 24,
+            ),
           ),
-        ),
-        // Hyper-realistic globe button for map view
-        if (eventModel.latitude != 0 && eventModel.longitude != 0)
-          _buildHyperRealisticGlobeButton(),
-      ],
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Location',
+                  style: TextStyle(
+                    color: _lightText,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    fontFamily: 'Roboto',
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  eventModel.location,
+                  style: TextStyle(
+                    color: _darkText,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 17,
+                    fontFamily: 'Roboto',
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Hyper-realistic globe button for map view
+          if (eventModel.latitude != 0 && eventModel.longitude != 0) ...[
+            const SizedBox(width: 12),
+            _buildHyperRealisticGlobeButton(),
+          ],
+        ],
+      ),
     );
   }
 
