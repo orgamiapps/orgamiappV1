@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
-import 'package:orgami/utils/colors.dart';
+
 import 'package:orgami/firebase/engagement_predictor.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/firebase/recommendation_analytics.dart';

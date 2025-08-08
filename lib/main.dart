@@ -7,9 +7,13 @@ import 'package:orgami/Utils/logger.dart';
 import 'package:orgami/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:orgami/utils/error_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize global error handling
+  ErrorHandler.initialize();
 
   Logger.info('Starting app initialization...');
 

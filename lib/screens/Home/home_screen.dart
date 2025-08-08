@@ -10,7 +10,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 // }
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/models/customer_model.dart';
@@ -33,6 +32,8 @@ import 'package:orgami/Screens/Home/notifications_screen.dart';
 import 'package:orgami/Screens/Home/account_screen.dart';
 import 'package:orgami/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:orgami/utils/location_helper.dart';
+import 'package:orgami/Utils/logger.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -191,19 +192,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _scrollController = ScrollController();
     _scrollController.addListener(_onScroll);
 
-    // Initialize pulse animation
+    // Initialize animations with reduced durations for better performance
     _pulseController = AnimationController(
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
+    _pulseAnimation = Tween<double>(begin: 0.9, end: 1.1).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     _pulseController.repeat(reverse: true);
 
     // Initialize fade animation
     _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 400),
       vsync: this,
     );
     _fadeAnimation = Tween<double>(
@@ -214,7 +215,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     // Initialize search animation
     _searchAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 200),
       vsync: this,
     );
 
@@ -372,14 +373,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> getCurrentLocation() async {
     try {
-      await Geolocator.getCurrentPosition().then((value) {
-        LatLng newLatLng = LatLng(value.latitude, value.longitude);
+      final position = await LocationHelper.getCurrentLocation(
+        showErrorDialog: false,
+        context:
+            null, // Don't show dialogs on home screen to avoid interrupting user experience
+      );
+
+      if (position != null && mounted) {
         setState(() {
-          currentLocation = newLatLng;
+          currentLocation = LatLng(position.latitude, position.longitude);
         });
-      });
+        Logger.success(
+          'Home screen location updated: ${position.latitude}, ${position.longitude}',
+        );
+      } else {
+        Logger.info(
+          'Getting error in current Location Fatching! User denied permissions to access the device\'s location.',
+        );
+      }
     } catch (e) {
-      debugPrint('Getting error in current Location Fatching! ${e.toString()}');
+      Logger.error('Error getting location in home screen: $e');
     }
   }
 
@@ -922,28 +935,61 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           return _buildEmptyStateWithDebug();
         }
 
-        // Process events data
-        List<EventModel> eventsList = snapshot.data!.docs
-            .map((e) => EventModel.fromJson(e.data() as Map<String, dynamic>))
-            .toList();
+        // Process events data with error handling and performance optimization
+        List<EventModel> eventsList = [];
+        try {
+          // Limit processing to prevent overwhelming the main thread
+          final limitedDocs = snapshot.data!.docs.take(50).toList();
 
-        List<EventModel> neededEventList = [];
-
-        for (var element in eventsList) {
-          // Filter out events that ended more than 2 hours ago
-          final eventEndTime = element.selectedDateTime.add(
-            Duration(hours: element.eventDuration),
-          );
-          final cutoffTime = DateTime.now().subtract(const Duration(hours: 2));
-          if (eventEndTime.isAfter(cutoffTime)) {
-            neededEventList.add(element);
+          for (var doc in limitedDocs) {
+            try {
+              final data = doc.data() as Map<String, dynamic>?;
+              if (data != null) {
+                eventsList.add(EventModel.fromJson(data));
+              }
+            } catch (e) {
+              Logger.error('Error parsing event document: $e');
+              continue; // Skip this document and continue processing
+            }
           }
+        } catch (e) {
+          Logger.error('Error processing events data: $e');
+          return _buildDetailedErrorState('Error processing events: $e');
         }
 
-        List<EventModel> filtered = filterEvents(neededEventList);
+        List<EventModel> neededEventList = [];
+        final now = DateTime.now();
+        final cutoffTime = now.subtract(const Duration(hours: 2));
 
-        // Apply sorting
-        filtered = _sortEvents(filtered);
+        try {
+          for (var element in eventsList) {
+            // Filter out events that ended more than 2 hours ago with error handling
+            try {
+              final eventEndTime = element.selectedDateTime.add(
+                Duration(hours: element.eventDuration),
+              );
+              if (eventEndTime.isAfter(cutoffTime)) {
+                neededEventList.add(element);
+              }
+            } catch (e) {
+              Logger.error('Error processing event time: $e');
+              continue; // Skip this event
+            }
+          }
+        } catch (e) {
+          Logger.error('Error filtering events: $e');
+          return _buildDetailedErrorState('Error processing events: $e');
+        }
+
+        List<EventModel> filtered = [];
+        try {
+          filtered = filterEvents(neededEventList);
+          // Apply sorting with error handling
+          filtered = _sortEvents(filtered);
+        } catch (e) {
+          Logger.error('Error filtering/sorting events: $e');
+          return _buildDetailedErrorState('Error processing events: $e');
+        }
 
         // Separate featured and non-featured events for carousel display
         List<EventModel> featuredEvents =
