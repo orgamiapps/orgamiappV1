@@ -590,11 +590,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       color: const Color(0xFF667EEA),
       child: FadeTransition(
         opacity: _fadeAnimation,
-        child: Column(
-          children: [
-            _headerView(),
-            _filterSection(),
-            Expanded(child: _eventsView()),
+        child: CustomScrollView(
+          controller: _scrollController,
+          slivers: [
+            // Header Section as Sliver
+            SliverToBoxAdapter(
+              child: _headerView(),
+            ),
+            // Filter Section as Sliver
+            SliverToBoxAdapter(
+              child: _filterSection(),
+            ),
+            // Events Content as Slivers
+            ..._buildEventsSliver(),
           ],
         ),
       ),
@@ -868,27 +876,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _eventsView() {
+  List<Widget> _buildEventsSliver() {
     // If search is active and has a value, show search results
     if (_isSearchExpanded && _searchValue.isNotEmpty) {
       if (_currentSearchType == SearchType.users) {
-        return _buildUsersSearchResults();
+        return [SliverToBoxAdapter(child: _buildUsersSearchResults())];
       } else {
-        return _buildEventsSearchResults();
+        return [SliverToBoxAdapter(child: _buildEventsSearchResults())];
       }
     }
 
     // If search is expanded but no value, show empty search state
     if (_isSearchExpanded && _searchValue.isEmpty) {
-      return _buildSearchEmptyState();
+      return [SliverToBoxAdapter(child: _buildSearchEmptyState())];
     }
 
-    return _buildFirestoreStream();
+    return _buildFirestoreStreamSlivers();
   }
 
-  Widget _buildFirestoreStream() {
+  List<Widget> _buildFirestoreStreamSlivers() {
     // Create a stream for the Firestore query
-    // Start with the simplest possible query
     Stream<QuerySnapshot> eventsStream;
 
     try {
@@ -896,104 +903,102 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           .collection(EventModel.firebaseKey)
           .snapshots();
     } catch (e) {
-      // Fallback: return simple error widget if stream creation fails
-      if (kDebugMode) {
-        debugPrint('Failed to create Firestore stream: $e');
-      }
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error, size: 48, color: Colors.red),
-            const SizedBox(height: 16),
-            Text('Failed to connect to database: $e'),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => setState(() {}),
-              child: const Text('Retry'),
+      return [
+        SliverToBoxAdapter(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error, size: 48, color: Colors.red),
+                const SizedBox(height: 16),
+                Text('Failed to connect to database: $e'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => setState(() {}),
+                  child: const Text('Retry'),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      );
+      ];
     }
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: eventsStream,
-      builder: (context, snapshot) {
-        // Show loading state
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildSkeletonLoading();
-        }
+    return [
+      SliverToBoxAdapter(
+        child: StreamBuilder<QuerySnapshot>(
+          stream: eventsStream,
+          builder: (context, snapshot) {
+            // Show loading state
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return _buildSkeletonLoading();
+            }
 
-        // Show error state
-        if (snapshot.hasError) {
-          return _buildDetailedErrorState(snapshot.error.toString());
-        }
+            // Show error state
+            if (snapshot.hasError) {
+              return _buildDetailedErrorState(snapshot.error.toString());
+            }
 
-        // Show empty state
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyStateWithDebug();
-        }
+            // Show empty state
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              return _buildEmptyStateWithDebug();
+            }
 
-        // Process events data with error handling and performance optimization
-        List<EventModel> eventsList = [];
-        try {
-          // Limit processing to prevent overwhelming the main thread
-          final limitedDocs = snapshot.data!.docs.take(50).toList();
-
-          for (var doc in limitedDocs) {
+            // Process events data with error handling and performance optimization
+            List<EventModel> eventsList = [];
             try {
-              final data = doc.data() as Map<String, dynamic>?;
-              if (data != null) {
-                eventsList.add(EventModel.fromJson(data));
+              final limitedDocs = snapshot.data!.docs.take(50).toList();
+
+              for (var doc in limitedDocs) {
+                try {
+                  final data = doc.data() as Map<String, dynamic>?;
+                  if (data != null) {
+                    eventsList.add(EventModel.fromJson(data));
+                  }
+                } catch (e) {
+                  Logger.error('Error parsing event document: $e');
+                  continue;
+                }
               }
             } catch (e) {
-              Logger.error('Error parsing event document: $e');
-              continue; // Skip this document and continue processing
+              Logger.error('Error processing events data: $e');
+              return _buildDetailedErrorState('Error processing events: $e');
             }
-          }
-        } catch (e) {
-          Logger.error('Error processing events data: $e');
-          return _buildDetailedErrorState('Error processing events: $e');
-        }
 
-        List<EventModel> neededEventList = [];
-        final now = DateTime.now();
-        final cutoffTime = now.subtract(const Duration(hours: 2));
+            List<EventModel> neededEventList = [];
+            final now = DateTime.now();
+            final cutoffTime = now.subtract(const Duration(hours: 2));
 
-        try {
-          for (var element in eventsList) {
-            // Filter out events that ended more than 2 hours ago with error handling
             try {
-              final eventEndTime = element.selectedDateTime.add(
-                Duration(hours: element.eventDuration),
-              );
-              if (eventEndTime.isAfter(cutoffTime)) {
-                neededEventList.add(element);
+              for (var element in eventsList) {
+                try {
+                  final eventEndTime = element.selectedDateTime.add(
+                    Duration(hours: element.eventDuration),
+                  );
+                  if (eventEndTime.isAfter(cutoffTime)) {
+                    neededEventList.add(element);
+                  }
+                } catch (e) {
+                  Logger.error('Error processing event time: $e');
+                  continue;
+                }
               }
             } catch (e) {
-              Logger.error('Error processing event time: $e');
-              continue; // Skip this event
+              Logger.error('Error filtering events: $e');
+              return _buildDetailedErrorState('Error processing events: $e');
             }
-          }
-        } catch (e) {
-          Logger.error('Error filtering events: $e');
-          return _buildDetailedErrorState('Error processing events: $e');
-        }
 
-        List<EventModel> filtered = [];
-        try {
-          filtered = filterEvents(neededEventList);
-          // Apply sorting with error handling
-          filtered = _sortEvents(filtered);
-        } catch (e) {
-          Logger.error('Error filtering/sorting events: $e');
-          return _buildDetailedErrorState('Error processing events: $e');
-        }
+            List<EventModel> filtered = [];
+            try {
+              filtered = filterEvents(neededEventList);
+              filtered = _sortEvents(filtered);
+            } catch (e) {
+              Logger.error('Error filtering/sorting events: $e');
+              return _buildDetailedErrorState('Error processing events: $e');
+            }
 
-        // Separate featured and non-featured events for carousel display
-        List<EventModel> featuredEvents =
-            filtered
+            // Separate featured and non-featured events
+            List<EventModel> featuredEvents = filtered
                 .where(
                   (e) =>
                       e.isFeatured == true &&
@@ -1007,83 +1012,42 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               );
 
-        // Create a combined list that maintains chronological order
-        // Featured events will still be visually distinguished in the UI
-        List<EventModel> allEventsInChronologicalOrder = [...filtered];
+            List<EventModel> allEventsInChronologicalOrder = [...filtered];
 
-        // Show empty state if no events after filtering
-        if (allEventsInChronologicalOrder.isEmpty) {
-          return _buildEmptyStateWithFilters();
-        }
+            // Show empty state if no events after filtering
+            if (allEventsInChronologicalOrder.isEmpty) {
+              return _buildEmptyStateWithFilters();
+            }
 
-        return Column(
-          children: [
-            // Featured Events Carousel - show if there are featured events (regardless of filter)
-            if (featuredEvents.isNotEmpty)
-              _buildFeaturedCarousel(featuredEvents),
-            // All Events List - show events in chronological order
-            Expanded(child: _buildEventsList(allEventsInChronologicalOrder)),
-          ],
-        );
-      },
-    );
+            return Column(
+              children: [
+                // Featured Events Carousel
+                if (featuredEvents.isNotEmpty) _buildFeaturedCarousel(featuredEvents),
+                // Events List
+                _buildEventsColumn(allEventsInChronologicalOrder),
+              ],
+            );
+          },
+        ),
+      ),
+    ];
   }
 
-  Widget _buildFeaturedCarousel(List<EventModel> featuredEvents) {
+  Widget _buildEventsColumn(List<EventModel> events) {
+    if (events.isEmpty) {
+      return _buildEmptyState();
+    }
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Row(
-            children: [
-              AnimatedBuilder(
-                animation: _pulseAnimation,
-                builder: (context, child) {
-                  return Transform.scale(
-                    scale: _pulseAnimation.value,
-                    child: const Icon(
-                      Icons.star,
-                      color: Color(0xFFFF9800),
-                      size: 24,
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Featured Events',
-                style: TextStyle(
-                  color: Color(0xFF1A1A1A),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 22,
-                  fontFamily: 'Roboto',
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        CarouselSlider.builder(
-          itemCount: featuredEvents.length,
-          itemBuilder: (context, index, realIndex) {
-            return _buildFeaturedCard(featuredEvents[index]);
-          },
-          options: CarouselOptions(
-            height: 240,
-            viewportFraction: 0.85,
-            enableInfiniteScroll: false,
-            autoPlay: featuredEvents.length > 1,
-            autoPlayInterval: const Duration(seconds: 4),
-          ),
-        ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 8),
+        ...events.map((event) => Padding(
+          padding: const EdgeInsets.only(left: 24, right: 24, bottom: 16),
+          child: _buildEventCard(event),
+        )).toList(),
+        const SizedBox(height: 80), // Extra padding at bottom
       ],
     );
-  }
-
-  Widget _buildFeaturedCard(EventModel event) {
-    return _FeaturedEventCard(event: event);
   }
 
   Widget _buildSkeletonLoading() {
@@ -1256,23 +1220,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildEventsList(List<EventModel> events) {
-    if (events.isEmpty) {
-      return _buildEmptyState();
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      itemCount: events.length,
-      itemBuilder: (context, index) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: _buildEventCard(events[index]),
-        );
-      },
-    );
-  }
-
   Widget _buildEventCard(EventModel event) {
     return SingleEventListViewItem(eventModel: event);
   }
@@ -1287,16 +1234,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return _buildSearchEmptyState();
     }
 
-    return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: 0),
-      itemCount: _searchEvents.length,
-      itemBuilder: (context, index) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          child: _buildEventCard(_searchEvents[index]),
-        );
-      },
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+        ..._searchEvents.map((event) => Padding(
+          padding: const EdgeInsets.only(left: 24, right: 24, bottom: 16),
+          child: _buildEventCard(event),
+        )).toList(),
+        const SizedBox(height: 80),
+      ],
     );
   }
 
@@ -1309,16 +1255,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return _buildSearchEmptyState();
     }
 
-    return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: 0),
-      itemCount: _searchUsers.length,
-      itemBuilder: (context, index) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          child: _buildUserCard(_searchUsers[index]),
-        );
-      },
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+        ..._searchUsers.map((user) => Padding(
+          padding: const EdgeInsets.only(left: 24, right: 24, bottom: 16),
+          child: _buildUserCard(user),
+        )).toList(),
+        const SizedBox(height: 80),
+      ],
     );
   }
 
@@ -1615,16 +1560,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       );
     }
 
-    return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: 0),
-      itemCount: _defaultEvents.length,
-      itemBuilder: (context, index) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          child: _buildEventCard(_defaultEvents[index]),
-        );
-      },
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+        ..._defaultEvents.map((event) => Padding(
+          padding: const EdgeInsets.only(left: 24, right: 24, bottom: 16),
+          child: _buildEventCard(event),
+        )).toList(),
+        const SizedBox(height: 80),
+      ],
     );
   }
 
@@ -1669,14 +1613,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       );
     }
 
-    return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: 0),
-      itemCount: _defaultUsers.length,
-      itemBuilder: (context, index) {
-        final user = _defaultUsers[index];
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+        ..._defaultUsers.map((user) => Padding(
+          padding: const EdgeInsets.only(left: 24, right: 24, bottom: 16),
           child: GestureDetector(
             onTap: () {
               RouterClass.nextScreenNormal(
@@ -1707,9 +1648,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(25),
-                      child:
-                          user.profilePictureUrl != null &&
-                              user.profilePictureUrl!.isNotEmpty
+                      child: user.profilePictureUrl != null && user.profilePictureUrl!.isNotEmpty
                           ? CachedNetworkImage(
                               imageUrl: user.profilePictureUrl!,
                               fit: BoxFit.cover,
@@ -1770,8 +1709,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
             ),
           ),
-        );
-      },
+        )).toList(),
+        const SizedBox(height: 80),
+      ],
     );
   }
 
@@ -2283,6 +2223,63 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         ),
       ),
     );
+  }
+
+  Widget _buildFeaturedCarousel(List<EventModel> featuredEvents) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Row(
+            children: [
+              AnimatedBuilder(
+                animation: _pulseAnimation,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: _pulseAnimation.value,
+                    child: const Icon(
+                      Icons.star,
+                      color: Color(0xFFFF9800),
+                      size: 24,
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Featured Events',
+                style: TextStyle(
+                  color: Color(0xFF1A1A1A),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 22,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        CarouselSlider.builder(
+          itemCount: featuredEvents.length,
+          itemBuilder: (context, index, realIndex) {
+            return _buildFeaturedCard(featuredEvents[index]);
+          },
+          options: CarouselOptions(
+            height: 240,
+            viewportFraction: 0.85,
+            enableInfiniteScroll: false,
+            autoPlay: featuredEvents.length > 1,
+            autoPlayInterval: const Duration(seconds: 4),
+          ),
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  Widget _buildFeaturedCard(EventModel event) {
+    return _FeaturedEventCard(event: event);
   }
 }
 
