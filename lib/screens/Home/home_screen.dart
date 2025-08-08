@@ -31,6 +31,7 @@ import 'package:orgami/Screens/QRScanner/qr_scanner_flow_screen.dart';
 import 'package:orgami/Screens/Messaging/messaging_screen.dart';
 import 'package:orgami/Screens/Home/notifications_screen.dart';
 import 'package:orgami/Screens/Home/account_screen.dart';
+import 'package:orgami/Screens/Home/test_connectivity_screen.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -862,55 +863,132 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return _buildSearchEmptyState();
     }
 
-    // Create a stream for the Firestore query
-    // Try with orderBy first, but have a fallback without it in case of index issues
-    Stream<QuerySnapshot> eventsStream;
-    try {
-      eventsStream = FirebaseFirestore.instance
-          .collection(EventModel.firebaseKey)
-          .where('private', isEqualTo: false)
-          .orderBy('selectedDateTime', descending: false)
-          .snapshots();
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('OrderBy query failed, falling back to simple query: $e');
-      }
-      // Fallback query without orderBy in case of missing index
-      eventsStream = FirebaseFirestore.instance
-          .collection(EventModel.firebaseKey)
-          .where('private', isEqualTo: false)
-          .snapshots();
+    // Add immediate debug info widget
+    if (kDebugMode) {
+      return Column(
+        children: [
+          _buildDebugInfo(),
+          Expanded(child: _buildFirestoreStream()),
+        ],
+      );
     }
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: eventsStream,
-      builder: (context, snapshot) {
-        if (kDebugMode) {
-          debugPrint('StreamBuilder state: ${snapshot.connectionState}');
-          debugPrint('Has data: ${snapshot.hasData}');
-          debugPrint('Has error: ${snapshot.hasError}');
+    return _buildFirestoreStream();
+  }
+
+  Widget _buildDebugInfo() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Debug Info:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const Spacer(),
+              ElevatedButton(
+                onPressed: () {
+                  RouterClass.nextScreenNormal(context, const TestConnectivityScreen());
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                ),
+                child: const Text('Test DB', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text('Firebase Collection: ${EventModel.firebaseKey}'),
+          Text('Selected Categories: $selectedCategories'),
+          Text('Radius: ${radiusInMiles.toStringAsFixed(1)} miles'),
+          Text('Current Location: ${currentLocation?.toString() ?? 'Not set'}'),
+          Text('Loading State: $isLoading'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFirestoreStream() {
+    // Create a stream for the Firestore query
+    // Start with the simplest possible query
+    Stream<QuerySnapshot> eventsStream = FirebaseFirestore.instance
+        .collection(EventModel.firebaseKey)
+        .snapshots();
+
+          return StreamBuilder<QuerySnapshot>(
+        stream: eventsStream,
+        builder: (context, snapshot) {
+          // Add visual debugging info directly in UI
+          Widget debugWidget = const SizedBox.shrink();
+          if (kDebugMode) {
+            debugWidget = Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                'Stream State: ${snapshot.connectionState}\n'
+                'Has Data: ${snapshot.hasData}\n'
+                'Has Error: ${snapshot.hasError}\n'
+                'Docs: ${snapshot.hasData ? snapshot.data!.docs.length : 0}\n'
+                'Error: ${snapshot.hasError ? snapshot.error.toString().substring(0, 100) : 'None'}',
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+              ),
+            );
+            
+            debugPrint('StreamBuilder state: ${snapshot.connectionState}');
+            debugPrint('Has data: ${snapshot.hasData}');
+            debugPrint('Has error: ${snapshot.hasError}');
+            if (snapshot.hasError) {
+              debugPrint('Error: ${snapshot.error}');
+            }
+            if (snapshot.hasData) {
+              debugPrint('Docs count: ${snapshot.data!.docs.length}');
+            }
+          }
+
+          // Show loading state with debug info
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Column(
+              children: [
+                debugWidget,
+                Expanded(child: _buildSkeletonLoading()),
+              ],
+            );
+          }
+
+          // Show error state with detailed error info
           if (snapshot.hasError) {
-            debugPrint('Error: ${snapshot.error}');
+            return Column(
+              children: [
+                debugWidget,
+                Expanded(child: _buildDetailedErrorState(snapshot.error.toString())),
+              ],
+            );
           }
-          if (snapshot.hasData) {
-            debugPrint('Docs count: ${snapshot.data!.docs.length}');
+
+          // Show empty state with debug info
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return Column(
+              children: [
+                debugWidget,
+                Expanded(child: _buildEmptyStateWithDebug()),
+              ],
+            );
           }
-        }
-
-        // Show loading state - simplified condition
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildSkeletonLoading();
-        }
-
-        // Show error state with retry button
-        if (snapshot.hasError) {
-          return _buildErrorState(error: snapshot.error.toString());
-        }
-
-        // Show empty state
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyState();
-        }
 
         // Process events data
         List<EventModel> eventsList = snapshot.data!.docs
@@ -980,12 +1058,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
         return Column(
           children: [
-            // Featured Events Carousel - show if there are featured events (regardless of filter)
-            if (featuredEvents.isNotEmpty)
-              _buildFeaturedCarousel(featuredEvents),
+            debugWidget,
+            Expanded(
+              child: Column(
+                children: [
+                  // Featured Events Carousel - show if there are featured events (regardless of filter)
+                  if (featuredEvents.isNotEmpty)
+                    _buildFeaturedCarousel(featuredEvents),
 
-            // All Events List - show events in chronological order
-            _buildEventsList(allEventsInChronologicalOrder),
+                  // All Events List - show events in chronological order
+                  Expanded(child: _buildEventsList(allEventsInChronologicalOrder)),
+                ],
+              ),
+            ),
           ],
         );
       },
@@ -2080,6 +2165,269 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   : _buildEventsSearchResults(),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailedErrorState(String error) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Colors.red,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Firestore Connection Error',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Error Details:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    error.length > 200 ? '${error.substring(0, 200)}...' : error,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                if (mounted) setState(() {});
+              },
+              child: const Text('Retry Connection'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyStateWithDebug() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.info_outline,
+              size: 64,
+              color: Colors.blue,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Firestore Connected Successfully',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.green,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Collection: ${EventModel.firebaseKey}',
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.yellow.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange),
+              ),
+              child: const Column(
+                children: [
+                  Text(
+                    '🎯 No Events Found',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'The database connection is working, but there are currently no events in the "Events" collection.',
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                RouterClass.nextScreenNormal(context, const ChoseDateTimeScreen());
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF667EEA),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Create First Event'),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                // Show sample static events for testing
+                _showSampleEvents();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Show Sample Events (Test UI)'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSampleEvents() {
+    // Create sample events to test UI components
+    List<EventModel> sampleEvents = [
+      EventModel(
+        id: 'sample1',
+        groupName: 'Tech Meetup',
+        title: 'Flutter Development Workshop',
+        description: 'Learn Flutter development basics',
+        location: 'Community Center',
+        customerUid: 'sample-user',
+        imageUrl: 'https://via.placeholder.com/300x200/667EEA/FFFFFF?text=Flutter+Workshop',
+        selectedDateTime: DateTime.now().add(const Duration(days: 1)),
+        eventGenerateTime: DateTime.now(),
+        status: 'active',
+        private: false,
+        getLocation: true,
+        radius: 100,
+        latitude: 37.7749,
+        longitude: -122.4194,
+        categories: ['Educational'],
+        isFeatured: true,
+        featureEndDate: DateTime.now().add(const Duration(days: 30)),
+        ticketsEnabled: true,
+        maxTickets: 50,
+        issuedTickets: 12,
+        eventDuration: 3,
+        coHosts: [],
+        signInMethods: ['qr_code'],
+        manualCode: null,
+      ),
+      EventModel(
+        id: 'sample2',
+        groupName: 'Business Network',
+        title: 'Networking Event',
+        description: 'Professional networking opportunity',
+        location: 'Downtown Office',
+        customerUid: 'sample-user',
+        imageUrl: 'https://via.placeholder.com/300x200/764BA2/FFFFFF?text=Networking',
+        selectedDateTime: DateTime.now().add(const Duration(days: 3)),
+        eventGenerateTime: DateTime.now(),
+        status: 'active',
+        private: false,
+        getLocation: true,
+        radius: 200,
+        latitude: 37.7849,
+        longitude: -122.4094,
+        categories: ['Professional'],
+        isFeatured: false,
+        featureEndDate: null,
+        ticketsEnabled: false,
+        maxTickets: 0,
+        issuedTickets: 0,
+        eventDuration: 2,
+        coHosts: [],
+        signInMethods: ['manual_code'],
+        manualCode: 'NET123',
+      ),
+    ];
+
+    // Navigate to a new screen showing sample events
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.8,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    const Text(
+                      'Sample Events (UI Test)',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: sampleEvents.length,
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _buildEventCard(sampleEvents[index]),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
