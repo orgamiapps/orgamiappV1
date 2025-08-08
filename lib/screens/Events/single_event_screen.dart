@@ -17,32 +17,32 @@ import 'package:orgami/models/attendance_model.dart';
 
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/models/event_question_model.dart';
-import 'package:orgami/Screens/Events/Attendance/attendance_sheet_screen.dart';
+import 'package:orgami/screens/Events/Attendance/attendance_sheet_screen.dart';
 
-import 'package:orgami/Screens/Events/Widget/comments_section.dart';
-import 'package:orgami/Screens/Events/Widget/sign_in_methods_display.dart';
-import 'package:orgami/Screens/Events/ticket_management_screen.dart';
-import 'package:orgami/Screens/Events/ticket_scanner_screen.dart';
-import 'package:orgami/Screens/Events/event_analytics_screen.dart';
-import 'package:orgami/Screens/Events/event_feedback_screen.dart';
-import 'package:orgami/Screens/Events/event_feedback_management_screen.dart';
-import 'package:orgami/Screens/Home/attendee_notification_screen.dart';
-import 'package:orgami/Screens/MyProfile/my_tickets_screen.dart';
-import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
+import 'package:orgami/screens/Events/Widget/comments_section.dart';
+import 'package:orgami/screens/Events/Widget/sign_in_methods_display.dart';
+import 'package:orgami/screens/Events/ticket_management_screen.dart';
+import 'package:orgami/screens/Events/ticket_scanner_screen.dart';
+import 'package:orgami/screens/Events/event_analytics_screen.dart';
+import 'package:orgami/screens/Events/event_feedback_screen.dart';
+import 'package:orgami/screens/Events/event_feedback_management_screen.dart';
+import 'package:orgami/screens/Home/attendee_notification_screen.dart';
+import 'package:orgami/screens/MyProfile/my_tickets_screen.dart';
+import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
 
-// import 'package:orgami/Screens/QRScanner/QrScannerScreenForLogedIn.dart';
-import 'package:orgami/Screens/QRScanner/qr_scanner_flow_screen.dart';
-import 'package:orgami/utils/colors.dart';
-import 'package:orgami/utils/router.dart';
-import 'package:orgami/utils/toast.dart';
-import 'package:orgami/utils/logger.dart';
+// import 'package:orgami/screens/QRScanner/QrScannerScreenForLogedIn.dart';
+import 'package:orgami/screens/QRScanner/qr_scanner_flow_screen.dart';
+import 'package:orgami/Utils/Colors.dart';
+import 'package:orgami/Utils/Router.dart';
+import 'package:orgami/Utils/Toast.dart';
+import 'package:orgami/Utils/logger.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
-import 'package:orgami/Screens/Events/chose_location_in_map_screen.dart';
-import 'package:orgami/Screens/Events/feature_event_screen.dart';
-import 'package:orgami/Screens/Events/edit_event_screen.dart';
-import 'package:orgami/Screens/Events/event_location_view_screen.dart';
+import 'package:orgami/screens/Events/chose_location_in_map_screen.dart';
+import 'package:orgami/screens/Events/feature_event_screen.dart';
+import 'package:orgami/screens/Events/edit_event_screen.dart';
+import 'package:orgami/screens/Events/event_location_view_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
