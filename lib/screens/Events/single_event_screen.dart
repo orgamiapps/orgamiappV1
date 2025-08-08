@@ -4247,51 +4247,69 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
   Widget _buildHyperRealisticGlobeButton() {
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0.0, end: 1.0),
-      duration: const Duration(seconds: 3),
-      curve: Curves.elasticOut,
+      duration: const Duration(seconds: 4),
+      curve: Curves.easeInOutCubic,
       builder: (context, animationValue, child) {
         return Transform.scale(
-          scale: 0.8 + (0.2 * animationValue),
+          scale: 0.85 + (0.15 * animationValue),
           child: Container(
-            width: 48,
-            height: 48,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
+              // Enhanced 3D gradient for more realistic sphere effect
               gradient: RadialGradient(
-                center: const Alignment(-0.3, -0.5),
-                radius: 1.2,
-                stops: const [0.0, 0.4, 0.7, 1.0],
+                center: const Alignment(-0.4, -0.6),
+                radius: 1.4,
+                stops: const [0.0, 0.2, 0.5, 0.7, 0.85, 1.0],
                 colors: [
-                  const Color(0xFF87CEEB), // Light sky blue (highlight)
+                  const Color(0xFFE6F3FF), // Bright highlight
+                  const Color(0xFF87CEEB), // Light sky blue
                   const Color(0xFF4169E1), // Royal blue (ocean)
-                  const Color(0xFF228B22), // Forest green (land)
-                  const Color(0xFF1E3A8A), // Dark blue (deep ocean/shadow)
+                  const Color(0xFF1E6091), // Medium ocean blue
+                  const Color(0xFF0D2F5C), // Deep ocean
+                  const Color(0xFF051529), // Shadow edge
                 ],
               ),
+              // Enhanced shadows for better 3D effect and clickability cues
               boxShadow: [
-                // Outer glow
+                // Outer elevated shadow for clickable appearance
                 BoxShadow(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.4),
-                  spreadRadius: 2,
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+                  color: const Color(0xFF2563EB).withValues(alpha: 0.3),
+                  spreadRadius: 1,
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
                 ),
-                // Inner shadow for depth
+                // Inner depth shadow
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  spreadRadius: -2,
+                  color: Colors.black.withValues(alpha: 0.4),
+                  spreadRadius: -3,
+                  blurRadius: 12,
+                  offset: const Offset(3, 3),
+                ),
+                // Subtle outer glow for interactivity
+                BoxShadow(
+                  color: const Color(0xFF60A5FA).withValues(alpha: 0.6),
+                  spreadRadius: 0,
                   blurRadius: 8,
-                  offset: const Offset(2, 2),
+                  offset: const Offset(0, 0),
                 ),
               ],
+              // Subtle border for clickability
+              border: Border.all(
+                color: const Color(0xFF93C5FD).withValues(alpha: 0.4),
+                width: 0.5,
+              ),
             ),
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(26),
+                splashColor: const Color(0xFF60A5FA).withValues(alpha: 0.3),
+                highlightColor: const Color(0xFF93C5FD).withValues(alpha: 0.2),
                 onTap: () {
-                  // Add haptic feedback for modern interaction
-                  HapticFeedback.lightImpact();
+                  // Enhanced haptic feedback
+                  HapticFeedback.mediumImpact();
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (context) =>
@@ -4302,70 +4320,109 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Rotating background pattern for continents
-                    Transform.rotate(
-                      angle: animationValue * 2 * pi / 8, // Slow rotation
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            center: const Alignment(0.3, -0.2),
-                            radius: 0.8,
-                            colors: [
-                              Colors.transparent,
-                              const Color(0xFF228B22).withValues(alpha: 0.6),
-                              const Color(0xFF32CD32).withValues(alpha: 0.4),
-                              Colors.transparent,
-                            ],
-                          ),
+                    // Base globe surface
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          center: const Alignment(0.2, -0.3),
+                          radius: 0.9,
+                          colors: [
+                            const Color(0xFF228B22).withValues(alpha: 0.3),
+                            const Color(0xFF32CD32).withValues(alpha: 0.2),
+                            Colors.transparent,
+                          ],
                         ),
                       ),
                     ),
-                    // Continental outline effect
+                    // Rotating continents
+                    Transform.rotate(
+                      angle:
+                          animationValue *
+                          2 *
+                          pi /
+                          12, // Slower, more realistic rotation
+                      child: CustomPaint(
+                        size: const Size(44, 44),
+                        painter: EnhancedContinentPainter(animationValue),
+                      ),
+                    ),
+                    // Enhanced grid system
                     CustomPaint(
-                      size: const Size(40, 40),
-                      painter: ContinentPainter(animationValue),
+                      size: const Size(46, 46),
+                      painter: RealisticGridPainter(animationValue),
                     ),
-                    // Shimmer highlight effect
+                    // Atmospheric glow effect
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          center: const Alignment(-0.3, -0.4),
+                          radius: 1.1,
+                          colors: [
+                            Colors.white.withValues(
+                              alpha: 0.4 * animationValue,
+                            ),
+                            Colors.white.withValues(
+                              alpha: 0.1 * animationValue,
+                            ),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Subtle rotating shimmer for interactivity
                     Transform.rotate(
-                      angle: animationValue * 2 * pi / 3,
+                      angle: animationValue * 2 * pi / 2,
                       child: Container(
-                        width: 44,
-                        height: 44,
+                        width: 46,
+                        height: 46,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+                          gradient: SweepGradient(
                             colors: [
-                              Colors.white.withValues(
-                                alpha: 0.6 * animationValue,
-                              ),
                               Colors.transparent,
-                              Colors.white.withValues(
-                                alpha: 0.3 * animationValue,
-                              ),
+                              Colors.white.withValues(alpha: 0.3),
+                              Colors.transparent,
+                              Colors.transparent,
                             ],
+                            stops: const [0.0, 0.1, 0.2, 1.0],
                           ),
                         ),
                       ),
                     ),
-                    // Pulse animation overlay
+                    // Click indicator pulse
                     AnimatedContainer(
                       duration: Duration(
-                        milliseconds: (1000 + (animationValue * 2000)).round(),
+                        milliseconds: (2000 + (animationValue * 1000)).round(),
                       ),
-                      width: 44 + (4 * sin(animationValue * 2 * pi)),
-                      height: 44 + (4 * sin(animationValue * 2 * pi)),
+                      width: 48 + (3 * sin(animationValue * 2 * pi)),
+                      height: 48 + (3 * sin(animationValue * 2 * pi)),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: const Color(
-                            0xFF667EEA,
-                          ).withValues(alpha: 0.3 * (1 - animationValue * 0.5)),
-                          width: 1,
+                            0xFF60A5FA,
+                          ).withValues(alpha: 0.4 * (1 - animationValue * 0.3)),
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                    // Tap indicator overlay
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(
+                              0xFFFFFFFF,
+                            ).withValues(alpha: 0.2),
+                            width: 0.5,
+                          ),
                         ),
                       ),
                     ),
@@ -4380,51 +4437,201 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
   }
 }
 
-/// Custom painter for drawing continent-like shapes on the globe
-class ContinentPainter extends CustomPainter {
+/// Enhanced custom painter for drawing more realistic continent shapes on the globe
+class EnhancedContinentPainter extends CustomPainter {
   final double animationValue;
 
-  ContinentPainter(this.animationValue);
+  EnhancedContinentPainter(this.animationValue);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF228B22).withValues(alpha: 0.8)
-      ..style = PaintingStyle.fill;
-
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
 
-    // Draw simplified continent shapes
-    // Africa-like shape
-    final africaPath = Path()
+    // Clip to circle first
+    canvas.clipRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: center, width: size.width, height: size.height),
+        Radius.circular(radius),
+      ),
+    );
+
+    // Save canvas state for rotation
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(animationValue * 2 * pi / 15); // Slower rotation
+    canvas.translate(-center.dx, -center.dy);
+
+    // Enhanced continent colors with gradients
+    final landPaint = Paint()
+      ..shader =
+          RadialGradient(
+            center: const Alignment(0.2, -0.3),
+            radius: 1.2,
+            colors: [
+              const Color(
+                0xFF32CD32,
+              ).withValues(alpha: 0.9), // Bright green highlight
+              const Color(0xFF228B22).withValues(alpha: 0.8), // Medium green
+              const Color(
+                0xFF006400,
+              ).withValues(alpha: 0.7), // Dark green shadow
+            ],
+          ).createShader(
+            Rect.fromCenter(
+              center: center,
+              width: size.width,
+              height: size.height,
+            ),
+          )
+      ..style = PaintingStyle.fill;
+
+    // More realistic continent shapes
+    // North America
+    final northAmericaPath = Path()
+      ..moveTo(center.dx - 12, center.dy - 8)
+      ..quadraticBezierTo(
+        center.dx - 8,
+        center.dy - 12,
+        center.dx - 3,
+        center.dy - 10,
+      )
+      ..quadraticBezierTo(
+        center.dx + 2,
+        center.dy - 8,
+        center.dx - 1,
+        center.dy - 4,
+      )
+      ..quadraticBezierTo(
+        center.dx - 6,
+        center.dy - 2,
+        center.dx - 12,
+        center.dy - 8,
+      )
+      ..close();
+
+    // South America
+    final southAmericaPath = Path()
       ..addOval(
         Rect.fromCenter(
-          center: Offset(center.dx + 3, center.dy + 2),
-          width: 8,
-          height: 12,
+          center: Offset(center.dx - 6, center.dy + 8),
+          width: 5,
+          height: 10,
         ),
       );
 
-    // Europe-like shape
+    // Africa (more detailed)
+    final africaPath = Path()
+      ..moveTo(center.dx + 2, center.dy - 6)
+      ..quadraticBezierTo(
+        center.dx + 5,
+        center.dy - 4,
+        center.dx + 6,
+        center.dy + 2,
+      )
+      ..quadraticBezierTo(
+        center.dx + 4,
+        center.dy + 8,
+        center.dx + 2,
+        center.dy + 10,
+      )
+      ..quadraticBezierTo(
+        center.dx - 1,
+        center.dy + 8,
+        center.dx + 1,
+        center.dy + 2,
+      )
+      ..quadraticBezierTo(
+        center.dx - 1,
+        center.dy - 2,
+        center.dx + 2,
+        center.dy - 6,
+      )
+      ..close();
+
+    // Europe
     final europePath = Path()
       ..addOval(
         Rect.fromCenter(
-          center: Offset(center.dx - 2, center.dy - 8),
-          width: 6,
-          height: 4,
+          center: Offset(center.dx + 2, center.dy - 8),
+          width: 4,
+          height: 3,
         ),
       );
 
-    // Asia-like shape
+    // Asia (larger, more detailed)
     final asiaPath = Path()
+      ..moveTo(center.dx + 6, center.dy - 8)
+      ..quadraticBezierTo(
+        center.dx + 12,
+        center.dy - 6,
+        center.dx + 14,
+        center.dy - 2,
+      )
+      ..quadraticBezierTo(
+        center.dx + 12,
+        center.dy + 2,
+        center.dx + 8,
+        center.dy + 1,
+      )
+      ..quadraticBezierTo(
+        center.dx + 4,
+        center.dy - 4,
+        center.dx + 6,
+        center.dy - 8,
+      )
+      ..close();
+
+    // Australia
+    final australiaPath = Path()
       ..addOval(
         Rect.fromCenter(
-          center: Offset(center.dx + 8, center.dy - 5),
-          width: 10,
-          height: 8,
+          center: Offset(center.dx + 10, center.dy + 6),
+          width: 3,
+          height: 2,
         ),
       );
+
+    // Draw all continents
+    canvas.drawPath(northAmericaPath, landPaint);
+    canvas.drawPath(southAmericaPath, landPaint);
+    canvas.drawPath(africaPath, landPaint);
+    canvas.drawPath(europePath, landPaint);
+    canvas.drawPath(asiaPath, landPaint);
+    canvas.drawPath(australiaPath, landPaint);
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(EnhancedContinentPainter oldDelegate) {
+    return oldDelegate.animationValue != animationValue;
+  }
+}
+
+/// Custom painter for realistic globe grid lines
+class RealisticGridPainter extends CustomPainter {
+  final double animationValue;
+
+  RealisticGridPainter(this.animationValue);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+
+    // Enhanced grid paint with better visibility
+    final gridPaint = Paint()
+      ..color = Colors.white.withValues(
+        alpha: 0.25 + (0.1 * sin(animationValue * 2 * pi)),
+      )
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8;
+
+    final faintGridPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.15)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.4;
 
     // Clip to circle
     canvas.clipRRect(
@@ -4434,47 +4641,91 @@ class ContinentPainter extends CustomPainter {
       ),
     );
 
-    // Draw continents with rotation effect
-    canvas.save();
-    canvas.translate(center.dx, center.dy);
-    canvas.rotate(animationValue * 2 * pi / 12);
-    canvas.translate(-center.dx, -center.dy);
+    // Latitude lines (horizontal) - more realistic spacing
+    final latitudes = [
+      -0.7,
+      -0.35,
+      0.0,
+      0.35,
+      0.7,
+    ]; // Representing major parallels
+    for (double lat in latitudes) {
+      final y = center.dy + (radius * lat);
+      final lineRadius = radius * cos(lat * pi / 2);
 
-    canvas.drawPath(africaPath, paint);
-    canvas.drawPath(europePath, paint);
-    canvas.drawPath(asiaPath, paint);
-
-    canvas.restore();
-
-    // Add grid lines for more realistic globe effect
-    final gridPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.2)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.5;
-
-    // Latitude lines
-    for (int i = 1; i < 4; i++) {
-      final y = center.dy + (radius * 0.6 * (i - 2) / 2);
-      canvas.drawLine(
-        Offset(center.dx - radius * 0.8, y),
-        Offset(center.dx + radius * 0.8, y),
-        gridPaint,
-      );
-    }
-
-    // Longitude lines
-    for (int i = 1; i < 4; i++) {
+      // Draw elliptical latitude lines for 3D effect
       final path = Path();
-      final startAngle = -pi / 2;
-      final sweepAngle = pi;
-      final ovalRect = Rect.fromCenter(
-        center: center,
-        width: radius * 1.6 * (1 - i * 0.2),
-        height: radius * 2,
+      path.addOval(
+        Rect.fromCenter(
+          center: Offset(center.dx, y),
+          width: lineRadius * 2,
+          height: lineRadius * 0.3, // Compressed for 3D perspective
+        ),
       );
-      path.addArc(ovalRect, startAngle, sweepAngle);
-      canvas.drawPath(path, gridPaint);
+
+      canvas.drawPath(
+        path,
+        lat == 0.0 ? gridPaint : faintGridPaint, // Equator more prominent
+      );
     }
+
+    // Longitude lines (vertical) - more realistic curved lines
+    for (int i = 0; i < 8; i++) {
+      final angle = (i * pi / 4);
+      final path = Path();
+
+      // Create curved longitude lines
+      for (double t = -1.0; t <= 1.0; t += 0.1) {
+        final x = center.dx + (radius * 0.9 * sin(angle) * cos(t * pi / 2));
+        final y = center.dy + (radius * 0.9 * t);
+        final z = cos(angle) * cos(t * pi / 2);
+
+        // Only draw visible parts (front of sphere)
+        if (z > 0) {
+          if (t == -1.0) {
+            path.moveTo(x, y);
+          } else {
+            path.lineTo(x, y);
+          }
+        }
+      }
+
+      canvas.drawPath(
+        path,
+        i % 2 == 0 ? gridPaint : faintGridPaint, // Alternate line prominence
+      );
+    }
+
+    // Add prime meridian emphasis
+    final primeMeridianPath = Path();
+    primeMeridianPath.moveTo(center.dx, center.dy - radius * 0.9);
+    primeMeridianPath.lineTo(center.dx, center.dy + radius * 0.9);
+
+    final primeMeridianPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.4)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    canvas.drawPath(primeMeridianPath, primeMeridianPaint);
+  }
+
+  @override
+  bool shouldRepaint(RealisticGridPainter oldDelegate) {
+    return oldDelegate.animationValue != animationValue;
+  }
+}
+
+/// Legacy painter class kept for backward compatibility
+class ContinentPainter extends CustomPainter {
+  final double animationValue;
+
+  ContinentPainter(this.animationValue);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Redirects to enhanced version
+    final enhancedPainter = EnhancedContinentPainter(animationValue);
+    enhancedPainter.paint(canvas, size);
   }
 
   @override
