@@ -14,6 +14,7 @@ import 'package:orgami/Screens/Events/single_event_screen.dart';
 import 'package:orgami/Screens/Home/dashboard_screen.dart';
 
 import 'package:orgami/Utils/router.dart';
+import 'package:orgami/Services/badge_service.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
@@ -226,6 +227,16 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                 .doc(questionId)
                 .set(questionToSave.toJson());
           }
+        }
+
+        // Update user badge for event creation
+        try {
+          await BadgeService().updateBadgeForActivity(
+            FirebaseAuth.instance.currentUser!.uid,
+            'event_created',
+          );
+        } catch (e) {
+          debugPrint('Failed to update badge: $e');
         }
 
         debugPrint('Event Uploaded!');

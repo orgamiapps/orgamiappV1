@@ -10,6 +10,8 @@ import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
+import 'package:orgami/Services/badge_service.dart';
+import 'package:orgami/controller/customer_controller.dart';
 
 class AnsQuestionsToSignInEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -82,7 +84,19 @@ class _AnsQuestionsToSignInEventScreenState
           .collection(AttendanceModel.firebaseKey)
           .doc(newAttendance.id)
           .set(newAttendance.toJson())
-          .then((value) {
+          .then((value) async {
+            // Update user badge for event attendance
+            if (CustomerController.logeInCustomer != null) {
+              try {
+                await BadgeService().updateBadgeForActivity(
+                  CustomerController.logeInCustomer!.uid,
+                  'event_attended',
+                );
+              } catch (e) {
+                debugPrint('Failed to update badge: $e');
+              }
+            }
+            
             if (!mounted) return;
             ShowToast().showSnackBar('Signed In Successfully!', context);
             _btnCtlr.success();

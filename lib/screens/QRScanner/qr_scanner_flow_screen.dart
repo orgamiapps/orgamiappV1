@@ -10,6 +10,7 @@ import 'package:orgami/Utils/toast.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/Screens/Events/single_event_screen.dart';
+import 'package:orgami/Services/badge_service.dart';
 
 class QRScannerFlowScreen extends StatefulWidget {
   const QRScannerFlowScreen({super.key});
@@ -786,6 +787,18 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
               .collection(AttendanceModel.firebaseKey)
               .doc(newAttendanceModel.id)
               .set(newAttendanceModel.toJson());
+
+          // Update user badge for event attendance
+          if (CustomerController.logeInCustomer != null) {
+            try {
+              await BadgeService().updateBadgeForActivity(
+                CustomerController.logeInCustomer!.uid,
+                'event_attended',
+              );
+            } catch (e) {
+              debugPrint('Failed to update badge: $e');
+            }
+          }
 
           ShowToast().showNormalToast(msg: 'Signed In Successfully!');
 
