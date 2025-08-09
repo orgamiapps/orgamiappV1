@@ -1955,27 +1955,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       vertical: 12,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
+                      // Solid white field for maximum contrast with black text
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        width: 1,
+                        color: const Color(0xFFE2E8F0),
+                        width: 1.2,
                       ),
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.search,
-                          color: Colors.white.withValues(alpha: 0.8),
-                          size: 20,
-                        ),
+                        Icon(Icons.search, color: Colors.black54, size: 20),
                         const SizedBox(width: 12),
                         Expanded(
                           child: TextField(
                             controller: _searchController,
                             focusNode: _searchFocusNode,
+                            cursorColor: Colors.black,
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: Colors.black,
                               fontSize: 16,
                               fontFamily: 'Roboto',
                             ),
@@ -1984,7 +1982,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   ? 'Search events by title...'
                                   : 'Search users by name...',
                               hintStyle: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.8),
+                                color: Colors.black45,
                                 fontSize: 16,
                                 fontFamily: 'Roboto',
                               ),
@@ -2010,7 +2008,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             },
                             child: Icon(
                               Icons.clear,
-                              color: Colors.white.withValues(alpha: 0.8),
+                              color: Colors.black54,
                               size: 20,
                             ),
                           ),

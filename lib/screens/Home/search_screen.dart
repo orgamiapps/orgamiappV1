@@ -137,9 +137,18 @@ class _SearchScreenState extends State<SearchScreen>
             width: 1.5,
           ),
         ),
-        child: TextField(
-          controller: _searchController,
-          decoration: InputDecoration(
+        child: Theme(
+          data: Theme.of(context).copyWith(
+            textSelectionTheme: const TextSelectionThemeData(
+              cursorColor: Colors.black,
+              selectionColor: Color(0x33000000),
+              selectionHandleColor: Colors.black,
+            ),
+          ),
+          child: TextField(
+            controller: _searchController,
+            cursorColor: Colors.black,
+            decoration: InputDecoration(
             contentPadding: const EdgeInsets.symmetric(
               vertical: 16,
               horizontal: 16,
@@ -169,10 +178,11 @@ class _SearchScreenState extends State<SearchScreen>
                   )
                 : null,
           ),
-          style: const TextStyle(
-            color: Color(0xFF1E293B),
-            fontSize: 15,
-            fontFamily: 'Roboto',
+            style: const TextStyle(
+              color: Colors.black,
+              fontSize: 15,
+              fontFamily: 'Roboto',
+            ),
           ),
         ),
       ),
