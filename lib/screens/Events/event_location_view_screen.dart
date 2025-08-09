@@ -677,7 +677,8 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
       final shareText =
           'Check out this event: $eventTitle\n'
           'Location: $location\n'
-          'Date: ${DateFormat('EEEE, MMMM dd, yyyy • KK:mm a').format(widget.eventModel.selectedDateTime)}\n'
+          'Date: ${DateFormat('EEEE, MMMM dd, yyyy').format(widget.eventModel.selectedDateTime)}\n'
+          'Time: ${DateFormat('KK:mm a').format(widget.eventModel.selectedDateTime)} – ${DateFormat('KK:mm a').format(widget.eventModel.eventEndTime)}\n'
           'Maps: https://www.google.com/maps/search/?api=1&query=$lat,$lng';
 
       // Use the existing share functionality

@@ -286,7 +286,10 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
           const SizedBox(height: 8),
           _buildInfoRow(
             Icons.access_time,
-            DateFormat.jm().format(widget.eventModel.selectedDateTime),
+            _formatTimeRange(
+              widget.eventModel.selectedDateTime,
+              widget.eventModel.eventEndTime,
+            ),
           ),
           const SizedBox(height: 8),
           _buildLocationRow(context),
@@ -314,6 +317,12 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
         Text(text, style: TextStyle(fontSize: 14, color: Colors.grey[800])),
       ],
     );
+  }
+
+  String _formatTimeRange(DateTime start, DateTime end) {
+    final String startStr = DateFormat.jm().format(start);
+    final String endStr = DateFormat.jm().format(end);
+    return '$startStr – $endStr';
   }
 
   Widget _buildLocationRow(BuildContext context) {

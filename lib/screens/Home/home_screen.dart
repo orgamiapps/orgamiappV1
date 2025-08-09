@@ -2437,9 +2437,7 @@ class _FeaturedEventCardState extends State<_FeaturedEventCard>
                                   ),
                                 ),
                                 child: Text(
-                                  DateFormat(
-                                    'MMM dd, KK:mm a',
-                                  ).format(widget.event.selectedDateTime),
+                                  '${DateFormat('MMM dd, KK:mm a').format(widget.event.selectedDateTime)} – ${DateFormat('KK:mm a').format(widget.event.eventEndTime)}',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w600,

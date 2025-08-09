@@ -1919,9 +1919,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         '''
 ${eventModel.title}
 
-${eventModel.description}
+ ${eventModel.description}
 
-📅 ${DateFormat('EEEE, MMMM d, y').format(eventModel.selectedDateTime)}
+ 📅 ${DateFormat('EEEE, MMMM d, y').format(eventModel.selectedDateTime)}
+ ⏰ ${DateFormat('KK:mm a').format(eventModel.selectedDateTime)} – ${DateFormat('KK:mm a').format(eventModel.eventEndTime)}
 📍 ${eventModel.location}
 
 Join us at: $eventUrl
@@ -1992,7 +1993,7 @@ Join us at: $eventUrl
 
   void _openGoogleCalendar() async {
     final eventUrl = Uri.encodeFull('''
-https://calendar.google.com/calendar/render?action=TEMPLATE&text=${Uri.encodeComponent(eventModel.title)}&dates=${DateFormat('yyyyMMddTHHmmss').format(eventModel.selectedDateTime)}/${DateFormat('yyyyMMddTHHmmss').format(eventModel.selectedDateTime.add(const Duration(hours: 2)))}&details=${Uri.encodeComponent(eventModel.description)}&location=${Uri.encodeComponent(eventModel.location)}
+https://calendar.google.com/calendar/render?action=TEMPLATE&text=${Uri.encodeComponent(eventModel.title)}&dates=${DateFormat('yyyyMMddTHHmmss').format(eventModel.selectedDateTime)}/${DateFormat('yyyyMMddTHHmmss').format(eventModel.eventEndTime)}&details=${Uri.encodeComponent(eventModel.description)}&location=${Uri.encodeComponent(eventModel.location)}
 ''');
 
     if (await canLaunchUrl(Uri.parse(eventUrl))) {
@@ -2004,7 +2005,7 @@ https://calendar.google.com/calendar/render?action=TEMPLATE&text=${Uri.encodeCom
 
   void _openAppleCalendar() async {
     final eventUrl = Uri.encodeFull('''
-https://calendar.google.com/calendar/render?action=TEMPLATE&text=${Uri.encodeComponent(eventModel.title)}&dates=${DateFormat('yyyyMMddTHHmmss').format(eventModel.selectedDateTime)}/${DateFormat('yyyyMMddTHHmmss').format(eventModel.selectedDateTime.add(const Duration(hours: 2)))}&details=${Uri.encodeComponent(eventModel.description)}&location=${Uri.encodeComponent(eventModel.location)}
+https://calendar.google.com/calendar/render?action=TEMPLATE&text=${Uri.encodeComponent(eventModel.title)}&dates=${DateFormat('yyyyMMddTHHmmss').format(eventModel.selectedDateTime)}/${DateFormat('yyyyMMddTHHmmss').format(eventModel.eventEndTime)}&details=${Uri.encodeComponent(eventModel.description)}&location=${Uri.encodeComponent(eventModel.location)}
 ''');
 
     if (await canLaunchUrl(Uri.parse(eventUrl))) {
@@ -2016,7 +2017,7 @@ https://calendar.google.com/calendar/render?action=TEMPLATE&text=${Uri.encodeCom
 
   void _openOutlookCalendar() async {
     final eventUrl = Uri.encodeFull('''
-https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeComponent(eventModel.title)}&body=${Uri.encodeComponent(eventModel.description)}&startdt=${DateFormat('yyyy-MM-ddTHH:mm:ss').format(eventModel.selectedDateTime)}&enddt=${DateFormat('yyyy-MM-ddTHH:mm:ss').format(eventModel.selectedDateTime.add(const Duration(hours: 2)))}
+https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeComponent(eventModel.title)}&body=${Uri.encodeComponent(eventModel.description)}&startdt=${DateFormat('yyyy-MM-ddTHH:mm:ss').format(eventModel.selectedDateTime)}&enddt=${DateFormat('yyyy-MM-ddTHH:mm:ss').format(eventModel.eventEndTime)}
 ''');
 
     if (await canLaunchUrl(Uri.parse(eventUrl))) {
@@ -3098,9 +3099,8 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               _buildDetailItem(
                 icon: Icons.access_time_rounded,
                 label: 'Time',
-                value: DateFormat(
-                  'KK:mm a',
-                ).format(eventModel.selectedDateTime),
+                value:
+                    '${DateFormat('KK:mm a').format(eventModel.selectedDateTime)} – ${DateFormat('KK:mm a').format(eventModel.eventEndTime)}',
               ),
               const SizedBox(height: 20),
               _buildLocationItem(),
