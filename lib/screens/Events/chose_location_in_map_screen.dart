@@ -3,17 +3,19 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import 'package:orgami/Screens/Events/add_questions_prompt_screen.dart';
+import 'package:orgami/screens/Events/add_questions_prompt_screen.dart';
 import 'package:orgami/Utils/router.dart';
 
 class ChoseLocationInMapScreen extends StatefulWidget {
   final DateTime selectedDateTime;
+  final int eventDurationHours;
   final List<String>? selectedSignInMethods;
   final String? manualCode;
 
   const ChoseLocationInMapScreen({
     super.key,
     required this.selectedDateTime,
+    required this.eventDurationHours,
     this.selectedSignInMethods,
     this.manualCode,
   });
@@ -507,6 +509,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
                       context,
                       AddQuestionsPromptScreen(
                         selectedDateTime: widget.selectedDateTime,
+                        eventDurationHours: widget.eventDurationHours,
                         selectedLocation: selectedLocation!,
                         radios: radius,
                         selectedSignInMethods:

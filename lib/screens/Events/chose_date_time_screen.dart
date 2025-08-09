@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:orgami/Screens/Events/chose_sign_in_methods_screen.dart';
+import 'package:orgami/screens/Events/chose_sign_in_methods_screen.dart';
 import 'package:orgami/Utils/router.dart';
 
 class ChoseDateTimeScreen extends StatefulWidget {
@@ -17,7 +17,9 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
 
   DateTime? selectedDate;
   DateTime todayDate = DateTime.now();
-  TimeOfDay? selectedTime;
+  // Start and end time for the event
+  TimeOfDay? startTime;
+  TimeOfDay? endTime;
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -52,10 +54,10 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
     }
   }
 
-  Future<void> _selectTime(BuildContext context) async {
+  Future<void> _selectStartTime(BuildContext context) async {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
-      initialTime: selectedTime ?? TimeOfDay.now(),
+      initialTime: startTime ?? TimeOfDay.now(),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -70,10 +72,68 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
         );
       },
     );
-    if (picked != null && picked != selectedTime) {
+    if (picked != null && picked != startTime) {
       setState(() {
-        selectedTime = picked;
+        startTime = picked;
+        // Reset end time if it's before the new start time
+        if (endTime != null) {
+          final startMinutes = (startTime!.hour * 60) + startTime!.minute;
+          final endMinutes = (endTime!.hour * 60) + endTime!.minute;
+          if (endMinutes <= startMinutes) {
+            endTime = null;
+          }
+        }
       });
+    }
+  }
+
+  Future<void> _selectEndTime(BuildContext context) async {
+    final TimeOfDay initialEnd =
+        endTime ??
+        (startTime != null
+            ? TimeOfDay(
+                hour: (startTime!.hour + 1) % 24,
+                minute: startTime!.minute,
+              )
+            : TimeOfDay.now());
+
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: initialEnd,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF667EEA),
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Color(0xFF1A1A1A),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      // Ensure end time is after start time (same day). If invalid, keep previous or null.
+      if (startTime != null) {
+        final startMinutes = (startTime!.hour * 60) + startTime!.minute;
+        final endMinutes = (picked.hour * 60) + picked.minute;
+        if (endMinutes > startMinutes) {
+          setState(() => endTime = picked);
+        } else {
+          // If invalid, just ignore; a small UX hint could be added with a SnackBar
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('End time must be after start time'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } else {
+        // If no start time yet, set end time and let user pick start; but better to require start first
+        setState(() => endTime = picked);
+      }
     }
   }
 
@@ -218,34 +278,69 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
               onTap: () => _selectDate(context),
             ),
             const SizedBox(height: 20),
-            // Time Selection Card
+            // Start Time Selection Card
             _buildSelectionCard(
-              icon: Icons.access_time_rounded,
-              title: selectedTime != null
-                  ? 'Selected Time'
-                  : 'Choose Your Time',
-              subtitle: selectedTime != null
+              icon: Icons.play_circle_fill_rounded,
+              title: startTime != null ? 'Start Time' : 'Choose Start Time',
+              subtitle: startTime != null
                   ? DateFormat('KK:mm a').format(
                       DateTime(
                         selectedDate?.year ?? DateTime.now().year,
                         selectedDate?.month ?? DateTime.now().month,
                         selectedDate?.day ?? DateTime.now().day,
-                        selectedTime!.hour,
-                        selectedTime!.minute,
+                        startTime!.hour,
+                        startTime!.minute,
                       ),
                     )
-                  : 'Tap to select a time',
-              isSelected: selectedTime != null,
-              onTap: () => _selectTime(context),
+                  : 'Tap to select start time',
+              isSelected: startTime != null,
+              onTap: () => _selectStartTime(context),
+            ),
+            const SizedBox(height: 12),
+            // End Time Selection Card
+            _buildSelectionCard(
+              icon: Icons.stop_circle_rounded,
+              title: endTime != null ? 'End Time' : 'Choose End Time',
+              subtitle: endTime != null
+                  ? DateFormat('KK:mm a').format(
+                      DateTime(
+                        selectedDate?.year ?? DateTime.now().year,
+                        selectedDate?.month ?? DateTime.now().month,
+                        selectedDate?.day ?? DateTime.now().day,
+                        endTime!.hour,
+                        endTime!.minute,
+                      ),
+                    )
+                  : (startTime == null
+                        ? 'Pick start time first'
+                        : 'Tap to select end time'),
+              isSelected: endTime != null,
+              onTap: startTime == null
+                  ? () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please select a start time first'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  : () => _selectEndTime(context),
             ),
             const Spacer(),
             // Continue Button
-            if (selectedDate != null && selectedTime != null)
-              _buildContinueButton(),
+            if (_canContinue) _buildContinueButton(),
           ],
         ),
       ),
     );
+  }
+
+  bool get _canContinue {
+    if (selectedDate == null || startTime == null || endTime == null)
+      return false;
+    final startMinutes = (startTime!.hour * 60) + startTime!.minute;
+    final endMinutes = (endTime!.hour * 60) + endTime!.minute;
+    return endMinutes > startMinutes;
   }
 
   Widget _buildSelectionCard({
@@ -374,17 +469,27 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () {
-            DateTime selectedDateAndTime = DateTime(
+            // Build start DateTime
+            final DateTime startDateTime = DateTime(
               selectedDate!.year,
               selectedDate!.month,
               selectedDate!.day,
-              selectedTime!.hour,
-              selectedTime!.minute,
+              startTime!.hour,
+              startTime!.minute,
             );
+            // Compute duration in whole hours (ceil), min 1 hour
+            final int diffMinutes =
+                (endTime!.hour * 60 + endTime!.minute) -
+                (startTime!.hour * 60 + startTime!.minute);
+            int durationHours = (diffMinutes / 60).ceil();
+            if (durationHours < 1) durationHours = 1;
 
             RouterClass.nextScreenNormal(
               context,
-              ChoseSignInMethodsScreen(selectedDateTime: selectedDateAndTime),
+              ChoseSignInMethodsScreen(
+                selectedDateTime: startDateTime,
+                eventDurationHours: durationHours,
+              ),
             );
           },
           child: const Center(

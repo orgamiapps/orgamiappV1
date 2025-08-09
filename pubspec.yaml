@@ -59,6 +59,7 @@ dependencies:
   shimmer: ^3.0.0
   fl_chart: ^1.0.0
   csv: ^6.0.0
+  flutter_staggered_grid_view: ^0.7.0
   # AI and ML dependencies
   # firebase_ml_kit: ^0.16.3  # Removed due to compatibility issues
   # firebase_ml_model_downloader: ^0.2.3+8  # Removed due to compatibility issues

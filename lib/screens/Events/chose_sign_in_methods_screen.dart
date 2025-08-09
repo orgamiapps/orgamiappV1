@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:orgami/Screens/Events/chose_location_in_map_screen.dart';
-import 'package:orgami/Screens/Events/add_questions_prompt_screen.dart';
+import 'package:orgami/screens/Events/chose_location_in_map_screen.dart';
+import 'package:orgami/screens/Events/add_questions_prompt_screen.dart';
 import 'package:orgami/Screens/Events/Widget/sign_in_methods_selector.dart';
 import 'package:orgami/Utils/router.dart';
 
 class ChoseSignInMethodsScreen extends StatefulWidget {
   final DateTime selectedDateTime;
+  final int eventDurationHours;
 
-  const ChoseSignInMethodsScreen({super.key, required this.selectedDateTime});
+  const ChoseSignInMethodsScreen({
+    super.key,
+    required this.selectedDateTime,
+    required this.eventDurationHours,
+  });
 
   @override
   State<ChoseSignInMethodsScreen> createState() =>
@@ -248,6 +253,7 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
                 context,
                 ChoseLocationInMapScreen(
                   selectedDateTime: widget.selectedDateTime,
+                  eventDurationHours: widget.eventDurationHours,
                   selectedSignInMethods: _selectedSignInMethods,
                   manualCode: _manualCode,
                 ),
@@ -258,6 +264,7 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
                 context,
                 AddQuestionsPromptScreen(
                   selectedDateTime: widget.selectedDateTime,
+                  eventDurationHours: widget.eventDurationHours,
                   selectedLocation: const LatLng(0, 0), // Default location
                   radios: 10.0, // Default radius
                   selectedSignInMethods: _selectedSignInMethods,

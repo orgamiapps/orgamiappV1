@@ -40,7 +40,7 @@ import 'package:orgami/utils/logger.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
-import 'package:orgami/Screens/Events/chose_location_in_map_screen.dart';
+import 'package:orgami/screens/Events/chose_location_in_map_screen.dart';
 import 'package:orgami/Screens/Events/feature_event_screen.dart';
 import 'package:orgami/Screens/Events/edit_event_screen.dart';
 import 'package:orgami/Screens/Events/event_location_view_screen.dart';
@@ -1549,6 +1549,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                         ChoseLocationInMapScreen(
                                           selectedDateTime:
                                               eventModel.selectedDateTime,
+                                          eventDurationHours:
+                                              eventModel.eventDuration,
                                         ),
                                   ),
                                 ).then((_) => _showEventManagementModal());
@@ -3401,9 +3403,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                     const SizedBox(width: 2),
                     Expanded(
                       child: Text(
-                        _addressLookupFailed
-                            ? 'Approx.'
-                            : 'From coords',
+                        _addressLookupFailed ? 'Approx.' : 'From coords',
                         style: TextStyle(
                           color: _addressLookupFailed ? _orange : _primaryBlue,
                           fontSize: 9,

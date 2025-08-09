@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/models/event_question_model.dart';
-import 'package:orgami/Screens/Events/Widget/add_question_popup.dart';
-import 'package:orgami/Screens/Events/create_event_screen.dart';
+import 'package:orgami/screens/Events/Widget/add_question_popup.dart';
+import 'package:orgami/screens/Events/create_event_screen.dart';
 import 'package:orgami/Utils/router.dart';
 
 class AddQuestionsToEventScreen extends StatefulWidget {
@@ -32,6 +33,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
   List<EventQuestionModel> questionsList = [];
   bool _isLoading = true;
   bool _showTemplates = false;
+  final Set<String> _selectedTemplateTitles = <String>{};
   String _selectedTemplateCategory = 'All'; // New category filter
   final TextEditingController _searchController =
       TextEditingController(); // New search functionality
@@ -462,10 +464,9 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
     _fadeController.forward();
     _slideController.forward();
 
-    // Show templates by default during event creation
-    if (widget.eventModel.id.isEmpty) {
-      _showTemplates = true;
-    }
+    // Start with templates collapsed to reduce initial overwhelm
+    // Users can expand when they want to browse all templates.
+    _showTemplates = false;
 
     _getQuestions();
   }
@@ -851,7 +852,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
 
             const SizedBox(height: 16),
 
-            // Results count and category info
+            // Results count and selected count
             if (_filteredTemplates.isNotEmpty) ...[
               Row(
                 children: [
@@ -894,21 +895,23 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
             if (_filteredTemplates.isEmpty)
               _buildEmptyTemplatesState()
             else
-              GridView.builder(
+              MasonryGridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 1.0, // More square for better layout
-                ),
+                crossAxisCount: 2,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
                 itemCount: _filteredTemplates.length,
                 itemBuilder: (context, index) {
                   final template = _filteredTemplates[index];
                   return _buildTemplateCard(template);
                 },
               ),
+
+            if (_showTemplates && _selectedTemplateTitles.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _buildAddSelectedBar(),
+            ],
           ],
         ],
       ),
@@ -967,23 +970,38 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
           question.questionTitle.toLowerCase().trim() ==
           questionTitle.toLowerCase().trim(),
     );
+    final bool isSelected = _selectedTemplateTitles.contains(questionTitle);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => _addTemplateQuestion(template),
+        onTap: () {
+          if (isAlreadyAdded) return;
+          setState(() {
+            if (isSelected) {
+              _selectedTemplateTitles.remove(questionTitle);
+            } else {
+              _selectedTemplateTitles.add(questionTitle);
+            }
+          });
+        },
+        onLongPress: () => _showTemplatePreview(template),
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: isAlreadyAdded
                 ? const Color(0xFFF3F4F6)
-                : template['color'].withValues(alpha: 0.08),
+                : (isSelected
+                      ? template['color'].withValues(alpha: 0.18)
+                      : template['color'].withValues(alpha: 0.08)),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isAlreadyAdded
                   ? const Color(0xFFE5E7EB)
-                  : template['color'].withValues(alpha: 0.2),
+                  : (isSelected
+                        ? template['color']
+                        : template['color'].withValues(alpha: 0.2)),
               width: 1.5,
             ),
           ),
@@ -1003,7 +1021,9 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
-                      isAlreadyAdded ? Icons.check : template['icon'],
+                      isAlreadyAdded
+                          ? Icons.check
+                          : (isSelected ? Icons.check : template['icon']),
                       color: Colors.white,
                       size: 16,
                     ),
@@ -1022,7 +1042,9 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        isAlreadyAdded ? 'Added' : template['category'],
+                        isAlreadyAdded
+                            ? 'Added'
+                            : (isSelected ? 'Selected' : template['category']),
                         style: TextStyle(
                           color: isAlreadyAdded
                               ? const Color(0xFF6B7280)
@@ -1041,23 +1063,19 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
               const SizedBox(height: 10),
 
               // Question title
-              Expanded(
-                child: Text(
-                  template['title'],
-                  style: TextStyle(
-                    color: isAlreadyAdded
-                        ? const Color(0xFF6B7280)
-                        : const Color(0xFF1A1A1A),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Roboto',
-                    height: 1.3,
-                    decoration: isAlreadyAdded
-                        ? TextDecoration.lineThrough
-                        : TextDecoration.none,
-                  ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
+              Text(
+                template['title'],
+                style: TextStyle(
+                  color: isAlreadyAdded
+                      ? const Color(0xFF6B7280)
+                      : const Color(0xFF1A1A1A),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Roboto',
+                  height: 1.35,
+                  decoration: isAlreadyAdded
+                      ? TextDecoration.lineThrough
+                      : TextDecoration.none,
                 ),
               ),
               const SizedBox(height: 8),
@@ -1078,14 +1096,16 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
               ),
               const SizedBox(height: 10),
 
-              // Add button
+              // Selection hint bar
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 decoration: BoxDecoration(
                   color: isAlreadyAdded
                       ? const Color(0xFFF3F4F6)
-                      : template['color'].withValues(alpha: 0.1),
+                      : (isSelected
+                            ? template['color'].withValues(alpha: 0.18)
+                            : template['color'].withValues(alpha: 0.1)),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -1094,7 +1114,9 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
                     Icon(
                       isAlreadyAdded
                           ? Icons.check_circle
-                          : Icons.add_circle_outline,
+                          : (isSelected
+                                ? Icons.check_circle
+                                : Icons.radio_button_unchecked),
                       color: isAlreadyAdded
                           ? const Color(0xFF6B7280)
                           : template['color'],
@@ -1102,7 +1124,9 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      isAlreadyAdded ? 'Already Added' : 'Add Question',
+                      isAlreadyAdded
+                          ? 'Already Added'
+                          : (isSelected ? 'Selected' : 'Tap to Select'),
                       style: TextStyle(
                         color: isAlreadyAdded
                             ? const Color(0xFF6B7280)
@@ -1120,6 +1144,65 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
         ),
       ),
     );
+  }
+
+  Widget _buildAddSelectedBar() {
+    final Color accent = const Color(0xFF667EEA);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accent.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '${_selectedTemplateTitles.length} selected',
+              style: TextStyle(
+                color: accent,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() => _selectedTemplateTitles.clear());
+            },
+            child: const Text('Clear'),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.add),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accent,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: _handleAddSelected,
+            label: const Text('Add Selected'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleAddSelected() {
+    if (_selectedTemplateTitles.isEmpty) return;
+    final List<Map<String, dynamic>> selectedTemplates = _filteredTemplates
+        .where((t) => _selectedTemplateTitles.contains(t['title'] as String))
+        .toList();
+
+    for (final template in selectedTemplates) {
+      _addTemplateQuestion(template);
+    }
+    setState(() => _selectedTemplateTitles.clear());
   }
 
   Widget _buildCurrentQuestionsSection() {
@@ -1396,6 +1479,141 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
     );
   }
 
+  void _showTemplatePreview(Map<String, dynamic> template) {
+    final String title = template['title'] as String;
+    final String? description = template['description'] as String?;
+    final Color accent =
+        (template['color'] as Color?) ?? const Color(0xFF667EEA);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        final bool isAlreadyAdded = questionsList.any(
+          (q) =>
+              q.questionTitle.toLowerCase().trim() ==
+              title.toLowerCase().trim(),
+        );
+
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.06),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: accent,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.auto_awesome,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1A1A1A),
+                          fontFamily: 'Roboto',
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (description != null && description.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+                  child: Text(
+                    description,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF4B5563),
+                      fontFamily: 'Roboto',
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: BorderSide(color: accent),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Close'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isAlreadyAdded
+                              ? const Color(0xFFF3F4F6)
+                              : accent,
+                          foregroundColor: isAlreadyAdded
+                              ? const Color(0xFF6B7280)
+                              : Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        onPressed: isAlreadyAdded
+                            ? null
+                            : () {
+                                Navigator.of(context).pop();
+                                _addTemplateQuestion(template);
+                              },
+                        child: Text(
+                          isAlreadyAdded ? 'Already Added' : 'Add Question',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildContinueButton() {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -1519,6 +1737,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
         context,
         CreateEventScreen(
           selectedDateTime: widget.eventCreationData!['selectedDateTime'],
+          eventDurationHours: widget.eventCreationData!['eventDurationHours'],
           selectedLocation: widget.eventCreationData!['selectedLocation'],
           radios: widget.eventCreationData!['radios'],
           selectedSignInMethods:

@@ -21,6 +21,7 @@ import 'dart:io';
 
 class CreateEventScreen extends StatefulWidget {
   final DateTime selectedDateTime;
+  final int eventDurationHours;
   final LatLng selectedLocation;
   final double radios;
   final List<String>? selectedSignInMethods;
@@ -30,6 +31,7 @@ class CreateEventScreen extends StatefulWidget {
   const CreateEventScreen({
     super.key,
     required this.selectedDateTime,
+    required this.eventDurationHours,
     required this.selectedLocation,
     required this.radios,
     this.selectedSignInMethods,
@@ -190,6 +192,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           latitude: widget.selectedLocation.latitude,
           private: privateEvent,
           categories: _selectedCategories,
+          eventDuration: widget.eventDurationHours,
           signInMethods: _selectedSignInMethods,
           manualCode: _manualCode,
         );
@@ -421,11 +424,20 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           _buildSummaryItem(
             icon: Icons.access_time_rounded,
             label: 'Time',
-            value: DateFormat('KK:mm a').format(widget.selectedDateTime),
+            value: _timeRangeLabel,
           ),
         ],
       ),
     );
+  }
+
+  String get _timeRangeLabel {
+    final String start = DateFormat('KK:mm a').format(widget.selectedDateTime);
+    final DateTime endDt =
+        widget.selectedDateTime.add(Duration(hours: widget.eventDurationHours));
+    final String end = DateFormat('KK:mm a').format(endDt);
+    final String duration = '${widget.eventDurationHours}h';
+    return '$start – $end ($duration)';
   }
 
   Widget _buildSummaryItem({
