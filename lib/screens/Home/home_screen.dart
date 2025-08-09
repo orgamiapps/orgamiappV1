@@ -1407,9 +1407,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           // View Profile Button
           GestureDetector(
             onTap: () {
+              final isOwn =
+                  CustomerController.logeInCustomer?.uid == user.uid;
               RouterClass.nextScreenNormal(
                 context,
-                UserProfileScreen(user: user),
+                UserProfileScreen(user: user, isOwnProfile: isOwn),
               );
             },
             child: Container(
@@ -1685,10 +1687,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         final user = _defaultUsers[index];
         return GestureDetector(
           onTap: () {
-            RouterClass.nextScreenNormal(
-              context,
-              UserProfileScreen(user: user),
-            );
+              final isOwn =
+                  CustomerController.logeInCustomer?.uid == user.uid;
+              RouterClass.nextScreenNormal(
+                context,
+                UserProfileScreen(user: user, isOwnProfile: isOwn),
+              );
           },
           child: Container(
             padding: const EdgeInsets.all(16),

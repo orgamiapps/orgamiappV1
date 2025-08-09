@@ -557,7 +557,13 @@ class _CommentsModalState extends State<CommentsModal> {
         if (!mounted) return;
         Navigator.pop(context); // Close comments modal first
         if (!mounted) return;
-        RouterClass.nextScreenNormal(context, UserProfileScreen(user: user));
+        RouterClass.nextScreenNormal(
+            context,
+            UserProfileScreen(
+              user: user,
+              isOwnProfile:
+                  CustomerController.logeInCustomer?.uid == user.uid,
+            ));
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(

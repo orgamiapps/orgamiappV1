@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
+import 'package:orgami/controller/customer_controller.dart';
 
 import 'package:orgami/firebase/engagement_predictor.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
@@ -149,35 +150,35 @@ class _SearchScreenState extends State<SearchScreen>
             controller: _searchController,
             cursorColor: Colors.black,
             decoration: InputDecoration(
-            contentPadding: const EdgeInsets.symmetric(
-              vertical: 16,
-              horizontal: 16,
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 16,
+                horizontal: 16,
+              ),
+              border: InputBorder.none,
+              hintText: _tabController.index == 0
+                  ? 'Find events by name, location, or category...'
+                  : 'Find users by name or username...',
+              hintStyle: const TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 15,
+                fontFamily: 'Roboto',
+              ),
+              prefixIcon: const Icon(
+                Icons.search,
+                color: Color(0xFF64748B),
+                size: 22,
+              ),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(
+                        Icons.clear,
+                        color: Color(0xFF64748B),
+                        size: 20,
+                      ),
+                      onPressed: () => _searchController.clear(),
+                    )
+                  : null,
             ),
-            border: InputBorder.none,
-            hintText: _tabController.index == 0
-                ? 'Find events by name, location, or category...'
-                : 'Find users by name or username...',
-            hintStyle: const TextStyle(
-              color: Color(0xFF64748B),
-              fontSize: 15,
-              fontFamily: 'Roboto',
-            ),
-            prefixIcon: const Icon(
-              Icons.search,
-              color: Color(0xFF64748B),
-              size: 22,
-            ),
-            suffixIcon: _searchController.text.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(
-                      Icons.clear,
-                      color: Color(0xFF64748B),
-                      size: 20,
-                    ),
-                    onPressed: () => _searchController.clear(),
-                  )
-                : null,
-          ),
             style: const TextStyle(
               color: Colors.black,
               fontSize: 15,
@@ -696,7 +697,11 @@ class _UsersListState extends State<UsersList>
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => UserProfileScreen(user: user),
+              builder: (context) => UserProfileScreen(
+                user: user,
+                isOwnProfile:
+                    CustomerController.logeInCustomer?.uid == user.uid,
+              ),
             ),
           ),
           child: Padding(

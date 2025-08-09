@@ -7,6 +7,7 @@ import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
 import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:orgami/Utils/logger.dart';
+import 'package:orgami/controller/customer_controller.dart';
 
 class AttendeesHorizontalList extends StatefulWidget {
   final EventModel eventModel;
@@ -256,7 +257,14 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
                                       if (!isAnon && customer != null) {
                                         RouterClass.nextScreenNormal(
                                           context,
-                                          UserProfileScreen(user: customer),
+                                          UserProfileScreen(
+                                            user: customer,
+                                            isOwnProfile:
+                                                CustomerController
+                                                    .logeInCustomer
+                                                    ?.uid ==
+                                                customer.uid,
+                                          ),
                                         );
                                       }
                                     },
@@ -462,7 +470,12 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
                           if (!isAnon && customer != null) {
                             RouterClass.nextScreenNormal(
                               context,
-                              UserProfileScreen(user: customer),
+                              UserProfileScreen(
+                                user: customer,
+                                isOwnProfile:
+                                    CustomerController.logeInCustomer?.uid ==
+                                    customer.uid,
+                              ),
                             );
                           }
                         },

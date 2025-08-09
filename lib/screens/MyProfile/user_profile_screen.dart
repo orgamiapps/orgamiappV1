@@ -108,12 +108,13 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         followingCount = 0;
       }
 
-      // Check if current user is following this user (only if not own profile)
+      // Check if current user is following this user (only if not own profile or same user)
       bool isFollowing = false;
       try {
-        if (!widget.isOwnProfile && CustomerController.logeInCustomer != null) {
+        final currentUserId = CustomerController.logeInCustomer?.uid;
+        if (currentUserId != null && currentUserId != widget.user.uid) {
           isFollowing = await FirebaseFirestoreHelper().isFollowingUser(
-            followerId: CustomerController.logeInCustomer!.uid,
+            followerId: currentUserId,
             followingId: widget.user.uid,
           );
           debugPrint('Follow status: $isFollowing');
@@ -238,7 +239,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             onPressed: () => Navigator.pop(context),
           ),
           const Spacer(),
-          if (!widget.isOwnProfile) ...[
+          if (!widget.isOwnProfile &&
+              CustomerController.logeInCustomer?.uid != widget.user.uid) ...[
             IconButton(
               icon: Container(
                 padding: const EdgeInsets.all(8),
@@ -742,6 +744,12 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     }
 
     if (widget.isOwnProfile) {
+      ShowToast().showNormalToast(msg: 'You cannot follow yourself');
+      return;
+    }
+
+    // Extra safety: prevent following yourself if screen was opened with wrong flag
+    if (CustomerController.logeInCustomer!.uid == widget.user.uid) {
       ShowToast().showNormalToast(msg: 'You cannot follow yourself');
       return;
     }

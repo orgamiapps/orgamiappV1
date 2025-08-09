@@ -8,13 +8,29 @@ service cloud.firestore {
     
     // Allow users to read/write their own customer data
     // Users can only access their own customer document
-    match /Customers/{customerId} {
-      allow read, write: if request.auth != null && request.auth.uid == customerId;
+    match /Customers/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
       allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
       // Allow access to special customer documents for manual/without_login users
-      allow read, write: if request.auth != null && (customerId == 'manual' || customerId == 'without_login');
+      allow read, write: if request.auth != null && (userId == 'manual' || userId == 'without_login');
       // Allow reading any customer document for authenticated users (for debugging)
       allow read: if request.auth != null;
+
+      // Followers subcollection: allow public reads; writes by follower or profile owner
+      match /followers/{followerId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null && request.auth.uid == followerId;
+        allow delete: if request.auth != null && (request.auth.uid == followerId || request.auth.uid == userId);
+        allow update: if false;
+      }
+
+      // Following subcollection: allow public reads; only the owner can modify their following
+      match /following/{followingId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null && request.auth.uid == userId;
+        allow update: if false;
+      }
     }
     
     // Allow authenticated users to access Settings collection for app configuration

@@ -4533,7 +4533,12 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                                         context,
                                         MaterialPageRoute(
                                           builder: (context) =>
-                                              UserProfileScreen(user: customer),
+                                              UserProfileScreen(
+                                                user: customer,
+                                                isOwnProfile: CustomerController
+                                                        .logeInCustomer?.uid ==
+                                                    customer.uid,
+                                              ),
                                         ),
                                       );
                                     }
