@@ -1754,32 +1754,39 @@ class FirebaseFirestoreHelper {
     required String followingId,
   }) async {
     try {
-      // Add to following collection
-      await _firestore
+      if (followerId == followingId) {
+        throw Exception('Users cannot follow themselves');
+      }
+
+      final followerFollowingRef = _firestore
           .collection('Customers')
           .doc(followerId)
           .collection('following')
-          .doc(followingId)
-          .set({
-            'followingId': followingId,
-            'followedAt': FieldValue.serverTimestamp(),
-          });
+          .doc(followingId);
 
-      // Add to followers collection
-      await _firestore
+      final followingFollowersRef = _firestore
           .collection('Customers')
           .doc(followingId)
           .collection('followers')
-          .doc(followerId)
-          .set({
-            'followerId': followerId,
-            'followedAt': FieldValue.serverTimestamp(),
-          });
+          .doc(followerId);
+
+      final batch = _firestore.batch();
+
+      batch.set(followerFollowingRef, {
+        'followingId': followingId,
+        'followedAt': FieldValue.serverTimestamp(),
+      });
+
+      batch.set(followingFollowersRef, {
+        'followerId': followerId,
+        'followedAt': FieldValue.serverTimestamp(),
+      });
+
+      await batch.commit();
 
       Logger.debug('User $followerId is now following $followingId');
     } catch (e) {
       Logger.debug('Error following user: $e');
-      // If permission denied, show user-friendly error
       if (e.toString().contains('permission-denied')) {
         throw Exception(
           'Follow feature is not available. Please contact support.',
@@ -1795,26 +1802,28 @@ class FirebaseFirestoreHelper {
     required String followingId,
   }) async {
     try {
-      // Remove from following collection
-      await _firestore
+      final followerFollowingRef = _firestore
           .collection('Customers')
           .doc(followerId)
           .collection('following')
-          .doc(followingId)
-          .delete();
+          .doc(followingId);
 
-      // Remove from followers collection
-      await _firestore
+      final followingFollowersRef = _firestore
           .collection('Customers')
           .doc(followingId)
           .collection('followers')
-          .doc(followerId)
-          .delete();
+          .doc(followerId);
+
+      final batch = _firestore.batch();
+
+      batch.delete(followerFollowingRef);
+      batch.delete(followingFollowersRef);
+
+      await batch.commit();
 
       Logger.debug('User $followerId unfollowed $followingId');
     } catch (e) {
       Logger.debug('Error unfollowing user: $e');
-      // If permission denied, show user-friendly error
       if (e.toString().contains('permission-denied')) {
         throw Exception(
           'Unfollow feature is not available. Please contact support.',
