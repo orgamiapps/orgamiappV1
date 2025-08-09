@@ -32,6 +32,10 @@ class _SearchScreenState extends State<SearchScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    // Keep the search bar hint and UI in sync when swiping between tabs
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _searchController.addListener(_onSearchChanged);
   }
 
@@ -60,20 +64,22 @@ class _SearchScreenState extends State<SearchScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: _buildAppBar(),
-      body: Column(
-        children: [
-          _buildSearchBar(),
-          _buildTabBar(),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                EventsList(searchQuery: _searchQuery),
-                UsersList(searchQuery: _searchQuery),
-              ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildSearchBar(),
+            _buildTabBar(),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  EventsList(searchQuery: _searchQuery),
+                  UsersList(searchQuery: _searchQuery),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -114,7 +120,12 @@ class _SearchScreenState extends State<SearchScreen>
   Widget _buildSearchBar() {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+      padding: EdgeInsets.fromLTRB(
+        MediaQuery.of(context).size.width * 0.05, // 5% of screen width
+        8,
+        MediaQuery.of(context).size.width * 0.05, // 5% of screen width
+        16,
+      ),
       child: Container(
         decoration: BoxDecoration(
           color: const Color(0xFFF8FAFC),
@@ -171,7 +182,12 @@ class _SearchScreenState extends State<SearchScreen>
   Widget _buildTabBar() {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      padding: EdgeInsets.fromLTRB(
+        MediaQuery.of(context).size.width * 0.05, // 5% of screen width
+        0,
+        MediaQuery.of(context).size.width * 0.05, // 5% of screen width
+        16,
+      ),
       child: Container(
         height: 50,
         decoration: BoxDecoration(
@@ -308,9 +324,12 @@ class _EventsListState extends State<EventsList>
           .limit(_pageSize);
 
       QuerySnapshot snapshot = await query.get();
-      List<EventModel> events = snapshot.docs
-          .map((e) => EventModel.fromJson(e.data() as Map<String, dynamic>))
-          .toList();
+      // Ensure each event includes its document ID even if the field isn't stored
+      List<EventModel> events = snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = data['id'] ?? doc.id;
+        return EventModel.fromJson(data);
+      }).toList();
 
       // Sort events with featured first
       events.sort((a, b) {
@@ -360,9 +379,12 @@ class _EventsListState extends State<EventsList>
           .startAfter([_allEvents.last.selectedDateTime]);
 
       QuerySnapshot snapshot = await query.get();
-      List<EventModel> newEvents = snapshot.docs
-          .map((e) => EventModel.fromJson(e.data() as Map<String, dynamic>))
-          .toList();
+      // Ensure each event includes its document ID even if the field isn't stored
+      List<EventModel> newEvents = snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = data['id'] ?? doc.id;
+        return EventModel.fromJson(data);
+      }).toList();
 
       if (mounted) {
         setState(() {
@@ -735,6 +757,8 @@ class _UsersListState extends State<UsersList>
                           color: Color(0xFF1E293B),
                           fontFamily: 'Roboto',
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       if (user.username != null &&
                           user.username!.isNotEmpty) ...[
@@ -747,6 +771,8 @@ class _UsersListState extends State<UsersList>
                             fontWeight: FontWeight.w500,
                             fontFamily: 'Roboto',
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ],

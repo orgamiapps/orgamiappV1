@@ -225,13 +225,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       vsync: this,
       value: 1.0,
     );
-    _fabOpacityAnimation = Tween<double>(
-      begin: 0.3,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fabOpacityController,
-      curve: Curves.easeInOut,
-    ));
+    _fabOpacityAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _fabOpacityController, curve: Curves.easeInOut),
+    );
 
     // Load default content
     _loadDefaultEvents();
@@ -369,14 +365,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void _onScroll() {
     // Use a threshold to prevent excessive calls during small scroll changes
     const scrollThreshold = 10.0;
-    
+
     // Only process significant scroll changes
-    if ((_scrollController.offset - _lastScrollOffset).abs() < scrollThreshold) {
+    if ((_scrollController.offset - _lastScrollOffset).abs() <
+        scrollThreshold) {
       return;
     }
-    
+
     _lastScrollOffset = _scrollController.offset;
-    
+
     if (_scrollController.offset > _appBarHeight && !_isScrollingDown) {
       _isScrollingDown = true;
       _animateFabOpacity(0.3);
@@ -552,7 +549,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       child: InkWell(
                         borderRadius: BorderRadius.circular(28),
                         onTap: _onFabPressed,
-                        child: const Icon(Icons.add, color: Colors.white, size: 28),
+                        child: const Icon(
+                          Icons.add,
+                          color: Colors.white,
+                          size: 28,
+                        ),
                       ),
                     ),
                   ),
@@ -1286,16 +1287,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return _buildSearchEmptyState();
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        children: _searchEvents.map((event) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-            child: _buildEventCard(event),
-          );
-        }).toList(),
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
       ),
+      itemCount: _searchEvents.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final event = _searchEvents[index];
+        return _buildEventCard(event);
+      },
     );
   }
 
@@ -1308,16 +1310,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return _buildSearchEmptyState();
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        children: _searchUsers.map((user) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-            child: _buildUserCard(user),
-          );
-        }).toList(),
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
       ),
+      itemCount: _searchUsers.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final user = _searchUsers[index];
+        return _buildUserCard(user);
+      },
     );
   }
 
@@ -1616,16 +1619,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        children: _defaultEvents.map((event) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-            child: _buildEventCard(event),
-          );
-        }).toList(),
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
       ),
+      itemCount: _defaultEvents.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final event = _defaultEvents[index];
+        return _buildEventCard(event);
+      },
     );
   }
 
@@ -1670,109 +1674,109 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        children: _defaultUsers.map((user) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-            child: GestureDetector(
-              onTap: () {
-                RouterClass.nextScreenNormal(
-                  context,
-                  UserProfileScreen(user: user),
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withValues(alpha: 0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(25),
-                        child:
-                            user.profilePictureUrl != null &&
-                                user.profilePictureUrl!.isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: user.profilePictureUrl!,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => const Center(
-                                  child: CircularProgressIndicator(
-                                    color: Color(0xFF667EEA),
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                                errorWidget: (context, url, error) =>
-                                    const Icon(
-                                      Icons.person,
-                                      color: Color(0xFF667EEA),
-                                      size: 24,
-                                    ),
-                              )
-                            : const Icon(
-                                Icons.person,
-                                color: Color(0xFF667EEA),
-                                size: 24,
-                              ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            user.name,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
-                          if (user.bio != null && user.bio!.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              user.bio!,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                                fontFamily: 'Roboto',
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const Icon(
-                      Icons.arrow_forward_ios,
-                      color: Colors.grey,
-                      size: 16,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }).toList(),
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
       ),
+      itemCount: _defaultUsers.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final user = _defaultUsers[index];
+        return GestureDetector(
+          onTap: () {
+            RouterClass.nextScreenNormal(
+              context,
+              UserProfileScreen(user: user),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withValues(alpha: 0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(25),
+                    child:
+                        user.profilePictureUrl != null &&
+                            user.profilePictureUrl!.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: user.profilePictureUrl!,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => const Center(
+                              child: CircularProgressIndicator(
+                                color: Color(0xFF667EEA),
+                                strokeWidth: 2,
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => const Icon(
+                              Icons.person,
+                              color: Color(0xFF667EEA),
+                              size: 24,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.person,
+                            color: Color(0xFF667EEA),
+                            size: 24,
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user.name,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                      if (user.bio != null && user.bio!.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          user.bio!,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                            fontFamily: 'Roboto',
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_forward_ios,
+                  color: Colors.grey,
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
