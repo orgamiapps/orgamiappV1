@@ -60,20 +60,22 @@ class _SearchScreenState extends State<SearchScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: _buildAppBar(),
-      body: Column(
-        children: [
-          _buildSearchBar(),
-          _buildTabBar(),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                EventsList(searchQuery: _searchQuery),
-                UsersList(searchQuery: _searchQuery),
-              ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildSearchBar(),
+            _buildTabBar(),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  EventsList(searchQuery: _searchQuery),
+                  UsersList(searchQuery: _searchQuery),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -114,7 +116,12 @@ class _SearchScreenState extends State<SearchScreen>
   Widget _buildSearchBar() {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+      padding: EdgeInsets.fromLTRB(
+        MediaQuery.of(context).size.width * 0.05, // 5% of screen width
+        8,
+        MediaQuery.of(context).size.width * 0.05, // 5% of screen width
+        16,
+      ),
       child: Container(
         decoration: BoxDecoration(
           color: const Color(0xFFF8FAFC),
@@ -171,7 +178,12 @@ class _SearchScreenState extends State<SearchScreen>
   Widget _buildTabBar() {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      padding: EdgeInsets.fromLTRB(
+        MediaQuery.of(context).size.width * 0.05, // 5% of screen width
+        0,
+        MediaQuery.of(context).size.width * 0.05, // 5% of screen width
+        16,
+      ),
       child: Container(
         height: 50,
         decoration: BoxDecoration(
@@ -735,6 +747,8 @@ class _UsersListState extends State<UsersList>
                           color: Color(0xFF1E293B),
                           fontFamily: 'Roboto',
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       if (user.username != null &&
                           user.username!.isNotEmpty) ...[
@@ -747,6 +761,8 @@ class _UsersListState extends State<UsersList>
                             fontWeight: FontWeight.w500,
                             fontFamily: 'Roboto',
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ],

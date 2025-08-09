@@ -244,11 +244,12 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
         color: const Color(0xFFFF9800),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: const Row(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.star, color: Colors.white, size: 14),
-          SizedBox(width: 4),
-          Text(
+          const Icon(Icons.star, color: Colors.white, size: 14),
+          const SizedBox(width: 4),
+          const Text(
             'Featured',
             style: TextStyle(
               color: Colors.white,
@@ -321,6 +322,7 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
         const Icon(Icons.location_on, color: Color(0xFF667EEA), size: 16),
         const SizedBox(width: 8),
         Expanded(
+          flex: 1,
           child: Text(
             widget.eventModel.location,
             style: TextStyle(fontSize: 14, color: Colors.grey[800]),
@@ -328,7 +330,8 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        if (widget.eventModel.latitude != 0 && widget.eventModel.longitude != 0)
+        if (widget.eventModel.latitude != 0 && widget.eventModel.longitude != 0) ...[
+          const SizedBox(width: 8),
           GestureDetector(
             onTap: () => RouterClass.nextScreenNormal(
               context,
@@ -337,9 +340,10 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
             child: const Icon(
               Icons.map_outlined,
               color: Color(0xFF667EEA),
-              size: 24,
+              size: 20,
             ),
           ),
+        ],
       ],
     );
   }
