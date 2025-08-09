@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:orgami/screens/Home/home_screen.dart';
+import 'package:orgami/screens/Home/dashboard_screen.dart';
 import 'package:orgami/screens/Splash/second_splash_screen.dart';
 
 class RouterClass {
@@ -31,7 +32,7 @@ class RouterClass {
   homeScreenRoute({required BuildContext context}) =>
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (splashContext) => const HomeScreen()),
+        MaterialPageRoute(builder: (splashContext) => const DashboardScreen()),
         (route) => false,
       );
 

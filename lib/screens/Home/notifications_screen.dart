@@ -2,11 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:orgami/firebase/firebase_messaging_helper.dart';
 import 'package:orgami/models/notification_model.dart';
 import 'package:intl/intl.dart';
-import 'package:orgami/Screens/Home/notification_settings_screen.dart';
+import 'package:orgami/screens/Home/notification_settings_screen.dart';
 import 'package:orgami/Utils/router.dart';
-import 'package:orgami/Screens/Home/home_screen.dart';
-import 'package:orgami/Screens/Messaging/messaging_screen.dart';
-import 'package:orgami/Screens/Home/account_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -73,45 +70,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 children: [_buildNotificationsList()],
               ),
             ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex:
-            2, // Notifications is selected when in NotificationsScreen
-        selectedItemColor: const Color(0xFF667EEA),
-        unselectedItemColor: Colors.grey,
-        onTap: (index) {
-          // Navigate to different screens based on index
-          switch (index) {
-            case 0:
-              RouterClass.nextScreenAndReplacementAndRemoveUntil(
-                context: context,
-                page: const HomeScreen(),
-              );
-              break;
-            case 1:
-              RouterClass.nextScreenNormal(context, const MessagingScreen());
-              break;
-            case 2:
-              // Already on notifications, do nothing
-              break;
-            case 3:
-              RouterClass.nextScreenNormal(context, const AccountScreen());
-              break;
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.event, size: 20), label: ''),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.message, size: 20),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.notifications, size: 20),
-            label: '',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.menu, size: 20), label: ''),
-        ],
-      ),
     );
   }
 

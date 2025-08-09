@@ -29,11 +29,15 @@ class SingleEventListViewItem extends StatefulWidget {
 }
 
 class _SingleEventListViewItemState extends State<SingleEventListViewItem>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   bool _isFavorited = false;
   bool _isLoadingFavorite = false;
+  bool _hasCheckedFavoriteStatus = false;
   late AnimationController _favoriteController;
   late Animation<double> _favoriteScaleAnimation;
+
+  @override
+  bool get wantKeepAlive => true; // Prevent rebuilding when scrolling
 
   @override
   void initState() {
@@ -45,7 +49,12 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
     _favoriteScaleAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
       CurvedAnimation(parent: _favoriteController, curve: Curves.elasticOut),
     );
-    _checkFavoriteStatus();
+    // Delay favorite status check to prevent flashing during rapid scrolling
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_hasCheckedFavoriteStatus) {
+        _checkFavoriteStatus();
+      }
+    });
   }
 
   @override
@@ -55,7 +64,10 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
   }
 
   Future<void> _checkFavoriteStatus() async {
-    if (CustomerController.logeInCustomer == null) return;
+    if (CustomerController.logeInCustomer == null || _hasCheckedFavoriteStatus)
+      return;
+
+    _hasCheckedFavoriteStatus = true;
 
     try {
       final isFavorited = await FirebaseFirestoreHelper().isEventFavorited(
@@ -124,6 +136,7 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     return Card(
       elevation: 5,
       shadowColor: Colors.black.withOpacity(0.1),

@@ -21,9 +21,7 @@ import 'package:orgami/Screens/MyProfile/my_profile_screen.dart';
 import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
 import 'package:orgami/Screens/Home/account_details_screen.dart';
 import 'package:orgami/Screens/Home/attendee_notification_screen.dart';
-import 'package:orgami/Screens/Home/home_screen.dart';
-import 'package:orgami/Screens/Messaging/messaging_screen.dart';
-import 'package:orgami/Screens/Home/notifications_screen.dart';
+
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -38,52 +36,6 @@ class _AccountScreenState extends State<AccountScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(child: _bodyView()),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: 3, // Account is selected when in AccountScreen
-        selectedItemColor: Theme.of(context).colorScheme.primary,
-        unselectedItemColor: Theme.of(
-          context,
-        ).colorScheme.onSurface.withValues(alpha: 0.6),
-        backgroundColor: Theme.of(
-          context,
-        ).bottomNavigationBarTheme.backgroundColor,
-        onTap: (index) {
-          // Navigate to different screens based on index
-          switch (index) {
-            case 0:
-              RouterClass.nextScreenAndReplacementAndRemoveUntil(
-                context: context,
-                page: const HomeScreen(),
-              );
-              break;
-            case 1:
-              RouterClass.nextScreenNormal(context, const MessagingScreen());
-              break;
-            case 2:
-              RouterClass.nextScreenNormal(
-                context,
-                const NotificationsScreen(),
-              );
-              break;
-            case 3:
-              // Already on account, do nothing
-              break;
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.event, size: 20), label: ''),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.message, size: 20),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.notifications, size: 20),
-            label: '',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.menu, size: 20), label: ''),
-        ],
-      ),
     );
   }
 

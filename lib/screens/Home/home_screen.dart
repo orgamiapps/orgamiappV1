@@ -27,9 +27,7 @@ import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/controller/customer_controller.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:orgami/Screens/QRScanner/qr_scanner_flow_screen.dart';
-import 'package:orgami/Screens/Messaging/messaging_screen.dart';
-import 'package:orgami/Screens/Home/notifications_screen.dart';
-import 'package:orgami/Screens/Home/account_screen.dart';
+
 import 'package:orgami/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:orgami/utils/location_helper.dart';
@@ -85,9 +83,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // Scroll controller and animation
   late ScrollController _scrollController;
-  double _fabOpacity = 1.0;
   bool _isScrollingDown = false;
   static const double _appBarHeight = 56.0;
+  double _lastScrollOffset = 0.0;
 
   // Animation controllers
   late AnimationController _pulseController;
@@ -95,6 +93,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
   late AnimationController _searchAnimationController;
+  late AnimationController _fabOpacityController;
+  late Animation<double> _fabOpacityAnimation;
 
   // Categories including Featured for HomeScreen
   final List<String> _allCategories = [
@@ -219,6 +219,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       vsync: this,
     );
 
+    // Initialize FAB opacity animation
+    _fabOpacityController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+      value: 1.0,
+    );
+    _fabOpacityAnimation = Tween<double>(
+      begin: 0.3,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _fabOpacityController,
+      curve: Curves.easeInOut,
+    ));
+
     // Load default content
     _loadDefaultEvents();
     _loadDefaultUsers();
@@ -244,6 +258,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _pulseController.dispose();
     _fadeController.dispose();
     _searchAnimationController.dispose();
+    _fabOpacityController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -352,23 +367,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _onScroll() {
+    // Use a threshold to prevent excessive calls during small scroll changes
+    const scrollThreshold = 10.0;
+    
+    // Only process significant scroll changes
+    if ((_scrollController.offset - _lastScrollOffset).abs() < scrollThreshold) {
+      return;
+    }
+    
+    _lastScrollOffset = _scrollController.offset;
+    
     if (_scrollController.offset > _appBarHeight && !_isScrollingDown) {
-      setState(() {
-        _isScrollingDown = true;
-      });
+      _isScrollingDown = true;
       _animateFabOpacity(0.3);
     } else if (_scrollController.offset <= _appBarHeight && _isScrollingDown) {
-      setState(() {
-        _isScrollingDown = false;
-      });
+      _isScrollingDown = false;
       _animateFabOpacity(1.0);
     }
   }
 
   void _animateFabOpacity(double targetOpacity) {
-    setState(() {
-      _fabOpacity = targetOpacity;
-    });
+    // Use AnimationController for smooth transitions without rebuilding the whole widget
+    if (targetOpacity >= 1.0) {
+      _fabOpacityController.forward();
+    } else {
+      _fabOpacityController.reverse();
+    }
   }
 
   void _onFabPressed() {
@@ -499,81 +523,42 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       floatingActionButton: _isSearchExpanded
           ? null
-          : AnimatedOpacity(
-              opacity: _fabOpacity,
-              duration: const Duration(milliseconds: 300),
-              child: Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-                  ),
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF667EEA).withValues(alpha: 0.3),
-                      spreadRadius: 2,
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
+          : AnimatedBuilder(
+              animation: _fabOpacityAnimation,
+              builder: (context, child) {
+                return Opacity(
+                  opacity: _fabOpacityAnimation.value,
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                      ),
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+                          spreadRadius: 2,
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(28),
-                    onTap: _onFabPressed,
-                    child: const Icon(Icons.add, color: Colors.white, size: 28),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(28),
+                        onTap: _onFabPressed,
+                        child: const Icon(Icons.add, color: Colors.white, size: 28),
+                      ),
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: 0, // Home is always selected when in HomeScreen
-        selectedItemColor: Theme.of(context).colorScheme.primary,
-        unselectedItemColor: Theme.of(
-          context,
-        ).colorScheme.onSurface.withValues(alpha: 0.6),
-        backgroundColor: Theme.of(
-          context,
-        ).bottomNavigationBarTheme.backgroundColor,
-        onTap: (index) {
-          // Navigate to different screens based on index
-          switch (index) {
-            case 0:
-              // Already on home, do nothing
-              break;
-            case 1:
-              RouterClass.nextScreenNormal(context, const MessagingScreen());
-              break;
-            case 2:
-              RouterClass.nextScreenNormal(
-                context,
-                const NotificationsScreen(),
-              );
-              break;
-            case 3:
-              RouterClass.nextScreenNormal(context, const AccountScreen());
-              break;
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.event, size: 20), label: ''),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.message, size: 20),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.notifications, size: 20),
-            label: '',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.menu, size: 20), label: ''),
-        ],
-      ),
       body: _isSearchExpanded
           ? _buildFullScreenSearch()
           : SafeArea(child: _bodyView()),
@@ -586,11 +571,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       color: const Color(0xFF667EEA),
       child: FadeTransition(
         opacity: _fadeAnimation,
-        child: Column(
-          children: [
-            _headerView(),
-            _filterSection(),
-            Expanded(child: _eventsView()),
+        child: CustomScrollView(
+          controller: _scrollController,
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          slivers: [
+            // Header Section as Sliver
+            SliverToBoxAdapter(child: _headerView()),
+            // Filter Section as Sliver
+            SliverToBoxAdapter(child: _filterSection()),
+            // Events Content as Sliver
+            SliverFillRemaining(hasScrollBody: false, child: _eventsView()),
           ],
         ),
       ),
@@ -879,10 +871,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return _buildSearchEmptyState();
     }
 
-    return _buildFirestoreStream();
+    return _buildFirestoreStreamContent();
   }
 
-  Widget _buildFirestoreStream() {
+  Widget _buildFirestoreStreamContent() {
     // Create a stream for the Firestore query
     // Start with the simplest possible query
     Stream<QuerySnapshot> eventsStream;
@@ -936,7 +928,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
         // Show empty state
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyStateWithDebug();
+          return _buildEmptyState();
         }
 
         // Process events data with error handling and performance optimization
@@ -1028,7 +1020,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             if (featuredEvents.isNotEmpty)
               _buildFeaturedCarousel(featuredEvents),
             // All Events List - show events in chronological order
-            Expanded(child: _buildEventsList(allEventsInChronologicalOrder)),
+            _buildEventsColumn(allEventsInChronologicalOrder),
           ],
         );
       },
@@ -1167,7 +1159,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
             const SizedBox(height: 24),
             const Text(
-              'No events found',
+              'No Events Yet',
               style: TextStyle(
                 color: Color(0xFF1A1A1A),
                 fontSize: 20,
@@ -1178,7 +1170,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
             const SizedBox(height: 8),
             const Text(
-              'No events are currently available in the database',
+              'Events will appear here once they are created.\nCheck back soon!',
               style: TextStyle(
                 color: Color(0xFF6B7280),
                 fontSize: 16,
@@ -1262,20 +1254,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildEventsList(List<EventModel> events) {
+  Widget _buildEventsColumn(List<EventModel> events) {
     if (events.isEmpty) {
       return _buildEmptyState();
     }
 
-    return ListView.builder(
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      itemCount: events.length,
-      itemBuilder: (context, index) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: _buildEventCard(events[index]),
-        );
-      },
+      child: Column(
+        children: events.map((event) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: _buildEventCard(event),
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -1293,16 +1286,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return _buildSearchEmptyState();
     }
 
-    return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: 0),
-      itemCount: _searchEvents.length,
-      itemBuilder: (context, index) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          child: _buildEventCard(_searchEvents[index]),
-        );
-      },
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        children: _searchEvents.map((event) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            child: _buildEventCard(event),
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -1315,16 +1308,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return _buildSearchEmptyState();
     }
 
-    return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: 0),
-      itemCount: _searchUsers.length,
-      itemBuilder: (context, index) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          child: _buildUserCard(_searchUsers[index]),
-        );
-      },
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        children: _searchUsers.map((user) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            child: _buildUserCard(user),
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -1623,16 +1616,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       );
     }
 
-    return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: 0),
-      itemCount: _defaultEvents.length,
-      itemBuilder: (context, index) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          child: _buildEventCard(_defaultEvents[index]),
-        );
-      },
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        children: _defaultEvents.map((event) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            child: _buildEventCard(event),
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -1677,109 +1670,109 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       );
     }
 
-    return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: 0),
-      itemCount: _defaultUsers.length,
-      itemBuilder: (context, index) {
-        final user = _defaultUsers[index];
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          child: GestureDetector(
-            onTap: () {
-              RouterClass.nextScreenNormal(
-                context,
-                UserProfileScreen(user: user),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withValues(alpha: 0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(25),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        children: _defaultUsers.map((user) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            child: GestureDetector(
+              onTap: () {
+                RouterClass.nextScreenNormal(
+                  context,
+                  UserProfileScreen(user: user),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withValues(alpha: 0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(25),
-                      child:
-                          user.profilePictureUrl != null &&
-                              user.profilePictureUrl!.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: user.profilePictureUrl!,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => const Center(
-                                child: CircularProgressIndicator(
-                                  color: Color(0xFF667EEA),
-                                  strokeWidth: 2,
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(25),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(25),
+                        child:
+                            user.profilePictureUrl != null &&
+                                user.profilePictureUrl!.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: user.profilePictureUrl!,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => const Center(
+                                  child: CircularProgressIndicator(
+                                    color: Color(0xFF667EEA),
+                                    strokeWidth: 2,
+                                  ),
                                 ),
-                              ),
-                              errorWidget: (context, url, error) => const Icon(
+                                errorWidget: (context, url, error) =>
+                                    const Icon(
+                                      Icons.person,
+                                      color: Color(0xFF667EEA),
+                                      size: 24,
+                                    ),
+                              )
+                            : const Icon(
                                 Icons.person,
                                 color: Color(0xFF667EEA),
                                 size: 24,
                               ),
-                            )
-                          : const Icon(
-                              Icons.person,
-                              color: Color(0xFF667EEA),
-                              size: 24,
-                            ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user.name,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            fontFamily: 'Roboto',
-                          ),
-                        ),
-                        if (user.bio != null && user.bio!.isNotEmpty) ...[
-                          const SizedBox(height: 4),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            user.bio!,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
+                            user.name,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
                               fontFamily: 'Roboto',
                             ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
                           ),
+                          if (user.bio != null && user.bio!.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              user.bio!,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                                fontFamily: 'Roboto',
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                  const Icon(
-                    Icons.arrow_forward_ios,
-                    color: Colors.grey,
-                    size: 16,
-                  ),
-                ],
+                    const Icon(
+                      Icons.arrow_forward_ios,
+                      color: Colors.grey,
+                      size: 16,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -2086,208 +2079,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               child: const Text('Retry Connection'),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyStateWithDebug() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.info_outline, size: 64, color: Colors.blue),
-            const SizedBox(height: 16),
-            const Text(
-              'Firestore Connected Successfully',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.green,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Collection: ${EventModel.firebaseKey}',
-              style: const TextStyle(fontSize: 14),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.yellow.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange),
-              ),
-              child: const Column(
-                children: [
-                  Text(
-                    '🎯 No Events Found',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'The database connection is working, but there are currently no events in the "Events" collection.',
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                RouterClass.nextScreenNormal(
-                  context,
-                  const ChoseDateTimeScreen(),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF667EEA),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Create First Event'),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                // Show sample static events for testing
-                _showSampleEvents();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Show Sample Events (Test UI)'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showSampleEvents() {
-    // Create sample events to test UI components
-    List<EventModel> sampleEvents = [
-      EventModel(
-        id: 'sample1',
-        groupName: 'Tech Meetup',
-        title: 'Flutter Development Workshop',
-        description: 'Learn Flutter development basics',
-        location: 'Community Center',
-        customerUid: 'sample-user',
-        imageUrl:
-            'https://via.placeholder.com/300x200/667EEA/FFFFFF?text=Flutter+Workshop',
-        selectedDateTime: DateTime.now().add(const Duration(days: 1)),
-        eventGenerateTime: DateTime.now(),
-        status: 'active',
-        private: false,
-        getLocation: true,
-        radius: 100,
-        latitude: 37.7749,
-        longitude: -122.4194,
-        categories: ['Educational'],
-        isFeatured: true,
-        featureEndDate: DateTime.now().add(const Duration(days: 30)),
-        ticketsEnabled: true,
-        maxTickets: 50,
-        issuedTickets: 12,
-        eventDuration: 3,
-        coHosts: [],
-        signInMethods: ['qr_code'],
-        manualCode: null,
-      ),
-      EventModel(
-        id: 'sample2',
-        groupName: 'Business Network',
-        title: 'Networking Event',
-        description: 'Professional networking opportunity',
-        location: 'Downtown Office',
-        customerUid: 'sample-user',
-        imageUrl:
-            'https://via.placeholder.com/300x200/764BA2/FFFFFF?text=Networking',
-        selectedDateTime: DateTime.now().add(const Duration(days: 3)),
-        eventGenerateTime: DateTime.now(),
-        status: 'active',
-        private: false,
-        getLocation: true,
-        radius: 200,
-        latitude: 37.7849,
-        longitude: -122.4094,
-        categories: ['Professional'],
-        isFeatured: false,
-        featureEndDate: null,
-        ticketsEnabled: false,
-        maxTickets: 0,
-        issuedTickets: 0,
-        eventDuration: 2,
-        coHosts: [],
-        signInMethods: ['manual_code'],
-        manualCode: 'NET123',
-      ),
-    ];
-
-    // Navigate to a new screen showing sample events
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.8,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  children: [
-                    const Text(
-                      'Sample Events (UI Test)',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  itemCount: sampleEvents.length,
-                  itemBuilder: (context, index) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _buildEventCard(sampleEvents[index]),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

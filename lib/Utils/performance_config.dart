@@ -1,109 +1,46 @@
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-
-/// Performance configuration class to centralize performance settings
+/// Performance configuration constants for optimal app performance
 class PerformanceConfig {
-  // Performance monitoring settings
-  static const bool enablePerformanceMonitoring = true;
-  static const bool enableMemoryMonitoring = true;
-  static const bool enableNetworkMonitoring = true;
+  // Animation durations - reduced for better performance
+  static const Duration shortAnimation = Duration(milliseconds: 200);
+  static const Duration mediumAnimation = Duration(milliseconds: 400);
+  static const Duration longAnimation = Duration(milliseconds: 600);
 
-  // Cache settings
-  static const int maxCacheSize = 100; // MB
-  static const Duration cacheExpiry = Duration(hours: 24);
+  // Image loading optimizations
+  static const Duration imageCacheExpiry = Duration(hours: 2);
+  static const int imageMemoryCacheWidth = 300;
+  static const int imageMemoryCacheHeight = 200;
+  static const int imageDiskCacheWidth = 600;
+  static const int imageDiskCacheHeight = 400;
 
-  // Image optimization settings
-  static const int maxImageWidth = 1024;
-  static const int maxImageHeight = 1024;
-  static const int imageQuality = 80;
+  // Firebase operation timeouts
+  static const Duration firebaseTimeout = Duration(seconds: 8);
+  static const Duration shortFirebaseTimeout = Duration(seconds: 5);
 
-  // Network settings
-  static const Duration networkTimeout = Duration(seconds: 30);
-  static const int maxRetries = 3;
+  // Location settings
+  static const Duration locationCacheExpiry = Duration(minutes: 5);
+  static const Duration locationTimeout = Duration(seconds: 10);
 
-  // Animation settings
-  static const Duration defaultAnimationDuration = Duration(milliseconds: 300);
-  static const Curve defaultAnimationCurve = Curves.easeInOut;
+  // UI performance settings
+  static const int maxAnimationControllers = 3; // Limit concurrent animations
+  static const Duration frameThrottleDuration = Duration(milliseconds: 16); // 60fps
+  static const int maxConcurrentOperations = 2;
 
-  // Debug settings
-  static const bool showPerformanceOverlay = false;
-  static const bool enableDebugLogging = true;
+  // Data processing limits
+  static const int maxEventsPerBatch = 50;
+  static const int maxUsersPerBatch = 30;
+  static const int maxSearchResults = 20;
 
-  // Initialize performance configuration
-  static void initialize() {
-    if (kDebugMode) {
-      debugPrint('Performance configuration initialized');
-    }
+  // Memory management
+  static const Duration cacheCleanupInterval = Duration(minutes: 30);
+  static const int maxCacheSize = 100; // Maximum cached items
 
-    // Set up performance monitoring
-    if (enablePerformanceMonitoring) {
-      _setupPerformanceMonitoring();
-    }
+  // Network optimization
+  static const Duration networkTimeout = Duration(seconds: 15);
+  static const int maxRetryAttempts = 3;
+  static const Duration retryDelay = Duration(seconds: 2);
 
-    if (kDebugMode) {
-      debugPrint(
-        'Performance monitoring enabled: $enablePerformanceMonitoring',
-      );
-      debugPrint('Memory monitoring enabled: $enableMemoryMonitoring');
-      debugPrint('Network monitoring enabled: $enableNetworkMonitoring');
-    }
-  }
-
-  // Set up performance monitoring
-  static void _setupPerformanceMonitoring() {
-    // This would typically set up performance monitoring tools
-    // like Firebase Performance, Sentry, etc.
-    if (kDebugMode) {
-      debugPrint('Setting up performance monitoring...');
-    }
-  }
-
-  // Get cache configuration
-  static Map<String, dynamic> getCacheConfig() {
-    return {'maxSize': maxCacheSize, 'expiry': cacheExpiry};
-  }
-
-  // Get image optimization configuration
-  static Map<String, dynamic> getImageConfig() {
-    return {
-      'maxWidth': maxImageWidth,
-      'maxHeight': maxImageHeight,
-      'quality': imageQuality,
-    };
-  }
-
-  // Get network configuration
-  static Map<String, dynamic> getNetworkConfig() {
-    return {'timeout': networkTimeout, 'maxRetries': maxRetries};
-  }
-}
-
-/// Animation speed enum
-enum AnimationSpeed { fast, normal, slow }
-
-/// Network operation type enum
-enum NetworkOperationType { short, normal, long }
-
-/// Performance monitoring utilities
-class PerformanceUtils {
-  static void logPerformance(String operation, Duration duration) {
-    if (kDebugMode) {
-      debugPrint(
-        '⏱️ Performance: $operation took ${duration.inMilliseconds}ms',
-      );
-    }
-  }
-
-  static void logMemoryUsage(String context, int bytes) {
-    if (kDebugMode) {
-      final mb = bytes / (1024 * 1024);
-      print('💾 Memory: $context - ${mb.toStringAsFixed(2)}MB');
-    }
-  }
-
-  static void logNetworkRequest(String url, Duration duration) {
-    if (kDebugMode) {
-      debugPrint('🌐 Network: $url took ${duration.inMilliseconds}ms');
-    }
-  }
+  // Debounce settings
+  static const Duration searchDebounce = Duration(milliseconds: 300);
+  static const Duration scrollDebounce = Duration(milliseconds: 100);
+  static const Duration refreshDebounce = Duration(seconds: 2);
 }

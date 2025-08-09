@@ -57,6 +57,7 @@ class DefaultFirebaseOptions {
     appId: '1:951311475019:android:83ce358b010643ba89c8ce',
     messagingSenderId: '951311475019',
     projectId: 'orgami-66nxok',
+    authDomain: 'orgami-66nxok.firebaseapp.com',
     storageBucket: 'orgami-66nxok.appspot.com',
   );
 

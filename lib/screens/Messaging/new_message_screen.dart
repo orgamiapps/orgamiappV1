@@ -182,7 +182,6 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
     final theme = Theme.of(context);
 
     return Scaffold(

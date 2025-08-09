@@ -15,10 +15,7 @@ import 'package:intl/intl.dart';
 import 'package:orgami/models/customer_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/Utils/logger.dart';
-import 'package:orgami/Utils/router.dart';
-import 'package:orgami/Screens/Home/home_screen.dart';
-import 'package:orgami/Screens/Home/notifications_screen.dart';
-import 'package:orgami/Screens/Home/account_screen.dart';
+
 
 class MessagingScreen extends StatefulWidget {
   const MessagingScreen({super.key});
@@ -210,7 +207,6 @@ class _MessagingScreenState extends State<MessagingScreen> {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -260,52 +256,6 @@ class _MessagingScreenState extends State<MessagingScreen> {
           Icons.message,
           color: Theme.of(context).colorScheme.onPrimary,
         ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: 1, // Messaging is selected when in MessagingScreen
-        selectedItemColor: Theme.of(context).colorScheme.primary,
-        unselectedItemColor: Theme.of(
-          context,
-        ).colorScheme.onSurface.withValues(alpha: 0.6),
-        backgroundColor: Theme.of(
-          context,
-        ).bottomNavigationBarTheme.backgroundColor,
-        onTap: (index) {
-          // Navigate to different screens based on index
-          switch (index) {
-            case 0:
-              RouterClass.nextScreenAndReplacementAndRemoveUntil(
-                context: context,
-                page: const HomeScreen(),
-              );
-              break;
-            case 1:
-              // Already on messaging, do nothing
-              break;
-            case 2:
-              RouterClass.nextScreenNormal(
-                context,
-                const NotificationsScreen(),
-              );
-              break;
-            case 3:
-              RouterClass.nextScreenNormal(context, const AccountScreen());
-              break;
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.event, size: 20), label: ''),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.message, size: 20),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.notifications, size: 20),
-            label: '',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.menu, size: 20), label: ''),
-        ],
       ),
     );
   }
