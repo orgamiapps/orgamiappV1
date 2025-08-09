@@ -47,6 +47,7 @@ import 'package:orgami/Screens/Events/event_location_view_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:orgami/Screens/MyProfile/badge_screen.dart';
 
 class SingleEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -4050,6 +4051,64 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               ),
             ),
           ),
+
+        const SizedBox(height: 12),
+        // My Badge button (under My Tickets)
+        Container(
+          width: double.infinity,
+          height: 48,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF667EEA).withAlpha((0.3 * 255).round()),
+                spreadRadius: 0,
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => BadgeScreen(
+                      userId: CustomerController.logeInCustomer?.uid,
+                      isOwnBadge: true,
+                    ),
+                  ),
+                );
+              },
+              child: const Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.military_tech, color: Colors.white, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'My Badge',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }

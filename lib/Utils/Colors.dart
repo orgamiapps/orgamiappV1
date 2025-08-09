@@ -57,3 +57,11 @@ class AppThemeColor {
     tileMode: TileMode.mirror,
   );
 }
+
+// Alias used by new Badge UI components
+class AppColors {
+  // Primary accent used in badge UI
+  static const Color primaryColor = Color(0xFF667EEA);
+  // Background color used in badge screen
+  static const Color backgroundColor = AppThemeColor.backGroundColor;
+}

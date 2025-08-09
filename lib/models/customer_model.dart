@@ -44,6 +44,18 @@ class CustomerModel {
     if (kDebugMode) {
       debugPrint('User Info $d');
     }
+
+    // Robust createdAt parsing with safe fallback
+    DateTime parsedCreatedAt = DateTime.now();
+    final rawCreatedAt = d['createdAt'];
+    if (rawCreatedAt is Timestamp) {
+      parsedCreatedAt = rawCreatedAt.toDate();
+    } else if (rawCreatedAt is DateTime) {
+      parsedCreatedAt = rawCreatedAt;
+    } else if (rawCreatedAt is String) {
+      parsedCreatedAt = DateTime.tryParse(rawCreatedAt) ?? DateTime.now();
+    }
+
     return CustomerModel(
       uid: d['uid'],
       name: d['name'],
@@ -63,7 +75,7 @@ class CustomerModel {
           d['isDiscoverable'] ??
           true, // Default to true for backward compatibility
       favorites: List<String>.from(d['favorites'] ?? []), // Saved events field
-      createdAt: (d['createdAt'] as Timestamp).toDate(),
+      createdAt: parsedCreatedAt,
     );
   }
 

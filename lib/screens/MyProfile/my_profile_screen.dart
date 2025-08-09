@@ -9,6 +9,10 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:orgami/Screens/MyProfile/my_tickets_screen.dart';
 import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
+import 'package:orgami/Screens/MyProfile/badge_screen.dart';
+import 'package:orgami/Screens/MyProfile/Widgets/professional_badge_widget.dart';
+import 'package:orgami/models/badge_model.dart';
+import 'package:orgami/Services/badge_service.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -39,6 +43,11 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   bool isLoading = true;
   int selectedTab = 1; // 1 = Created, 2 = Attended, 3 = Saved
   bool isDiscoverable = true; // User discoverability setting
+  
+  // Badge related fields
+  UserBadgeModel? _userBadge;
+  bool _isBadgeLoading = false;
+  final BadgeService _badgeService = BadgeService();
 
   // Selection state
   bool isSelectionMode = false;
@@ -153,6 +162,9 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       );
       debugPrint('Saved events count: ${saved.length}');
 
+      // Load user badge
+      await _loadUserBadge();
+
       if (mounted) {
         setState(() {
           createdEvents = created;
@@ -214,6 +226,48 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       isEditingBio = false;
       _bioController.text = bio ?? '';
     });
+  }
+
+  // Badge related methods
+  Future<void> _loadUserBadge() async {
+    try {
+      final userId = CustomerController.logeInCustomer?.uid;
+      if (userId == null) return;
+
+      setState(() {
+        _isBadgeLoading = true;
+      });
+
+      final badge = await _badgeService.getOrGenerateBadge(userId);
+      
+      if (mounted) {
+        setState(() {
+          _userBadge = badge;
+          _isBadgeLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading user badge: $e');
+      if (mounted) {
+        setState(() {
+          _isBadgeLoading = false;
+        });
+      }
+    }
+  }
+
+  void _navigateToBadgeScreen() {
+    if (_userBadge != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => BadgeScreen(
+            userId: CustomerController.logeInCustomer?.uid,
+            isOwnBadge: true,
+          ),
+        ),
+      );
+    }
   }
 
   // Selection methods
@@ -485,6 +539,8 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           SliverToBoxAdapter(child: _buildProfileHeader(user)),
           // Bio Section
           SliverToBoxAdapter(child: _buildBioSection()),
+          // Badge Section
+          SliverToBoxAdapter(child: _buildBadgeSection()),
           // Discoverability Section
           SliverToBoxAdapter(child: _buildDiscoverabilitySection()),
           // My Tickets Section
@@ -866,6 +922,124 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                     height: 1.5,
                   ),
                 ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBadgeSection() {
+    if (_isBadgeLoading) {
+      return Container(
+        margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              spreadRadius: 0,
+              blurRadius: 20,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
+          ),
+        ),
+      );
+    }
+
+    if (_userBadge == null) {
+      return const SizedBox(); // Don't show anything if badge failed to load
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            spreadRadius: 0,
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.military_tech,
+                    color: const Color(0xFF667EEA),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'My Badge',
+                    style: TextStyle(
+                      color: Color(0xFF1A1A1A),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                ],
+              ),
+              GestureDetector(
+                onTap: _navigateToBadgeScreen,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'View Full Badge',
+                        style: TextStyle(
+                          color: Color(0xFF667EEA),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.arrow_forward_ios,
+                        color: Color(0xFF667EEA),
+                        size: 12,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Center(
+            child: GestureDetector(
+              onTap: _navigateToBadgeScreen,
+              child: ProfessionalBadgeWidget(
+                badge: _userBadge!,
+                width: 280,
+                height: 180,
+                showActions: false,
+              ),
+            ),
+          ),
         ],
       ),
     );
