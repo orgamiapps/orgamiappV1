@@ -852,63 +852,26 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 8),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Legend for tracking indicators
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF10B981),
-                              shape: BoxShape.circle,
-                            ),
+                          _buildLegendChip(
+                            color: const Color(0xFF10B981),
+                            label: 'Active',
+                            count: _countTrackingState('active'),
                           ),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'Active',
-                            style: TextStyle(
-                              color: Color(0xFF6B7280),
-                              fontSize: 10,
-                              fontFamily: 'Roboto',
-                            ),
+                          const SizedBox(width: 8),
+                          _buildLegendChip(
+                            color: const Color(0xFFEF4444),
+                            label: 'Completed',
+                            count: _countTrackingState('completed'),
                           ),
-                          const SizedBox(width: 12),
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFEF4444),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'Completed',
-                            style: TextStyle(
-                              color: Color(0xFF6B7280),
-                              fontSize: 10,
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF9CA3AF),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'Pending',
-                            style: TextStyle(
-                              color: Color(0xFF6B7280),
-                              fontSize: 10,
-                              fontFamily: 'Roboto',
-                            ),
+                          const SizedBox(width: 8),
+                          _buildLegendChip(
+                            color: const Color(0xFF9CA3AF),
+                            label: 'Pending',
+                            count: _countTrackingState('pending'),
                           ),
                         ],
                       ),
@@ -1661,5 +1624,40 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
     } else {
       return '';
     }
+  }
+
+  int _countTrackingState(String state) {
+    return attendanceList.where((a) => a.trackingState == state).length;
+  }
+
+  Widget _buildLegendChip({required Color color, required String label, required int count}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '$label (${count.toString()})',
+            style: const TextStyle(
+              color: Color(0xFF4B5563),
+              fontSize: 11,
+              fontFamily: 'Roboto',
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

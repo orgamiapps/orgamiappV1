@@ -2521,6 +2521,8 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
 
     try {
       await DwellTimeTracker.startDwellTracking(eventModel.id);
+      // Start monitoring location to track exit/away automatically
+      DwellTimeTracker.startLocationMonitoring(eventModel.id);
 
       if (mounted) {
         setState(() {
