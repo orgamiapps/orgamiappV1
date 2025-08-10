@@ -76,7 +76,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   // _isLoading removed - no longer needed after removing manual code input
 
   // Dwell time tracking variables
+  // ignore: unused_field
   bool _isDwellTrackingActive = false;
+  // ignore: unused_field
   String _dwellStatusMessage = '';
   bool _hasShownPrivacyDialog = false;
 
@@ -106,10 +108,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   // Attendees dropdown state
   bool _isAttendeesExpanded = false;
 
-  // Address lookup state
+  // Address lookup state (kept for background resolution if needed)
   String? _resolvedAddress;
-  bool _isLoadingAddress = false;
-  bool _addressLookupFailed = false;
+  String? _creatorName;
 
   // Modern color palette
   static const Color _primaryBlue = Color(0xFF667EEA);
@@ -1121,8 +1122,6 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                 // Reset address lookup if coordinates changed
                 if (coordinatesChanged) {
                   _resolvedAddress = null;
-                  _isLoadingAddress = false;
-                  _addressLookupFailed = false;
                 }
               });
 
@@ -1180,6 +1179,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     getAttendance();
     getPreRegisterCount();
     loadEventSummary();
+    _loadCreatorName();
 
     // Check if event is favorited
     _checkFavoriteStatus();
@@ -1193,6 +1193,21 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
     // Get address from coordinates if available
     _getAddressFromCoordinates();
+  }
+
+  Future<void> _loadCreatorName() async {
+    try {
+      final users = await FirebaseFirestoreHelper().getUsersByIds(
+        userIds: [eventModel.customerUid],
+      );
+      if (users.isNotEmpty && mounted) {
+        setState(() {
+          _creatorName = users.first.name;
+        });
+      }
+    } catch (e) {
+      Logger.error('Error loading creator name: $e');
+    }
   }
 
   // Favorite functionality methods
@@ -2096,10 +2111,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       return;
     }
 
-    setState(() {
-      _isLoadingAddress = true;
-      _addressLookupFailed = false;
-    });
+    // No UI spinner; silently resolve in background if ever used again
 
     try {
       List<Placemark> placemarks = await placemarkFromCoordinates(
@@ -2157,7 +2169,6 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
 
         setState(() {
           _resolvedAddress = formattedAddress;
-          _isLoadingAddress = false;
         });
 
         Logger.debug('Address resolved: $formattedAddress');
@@ -2168,9 +2179,6 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       Logger.error('Error getting address from coordinates: $e');
       if (mounted) {
         setState(() {
-          _isLoadingAddress = false;
-          _addressLookupFailed = true;
-          // Fallback to coordinates display
           _resolvedAddress =
               'Coordinates: ${eventModel.latitude.toStringAsFixed(6)}, ${eventModel.longitude.toStringAsFixed(6)}';
         });
@@ -2495,201 +2503,10 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             CommentsSection(eventModel: eventModel),
             const SizedBox(height: 24),
 
-            // Dwell Tracking Section (for signed-in users)
-            if (signedIn == true && CustomerController.logeInCustomer != null)
-              _buildDwellTrackingSection(),
-
+            // Dwell tracking UI hidden in public view; functionality remains available elsewhere
             const SizedBox(height: 140), // Increased space for bottom buttons
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildDwellTrackingSection() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha((0.08 * 255).round()),
-            spreadRadius: 0,
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withAlpha((0.1 * 255).round()),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.timer,
-                  color: Color(0xFF667EEA),
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 16),
-              const Expanded(
-                child: Text(
-                  'Dwell Time Tracking',
-                  style: TextStyle(
-                    color: Color(0xFF1A1A1A),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 18,
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Status and Controls
-          if (_isDwellTrackingActive) ...[
-            // Active tracking status
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withAlpha((0.1 * 255).round()),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFF10B981).withAlpha((0.3 * 255).round()),
-                  width: 1,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.location_on,
-                        color: Color(0xFF10B981),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Tracking Active',
-                        style: TextStyle(
-                          color: Color(0xFF10B981),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                          fontFamily: 'Roboto',
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (_dwellStatusMessage.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      _dwellStatusMessage,
-                      style: const TextStyle(
-                        color: Color(0xFF6B7280),
-                        fontSize: 14,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ] else ...[
-            // Inactive tracking status
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF6B7280).withAlpha((0.1 * 255).round()),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFF6B7280).withAlpha((0.3 * 255).round()),
-                  width: 1,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.location_off,
-                        color: Color(0xFF6B7280),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Tracking Inactive',
-                        style: TextStyle(
-                          color: Color(0xFF6B7280),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                          fontFamily: 'Roboto',
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Enable dwell time tracking to monitor your time at this event',
-                    style: TextStyle(
-                      color: Color(0xFF6B7280),
-                      fontSize: 14,
-                      fontFamily: 'Roboto',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 16),
-
-          // Control buttons
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _isDwellTrackingActive
-                      ? _stopDwellTracking
-                      : _startDwellTracking,
-                  icon: Icon(
-                    _isDwellTrackingActive ? Icons.stop : Icons.play_arrow,
-                    size: 18,
-                  ),
-                  label: Text(
-                    _isDwellTrackingActive ? 'Stop Tracking' : 'Start Tracking',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Roboto',
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isDwellTrackingActive
-                        ? const Color(0xFFEF4444)
-                        : const Color(0xFF10B981),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -2718,6 +2535,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     }
   }
 
+  // ignore: unused_element
   Future<void> _stopDwellTracking() async {
     if (CustomerController.logeInCustomer == null) return;
 
@@ -3003,6 +2821,40 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                       ),
                     ),
                   ),
+                  if (_creatorName != null) ...[
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _backgroundColor,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: _borderColor, width: 1),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.person_outline,
+                            color: _lightText,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Hosted by ${_creatorName!}',
+                            style: TextStyle(
+                              color: _lightText,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   if (eventModel.hasManagementPermissions(
                     FirebaseAuth.instance.currentUser!.uid,
                   ))
@@ -3330,37 +3182,8 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
   }
 
   Widget _buildLocationText() {
-    if (_isLoadingAddress) {
-      return Row(
-        children: [
-          SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(_primaryBlue),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Loading address...',
-              style: TextStyle(
-                color: _mediumText,
-                fontWeight: FontWeight.w500,
-                fontSize: 15,
-                fontFamily: 'Roboto',
-                fontStyle: FontStyle.italic,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      );
-    }
-
-    // Use resolved address if available, otherwise fall back to original location
-    String displayText = _resolvedAddress ?? eventModel.location;
+    // Always show the creator-entered location text for clarity
+    final String displayText = eventModel.location;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3378,49 +3201,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
           overflow: TextOverflow.ellipsis,
           softWrap: true,
         ),
-        // Show additional info if address was resolved from coordinates
-        if (_resolvedAddress != null &&
-            eventModel.location != _resolvedAddress) ...[
-          const SizedBox(height: 4),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              return Container(
-                width: constraints.maxWidth,
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                decoration: BoxDecoration(
-                  color: _primaryBlue.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.max,
-                  children: [
-                    Icon(
-                      _addressLookupFailed
-                          ? Icons.warning_amber_rounded
-                          : Icons.location_searching_rounded,
-                      size: 9,
-                      color: _addressLookupFailed ? _orange : _primaryBlue,
-                    ),
-                    const SizedBox(width: 2),
-                    Expanded(
-                      child: Text(
-                        _addressLookupFailed ? 'Approx.' : 'From coords',
-                        style: TextStyle(
-                          color: _addressLookupFailed ? _orange : _primaryBlue,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w500,
-                          fontFamily: 'Roboto',
-                        ),
-                        overflow: TextOverflow.clip,
-                        maxLines: 1,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ],
+        // No reverse-geocoded hint; prioritize creator-entered location
       ],
     );
   }
@@ -4535,8 +4316,10 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                                           builder: (context) =>
                                               UserProfileScreen(
                                                 user: customer,
-                                                isOwnProfile: CustomerController
-                                                        .logeInCustomer?.uid ==
+                                                isOwnProfile:
+                                                    CustomerController
+                                                        .logeInCustomer
+                                                        ?.uid ==
                                                     customer.uid,
                                               ),
                                         ),

@@ -87,7 +87,12 @@ class _BadgeScreenState extends State<BadgeScreen>
         return;
       }
 
-      final badge = await _badgeService.getOrGenerateBadge(userId);
+      // Try to get or generate an existing badge
+      UserBadgeModel? badge = await _badgeService.getOrGenerateBadge(userId);
+      // If still null, force-generate (first-time creation or stale rules/cache)
+      if (badge == null) {
+        badge = await _badgeService.generateUserBadge(userId);
+      }
       
       if (mounted) {
         setState(() {
@@ -326,15 +331,31 @@ class _BadgeScreenState extends State<BadgeScreen>
             ),
           ),
           const SizedBox(height: 12),
-          ElevatedButton(
-            onPressed: _loadBadge,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(25),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton(
+                onPressed: _loadBadge,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                ),
+                child: const Text('Retry'),
               ),
-            ),
-            child: const Text('Retry'),
+              const SizedBox(width: 12),
+              OutlinedButton(
+                onPressed: _refreshBadge,
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.primaryColor),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                ),
+                child: const Text('Create Badge'),
+              ),
+            ],
           ),
         ],
       ),

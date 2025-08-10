@@ -283,22 +283,35 @@ class FirebaseMessagingHelper {
 
   // Messaging methods
   Future<String> sendMessage({
-    required String receiverId,
+    String? receiverId, // for 1-1
     required String content,
     String messageType = 'text',
     String? mediaUrl,
     String? fileName,
+    String? conversationId, // for group or existing thread
   }) async {
     try {
       final user = _auth.currentUser;
       if (user == null) throw Exception('User not authenticated');
 
       if (kDebugMode) {
-        Logger.error('📤 Creating message data for receiver: $receiverId');
+        Logger.error(
+          '📤 Creating message data for conv: ${conversationId ?? 'n/a'} receiver: ${receiverId ?? 'n/a'}',
+        );
       }
+      // Determine conversationId
+      String resolvedConversationId =
+          conversationId ??
+          (receiverId != null ? _getConversationId(user.uid, receiverId) : '');
+
+      if (resolvedConversationId.isEmpty) {
+        throw Exception('conversationId or receiverId required');
+      }
+
       final messageData = {
         'senderId': user.uid,
         'receiverId': receiverId,
+        'conversationId': resolvedConversationId,
         'content': content,
         'timestamp': FieldValue.serverTimestamp(),
         'isRead': false,
@@ -318,19 +331,25 @@ class FirebaseMessagingHelper {
         Logger.error('✅ Message added with ID: ${messageRef.id}');
       }
 
-      // Update or create conversation
+      // Update conversation metadata
       await _updateConversation(
-        senderId: user.uid,
-        receiverId: receiverId,
+        conversationId: resolvedConversationId,
         lastMessage: content,
         lastMessageTime: DateTime.now(),
+        lastMessageSenderId: user.uid,
       );
 
-      // Ensure conversation exists
-      await _ensureConversationExists(user.uid, receiverId);
+      // Ensure conversation exists (1-1 only)
+      if (receiverId != null) {
+        await _ensureConversationExists(user.uid, receiverId);
+      }
 
       // Send push notification to receiver
-      await _sendPushNotification(receiverId, content, user.uid);
+      if (receiverId != null) {
+        await _sendPushNotification(receiverId, content, user.uid);
+      } else {
+        // TODO: Broadcast to group members (Cloud Function recommended)
+      }
 
       return messageRef.id;
     } catch (e) {
@@ -423,43 +442,20 @@ class FirebaseMessagingHelper {
   }
 
   Future<void> _updateConversation({
-    required String senderId,
-    required String receiverId,
+    required String conversationId,
     required String lastMessage,
     required DateTime lastMessageTime,
+    String? lastMessageSenderId,
   }) async {
     try {
-      final conversationId = _getConversationId(senderId, receiverId);
       final conversationRef = _firestore
           .collection('Conversations')
           .doc(conversationId);
 
-      // Get participant info
-      final senderInfo = await _getUserInfo(senderId);
-      final receiverInfo = await _getUserInfo(receiverId);
-
-      // Use sorted IDs for consistency
-      final sortedIds = [senderId, receiverId]..sort();
-      final participant1Id = sortedIds[0];
-      final participant2Id = sortedIds[1];
-
       final conversationData = {
-        'participant1Id': participant1Id,
-        'participant2Id': participant2Id,
         'lastMessage': lastMessage,
         'lastMessageTime': lastMessageTime,
-        'participantInfo': {
-          senderId: {
-            'name': senderInfo.name,
-            'profilePictureUrl': senderInfo.profilePictureUrl,
-            'username': senderInfo.username,
-          },
-          receiverId: {
-            'name': receiverInfo.name,
-            'profilePictureUrl': receiverInfo.profilePictureUrl,
-            'username': receiverInfo.username,
-          },
-        },
+        'lastMessageSenderId': lastMessageSenderId,
       };
 
       if (kDebugMode) {
@@ -504,73 +500,51 @@ class FirebaseMessagingHelper {
     }
 
     try {
-      // Get conversations where user is either participant1 or participant2
-      return _firestore
+      // Prefer new schema: participantIds contains user
+      final baseQuery = _firestore
           .collection('Conversations')
-          .where('participant1Id', isEqualTo: userId)
-          .snapshots()
-          .asyncMap((snapshot1) async {
-            if (kDebugMode) {
-              Logger.error(
-                '�� Found ${snapshot1.docs.length} conversations as participant1',
-              );
-            }
+          .where('participantIds', arrayContains: userId)
+          .snapshots();
 
-            final conversations1 = snapshot1.docs
-                .map((doc) {
-                  try {
-                    return ConversationModel.fromFirestore(doc);
-                  } catch (e) {
-                    if (kDebugMode) {
-                      Logger.error('❌ Error parsing conversation document: $e');
-                    }
-                    return null;
-                  }
-                })
-                .where((conversation) => conversation != null)
-                .cast<ConversationModel>()
-                .toList();
+      return baseQuery.asyncMap((snapshotNew) async {
+        final convNew = snapshotNew.docs
+            .map((doc) {
+              try {
+                return ConversationModel.fromFirestore(doc);
+              } catch (e) {
+                if (kDebugMode) Logger.error('❌ Parse conv error: $e');
+                return null;
+              }
+            })
+            .whereType<ConversationModel>()
+            .toList();
 
-            // Also get conversations where user is participant2
-            final snapshot2 = await _firestore
-                .collection('Conversations')
-                .where('participant2Id', isEqualTo: userId)
-                .get();
+        // Legacy fallback: participant1Id/participant2Id
+        final legacy1 = await _firestore
+            .collection('Conversations')
+            .where('participant1Id', isEqualTo: userId)
+            .get();
+        final legacy2 = await _firestore
+            .collection('Conversations')
+            .where('participant2Id', isEqualTo: userId)
+            .get();
 
-            if (kDebugMode) {
-              Logger.error(
-                '📊 Found ${snapshot2.docs.length} conversations as participant2',
-              );
-            }
+        final convLegacy = <ConversationModel>[];
+        for (final doc in [...legacy1.docs, ...legacy2.docs]) {
+          try {
+            convLegacy.add(ConversationModel.fromFirestore(doc));
+          } catch (_) {}
+        }
 
-            final conversations2 = snapshot2.docs
-                .map((doc) {
-                  try {
-                    return ConversationModel.fromFirestore(doc);
-                  } catch (e) {
-                    if (kDebugMode) {
-                      Logger.error('❌ Error parsing conversation document: $e');
-                    }
-                    return null;
-                  }
-                })
-                .where((conversation) => conversation != null)
-                .cast<ConversationModel>()
-                .toList();
-
-            // Combine and sort by last message time
-            final allConversations = [...conversations1, ...conversations2];
-            allConversations.sort(
-              (a, b) => b.lastMessageTime.compareTo(a.lastMessageTime),
-            );
-
-            if (kDebugMode) {
-              Logger.error(
-                '✅ Total conversations found: ${allConversations.length}',
-              );
-            }
-            return allConversations;
-          });
+        // Merge by id
+        final byId = <String, ConversationModel>{
+          for (final c in convNew) c.id: c,
+          for (final c in convLegacy) c.id: c,
+        };
+        final all = byId.values.toList();
+        all.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
+        return all;
+      });
     } catch (e) {
       if (kDebugMode) {
         Logger.error('❌ Error in getUserConversations: $e');
@@ -596,9 +570,12 @@ class FirebaseMessagingHelper {
 
       // Create conversation document with proper ID
       final conversationId = _getConversationId(userId, otherUserId);
+      final participantIds = [userId, otherUserId]..sort();
       final conversationData = {
         'participant1Id': userId,
         'participant2Id': otherUserId,
+        'participantIds': participantIds,
+        'isGroup': false,
         'lastMessage': '',
         'lastMessageTime': FieldValue.serverTimestamp(),
         'unreadCount': 0,
@@ -622,11 +599,13 @@ class FirebaseMessagingHelper {
         id: conversationId,
         participant1Id: userId,
         participant2Id: otherUserId,
+        participantIds: participantIds,
         lastMessage: '',
         lastMessageTime: DateTime.now(),
         unreadCount: 0,
         participantInfo:
             conversationData['participantInfo'] as Map<String, dynamic>,
+        isGroup: false,
       );
 
       if (kDebugMode) {
@@ -647,53 +626,13 @@ class FirebaseMessagingHelper {
         Logger.error('🔍 Getting messages for conversation: $conversationId');
       }
 
-      // Parse conversation ID to get participants
-      final participants = conversationId.split('_');
-      if (participants.length != 2) {
-        if (kDebugMode) {
-          Logger.error('❌ Invalid conversation ID format: $conversationId');
-        }
-        return Stream.value([]);
-      }
-
-      final participant1Id = participants[0];
-      final participant2Id = participants[1];
-
-      if (kDebugMode) {
-        Logger.error(
-          '📊 Getting messages between $participant1Id and $participant2Id',
-        );
-      }
-
-      // Get messages in both directions using separate queries
       return _firestore
           .collection('Messages')
-          .where('senderId', isEqualTo: participant1Id)
-          .where('receiverId', isEqualTo: participant2Id)
+          .where('conversationId', isEqualTo: conversationId)
           .orderBy('timestamp', descending: false)
           .snapshots()
-          .asyncMap((snapshot1) async {
-            final messages1 = snapshot1.docs;
-
-            // Get messages in the other direction
-            final snapshot2 = await _firestore
-                .collection('Messages')
-                .where('senderId', isEqualTo: participant2Id)
-                .where('receiverId', isEqualTo: participant1Id)
-                .orderBy('timestamp', descending: false)
-                .get();
-
-            final messages2 = snapshot2.docs;
-
-            // Combine and sort all messages
-            final allMessages = [...messages1, ...messages2];
-            allMessages.sort((a, b) {
-              final timestampA = (a.data()['timestamp'] as Timestamp).toDate();
-              final timestampB = (b.data()['timestamp'] as Timestamp).toDate();
-              return timestampA.compareTo(timestampB);
-            });
-
-            final messageModels = allMessages
+          .map((snapshot) {
+            final messageModels = snapshot.docs
                 .map((doc) {
                   try {
                     return MessageModel.fromFirestore(doc);
@@ -704,13 +643,8 @@ class FirebaseMessagingHelper {
                     return null;
                   }
                 })
-                .where((message) => message != null)
-                .cast<MessageModel>()
+                .whereType<MessageModel>()
                 .toList();
-
-            if (kDebugMode) {
-              Logger.error('✅ Found ${messageModels.length} messages');
-            }
             return messageModels;
           });
     } catch (e) {
@@ -726,23 +660,41 @@ class FirebaseMessagingHelper {
     String currentUserId,
   ) async {
     try {
-      final participants = conversationId.split('_');
-      if (participants.length != 2) return;
-
       final batch = _firestore.batch();
-      final otherParticipantId = participants.firstWhere(
-        (id) => id != currentUserId,
-      );
 
-      final messagesQuery = await _firestore
-          .collection('Messages')
-          .where('senderId', isEqualTo: otherParticipantId)
-          .where('receiverId', isEqualTo: currentUserId)
-          .where('isRead', isEqualTo: false)
+      // Get conversation to know if it's group
+      final convDoc = await _firestore
+          .collection('Conversations')
+          .doc(conversationId)
           .get();
+      final isGroup = (convDoc.data() ?? const {})['isGroup'] == true;
 
-      for (final doc in messagesQuery.docs) {
-        batch.update(doc.reference, {'isRead': true});
+      if (isGroup) {
+        final messagesQuery = await _firestore
+            .collection('Messages')
+            .where('conversationId', isEqualTo: conversationId)
+            .get();
+        for (final doc in messagesQuery.docs) {
+          batch.update(doc.reference, {
+            'readByUserIds': FieldValue.arrayUnion([currentUserId]),
+          });
+        }
+      } else {
+        final participants = conversationId.split('_');
+        if (participants.length == 2) {
+          final otherParticipantId = participants.firstWhere(
+            (id) => id != currentUserId,
+          );
+          final messagesQuery = await _firestore
+              .collection('Messages')
+              .where('senderId', isEqualTo: otherParticipantId)
+              .where('receiverId', isEqualTo: currentUserId)
+              .where('isRead', isEqualTo: false)
+              .get();
+          for (final doc in messagesQuery.docs) {
+            batch.update(doc.reference, {'isRead': true});
+          }
+        }
       }
 
       await batch.commit();
@@ -750,6 +702,72 @@ class FirebaseMessagingHelper {
       if (kDebugMode) {
         Logger.error('❌ Error marking messages as read: $e');
       }
+    }
+  }
+
+  // Create a group conversation
+  Future<ConversationModel?> createGroupConversation({
+    String? groupName,
+    String? groupAvatarUrl,
+    required List<String> participantIds,
+  }) async {
+    try {
+      if (participantIds.length < 3) {
+        throw Exception('Group must have at least 3 participants');
+      }
+      final sorted = [...participantIds]..sort();
+      final docRef = _firestore.collection('Conversations').doc();
+
+      // Build participantInfo map and collect names to generate default name
+      final infoEntries = <String, Map<String, dynamic>>{};
+      final names = <String>[];
+      for (final uid in sorted) {
+        try {
+          final u = await _getUserInfo(uid);
+          infoEntries[uid] = {
+            'name': u.name,
+            'profilePictureUrl': u.profilePictureUrl,
+            'username': u.username,
+          };
+          if (u.name.isNotEmpty) names.add(u.name);
+        } catch (_) {}
+      }
+
+      // Auto-generate a group name if not provided
+      String finalName = (groupName ?? '').trim();
+      if (finalName.isEmpty) {
+        if (names.isNotEmpty) {
+          finalName = names.join(', ');
+        } else {
+          finalName = 'Group';
+        }
+      }
+
+      await docRef.set({
+        'isGroup': true,
+        'groupName': finalName,
+        'groupAvatarUrl': groupAvatarUrl,
+        'participantIds': sorted,
+        'participantInfo': infoEntries,
+        'lastMessage': '',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+        'unreadCount': 0,
+      });
+
+      return ConversationModel(
+        id: docRef.id,
+        participantIds: sorted,
+        lastMessage: '',
+        lastMessageTime: DateTime.now(),
+        unreadCount: 0,
+        participantInfo: infoEntries,
+        isGroup: true,
+        groupName: finalName,
+        groupAvatarUrl: groupAvatarUrl,
+      );
+    } catch (e) {
+      if (kDebugMode) Logger.error('❌ Error creating group: $e');
+      return null;
     }
   }
 

@@ -16,7 +16,6 @@ import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/Screens/Events/chose_date_time_screen.dart';
 import 'package:orgami/Screens/Events/single_event_screen.dart';
 import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
-import 'package:orgami/Utils/images.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:shimmer/shimmer.dart';
@@ -634,35 +633,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
               Row(
                 children: [
-                  // Search Icon
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    width: _isSearchExpanded ? 0 : 40,
-                    child: _isSearchExpanded
-                        ? const SizedBox.shrink()
-                        : Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(20),
-                                onTap: _toggleSearch,
-                                child: const Icon(
-                                  Icons.search,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              ),
-                            ),
-                          ),
-                  ),
-                  const SizedBox(width: 8),
-                  // QR Code Icon
+                  // QR Code Icon (now to the left of search)
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
                     width: _isSearchExpanded ? 0 : 40,
@@ -695,22 +666,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ),
                   ),
                   const SizedBox(width: 8),
-                  // Logo
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: Image.asset(
-                        Images.inAppLogo,
-                        width: 32,
-                        height: 32,
-                      ),
-                    ),
+                  // Search Icon (now on far right)
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    width: _isSearchExpanded ? 0 : 40,
+                    child: _isSearchExpanded
+                        ? const SizedBox.shrink()
+                        : Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(20),
+                                onTap: _toggleSearch,
+                                child: const Icon(
+                                  Icons.search,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          ),
                   ),
                 ],
               ),
@@ -1407,8 +1388,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           // View Profile Button
           GestureDetector(
             onTap: () {
-              final isOwn =
-                  CustomerController.logeInCustomer?.uid == user.uid;
+              final isOwn = CustomerController.logeInCustomer?.uid == user.uid;
               RouterClass.nextScreenNormal(
                 context,
                 UserProfileScreen(user: user, isOwnProfile: isOwn),
@@ -1687,12 +1667,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         final user = _defaultUsers[index];
         return GestureDetector(
           onTap: () {
-              final isOwn =
-                  CustomerController.logeInCustomer?.uid == user.uid;
-              RouterClass.nextScreenNormal(
-                context,
-                UserProfileScreen(user: user, isOwnProfile: isOwn),
-              );
+            final isOwn = CustomerController.logeInCustomer?.uid == user.uid;
+            RouterClass.nextScreenNormal(
+              context,
+              UserProfileScreen(user: user, isOwnProfile: isOwn),
+            );
           },
           child: Container(
             padding: const EdgeInsets.all(16),
@@ -1755,6 +1734,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           fontFamily: 'Roboto',
                         ),
                       ),
+                      if (user.username != null &&
+                          user.username!.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '@${user.username}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                            fontFamily: 'Roboto',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                       if (user.bio != null && user.bio!.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
@@ -2425,31 +2418,38 @@ class _FeaturedEventCardState extends State<_FeaturedEventCard>
                           ),
                           const SizedBox(height: 12),
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.3),
-                                    width: 1,
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
                                   ),
-                                ),
-                                child: Text(
-                                  '${DateFormat('MMM dd, KK:mm a').format(widget.event.selectedDateTime)} – ${DateFormat('KK:mm a').format(widget.event.eventEndTime)}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
-                                    fontFamily: 'Roboto',
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.3,
+                                      ),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '${DateFormat('MMM dd, KK:mm a').format(widget.event.selectedDateTime)} – ${DateFormat('KK:mm a').format(widget.event.eventEndTime)}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                      fontFamily: 'Roboto',
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    softWrap: false,
                                   ),
                                 ),
                               ),
+                              const SizedBox(width: 12),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 16,

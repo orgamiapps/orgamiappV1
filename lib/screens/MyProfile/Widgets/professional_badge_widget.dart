@@ -97,12 +97,22 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
           opacity: _fadeAnimation,
           child: ScaleTransition(
             scale: _scaleAnimation,
-            child: Container(
+            child: SizedBox(
               width: widget.width,
               height: widget.height,
               child: Column(
                 children: [
-                  Expanded(child: _buildBadgeCard()),
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.contain,
+                      alignment: Alignment.center,
+                      child: SizedBox(
+                        width: 340,
+                        height: 220,
+                        child: _buildBadgeCard(),
+                      ),
+                    ),
+                  ),
                   if (widget.showActions) _buildActionButtons(),
                 ],
               ),
@@ -138,6 +148,7 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
           children: [
             _buildGradientBackground(),
             _buildShimmerEffect(),
+            _buildContrastOverlay(),
             _buildBadgeContent(),
             _buildHolographicEffect(),
           ],
@@ -176,9 +187,9 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
               end: Alignment.bottomRight,
               colors: [
                 Colors.transparent,
-                Colors.white.withOpacity(0.1),
-                Colors.white.withOpacity(0.3),
-                Colors.white.withOpacity(0.1),
+                Colors.white.withOpacity(0.05),
+                Colors.white.withOpacity(0.12),
+                Colors.white.withOpacity(0.05),
                 Colors.transparent,
               ],
               stops: [
@@ -195,6 +206,26 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
     );
   }
 
+  // Adds a subtle dark overlay to improve text contrast across light gradients
+  Widget _buildContrastOverlay() {
+    return Positioned.fill(
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.black.withOpacity(0.28),
+              Colors.black.withOpacity(0.16),
+              Colors.black.withOpacity(0.10),
+            ],
+            stops: const [0.0, 0.55, 1.0],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildHolographicEffect() {
     return Positioned.fill(
       child: Container(
@@ -203,11 +234,11 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Colors.white.withOpacity(0.1),
+              Colors.white.withOpacity(0.06),
               Colors.transparent,
-              const Color(0xFF00FFFF).withOpacity(0.1),
+              const Color(0xFF00FFFF).withOpacity(0.06),
               Colors.transparent,
-              const Color(0xFFFF00FF).withOpacity(0.1),
+              const Color(0xFFFF00FF).withOpacity(0.06),
               Colors.transparent,
             ],
           ),
@@ -250,18 +281,20 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
             Text(
               'ORGAMI',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withOpacity(0.98),
                 letterSpacing: 2,
+                shadows: _textShadows(),
               ),
             ),
             Text(
               'EVENT BADGE',
               style: TextStyle(
-                fontSize: 8,
-                color: Colors.white.withOpacity(0.7),
+                fontSize: 9,
+                color: Colors.white.withOpacity(0.9),
                 letterSpacing: 1.5,
+                shadows: _textShadows(small: true),
               ),
             ),
           ],
@@ -269,9 +302,9 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
+            color: Colors.black.withOpacity(0.35),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withOpacity(0.3)),
+            border: Border.all(color: Colors.white.withOpacity(0.25)),
           ),
           child: Text(
             widget.badge.badgeLevel.toUpperCase(),
@@ -328,7 +361,7 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
         Text(
           widget.badge.userName,
           style: const TextStyle(
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
@@ -364,18 +397,23 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
         children: [
           Text(
             label,
-            style: TextStyle(fontSize: 8, color: Colors.white.withOpacity(0.8)),
+            style: TextStyle(
+              fontSize: 9,
+              color: Colors.white.withOpacity(0.95),
+              shadows: _textShadows(small: true),
+            ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.black.withOpacity(0.35),
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white.withOpacity(0.2)),
             ),
             child: Text(
               value,
               style: const TextStyle(
-                fontSize: 8,
+                fontSize: 9,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),
@@ -393,9 +431,10 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
         Text(
           'Achievements',
           style: TextStyle(
-            fontSize: 8,
-            color: Colors.white.withOpacity(0.8),
+            fontSize: 9,
+            color: Colors.white.withOpacity(0.95),
             fontWeight: FontWeight.bold,
+            shadows: _textShadows(small: true),
           ),
         ),
         const SizedBox(height: 2),
@@ -406,12 +445,13 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.black.withOpacity(0.35),
                 borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.white.withOpacity(0.2)),
               ),
               child: Text(
                 achievement,
-                style: const TextStyle(fontSize: 6, color: Colors.white),
+                style: const TextStyle(fontSize: 7, color: Colors.white),
               ),
             );
           }).toList(),
@@ -427,17 +467,32 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
         Text(
           'ID: ${widget.badge.uid.substring(0, 8)}',
           style: TextStyle(
-            fontSize: 6,
-            color: Colors.white.withOpacity(0.6),
+            fontSize: 7,
+            color: Colors.white.withOpacity(0.85),
             fontFamily: 'Courier',
+            shadows: _textShadows(small: true),
           ),
         ),
         Text(
           'Valid: ${DateTime.now().year}',
-          style: TextStyle(fontSize: 6, color: Colors.white.withOpacity(0.6)),
+          style: TextStyle(
+            fontSize: 7,
+            color: Colors.white.withOpacity(0.85),
+            shadows: _textShadows(small: true),
+          ),
         ),
       ],
     );
+  }
+
+  List<Shadow> _textShadows({bool small = false}) {
+    return [
+      Shadow(
+        color: Colors.black.withOpacity(0.45),
+        blurRadius: small ? 2 : 4,
+        offset: const Offset(0, 1),
+      ),
+    ];
   }
 
   Widget _buildActionButtons() {

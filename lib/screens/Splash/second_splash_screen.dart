@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:orgami/Screens/Authentication/login_screen.dart';
-import 'package:orgami/Screens/Authentication/signup_screen.dart';
+import 'package:orgami/screens/Authentication/create_account/create_account_screen.dart';
 import 'package:orgami/Screens/Splash/Widgets/social_icons_view.dart';
 import 'package:orgami/utils/colors.dart';
 import 'package:orgami/utils/images.dart';
@@ -274,9 +274,9 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
       child: Column(
         children: [
           _buildPrimaryButton(
-            label: 'Sign Up',
+            label: 'Create Account',
             onTap: () =>
-                RouterClass.nextScreenNormal(context, const SignupScreen()),
+                RouterClass.nextScreenNormal(context, const CreateAccountScreen()),
             isPrimary: true,
           ),
           const SizedBox(height: 12),

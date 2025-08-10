@@ -116,6 +116,15 @@ service cloud.firestore {
       allow create: if request.auth != null;
       allow update: if request.auth != null;
     }
+
+    // User badges (profile badges with stats)
+    // Each user can read/write only their own badge document
+    match /UserBadges/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
     
     // Allow users to read/write their own notifications
     match /users/{userId}/notifications/{notificationId} {
@@ -132,25 +141,65 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
     
-    // Allow users to read/write conversations they are part of
+    // Allow users to read/write conversations they are part of (legacy 1-1 and new group schema)
     match /Conversations/{conversationId} {
-      allow read, write: if request.auth != null && 
-        (request.auth.uid == resource.data.participant1Id || 
-         request.auth.uid == resource.data.participant2Id);
-      allow create: if request.auth != null && 
-        (request.auth.uid == request.resource.data.participant1Id || 
-         request.auth.uid == request.resource.data.participant2Id);
+      function isParticipant() {
+        return request.auth != null && (
+          request.auth.uid == resource.data.participant1Id ||
+          request.auth.uid == resource.data.participant2Id ||
+          (resource.data.participantIds != null && request.auth.uid in resource.data.participantIds)
+        );
+      }
+
+      function isParticipantOnCreate() {
+        return request.auth != null && (
+          request.auth.uid == request.resource.data.participant1Id ||
+          request.auth.uid == request.resource.data.participant2Id ||
+          (request.resource.data.participantIds != null && request.auth.uid in request.resource.data.participantIds)
+        );
+      }
+
+      allow read, write: if isParticipant();
+      allow create: if isParticipantOnCreate();
     }
-    
+
     // Allow users to read/write messages in conversations they are part of
     match /Messages/{messageId} {
-      allow read: if request.auth != null && 
-        (request.auth.uid == resource.data.senderId || 
-         request.auth.uid == resource.data.receiverId);
-      allow create: if request.auth != null && 
-        request.auth.uid == request.resource.data.senderId;
-      allow update: if request.auth != null && 
-        request.auth.uid == resource.data.senderId;
+      function conversationDoc() {
+        return get(/databases/$(database)/documents/Conversations/$(resource.data.conversationId));
+      }
+      function conversationDocOnCreate() {
+        return get(/databases/$(database)/documents/Conversations/$(request.resource.data.conversationId));
+      }
+      function isConvParticipant(doc) {
+        return request.auth != null && (
+          request.auth.uid == doc.data.participant1Id ||
+          request.auth.uid == doc.data.participant2Id ||
+          (doc.data.participantIds != null && request.auth.uid in doc.data.participantIds)
+        );
+      }
+
+      // Read allowed if user is sender/receiver (legacy) OR member of the conversation (via conversationId)
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.senderId ||
+        request.auth.uid == resource.data.receiverId ||
+        (
+          resource.data.conversationId != null &&
+          isConvParticipant(conversationDoc())
+        )
+      );
+
+      // Create allowed only by sender who is participant of the conversation
+      allow create: if request.auth != null &&
+        request.auth.uid == request.resource.data.senderId &&
+        request.resource.data.conversationId != null &&
+        isConvParticipant(conversationDocOnCreate());
+
+      // Allow participants to mark messages as read (only isRead/readByUserIds fields)
+      allow update: if request.auth != null &&
+        resource.data.conversationId != null &&
+        isConvParticipant(conversationDoc()) &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['isRead', 'readByUserIds']);
     }
     
     // Allow users to read/write their own user data for FCM tokens

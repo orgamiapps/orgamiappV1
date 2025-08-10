@@ -383,7 +383,8 @@ class _CoHostManagementWidgetState extends State<CoHostManagementWidget> {
                                 fontFamily: 'Roboto',
                               ),
                             ),
-                            if (coHost.username != null)
+                            if (coHost.username != null &&
+                                coHost.username!.isNotEmpty)
                               Text(
                                 '@${coHost.username}',
                                 style: TextStyle(
@@ -696,7 +697,9 @@ class _AddCoHostDialogState extends State<_AddCoHostDialog> {
                                 fontFamily: 'Roboto',
                               ),
                             ),
-                            subtitle: user.username != null
+                            subtitle:
+                                user.username != null &&
+                                    user.username!.isNotEmpty
                                 ? Text(
                                     '@${user.username}',
                                     style: TextStyle(

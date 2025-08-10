@@ -10,12 +10,12 @@ import 'package:orgami/Utils/toast.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
-  final CustomerModel otherParticipantInfo;
+  final CustomerModel? otherParticipantInfo; // null for group
 
   const ChatScreen({
     super.key,
     required this.conversationId,
-    required this.otherParticipantInfo,
+    this.otherParticipantInfo,
   });
 
   @override
@@ -31,7 +31,8 @@ class _ChatScreenState extends State<ChatScreen> {
   List<MessageModel> _messages = [];
   bool _isLoading = true;
   bool _isSending = false;
-  StreamSubscription<QuerySnapshot>? _messagesSubscription;
+  StreamSubscription<List<MessageModel>>? _messagesSubscription;
+  ConversationModel? _conversation;
 
   @override
   void initState() {
@@ -52,19 +53,32 @@ class _ChatScreenState extends State<ChatScreen> {
       User? currentUser = _auth.currentUser;
       if (currentUser == null) return;
 
-      if (kDebugMode) {
-        debugPrint('🔧 Creating conversation ${widget.conversationId}');
-      }
-
-      // Load messages
-      await _loadMessages();
-
-      // Listen for new messages
+      // Start listener ASAP so new messages appear instantly
       _listenForMessages();
+
+      // Load conversation metadata and initial messages
+      await _loadConversation();
+      await _loadMessages();
     } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ Error initializing chat: $e');
       }
+    }
+  }
+
+  Future<void> _loadConversation() async {
+    try {
+      final doc = await _firestore
+          .collection('Conversations')
+          .doc(widget.conversationId)
+          .get();
+      if (doc.exists) {
+        setState(() {
+          _conversation = ConversationModel.fromFirestore(doc);
+        });
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('❌ Error loading conversation: $e');
     }
   }
 
@@ -75,37 +89,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
       if (kDebugMode) {
         debugPrint(
-          '🧪 Sending test message to ${widget.otherParticipantInfo.uid}',
-        );
-      }
-
-      // For testing purposes, send a test message
-      try {
-        await FirebaseMessagingHelper().sendMessage(
-          receiverId: widget.otherParticipantInfo.uid,
-          content: 'Test message from ${currentUser.displayName}',
-        );
-
-        if (kDebugMode) {
-          debugPrint('✅ Test message sent successfully');
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          debugPrint('❌ Error sending test message: $e');
-        }
-      }
-
-      if (kDebugMode) {
-        debugPrint(
           '🔍 Loading messages for conversation: ${widget.conversationId}',
         );
         debugPrint('🔍 Current user: ${currentUser.uid}');
-        debugPrint('🔍 Other participant: ${widget.otherParticipantInfo}');
+        debugPrint('🔍 Conversation loaded: ${_conversation?.id}');
       }
 
       // Get messages from Firestore
-      Stream<List<MessageModel>> messagesStream = FirebaseMessagingHelper()
-          .getMessages(widget.conversationId);
+      Stream<List<MessageModel>> messagesStream =
+          FirebaseMessagingHelper().getMessages(widget.conversationId);
 
       // Listen to the stream and get the first value
       List<MessageModel> messages = await messagesStream.first;
@@ -155,57 +147,38 @@ class _ChatScreenState extends State<ChatScreen> {
       User? currentUser = _auth.currentUser;
       if (currentUser == null) return;
 
-      _messagesSubscription = _firestore
-          .collection('messages')
-          .where('conversationId', isEqualTo: widget.conversationId)
-          .orderBy('timestamp', descending: true)
-          .limit(50)
-          .snapshots()
-          .listen((snapshot) {
-            try {
-              List<MessageModel> newMessages = [];
-              for (DocumentSnapshot doc in snapshot.docs) {
-                try {
-                  MessageModel message = MessageModel.fromFirestore(doc);
-                  newMessages.add(message);
-                } catch (e) {
-                  if (kDebugMode) {
-                    debugPrint('❌ Exception in _loadMessages: $e');
-                  }
-                }
-              }
+      _messagesSubscription = FirebaseMessagingHelper()
+          .getMessages(widget.conversationId)
+          .listen((newMessages) {
+        try {
+          // Sort by timestamp (oldest first)
+          newMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+          if (mounted) {
+            setState(() {
+              _messages = newMessages;
+            });
 
-              // Sort by timestamp (oldest first)
-              newMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+            // Mark messages as read
+            FirebaseMessagingHelper().markMessagesAsRead(
+              widget.conversationId,
+              currentUser.uid,
+            );
 
-              if (mounted) {
-                setState(() {
-                  _messages = newMessages;
-                });
-
-                // Mark messages as read
-                FirebaseMessagingHelper().markMessagesAsRead(
-                  widget.conversationId,
-                  currentUser.uid,
+            // Scroll to bottom for new messages
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (_scrollController.hasClients) {
+                _scrollController.animateTo(
+                  _scrollController.position.maxScrollExtent,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOut,
                 );
-
-                // Scroll to bottom for new messages
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (_scrollController.hasClients) {
-                    _scrollController.animateTo(
-                      _scrollController.position.maxScrollExtent,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeOut,
-                    );
-                  }
-                });
               }
-            } catch (e) {
-              if (kDebugMode) {
-                debugPrint('❌ Exception in _loadMessages: $e');
-              }
-            }
-          });
+            });
+          }
+        } catch (e) {
+          if (kDebugMode) debugPrint('❌ Listen error: $e');
+        }
+      });
     } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ Error loading messages: $e');
@@ -221,22 +194,56 @@ class _ChatScreenState extends State<ChatScreen> {
       if (currentUser == null) return;
 
       String message = _messageController.text.trim();
-      String receiverId = widget.otherParticipantInfo.uid;
 
       setState(() {
         _isSending = true;
       });
 
       if (kDebugMode) {
-        debugPrint('📤 Sending message to $receiverId: $message');
+        debugPrint('📤 Sending message to conversation ${widget.conversationId}: $message');
         debugPrint('📤 Conversation ID: ${widget.conversationId}');
       }
 
-      // Send message
-      await FirebaseMessagingHelper().sendMessage(
-        receiverId: receiverId,
+      final isGroup = _conversation?.isGroup == true;
+
+      // Optimistically add message to the list for instant feedback
+      final provisional = MessageModel(
+        id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+        senderId: currentUser.uid,
+        receiverId: isGroup ? null : widget.otherParticipantInfo?.uid,
+        conversationId: widget.conversationId,
         content: message,
+        timestamp: DateTime.now(),
+        isRead: false,
       );
+      setState(() {
+        _messages = [..._messages, provisional];
+      });
+      // Scroll to bottom immediately
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+
+      // Persist to Firestore
+      if (isGroup) {
+        await FirebaseMessagingHelper().sendMessage(
+          content: message,
+          conversationId: widget.conversationId,
+        );
+      } else {
+        final receiverId = widget.otherParticipantInfo!.uid;
+        await FirebaseMessagingHelper().sendMessage(
+          receiverId: receiverId,
+          content: message,
+          conversationId: widget.conversationId,
+        );
+      }
 
       if (kDebugMode) {
         debugPrint('✅ Message sent successfully');
@@ -266,23 +273,53 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildMessageBubble(MessageModel message) {
     User? currentUser = _auth.currentUser;
     bool isMe = currentUser?.uid == message.senderId;
+    final isGroup = _conversation?.isGroup == true;
+    final senderName = isGroup
+        ? (_conversation?.participantInfo[message.senderId]?['name'] ?? '')
+        : '';
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-        decoration: BoxDecoration(
-          color: isMe ? Colors.blue : Colors.grey[300],
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          message.content,
-          style: TextStyle(
-            color: isMe ? Colors.white : Colors.black,
-            fontSize: 16,
+      child: Column(
+        crossAxisAlignment:
+            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          if (!isMe && isGroup && senderName.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 12, bottom: 2),
+              child: Text(
+                senderName,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ),
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+            decoration: BoxDecoration(
+              color: isMe ? const Color(0xFF0B93F6) : const Color(0xFFE5E5EA),
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(18),
+                topRight: const Radius.circular(18),
+                bottomLeft: Radius.circular(isMe ? 18 : 4),
+                bottomRight: Radius.circular(isMe ? 4 : 18),
+              ),
+            ),
+            child: Text(
+              message.content,
+              style: TextStyle(
+                color: isMe ? Colors.white : Colors.black,
+                fontSize: 16,
+              ),
+            ),
           ),
-        ),
+          Padding(
+            padding: const EdgeInsets.only(left: 12, right: 12, bottom: 4),
+            child: Text(
+              _formatTimestamp(message.timestamp),
+              style: const TextStyle(fontSize: 11, color: Colors.grey),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -353,43 +390,20 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  String _formatTimestamp(DateTime dt) {
+    final now = DateTime.now();
+    final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
+    if (isToday) {
+      return TimeOfDay.fromDateTime(dt).format(context);
+    }
+    return '${dt.month}/${dt.day}/${dt.year} ${TimeOfDay.fromDateTime(dt).format(context)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            CircleAvatar(
-              backgroundImage:
-                  widget.otherParticipantInfo.profilePictureUrl != null
-                  ? NetworkImage(widget.otherParticipantInfo.profilePictureUrl!)
-                  : null,
-              child: widget.otherParticipantInfo.profilePictureUrl == null
-                  ? Text(
-                      widget.otherParticipantInfo.name.isNotEmpty
-                          ? widget.otherParticipantInfo.name[0].toUpperCase()
-                          : '?',
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.otherParticipantInfo.name,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  Text(
-                    widget.otherParticipantInfo.email,
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+        title: _buildAppBarTitle(),
         actions: [
           IconButton(
             icon: const Icon(Icons.more_vert),
@@ -405,6 +419,48 @@ class _ChatScreenState extends State<ChatScreen> {
           _buildMessageInput(),
         ],
       ),
+    );
+  }
+
+  Widget _buildAppBarTitle() {
+    if (_conversation?.isGroup == true) {
+      final name = _conversation?.groupName ?? 'Group';
+      return Row(
+        children: [
+          const CircleAvatar(child: Icon(Icons.group)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              name,
+              style: const TextStyle(fontSize: 16),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      );
+    }
+    final user = widget.otherParticipantInfo;
+    if (user == null) return const SizedBox.shrink();
+    return Row(
+      children: [
+        CircleAvatar(
+          backgroundImage:
+              user.profilePictureUrl != null ? NetworkImage(user.profilePictureUrl!) : null,
+          child: user.profilePictureUrl == null
+              ? Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?')
+              : null,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(user.name, style: const TextStyle(fontSize: 16)),
+              Text(user.email, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

@@ -13,6 +13,12 @@ class AppConstants {
   static DateFormat dateFormat1 = DateFormat("dd MMM yyyy");
   static DateFormat dateFormat2 = DateFormat("dd-MM-yyyy");
 
+  // Google Places API key used for client-side autocomplete in signup.
+  // NOTE: Keep this key restricted to Places APIs only. This mirrors the key
+  // present in AndroidManifest for Maps SDK usage.
+  static const String googlePlacesApiKey =
+      'AIzaSyAf1t5cToh1UoF7R52vTSJxMajw8CvmVUA';
+
   static String getMilesSliderLabel(double value) {
     switch (value.round()) {
       case 0:

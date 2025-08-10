@@ -5,7 +5,7 @@ import 'package:orgami/firebase/firebase_messaging_helper.dart';
 import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:orgami/Utils/cached_image.dart';
-import 'package:orgami/Screens/Messaging/chat_screen.dart';
+import 'package:orgami/screens/Messaging/chat_screen.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:orgami/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
@@ -22,11 +22,14 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseMessagingHelper _messagingHelper = FirebaseMessagingHelper();
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _groupNameController = TextEditingController();
 
   List<CustomerModel> _searchResults = [];
   List<CustomerModel> _allUsers = [];
   bool _isLoading = false;
   bool _isSearching = false;
+  bool _groupMode = false;
+  final Set<String> _selectedUserIds = {};
 
   @override
   void initState() {
@@ -38,6 +41,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _groupNameController.dispose();
     super.dispose();
   }
 
@@ -179,6 +183,42 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
     }
   }
 
+  Future<void> _createGroupAndOpenChat() async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) return;
+      final participants = {currentUser.uid, ..._selectedUserIds}.toList();
+      if (participants.length < 3) {
+        ShowToast().showSnackBar(
+          'Select at least 2 people for a group',
+          context,
+        );
+        return;
+      }
+      final groupName = _groupNameController.text.trim();
+
+      final conv = await _messagingHelper.createGroupConversation(
+        groupName: groupName.isEmpty ? null : groupName,
+        participantIds: participants,
+      );
+      if (conv == null) {
+        ShowToast().showSnackBar('Failed to create group', context);
+        return;
+      }
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatScreen(conversationId: conv.id),
+        ),
+      );
+    } catch (e) {
+      Logger.error('Error creating group: $e');
+      if (!mounted) return;
+      ShowToast().showSnackBar('Error creating group', context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
@@ -188,7 +228,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
-          'New Message',
+          _groupMode ? 'New Group' : 'New Message',
           style: TextStyle(
             color: theme.appBarTheme.foregroundColor,
             fontWeight: FontWeight.bold,
@@ -209,6 +249,8 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
       ),
       body: Column(
         children: [
+          _buildModeToggle(),
+          if (_groupMode) _buildGroupHeader(),
           _buildSearchBar(),
           Expanded(
             child: _isLoading
@@ -220,6 +262,63 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                 : _searchResults.isEmpty
                 ? _buildEmptyState()
                 : _buildUsersList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeToggle() {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Row(
+        children: [
+          ChoiceChip(
+            label: const Text('Direct'),
+            selected: !_groupMode,
+            onSelected: (v) => setState(() => _groupMode = false),
+            selectedColor: theme.colorScheme.primary.withOpacity(0.15),
+          ),
+          const SizedBox(width: 8),
+          ChoiceChip(
+            label: const Text('Group'),
+            selected: _groupMode,
+            onSelected: (v) => setState(() => _groupMode = true),
+            selectedColor: theme.colorScheme.primary.withOpacity(0.15),
+          ),
+          const Spacer(),
+          if (_groupMode)
+            FilledButton(
+              onPressed: _selectedUserIds.length >= 2
+                  ? _createGroupAndOpenChat
+                  : null,
+              child: const Text('Create'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGroupHeader() {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _groupNameController,
+              decoration: const InputDecoration(
+                hintText: 'Group name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            '${_selectedUserIds.length} selected',
+            style: TextStyle(color: theme.textTheme.bodyMedium?.color),
           ),
         ],
       ),
@@ -388,7 +487,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (user.username != null) ...[
+            if (user.username != null && user.username!.isNotEmpty) ...[
               Text(
                 '@${user.username}',
                 style: TextStyle(
@@ -411,16 +510,39 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
             ],
           ],
         ),
-        trailing: IconButton(
-          icon: Icon(
-            Icons.message_outlined,
-            color: isDark
-                ? const Color(0xFF2C5A96)
-                : AppThemeColor.darkBlueColor,
-          ),
-          onPressed: () => _startConversation(user),
-        ),
-        onTap: () => _startConversation(user),
+        trailing: _groupMode
+            ? Checkbox(
+                value: _selectedUserIds.contains(user.uid),
+                onChanged: (checked) {
+                  setState(() {
+                    if (checked == true) {
+                      _selectedUserIds.add(user.uid);
+                    } else {
+                      _selectedUserIds.remove(user.uid);
+                    }
+                  });
+                },
+              )
+            : IconButton(
+                icon: Icon(
+                  Icons.message_outlined,
+                  color: isDark
+                      ? const Color(0xFF2C5A96)
+                      : AppThemeColor.darkBlueColor,
+                ),
+                onPressed: () => _startConversation(user),
+              ),
+        onTap: _groupMode
+            ? () {
+                setState(() {
+                  if (_selectedUserIds.contains(user.uid)) {
+                    _selectedUserIds.remove(user.uid);
+                  } else {
+                    _selectedUserIds.add(user.uid);
+                  }
+                });
+              }
+            : () => _startConversation(user),
       ),
     );
   }

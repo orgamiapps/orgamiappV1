@@ -9,13 +9,13 @@ import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:orgami/Utils/cached_image.dart';
 import 'package:orgami/Utils/theme_provider.dart';
-import 'package:orgami/Screens/Messaging/chat_screen.dart';
-import 'package:orgami/Screens/Messaging/new_message_screen.dart';
+import 'package:orgami/screens/Messaging/chat_screen.dart';
+import 'package:orgami/screens/Messaging/new_message_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:orgami/models/customer_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/Utils/logger.dart';
-
+import 'package:orgami/firebase/firebase_firestore_helper.dart';
 
 class MessagingScreen extends StatefulWidget {
   const MessagingScreen({super.key});
@@ -35,6 +35,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
   Timer? _timeoutTimer;
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
+  final Map<String, Map<String, dynamic>> _userInfoCache = {};
 
   @override
   void initState() {
@@ -159,9 +160,11 @@ class _MessagingScreenState extends State<MessagingScreen> {
     if (currentUserId == null) return '';
 
     try {
-      return conversation.participant1Id == currentUserId
-          ? conversation.participant2Id
-          : conversation.participant1Id;
+      if (conversation.isGroup) return '';
+      final p1 = conversation.participant1Id;
+      final p2 = conversation.participant2Id;
+      if (p1 == null || p2 == null) return '';
+      return p1 == currentUserId ? p2 : p1;
     } catch (e) {
       Logger.error('Error getting other participant ID: $e');
       return '';
@@ -172,11 +175,37 @@ class _MessagingScreenState extends State<MessagingScreen> {
     ConversationModel conversation,
   ) {
     try {
+      if (conversation.isGroup) return {};
       final otherId = _getOtherParticipantId(conversation);
-      return conversation.participantInfo[otherId] ?? {};
+      final fromConv = conversation.participantInfo[otherId] ?? {};
+      if (fromConv.isNotEmpty) return fromConv;
+      // Fallback to cache
+      final cached = _userInfoCache[otherId];
+      if (cached != null) return cached;
+      // Trigger async fetch (non-blocking)
+      _prefetchUserInfo(otherId);
+      return {};
     } catch (e) {
       Logger.error('Error getting other participant info: $e');
       return {};
+    }
+  }
+
+  Future<void> _prefetchUserInfo(String userId) async {
+    if (userId.isEmpty || _userInfoCache.containsKey(userId)) return;
+    final helper = FirebaseFirestoreHelper();
+    final user = await helper.getSingleCustomer(customerId: userId);
+    if (user != null && mounted) {
+      setState(() {
+        _userInfoCache[userId] = {
+          'uid': user.uid,
+          'name': user.name,
+          'email': user.email,
+          'username': user.username,
+          'profilePictureUrl': user.profilePictureUrl,
+          'bio': user.bio,
+        };
+      });
     }
   }
 
@@ -519,10 +548,20 @@ class _MessagingScreenState extends State<MessagingScreen> {
     final isDark = themeProvider.isDarkMode;
     final theme = Theme.of(context);
 
-    final name = otherParticipantInfo['name'] ?? 'Unknown User';
-    final profilePictureUrl = otherParticipantInfo['profilePictureUrl'];
-    final username = otherParticipantInfo['username'];
+    final bool isGroup = conversation.isGroup;
     final hasUnread = conversation.unreadCount > 0;
+    String name;
+    String? subtitleUsername;
+    String? profilePictureUrl;
+    if (isGroup) {
+      name = conversation.groupName ?? 'Group';
+      subtitleUsername = null;
+      profilePictureUrl = conversation.groupAvatarUrl;
+    } else {
+      name = otherParticipantInfo['name'] ?? 'Unknown User';
+      profilePictureUrl = otherParticipantInfo['profilePictureUrl'];
+      subtitleUsername = otherParticipantInfo['username'];
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -541,37 +580,41 @@ class _MessagingScreenState extends State<MessagingScreen> {
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
-        leading: CircleAvatar(
-          radius: 25,
-          backgroundColor: isDark
-              ? const Color(0xFF4A90E2)
-              : AppThemeColor.lightBlueColor,
-          child: profilePictureUrl != null
-              ? ClipOval(
-                  child: SafeNetworkImage(
-                    imageUrl: profilePictureUrl,
-                    fit: BoxFit.cover,
-                    placeholder: Icon(
-                      Icons.person,
-                      color: isDark
-                          ? const Color(0xFF2C5A96)
-                          : const Color(0xFF667EEA),
-                    ),
-                    errorWidget: Icon(
-                      Icons.person,
-                      color: isDark
-                          ? const Color(0xFF2C5A96)
-                          : const Color(0xFF667EEA),
-                    ),
-                  ),
-                )
-              : Icon(
-                  Icons.person,
+        leading: isGroup
+            ? _buildGroupAvatar(conversation)
+            : ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  width: 48,
+                  height: 48,
                   color: isDark
-                      ? const Color(0xFF2C5A96)
-                      : const Color(0xFF667EEA),
+                      ? const Color(0xFF4A90E2)
+                      : AppThemeColor.lightBlueColor,
+                  child: profilePictureUrl != null
+                      ? SafeNetworkImage(
+                          imageUrl: profilePictureUrl,
+                          fit: BoxFit.cover,
+                          placeholder: Icon(
+                            Icons.person,
+                            color: isDark
+                                ? const Color(0xFF2C5A96)
+                                : const Color(0xFF667EEA),
+                          ),
+                          errorWidget: Icon(
+                            Icons.person,
+                            color: isDark
+                                ? const Color(0xFF2C5A96)
+                                : const Color(0xFF667EEA),
+                          ),
+                        )
+                      : Icon(
+                          Icons.person,
+                          color: isDark
+                              ? const Color(0xFF2C5A96)
+                              : const Color(0xFF667EEA),
+                        ),
                 ),
-        ),
+              ),
         title: Row(
           children: [
             Expanded(
@@ -611,9 +654,9 @@ class _MessagingScreenState extends State<MessagingScreen> {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (username != null) ...[
+            if (!isGroup && subtitleUsername != null) ...[
               Text(
-                '@$username',
+                '@$subtitleUsername',
                 style: TextStyle(
                   fontSize: 14,
                   color: theme.textTheme.bodyMedium?.color,
@@ -622,7 +665,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
               const SizedBox(height: 4),
             ],
             Text(
-              conversation.lastMessage,
+              _buildLastMessagePreview(conversation),
               style: TextStyle(
                 fontSize: 14,
                 color: hasUnread
@@ -651,14 +694,68 @@ class _MessagingScreenState extends State<MessagingScreen> {
             MaterialPageRoute(
               builder: (context) => ChatScreen(
                 conversationId: conversation.id,
-                otherParticipantInfo: _convertToCustomerModel(
-                  otherParticipantInfo,
-                ),
+                otherParticipantInfo: conversation.isGroup
+                    ? null
+                    : _convertToCustomerModel(otherParticipantInfo),
               ),
             ),
           );
         },
       ),
     );
+  }
+
+  // Build stacked avatars for a group (show up to 3)
+  Widget _buildGroupAvatar(ConversationModel conversation) {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.isDarkMode;
+    final List<String> memberIds = conversation.participantIds;
+    final currentUserId = _auth.currentUser?.uid;
+    final others = memberIds
+        .where((id) => id != currentUserId)
+        .take(3)
+        .toList();
+
+    List<Widget> circles = [];
+    for (int i = 0; i < others.length; i++) {
+      final uid = others[i];
+      final info = conversation.participantInfo[uid] ?? {};
+      final url = info['profilePictureUrl'];
+      circles.add(
+        Positioned(
+          left: i * 18.0,
+          child: CircleAvatar(
+            radius: 16,
+            backgroundColor: isDark
+                ? const Color(0xFF4A90E2)
+                : AppThemeColor.lightBlueColor,
+            child: url != null
+                ? ClipOval(
+                    child: SafeNetworkImage(
+                      imageUrl: url,
+                      fit: BoxFit.cover,
+                      placeholder: const Icon(Icons.person, size: 14),
+                      errorWidget: const Icon(Icons.person, size: 14),
+                    ),
+                  )
+                : const Icon(Icons.person, size: 14),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(width: 56, height: 32, child: Stack(children: circles));
+  }
+
+  String _buildLastMessagePreview(ConversationModel conversation) {
+    if (conversation.isGroup) {
+      final senderId = conversation.lastMessageSenderId;
+      if (senderId != null && conversation.participantInfo[senderId] != null) {
+        final name =
+            conversation.participantInfo[senderId]['name'] ?? 'Someone';
+        return '$name: ${conversation.lastMessage}';
+      }
+    }
+    return conversation.lastMessage;
   }
 }

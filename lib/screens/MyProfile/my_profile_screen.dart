@@ -257,17 +257,15 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   }
 
   void _navigateToBadgeScreen() {
-    if (_userBadge != null) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => BadgeScreen(
-            userId: CustomerController.logeInCustomer?.uid,
-            isOwnBadge: true,
-          ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => BadgeScreen(
+          userId: CustomerController.logeInCustomer?.uid,
+          isOwnBadge: true,
         ),
-      );
-    }
+      ),
+    );
   }
 
   // Selection methods
@@ -1032,11 +1030,18 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           Center(
             child: GestureDetector(
               onTap: _navigateToBadgeScreen,
-              child: ProfessionalBadgeWidget(
-                badge: _userBadge!,
-                width: 280,
-                height: 180,
-                showActions: false,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final availableWidth = constraints.maxWidth;
+                  final badgeWidth = availableWidth.clamp(260.0, 360.0);
+                  final badgeHeight = badgeWidth * (180 / 280);
+                  return ProfessionalBadgeWidget(
+                    badge: _userBadge!,
+                    width: badgeWidth,
+                    height: badgeHeight,
+                    showActions: false,
+                  );
+                },
               ),
             ),
           ),
@@ -1170,78 +1175,152 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           ),
         ],
       ),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFF9800).withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: const Color(0xFFFF9800).withValues(alpha: 0.3),
-          ),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const MyTicketsScreen(),
-                ),
-              );
-            },
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF9800).withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.confirmation_number,
-                    color: Color(0xFFFF9800),
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'My Tickets',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF1A1A1A),
-                          fontFamily: 'Roboto',
-                        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // My Tickets button
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF9800).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFFF9800).withValues(alpha: 0.3),
+              ),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const MyTicketsScreen(),
+                    ),
+                  );
+                },
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF9800).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      const SizedBox(height: 2),
-                      const Text(
-                        'View and manage your event tickets',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF6B7280),
-                          fontFamily: 'Roboto',
-                        ),
+                      child: const Icon(
+                        Icons.confirmation_number,
+                        color: Color(0xFFFF9800),
+                        size: 20,
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'My Tickets',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1A1A1A),
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'View and manage your event tickets',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6B7280),
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.arrow_forward_ios,
+                      color: Color(0xFFFF9800),
+                      size: 16,
+                    ),
+                  ],
                 ),
-                const Icon(
-                  Icons.arrow_forward_ios,
-                  color: Color(0xFFFF9800),
-                  size: 16,
-                ),
-              ],
+              ),
             ),
           ),
-        ),
+          const SizedBox(height: 12),
+          // My Badge button (under My Tickets)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF667EEA).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+              ),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: _navigateToBadgeScreen,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF667EEA).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.military_tech,
+                        color: Color(0xFF667EEA),
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'My Badge',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1A1A1A),
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'View your professional badge',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6B7280),
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.arrow_forward_ios,
+                      color: Color(0xFF667EEA),
+                      size: 16,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

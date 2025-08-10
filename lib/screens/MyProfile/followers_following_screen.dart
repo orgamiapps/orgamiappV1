@@ -486,7 +486,7 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
                       fontFamily: 'Roboto',
                     ),
                   ),
-                  if (user.username != null) ...[
+                  if (user.username != null && user.username!.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(
                       '@${user.username}',
