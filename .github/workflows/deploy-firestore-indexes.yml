@@ -1,0 +1,20 @@
+name: Deploy Firestore Indexes
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - firestore.indexes.json
+jobs:
+  deploy-indexes:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/951311475019/locations/global/workloadIdentityPools/GITHUB_POOL/providers/GITHUB_PROVIDER
+          service_account: sa-deployer@orgami-66nxok.iam.gserviceaccount.com
+      - run: npm i -g firebase-tools
+      - run: firebase deploy --only firestore:indexes --project orgami-66nxok
