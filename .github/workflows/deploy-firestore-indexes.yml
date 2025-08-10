@@ -1,0 +1,30 @@
+name: Deploy Firestore Indexes
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - firestore.indexes.json
+
+jobs:
+  deploy-indexes:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          # Replace with your provider resource path from the setup script output
+          workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/GITHUB_POOL/providers/GITHUB_PROVIDER
+          service_account: sa-deployer@orgami-66nxok.iam.gserviceaccount.com
+
+      - name: Install Firebase CLI
+        run: npm i -g firebase-tools
+
+      - name: Deploy Firestore Indexes
+        run: firebase deploy --only firestore:indexes --project orgami-66nxok
