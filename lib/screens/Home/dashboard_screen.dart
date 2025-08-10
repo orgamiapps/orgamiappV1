@@ -3,6 +3,7 @@ import 'package:orgami/Screens/Home/home_screen.dart';
 import 'package:orgami/Screens/Home/account_screen.dart';
 import 'package:orgami/Screens/Home/notifications_screen.dart';
 import 'package:orgami/Screens/Messaging/messaging_screen.dart';
+import 'package:orgami/Screens/Organizations/organizations_tab.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -12,13 +13,14 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  late final double _screenWidth = MediaQuery.of(context).size.width;
+    late final double _screenWidth = MediaQuery.of(context).size.width;
   late final double _screenHeight = MediaQuery.of(context).size.height;
 
   int _selectedIndex = 0;
 
-  final List<Widget> _dashBoardScreens = [
+    final List<Widget> _dashBoardScreens = [
     const HomeScreen(),
+    const OrganizationsTab(),
     const MessagingScreen(),
     const NotificationsScreen(),
     const AccountScreen(),
@@ -87,11 +89,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onDestinationSelected: (index) => setState(() {
                 _selectedIndex = index;
               }),
-              destinations: const [
+                            destinations: const [
                 NavigationDestination(
                   icon: Icon(Icons.event_outlined),
                   selectedIcon: Icon(Icons.event),
                   label: 'Events',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.apartment_outlined),
+                  selectedIcon: Icon(Icons.apartment),
+                  label: 'Orgs',
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.chat_bubble_outline),
