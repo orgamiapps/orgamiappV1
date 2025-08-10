@@ -3,6 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/Utils/Toast.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geocoding/geocoding.dart';
 
 class GeofenceSetupScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -23,6 +24,10 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
 
   Set<Marker> markers = {};
   Set<Circle> circles = {};
+
+  // Search state
+  final TextEditingController _searchController = TextEditingController();
+  bool _isSearching = false;
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -56,14 +61,9 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
     _fadeController.forward();
     _slideController.forward();
 
-    // Initialize with event location if available
-    if (widget.eventModel.latitude != 0 && widget.eventModel.longitude != 0) {
-      selectedLocation = LatLng(
-        widget.eventModel.latitude,
-        widget.eventModel.longitude,
-      );
+    // Initialize radius from event if present
+    if (widget.eventModel.radius > 0) {
       radius = widget.eventModel.radius;
-      _addMarker(selectedLocation!);
     }
   }
 
@@ -71,6 +71,7 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
   void dispose() {
     _fadeController.dispose();
     _slideController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -136,6 +137,63 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
     });
   }
 
+  void _onMapCreated(GoogleMapController controller) async {
+    mapController = controller;
+    // Start with a "globe" view
+    await mapController.moveCamera(
+      CameraUpdate.newCameraPosition(
+        const CameraPosition(
+          target: LatLng(0, 0),
+          zoom: 1.3, // World view
+        ),
+      ),
+    );
+
+    // If event has existing coordinates, add marker but do not auto-zoom
+    if (widget.eventModel.latitude != 0 && widget.eventModel.longitude != 0) {
+      final eventLatLng = widget.eventModel.getLatLng();
+      selectedLocation = eventLatLng;
+      _addMarker(eventLatLng);
+    }
+  }
+
+  Future<void> _zoomToEvent() async {
+    if (widget.eventModel.latitude == 0 && widget.eventModel.longitude == 0) {
+      ShowToast().showNormalToast(msg: 'No event location set yet');
+      return;
+    }
+    final eventLatLng = widget.eventModel.getLatLng();
+    await mapController.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(target: eventLatLng, zoom: 16),
+      ),
+    );
+  }
+
+  Future<void> _searchPlace() async {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) return;
+    setState(() => _isSearching = true);
+    try {
+      final locations = await locationFromAddress(query);
+      if (locations.isNotEmpty) {
+        final loc = locations.first;
+        final latLng = LatLng(loc.latitude, loc.longitude);
+        await mapController.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(target: latLng, zoom: 14),
+          ),
+        );
+      } else {
+        ShowToast().showNormalToast(msg: 'No results found for "$query"');
+      }
+    } catch (e) {
+      ShowToast().showNormalToast(msg: 'Search failed');
+    } finally {
+      if (mounted) setState(() => _isSearching = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -194,7 +252,7 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
               const SizedBox(width: 16),
               const Expanded(
                 child: Text(
-                  'Geofence Setup',
+                  'Set Distance',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 24,
@@ -203,12 +261,29 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
                   ),
                 ),
               ),
+              // Zoom to event
+              GestureDetector(
+                onTap: _zoomToEvent,
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    Icons.zoom_in_map,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
           // Subtitle
           const Text(
-            'Set the location and distance for automatic sign-in',
+            'Start from a globe view. Zoom in to set your exact event location and distance.',
             style: TextStyle(
               color: Colors.white,
               fontSize: 16,
@@ -216,6 +291,49 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
               height: 1.4,
             ),
             textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          // Search bar
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                const Icon(Icons.search, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    onSubmitted: (_) => _searchPlace(),
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      hintText: 'Search a place',
+                      hintStyle: TextStyle(color: Colors.white70),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: _isSearching ? null : _searchPlace,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: _isSearching ? 0.2 : 0.3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _isSearching ? 'Searching...' : 'Go',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -330,33 +448,91 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: GoogleMap(
-          onMapCreated: (GoogleMapController controller) {
-            mapController = controller;
-            if (selectedLocation != null) {
-              controller.animateCamera(
-                CameraUpdate.newCameraPosition(
-                  CameraPosition(target: selectedLocation!, zoom: 15),
+        child: Stack(
+          children: [
+            GoogleMap(
+              onMapCreated: _onMapCreated,
+              initialCameraPosition: const CameraPosition(
+                target: LatLng(0, 0),
+                zoom: 1.3,
+              ),
+              markers: markers,
+              circles: circles,
+              onTap: (LatLng latLng) {
+                setState(() {
+                  selectedLocation = latLng;
+                });
+                _addMarker(latLng);
+              },
+              myLocationEnabled: true,
+              myLocationButtonEnabled: true,
+              zoomControlsEnabled: false,
+              mapToolbarEnabled: false,
+            ),
+            // Zoom controls
+            Positioned(
+              top: 12,
+              right: 12,
+              child: Column(
+                children: [
+                  _mapIconBtn(Icons.add, () => mapController.animateCamera(CameraUpdate.zoomIn())),
+                  const SizedBox(height: 8),
+                  _mapIconBtn(Icons.remove, () => mapController.animateCamera(CameraUpdate.zoomOut())),
+                ],
+              ),
+            ),
+            // Helper hint
+            Positioned(
+              bottom: 12,
+              left: 12,
+              right: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-              );
-            }
-          },
-          initialCameraPosition: CameraPosition(
-            target: selectedLocation ?? const LatLng(37.7749, -122.4194),
-            zoom: 15,
+                child: const Text(
+                  'Tap on the map to set the event location. Use the slider below to adjust distance.',
+                  style: TextStyle(color: Color(0xFF1A1A1A), fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _mapIconBtn(IconData icon, VoidCallback onTap) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          markers: markers,
-          circles: circles,
-          onTap: (LatLng latLng) {
-            setState(() {
-              selectedLocation = latLng;
-            });
-            _addMarker(latLng);
-          },
-          myLocationEnabled: true,
-          myLocationButtonEnabled: true,
-          zoomControlsEnabled: false,
-          mapToolbarEnabled: false,
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: onTap,
+          child: Icon(icon, color: const Color(0xFF667EEA)),
         ),
       ),
     );
