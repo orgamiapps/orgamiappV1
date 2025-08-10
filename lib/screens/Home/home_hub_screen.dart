@@ -16,6 +16,15 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   bool _searching = false;
   List<Map<String, String>> _myOrgs = [];
   List<Map<String, dynamic>> _discoverOrgs = [];
+  String? _selectedCategoryLower;
+  final List<Map<String, String>> _categoryOptions = const [
+    {'label': 'All', 'value': ''},
+    {'label': 'Business', 'value': 'business'},
+    {'label': 'Club', 'value': 'club'},
+    {'label': 'School', 'value': 'school'},
+    {'label': 'Sports', 'value': 'sports'},
+    {'label': 'Other', 'value': 'other'},
+  ];
 
   @override
   void initState() {
@@ -35,6 +44,9 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
     try {
       Query query = FirebaseFirestore.instance.collection('Organizations').limit(25);
       final q = _searchCtlr.text.trim().toLowerCase();
+      if (_selectedCategoryLower != null && _selectedCategoryLower!.isNotEmpty) {
+        query = query.where('category_lowercase', isEqualTo: _selectedCategoryLower);
+      }
       if (q.isNotEmpty) {
         final String end = q.substring(0, q.length - 1) + String.fromCharCode(q.codeUnitAt(q.length - 1) + 1);
         query = query.orderBy('name_lowercase').startAt([q]).endBefore([end]);
@@ -191,6 +203,8 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
                 const SizedBox(height: 16),
                 const Text('Discover Organizations', style: TextStyle(fontWeight: FontWeight.w700)),
                 const SizedBox(height: 8),
+                _buildCategoryChips(),
+                const SizedBox(height: 8),
               ],
             ),
           ),
@@ -210,6 +224,30 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
             },
           )
         ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryChips() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: _categoryOptions.map((opt) {
+          final selected = (_selectedCategoryLower ?? '') == (opt['value'] ?? '');
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(opt['label'] ?? ''),
+              selected: selected,
+              onSelected: (_) {
+                setState(() {
+                  _selectedCategoryLower = (opt['value'] ?? '').isEmpty ? null : opt['value'];
+                });
+                _discover();
+              },
+            ),
+          );
+        }).toList(),
       ),
     );
   }
