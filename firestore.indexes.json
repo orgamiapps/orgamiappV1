@@ -107,14 +107,6 @@
         { "fieldPath": "isRead", "order": "ASCENDING" }
       ]
     },
-    // New: Organizations search indexes
-    {
-      "collectionGroup": "Organizations",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "name_lowercase", "order": "ASCENDING" }
-      ]
-    },
     {
       "collectionGroup": "Organizations",
       "queryScope": "COLLECTION",
