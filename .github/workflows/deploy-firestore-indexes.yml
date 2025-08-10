@@ -20,7 +20,7 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           # Replace with your provider resource path from the setup script output
-          workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/GITHUB_POOL/providers/GITHUB_PROVIDER
+          workload_identity_provider: projects/951311475019/locations/global/workloadIdentityPools/GITHUB_POOL/providers/GITHUB_PROVIDER
           service_account: sa-deployer@orgami-66nxok.iam.gserviceaccount.com
 
       - name: Install Firebase CLI

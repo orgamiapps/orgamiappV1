@@ -3,10 +3,10 @@ set -euo pipefail
 
 # EDIT THESE VALUES
 PROJECT_ID="orgami-66nxok"
-PROJECT_NUMBER="CHANGE_ME"
+PROJECT_NUMBER="951311475019"
 POOL_ID="GITHUB_POOL"
 PROVIDER_ID="GITHUB_PROVIDER"
-GH_REPO="your-org/your-repo"  # e.g., username/reponame
+GH_REPO="orgamiapps/orgamiappV1"  # e.g., username/reponame
 SA_ID="sa-deployer"
 SA_EMAIL="${SA_ID}@${PROJECT_ID}.iam.gserviceaccount.com"
 
