@@ -96,7 +96,7 @@ class DynamicLinksInitializer {
 
   static Future<void> _handleLink(Uri link) async {
     try {
-      if (link.pathSegments.contains('invite')) {
+      if (link.host.contains('orgami.app') && link.pathSegments.contains('invite')) {
         final eventId = link.queryParameters['eventId'];
         if (eventId != null && appNavigatorKey.currentState != null) {
           // Fetch event and navigate

@@ -6,6 +6,7 @@ import 'package:orgami/models/event_model.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
+import 'package:orgami/Utils/app_constants.dart';
 
 class AccessListManagementWidget extends StatefulWidget {
   final EventModel eventModel;
@@ -85,10 +86,10 @@ class _AccessListManagementWidgetState extends State<AccessListManagementWidget>
   Future<String?> _createLink() async {
     try {
       final DynamicLinkParameters params = DynamicLinkParameters(
-        link: Uri.parse('https://orgami.app/invite?eventId=${widget.eventModel.id}'),
-        uriPrefix: 'https://orgamiapp.page.link',
-        androidParameters: const AndroidParameters(packageName: 'com.stormdeve.orgami'),
-        iosParameters: const IOSParameters(bundleId: 'com.stormdeve.orgami'),
+        link: AppConstants.buildInviteUri(widget.eventModel.id),
+        uriPrefix: AppConstants.dynamicLinksDomain,
+        androidParameters: const AndroidParameters(packageName: AppConstants.androidPackageName),
+        iosParameters: const IOSParameters(bundleId: AppConstants.iosBundleId),
         socialMetaTagParameters: SocialMetaTagParameters(
           title: widget.eventModel.title,
           description: widget.eventModel.description,
