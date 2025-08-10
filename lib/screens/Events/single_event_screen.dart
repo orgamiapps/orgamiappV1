@@ -48,6 +48,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:orgami/Screens/MyProfile/badge_screen.dart';
+import 'package:orgami/screens/Events/geofence_setup_screen.dart';
 
 class SingleEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -4669,7 +4670,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (context) =>
-                          EventLocationViewScreen(eventModel: eventModel),
+                          GeofenceSetupScreen(eventModel: eventModel),
                     ),
                   );
                 },
