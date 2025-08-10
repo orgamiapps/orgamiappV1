@@ -42,7 +42,10 @@ void main() async {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({super.key, this.homeOverride});
+
+  // Allows tests to inject a simple home to avoid heavy initialization in widgets
+  final Widget? homeOverride;
 
   @override
   Widget build(BuildContext context) {
@@ -54,7 +57,7 @@ class MyApp extends StatelessWidget {
           theme: themeProvider.lightTheme,
           darkTheme: themeProvider.darkTheme,
           themeMode: themeProvider.themeMode,
-          home: const SplashScreen(),
+          home: homeOverride ?? const SplashScreen(),
         );
       },
     );

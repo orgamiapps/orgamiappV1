@@ -47,6 +47,7 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
         );
       },
     );
+    if (!mounted) return;
     if (picked != null && picked != selectedDate) {
       setState(() {
         selectedDate = picked;
@@ -72,13 +73,13 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
         );
       },
     );
+    if (!mounted) return;
     if (picked != null && picked != startTime) {
       setState(() {
         startTime = picked;
-        // Reset end time if it's before the new start time
         if (endTime != null) {
-          final startMinutes = (startTime!.hour * 60) + startTime!.minute;
-          final endMinutes = (endTime!.hour * 60) + endTime!.minute;
+          final int startMinutes = (startTime!.hour * 60) + startTime!.minute;
+          final int endMinutes = (endTime!.hour * 60) + endTime!.minute;
           if (endMinutes <= startMinutes) {
             endTime = null;
           }
@@ -114,11 +115,12 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
         );
       },
     );
+    if (!mounted) return;
     if (picked != null) {
       // Ensure end time is after start time (same day). If invalid, keep previous or null.
       if (startTime != null) {
-        final startMinutes = (startTime!.hour * 60) + startTime!.minute;
-        final endMinutes = (picked.hour * 60) + picked.minute;
+        final int startMinutes = (startTime!.hour * 60) + startTime!.minute;
+        final int endMinutes = (picked.hour * 60) + picked.minute;
         if (endMinutes > startMinutes) {
           setState(() => endTime = picked);
         } else {

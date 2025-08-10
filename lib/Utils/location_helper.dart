@@ -73,8 +73,11 @@ class LocationHelper {
       // Get current position with timeout
       Logger.debug('Getting current location...');
       Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
+        // New Geolocator versions recommend settings objects instead of deprecated fields
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
       );
 
       // Cache the position

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:orgami/Utils/Colors.dart';
+import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:orgami/Utils/Toast.dart';
 

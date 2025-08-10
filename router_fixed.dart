@@ -5,7 +5,7 @@ import 'package:orgami/screens/Splash/second_splash_screen.dart';
 
 class RouterClass {
   static late BuildContext splashContext;
-  appLogout({required BuildContext context}) =>
+  Future<T?> appLogout<T>({required BuildContext context}) =>
       Navigator.of(context, rootNavigator: false).pushAndRemoveUntil(
         CupertinoPageRoute(
           builder: (BuildContext context) {
@@ -15,20 +15,21 @@ class RouterClass {
         (_) => false,
       );
 
-  appRest({required BuildContext context}) => Navigator.pushAndRemoveUntil(
-    context,
-    MaterialPageRoute(builder: (context) => const SecondSplashScreen()),
-    (route) => false,
-  );
+  Future<T?> appRest<T>({required BuildContext context}) =>
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const SecondSplashScreen()),
+        (route) => false,
+      );
 
-  secondSplashScreenRoute({required BuildContext context}) =>
+  Future<T?> secondSplashScreenRoute<T>({required BuildContext context}) =>
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (splashContext) => const SecondSplashScreen(),
         ),
       );
-  homeScreenRoute({required BuildContext context}) =>
+  Future<T?> homeScreenRoute<T>({required BuildContext context}) =>
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
@@ -37,23 +38,31 @@ class RouterClass {
         (route) => false,
       );
 
-  static void nextScreenNormal(context, page) {
-    Navigator.push(context, MaterialPageRoute(builder: (context) => page));
-  }
-
-  static void nextScreenAndReplacement(context, page) {
-    Navigator.pushReplacement(
+  static Future<T?> nextScreenNormal<T>(BuildContext context, Widget page) {
+    return Navigator.push<T>(
       context,
       MaterialPageRoute(builder: (context) => page),
     );
   }
 
-  static nextScreenAndReplacementAndRemoveUntil({
+  static Future<T?> nextScreenAndReplacement<T>(
+    BuildContext context,
+    Widget page,
+  ) {
+    return Navigator.pushReplacement<T, T>(
+      context,
+      MaterialPageRoute(builder: (context) => page),
+    );
+  }
+
+  static Future<T?> nextScreenAndReplacementAndRemoveUntil<T>({
     required BuildContext context,
     required Widget page,
-  }) => Navigator.pushAndRemoveUntil(
-    context,
-    MaterialPageRoute(builder: (context) => page),
-    (route) => false,
-  );
+  }) {
+    return Navigator.pushAndRemoveUntil<T>(
+      context,
+      MaterialPageRoute(builder: (context) => page),
+      (route) => false,
+    );
+  }
 }

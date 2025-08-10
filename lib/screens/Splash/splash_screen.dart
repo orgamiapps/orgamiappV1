@@ -24,7 +24,7 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _logoScaleAnimation;
   late Animation<double> _logoOpacityAnimation;
   late Animation<double> _fadeAnimation;
-  late Animation<double> _loadingAnimation;
+  // Removed unused `_loadingAnimation` to satisfy analyzer warnings
 
   bool _isLoading = false;
   bool _hasNavigated = false;
@@ -83,12 +83,7 @@ class _SplashScreenState extends State<SplashScreen>
       vsync: this,
     );
 
-    _loadingAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _loadingAnimationController,
-        curve: Curves.linear,
-      ),
-    );
+    // Using controller directly for the loading indicator; no separate animation needed
   }
 
   void _startLoadingSequence() async {
@@ -293,7 +288,7 @@ class _SplashScreenState extends State<SplashScreen>
                                   borderRadius: BorderRadius.circular(24),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
+                                      color: Colors.black.withValues(alpha: 0.1),
                                       blurRadius: 20,
                                       offset: const Offset(0, 10),
                                     ),
@@ -393,7 +388,7 @@ class _SplashScreenState extends State<SplashScreen>
                             height: 40,
                             child: CircularProgressIndicator(
                               valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white.withOpacity(0.8),
+                                Colors.white.withValues(alpha: 0.8),
                               ),
                               strokeWidth: 3,
                             ),

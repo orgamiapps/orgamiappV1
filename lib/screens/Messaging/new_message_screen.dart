@@ -85,13 +85,14 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
 
   Future<void> _performSearch(String query) async {
     try {
-      final currentUser = _auth.currentUser;
+      final User? currentUser = _auth.currentUser;
       if (currentUser == null) return;
 
-      final results = await _messagingHelper.searchUsers(
+      final List<CustomerModel> results = await _messagingHelper.searchUsers(
         query,
         currentUser.uid,
       );
+      if (!mounted) return;
       setState(() {
         _searchResults = results;
       });
@@ -278,14 +279,14 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
             label: const Text('Direct'),
             selected: !_groupMode,
             onSelected: (v) => setState(() => _groupMode = false),
-            selectedColor: theme.colorScheme.primary.withOpacity(0.15),
+            selectedColor: theme.colorScheme.primary.withValues(alpha: 0.15),
           ),
           const SizedBox(width: 8),
           ChoiceChip(
             label: const Text('Group'),
             selected: _groupMode,
             onSelected: (v) => setState(() => _groupMode = true),
-            selectedColor: theme.colorScheme.primary.withOpacity(0.15),
+            selectedColor: theme.colorScheme.primary.withValues(alpha: 0.15),
           ),
           const Spacer(),
           if (_groupMode)

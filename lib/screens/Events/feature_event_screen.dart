@@ -17,6 +17,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
   int? _selectedDays;
   bool _loading = false;
   final List<int> _tiers = [3, 7, 14];
+  bool _untilEvent = false;
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -402,6 +403,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
                   setState(() {
                     // Toggle selection: if already selected, unselect; otherwise select
                     _selectedDays = (_selectedDays == days) ? null : days;
+                    _untilEvent = false;
                   });
                 },
                 child: Container(
@@ -454,8 +456,106 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
             );
           }).toList(),
         ),
+        const SizedBox(height: 12),
+        _buildUntilEventOption(),
       ],
     );
+  }
+
+  Widget _buildUntilEventOption() {
+    final DateTime now = DateTime.now();
+    final DateTime eventTime = widget.eventModel.selectedDateTime;
+    final bool eventInPast = eventTime.isBefore(now);
+    final String timeLeftLabel = eventInPast
+        ? 'Event has started'
+        : _formatTimeLeft(now, eventTime);
+
+    return GestureDetector(
+      onTap: eventInPast
+          ? null
+          : () {
+              setState(() {
+                _untilEvent = true;
+                _selectedDays = null;
+              });
+            },
+      child: Container(
+        width: double.infinity,
+        height: 60,
+        decoration: BoxDecoration(
+          color: _untilEvent ? const Color(0xFFFF9800) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: _untilEvent
+                ? const Color(0xFFFF9800)
+                : const Color(0xFFE5E7EB),
+            width: 2,
+          ),
+          boxShadow: _untilEvent
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFFFF9800).withValues(alpha: 0.3),
+                    spreadRadius: 0,
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    spreadRadius: 0,
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+        ),
+        child: Center(
+          child: RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Until event takes place ',
+                  style: TextStyle(
+                    color: _untilEvent ? Colors.white : const Color(0xFFFF9800),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+                TextSpan(
+                  text: '(${timeLeftLabel})',
+                  style: TextStyle(
+                    color: _untilEvent
+                        ? Colors.white.withValues(alpha: 0.9)
+                        : const Color(0xFF6B7280),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatTimeLeft(DateTime from, DateTime to) {
+    final Duration diff = to.difference(from);
+    if (diff.inSeconds <= 0) return '0m left';
+
+    final int days = diff.inDays;
+    final int hours = diff.inHours % 24;
+    final int minutes = diff.inMinutes % 60;
+
+    if (days > 0) {
+      return '${days}d${hours > 0 ? ', ${hours}h' : ''} left';
+    } else if (hours > 0) {
+      return '${hours}h${minutes > 0 ? ', ${minutes}m' : ''} left';
+    } else {
+      return '${minutes}m left';
+    }
   }
 
   Widget _buildFeatureButton() {
@@ -476,7 +576,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
         width: double.infinity,
         height: 56,
         decoration: BoxDecoration(
-          gradient: _selectedDays != null
+          gradient: (_selectedDays != null || _untilEvent)
               ? const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -488,7 +588,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
                   colors: [Color(0xFFF3F4F6), Color(0xFFE5E7EB)],
                 ),
           borderRadius: BorderRadius.circular(16),
-          boxShadow: _selectedDays != null
+          boxShadow: (_selectedDays != null || _untilEvent)
               ? [
                   BoxShadow(
                     color: const Color(0xFFFF9800).withValues(alpha: 0.3),
@@ -510,7 +610,9 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
-            onTap: (_loading || _selectedDays == null) ? null : _featureEvent,
+            onTap: (_loading || (_selectedDays == null && !_untilEvent))
+                ? null
+                : _featureEvent,
             child: Center(
               child: _loading
                   ? const SizedBox(
@@ -522,11 +624,11 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
                       ),
                     )
                   : Text(
-                      _selectedDays != null
+                      (_selectedDays != null || _untilEvent)
                           ? 'Feature Now'
                           : 'Select Duration to Feature',
                       style: TextStyle(
-                        color: _selectedDays != null
+                        color: (_selectedDays != null || _untilEvent)
                             ? Colors.white
                             : const Color(0xFF6B7280),
                         fontWeight: FontWeight.bold,
@@ -542,10 +644,28 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
   }
 
   Future<void> _featureEvent() async {
-    if (_selectedDays == null) return;
+    if (_selectedDays == null && !_untilEvent) return;
 
     setState(() => _loading = true);
-    final endDate = DateTime.now().add(Duration(days: _selectedDays!));
+    DateTime endDate;
+    if (_untilEvent) {
+      endDate = widget.eventModel.selectedDateTime;
+      // Guard: if event time already passed, stop early
+      if (endDate.isBefore(DateTime.now())) {
+        setState(() => _loading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Event start time has already passed.'),
+              backgroundColor: Color(0xFFFF9800),
+            ),
+          );
+        }
+        return;
+      }
+    } else {
+      endDate = DateTime.now().add(Duration(days: _selectedDays!));
+    }
     await FirebaseFirestore.instance
         .collection(EventModel.firebaseKey)
         .doc(widget.eventModel.id)

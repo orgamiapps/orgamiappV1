@@ -3,7 +3,6 @@ import 'package:orgami/firebase/firebase_messaging_helper.dart';
 import 'package:orgami/models/notification_model.dart';
 import 'package:intl/intl.dart';
 import 'package:orgami/screens/Home/notification_settings_screen.dart';
-import 'package:orgami/Utils/router.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});

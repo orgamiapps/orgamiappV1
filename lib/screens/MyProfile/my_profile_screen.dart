@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:orgami/controller/customer_controller.dart';
+import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/Utils/colors.dart';
@@ -34,16 +35,13 @@ class MyProfileScreen extends StatefulWidget {
 
 class _MyProfileScreenState extends State<MyProfileScreen>
     with TickerProviderStateMixin {
-  String? bio;
-  bool isEditingBio = false;
-  final TextEditingController _bioController = TextEditingController();
   List<EventModel> createdEvents = [];
   List<EventModel> attendedEvents = [];
   List<EventModel> savedEvents = [];
   bool isLoading = true;
   int selectedTab = 1; // 1 = Created, 2 = Attended, 3 = Saved
   bool isDiscoverable = true; // User discoverability setting
-  
+
   // Badge related fields
   UserBadgeModel? _userBadge;
   bool _isBadgeLoading = false;
@@ -97,7 +95,6 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   void dispose() {
     _fadeController.dispose();
     _slideController.dispose();
-    _bioController.dispose();
     super.dispose();
   }
 
@@ -170,8 +167,6 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           createdEvents = created;
           attendedEvents = attended;
           savedEvents = saved;
-          bio = CustomerController.logeInCustomer?.bio ?? '';
-          _bioController.text = bio ?? '';
           isDiscoverable =
               CustomerController.logeInCustomer?.isDiscoverable ?? true;
           isLoading = false;
@@ -191,42 +186,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     }
   }
 
-  void _saveBio() async {
-    if (_bioController.text.trim().isEmpty) {
-      ShowToast().showNormalToast(msg: 'Bio cannot be empty');
-      return;
-    }
-
-    setState(() {
-      isEditingBio = false;
-    });
-
-    try {
-      CustomerController.logeInCustomer?.bio = _bioController.text.trim();
-      await FirebaseFirestoreHelper().updateCustomerProfile(
-        customerId: CustomerController.logeInCustomer!.uid,
-        name: CustomerController.logeInCustomer!.name,
-        profilePictureUrl: CustomerController.logeInCustomer!.profilePictureUrl,
-        bio: _bioController.text.trim(),
-      );
-
-      if (mounted) {
-        setState(() {
-          bio = _bioController.text.trim();
-        });
-        ShowToast().showNormalToast(msg: 'Bio updated successfully!');
-      }
-    } catch (e) {
-      ShowToast().showNormalToast(msg: 'Failed to update bio');
-    }
-  }
-
-  void _cancelBioEdit() {
-    setState(() {
-      isEditingBio = false;
-      _bioController.text = bio ?? '';
-    });
-  }
+  // Bio section and related state removed to avoid duplication with UserProfileScreen
 
   // Badge related methods
   Future<void> _loadUserBadge() async {
@@ -239,7 +199,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       });
 
       final badge = await _badgeService.getOrGenerateBadge(userId);
-      
+
       if (mounted) {
         setState(() {
           _userBadge = badge;
@@ -527,7 +487,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     );
   }
 
-  Widget _buildProfileContent(user) {
+  Widget _buildProfileContent(CustomerModel? user) {
     return RefreshIndicator(
       onRefresh: _loadProfileData,
       color: const Color(0xFF667EEA),
@@ -535,8 +495,6 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         slivers: [
           // Back Button and Profile Header
           SliverToBoxAdapter(child: _buildProfileHeader(user)),
-          // Bio Section
-          SliverToBoxAdapter(child: _buildBioSection()),
           // Badge Section
           SliverToBoxAdapter(child: _buildBadgeSection()),
           // Discoverability Section
@@ -552,7 +510,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     );
   }
 
-  Widget _buildProfileHeader(user) {
+  Widget _buildProfileHeader(CustomerModel? user) {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -694,7 +652,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                             context,
                             MaterialPageRoute(
                               builder: (context) => UserProfileScreen(
-                                user: user!,
+                                user: user,
                                 isOwnProfile: true,
                               ),
                             ),
@@ -763,167 +721,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     );
   }
 
-  Widget _buildBioSection() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            spreadRadius: 0,
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.edit_note,
-                    color: const Color(0xFF667EEA),
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'About Me',
-                    style: TextStyle(
-                      color: Color(0xFF1A1A1A),
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                      fontFamily: 'Roboto',
-                    ),
-                  ),
-                ],
-              ),
-              if (!isEditingBio)
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      isEditingBio = true;
-                    });
-                  },
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF667EEA).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.edit,
-                      color: Color(0xFF667EEA),
-                      size: 16,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          isEditingBio
-              ? Column(
-                  children: [
-                    TextField(
-                      controller: _bioController,
-                      maxLines: 3,
-                      maxLength: 150,
-                      decoration: InputDecoration(
-                        hintText: 'Tell us about yourself...',
-                        hintStyle: TextStyle(
-                          color: const Color(0xFF9CA3AF),
-                          fontSize: 14,
-                          fontFamily: 'Roboto',
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: const Color(0xFFE1E5E9),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF667EEA),
-                          ),
-                        ),
-                        contentPadding: const EdgeInsets.all(16),
-                      ),
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF1A1A1A),
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: _cancelBioEdit,
-                          child: Text(
-                            'Cancel',
-                            style: TextStyle(
-                              color: const Color(0xFF9CA3AF),
-                              fontSize: 14,
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton(
-                          onPressed: _saveBio,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF667EEA),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 12,
-                            ),
-                          ),
-                          child: const Text(
-                            'Save',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                )
-              : Text(
-                  bio?.isNotEmpty == true
-                      ? bio!
-                      : 'No bio added yet. Tap the edit button to add one!',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: bio?.isNotEmpty == true
-                        ? const Color(0xFF1A1A1A)
-                        : const Color(0xFF9CA3AF),
-                    fontStyle: bio?.isNotEmpty == true
-                        ? FontStyle.normal
-                        : FontStyle.italic,
-                    fontFamily: 'Roboto',
-                    height: 1.5,
-                  ),
-                ),
-        ],
-      ),
-    );
-  }
+  // _buildBioSection removed
 
   Widget _buildBadgeSection() {
     if (_isBadgeLoading) {
@@ -997,7 +795,10 @@ class _MyProfileScreenState extends State<MyProfileScreen>
               GestureDetector(
                 onTap: _navigateToBadgeScreen,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF667EEA).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
@@ -1245,74 +1046,6 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                     const Icon(
                       Icons.arrow_forward_ios,
                       color: Color(0xFFFF9800),
-                      size: 16,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          // My Badge button (under My Tickets)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF667EEA).withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: const Color(0xFF667EEA).withValues(alpha: 0.3),
-              ),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: _navigateToBadgeScreen,
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF667EEA).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.military_tech,
-                        color: Color(0xFF667EEA),
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'My Badge',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF1A1A1A),
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
-                          SizedBox(height: 2),
-                          Text(
-                            'View your professional badge',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF6B7280),
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(
-                      Icons.arrow_forward_ios,
-                      color: Color(0xFF667EEA),
                       size: 16,
                     ),
                   ],

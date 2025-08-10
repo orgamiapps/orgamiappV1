@@ -43,35 +43,37 @@ class _LoginScreenState extends State<LoginScreen>
 
       await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password)
-          .then((signInCustomer) {
-            if (signInCustomer.user != null) {
-              FirebaseFirestoreHelper()
-                  .getSingleCustomer(customerId: signInCustomer.user!.uid)
-                  .then((fireStoreCustomer) async {
-                    // Ensure user profile has all required fields
-                    await FirebaseFirestoreHelper()
-                        .ensureUserProfileCompleteness(
-                          signInCustomer.user!.uid,
-                        );
+          .then((UserCredential signInCustomer) async {
+            final User? user = signInCustomer.user;
+            if (user != null) {
+              final fireStoreCustomer = await FirebaseFirestoreHelper()
+                  .getSingleCustomer(customerId: user.uid);
+              // Ensure user profile has all required fields
+              await FirebaseFirestoreHelper().ensureUserProfileCompleteness(
+                user.uid,
+              );
 
-                    if (mounted) {
-                      setState(() {
-                        CustomerController.logeInCustomer = fireStoreCustomer;
-                      });
-                      RouterClass().homeScreenRoute(context: context);
-                      _btnCtlr.success();
-                    }
-                  });
+              if (!mounted) return;
+              setState(() {
+                CustomerController.logeInCustomer = fireStoreCustomer;
+              });
+              RouterClass().homeScreenRoute(context: context);
+              _btnCtlr.success();
             }
           });
     } on FirebaseAuthException catch (e) {
       Logger.warning('Firebase Auth Exception: ${e.code}');
       switch (e.code) {
         case "invalid-credential":
-          ShowToast().showNormalToast(msg: "Invalid email or password. Please check your credentials.");
+          ShowToast().showNormalToast(
+            msg: "Invalid email or password. Please check your credentials.",
+          );
           break;
         case "network-request-failed":
-          ShowToast().showNormalToast(msg: "Network error. Please check your internet connection and try again.");
+          ShowToast().showNormalToast(
+            msg:
+                "Network error. Please check your internet connection and try again.",
+          );
           break;
         case "ERROR_WRONG_PASSWORD":
         case "wrong-password":
@@ -102,7 +104,9 @@ class _LoginScreenState extends State<LoginScreen>
           );
           break;
         default:
-          ShowToast().showNormalToast(msg: "Login failed: ${e.message ?? 'An undefined error happened.'}");
+          ShowToast().showNormalToast(
+            msg: "Login failed: ${e.message ?? 'An undefined error happened.'}",
+          );
       }
       _btnCtlr.reset();
     } catch (e) {
@@ -111,7 +115,7 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  _handleAnimation() {
+  void _handleAnimation() {
     logoAnimation = AnimationController(
       duration: const Duration(milliseconds: 2000),
       vsync: this,

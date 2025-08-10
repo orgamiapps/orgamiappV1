@@ -727,6 +727,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       ShowToast().showNormalToast(msg: 'Signed In Successfully!');
 
       // Pop the sign-in dialog
+      if (!mounted) return;
       if (Navigator.canPop(context)) {
         Navigator.of(context).pop();
       }
@@ -739,6 +740,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
       // Reset the button and the flag after a delay
       Future.delayed(const Duration(seconds: 2), () {
+        if (!mounted) return;
         _btnCtlr.reset();
         setState(() {
           _justSignedIn = false;
@@ -2521,6 +2523,8 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
 
     try {
       await DwellTimeTracker.startDwellTracking(eventModel.id);
+      // Start monitoring location to track exit/away automatically
+      DwellTimeTracker.startLocationMonitoring(eventModel.id);
 
       if (mounted) {
         setState(() {

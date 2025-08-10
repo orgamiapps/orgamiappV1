@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:orgami/Utils/Colors.dart';
+import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/Images.dart';
 import 'package:flutter/foundation.dart';
 import 'package:orgami/Utils/Toast.dart';

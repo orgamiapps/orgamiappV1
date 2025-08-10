@@ -274,7 +274,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.12),
+              color: Colors.black.withValues(alpha: 0.12),
               blurRadius: 18,
               offset: const Offset(0, 8),
             ),
@@ -291,9 +291,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      primary.withOpacity(0.85),
-                      primary.withOpacity(0.70),
-                      Colors.white.withOpacity(0.85),
+                      primary.withValues(alpha: 0.85),
+                      primary.withValues(alpha: 0.70),
+                      Colors.white.withValues(alpha: 0.85),
                     ],
                     stops: const [0.0, 0.45, 1.0],
                   ),
@@ -306,8 +306,8 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withOpacity(0.25),
-                      Colors.black.withOpacity(0.10),
+                      Colors.black.withValues(alpha: 0.25),
+                      Colors.black.withValues(alpha: 0.10),
                     ],
                   ),
                 ),
@@ -329,7 +329,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                         placeholder: (context, url) => Container(
                           width: 64,
                           height: 64,
-                          color: Colors.white.withOpacity(0.15),
+                          color: Colors.white.withValues(alpha: 0.15),
                           child: const Center(
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
@@ -337,7 +337,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                         errorWidget: (context, url, error) => Container(
                           width: 64,
                           height: 64,
-                          color: Colors.white.withOpacity(0.15),
+                          color: Colors.white.withValues(alpha: 0.15),
                           child: const Icon(
                             Icons.image_not_supported,
                             color: Colors.white,
@@ -372,11 +372,11 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: isUsed
-                                      ? Colors.black.withOpacity(0.35)
-                                      : Colors.black.withOpacity(0.35),
+                                      ? Colors.black.withValues(alpha: 0.35)
+                                      : Colors.black.withValues(alpha: 0.35),
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
-                                    color: Colors.white.withOpacity(0.25),
+                                    color: Colors.white.withValues(alpha: 0.25),
                                   ),
                                 ),
                                 child: Text(
@@ -397,7 +397,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -407,7 +407,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                             ).format(ticket.eventDateTime),
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                             ),
                           ),
                           const SizedBox(height: 10),
@@ -418,10 +418,10 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                                 width: 34,
                                 height: 34,
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.35),
+                                  color: Colors.black.withValues(alpha: 0.35),
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
-                                    color: Colors.white.withOpacity(0.25),
+                                    color: Colors.white.withValues(alpha: 0.25),
                                   ),
                                 ),
                                 child: const Icon(
@@ -466,9 +466,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
-                          Colors.white.withOpacity(0.05),
+                          Colors.white.withValues(alpha: 0.05),
                           Colors.transparent,
-                          accent.withOpacity(0.08),
+                          accent.withValues(alpha: 0.08),
                           Colors.transparent,
                         ],
                       ),

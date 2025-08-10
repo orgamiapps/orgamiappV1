@@ -64,8 +64,10 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
   }
 
   Future<void> _checkFavoriteStatus() async {
-    if (CustomerController.logeInCustomer == null || _hasCheckedFavoriteStatus)
+    if (CustomerController.logeInCustomer == null ||
+        _hasCheckedFavoriteStatus) {
       return;
+    }
 
     _hasCheckedFavoriteStatus = true;
 
@@ -139,7 +141,7 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
     super.build(context); // Required for AutomaticKeepAliveClientMixin
     return Card(
       elevation: 5,
-      shadowColor: Colors.black.withOpacity(0.1),
+      shadowColor: Colors.black.withValues(alpha: 0.1),
       margin: const EdgeInsets.only(bottom: 20),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: InkWell(
@@ -203,11 +205,11 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withValues(alpha: 0.9),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
+                    color: Colors.black.withValues(alpha: 0.15),
                     blurRadius: 8,
                   ),
                 ],
