@@ -21,6 +21,8 @@ class EventModel {
   int issuedTickets;
   int eventDuration; // Duration in hours
   List<String> coHosts; // Array of user IDs who are co-hosts
+  String? organizationId; // Optional organization context for the event
+  List<String> accessList; // For private events outside org or additional invitees
 
   // Sign-in methods configuration
   List<String> signInMethods; // ['qr_code', 'manual_code', 'geofence']
@@ -54,6 +56,8 @@ class EventModel {
     this.issuedTickets = 0,
     this.eventDuration = 2, // Default 2 hours
     this.coHosts = const [],
+    this.organizationId,
+    this.accessList = const [],
     this.signInMethods = const ['qr_code', 'manual_code'], // Default methods
     this.manualCode,
   });
@@ -100,6 +104,10 @@ class EventModel {
       eventDuration: data['eventDuration'] ?? 2,
       coHosts: (data.containsKey('coHosts') && data['coHosts'] != null)
           ? List<String>.from(data['coHosts'])
+          : [],
+      organizationId: data['organizationId'],
+      accessList: (data.containsKey('accessList') && data['accessList'] != null)
+          ? List<String>.from(data['accessList'])
           : [],
       signInMethods:
           (data.containsKey('signInMethods') && data['signInMethods'] != null)
@@ -192,6 +200,8 @@ class EventModel {
     data['issuedTickets'] = issuedTickets;
     data['eventDuration'] = eventDuration;
     data['coHosts'] = coHosts;
+    if (organizationId != null) data['organizationId'] = organizationId;
+    data['accessList'] = accessList;
     data['signInMethods'] = signInMethods;
     if (manualCode != null) data['manualCode'] = manualCode;
     return data;

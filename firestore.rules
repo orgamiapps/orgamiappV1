@@ -68,16 +68,67 @@ service cloud.firestore {
          resource.data.customerUid == 'without_login');
     }
     
-    // Allow users to read/write their own events
-    // Also allow reading public events (private == false) for all authenticated users
-    // And allow reading events that the user has attended (for attendance tracking)
-    // Co-hosts can also write to events they are co-hosting
+        // Events access rules with public/private and organization scoping
     match /Events/{eventId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-        (request.auth.uid == resource.data.customerUid || 
-         request.auth.uid in resource.data.coHosts);
+      function isOrgMember(orgId) {
+        return exists(/databases/$(database)/documents/Organizations/$(orgId)/Members/$(request.auth.uid));
+      }
+
+      function canWriteEvent() {
+        return request.auth != null && (
+          request.auth.uid == resource.data.customerUid ||
+          request.auth.uid in resource.data.coHosts ||
+          (
+            resource.data.organizationId != null &&
+            exists(/databases/$(database)/documents/Organizations/$(resource.data.organizationId)/Members/$(request.auth.uid)) &&
+            (
+              // If membership has permissions array containing CreateEditEvents
+              (get(/databases/$(database)/documents/Organizations/$(resource.data.organizationId)/Members/$(request.auth.uid)).data.permissions != null &&
+               'CreateEditEvents' in get(/databases/$(database)/documents/Organizations/$(resource.data.organizationId)/Members/$(request.auth.uid)).data.permissions)
+            )
+          )
+        );
+      }
+
+      allow read: if request.auth != null && (
+        resource.data.private == false ||
+        request.auth.uid == resource.data.customerUid ||
+        request.auth.uid in resource.data.coHosts ||
+        (resource.data.accessList != null && request.auth.uid in resource.data.accessList) ||
+        (resource.data.organizationId != null && isOrgMember(resource.data.organizationId))
+      );
+
+      allow write: if canWriteEvent();
       allow create: if request.auth != null && request.auth.uid == request.resource.data.customerUid;
+    }
+    
+    // Organizations and membership rules
+    match /Organizations/{orgId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && exists(/databases/$(database)/documents/Organizations/$(orgId)/Members/$(request.auth.uid)) &&
+        (
+          'ManageMembersRoles' in get(/databases/$(database)/documents/Organizations/$(orgId)/Members/$(request.auth.uid)).data.permissions
+        );
+
+      match /Members/{userId} {
+        allow read: if request.auth != null && exists(/databases/$(database)/documents/Organizations/$(orgId)/Members/$(request.auth.uid));
+        allow create: if request.auth != null && request.auth.uid == userId; // self-join approved by admins
+        allow update, delete: if request.auth != null && (
+          request.auth.uid == userId ||
+          (
+            exists(/databases/$(database)/documents/Organizations/$(orgId)/Members/$(request.auth.uid)) &&
+            'ManageMembersRoles' in get(/databases/$(database)/documents/Organizations/$(orgId)/Members/$(request.auth.uid)).data.permissions
+          )
+        );
+      }
+
+      match /JoinRequests/{requestId} {
+        allow read: if request.auth != null && exists(/databases/$(database)/documents/Organizations/$(orgId)/Members/$(request.auth.uid));
+        allow create: if request.auth != null && request.auth.uid == request.resource.data.userId; // submit own request
+        allow update, delete: if request.auth != null && exists(/databases/$(database)/documents/Organizations/$(orgId)/Members/$(request.auth.uid)) &&
+          'ApproveJoinRequests' in get(/databases/$(database)/documents/Organizations/$(orgId)/Members/$(request.auth.uid)).data.permissions;
+      }
     }
     
     // Allow event hosts and co-hosts to read/write their event analytics

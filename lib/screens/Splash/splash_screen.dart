@@ -7,6 +7,7 @@ import 'package:orgami/firebase/firebase_firestore_helper.dart';
 
 import 'package:orgami/Utils/images.dart';
 import 'package:orgami/Utils/router.dart';
+import 'package:orgami/main.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -34,6 +35,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
+    DynamicLinksInitializer.initialize();
     _initializeAnimations();
     _startLoadingSequence();
 

@@ -18,6 +18,7 @@ import 'package:orgami/Utils/router.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
 import 'dart:io';
+import 'package:orgami/firebase/organization_helper.dart'; // ignore: unused_import
 
 class CreateEventScreen extends StatefulWidget {
   final DateTime selectedDateTime;
@@ -65,6 +66,10 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       TextEditingController();
 
   String? _selectedImagePath;
+
+  // Organization selection
+  String? _selectedOrganizationId;
+  List<Map<String, String>> _userOrganizations = const [];
 
   // Sign-in methods
   late List<String> _selectedSignInMethods;
@@ -193,6 +198,10 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           private: privateEvent,
           categories: _selectedCategories,
           eventDuration: widget.eventDurationHours,
+          organizationId: _selectedOrganizationId,
+          accessList: privateEvent
+              ? [FirebaseAuth.instance.currentUser!.uid]
+              : const [],
           signInMethods: _selectedSignInMethods,
           manualCode: _manualCode,
         );
@@ -264,6 +273,9 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         widget.selectedSignInMethods ?? ['qr_code', 'manual_code'];
     _manualCode = widget.manualCode;
 
+    // Load user's organizations (lightweight)
+    _loadUserOrganizations();
+
     // Initialize animations
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -281,6 +293,24 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
     _fadeController.forward();
     _slideController.forward();
+  }
+
+  Future<void> _loadUserOrganizations() async {
+    try {
+      // Lazy import to avoid circular deps
+      final helper = await _getOrganizationHelper();
+      final orgs = await helper.getUserOrganizationsLite();
+      if (mounted) {
+        setState(() {
+          _userOrganizations = orgs;
+          // Optionally set default based on org default visibility or first org
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<dynamic> _getOrganizationHelper() async {
+    return Future.value(OrganizationHelper());
   }
 
   @override
@@ -378,6 +408,9 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             children: [
               // Date and Time Summary
               _buildSummaryCard(),
+              const SizedBox(height: 24),
+              // Organization selector
+              _buildOrganizationSelector(),
               const SizedBox(height: 24),
               // Private Event Toggle
               _buildPrivateEventToggle(),
@@ -631,6 +664,69 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    );
+  }
+
+  Widget _buildOrganizationSelector() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            spreadRadius: 0,
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.apartment, color: Color(0xFF667EEA), size: 20),
+              SizedBox(width: 8),
+              Text('Organization (optional)',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1A1A))),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_userOrganizations.isEmpty)
+            const Text(
+              'You are not in any organization yet',
+              style: TextStyle(color: Color(0xFF6B7280)),
+            )
+          else
+            DropdownButtonFormField<String>(
+              value: _selectedOrganizationId,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(borderSide: BorderSide.none),
+                filled: true,
+                fillColor: Color(0xFFF9FAFB),
+              ),
+              items: _userOrganizations
+                  .map(
+                    (org) => DropdownMenuItem<String>(
+                      value: org['id'],
+                      child: Text(org['name'] ?? ''),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedOrganizationId = value;
+                });
+              },
+            ),
+        ],
+      ),
     );
   }
 

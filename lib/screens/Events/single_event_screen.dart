@@ -46,6 +46,7 @@ import 'package:orgami/Screens/Events/edit_event_screen.dart';
 import 'package:orgami/Screens/Events/event_location_view_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:orgami/Screens/Events/Widget/access_list_management_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:orgami/Screens/MyProfile/badge_screen.dart';
 
@@ -72,6 +73,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   bool _justSignedIn =
       false; // Flag to prevent showing sign-in dialog immediately after sign-in
   int _selectedTabIndex = 0;
+  bool get _canManageEvent => eventModel.hasManagementPermissions(FirebaseAuth.instance.currentUser?.uid ?? '');
 
   // _isLoading removed - no longer needed after removing manual code input
 
@@ -1620,6 +1622,35 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                             ),
                           ],
                         ),
+                        const SizedBox(height: 24),
+                        if (eventModel.private)
+                          _buildManagementSection(
+                            icon: Icons.lock,
+                            title: 'Private Access',
+                            color: const Color(0xFF8B5CF6),
+                            children: [
+                              _buildManagementOption(
+                                icon: Icons.person_add,
+                                title: 'Invite & Access List',
+                                subtitle: 'Add or remove people who can view',
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  showModalBottomSheet(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    builder: (_) => DraggableScrollableSheet(
+                                      initialChildSize: 0.85,
+                                      minChildSize: 0.5,
+                                      maxChildSize: 0.95,
+                                      expand: false,
+                                      builder: (_, __) => AccessListManagementWidget(eventModel: eventModel),
+                                    ),
+                                  ).then((_) => _showEventManagementModal());
+                                },
+                              ),
+                            ],
+                          ),
+                        const SizedBox(height: 24),
                       ],
                     ),
                   ),
