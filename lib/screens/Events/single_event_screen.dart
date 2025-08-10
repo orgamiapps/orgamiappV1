@@ -4670,7 +4670,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (context) =>
-                          GeofenceSetupScreen(eventModel: eventModel),
+                          EventLocationViewScreen(eventModel: eventModel),
                     ),
                   );
                 },
