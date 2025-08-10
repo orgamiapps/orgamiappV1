@@ -111,6 +111,84 @@ class OrganizationHelper {
     }
   }
 
+  Future<List<Map<String, dynamic>>> getJoinRequests(String organizationId) async {
+    try {
+      final query = await _firestore
+          .collection('Organizations')
+          .doc(organizationId)
+          .collection('JoinRequests')
+          .orderBy('createdAt', descending: true)
+          .get();
+      return query.docs.map((d) => d.data()).toList();
+    } catch (e) {
+      Logger.error('Failed to load join requests: $e');
+      return [];
+    }
+  }
+
+  Future<bool> approveJoinRequest(String organizationId, String userId) async {
+    try {
+      final memberRef = _firestore
+          .collection('Organizations')
+          .doc(organizationId)
+          .collection('Members')
+          .doc(userId);
+      await memberRef.set({
+        'organizationId': organizationId,
+        'userId': userId,
+        'role': 'Member',
+        'permissions': <String>[],
+        'status': 'approved',
+        'joinedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // Remove join request
+      await _firestore
+          .collection('Organizations')
+          .doc(organizationId)
+          .collection('JoinRequests')
+          .doc(userId)
+          .delete();
+      return true;
+    } catch (e) {
+      Logger.error('Failed to approve join request: $e');
+      return false;
+    }
+  }
+
+  Future<bool> declineJoinRequest(String organizationId, String userId) async {
+    try {
+      await _firestore
+          .collection('Organizations')
+          .doc(organizationId)
+          .collection('JoinRequests')
+          .doc(userId)
+          .update({'status': 'declined'});
+      return true;
+    } catch (e) {
+      Logger.error('Failed to decline join request: $e');
+      return false;
+    }
+  }
+
+  Future<bool> updateMemberPermissions(String organizationId, String userId, {required List<String> permissions, String? role}) async {
+    try {
+      await _firestore
+          .collection('Organizations')
+          .doc(organizationId)
+          .collection('Members')
+          .doc(userId)
+          .update({
+        if (role != null) 'role': role,
+        'permissions': permissions,
+      });
+      return true;
+    } catch (e) {
+      Logger.error('Failed to update member permissions: $e');
+      return false;
+    }
+  }
+
   Future<bool> isMember(String organizationId, {String? userId}) async {
     final uid = userId ?? _auth.currentUser?.uid;
     if (uid == null) return false;

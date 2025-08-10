@@ -80,26 +80,99 @@ class OrganizationProfileScreen extends StatelessWidget {
     return DefaultTabController(
       length: 4,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Organization'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Events'),
-              Tab(text: 'Members'),
-              Tab(text: 'About'),
-              Tab(text: 'Settings'),
-            ],
-          ),
-        ),
-        body: TabBarView(
+        body: Column(
           children: [
-            _OrgEventsTab(orgId: organizationId),
-            _OrgMembersTab(orgId: organizationId),
-            _OrgAboutTab(orgId: organizationId),
-            _OrgSettingsTab(orgId: organizationId),
+            _OrgHeader(orgId: organizationId),
+            const TabBar(
+              tabs: [
+                Tab(text: 'Events'),
+                Tab(text: 'Members'),
+                Tab(text: 'About'),
+                Tab(text: 'Settings'),
+              ],
+            ),
+            Expanded(
+              child: TabBarView(
+                children: [
+                  _OrgEventsTab(orgId: organizationId),
+                  _OrgMembersTab(orgId: organizationId),
+                  _OrgAboutTab(orgId: organizationId),
+                  _OrgSettingsTab(orgId: organizationId),
+                ],
+              ),
+            ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _OrgHeader extends StatelessWidget {
+  final String orgId;
+  const _OrgHeader({required this.orgId});
+
+  @override
+  Widget build(BuildContext context) {
+    final doc = FirebaseFirestore.instance.collection('Organizations').doc(orgId);
+    return FutureBuilder<DocumentSnapshot>(
+      future: doc.get(),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data() as Map<String, dynamic>?;
+        final bannerUrl = data?['bannerUrl']?.toString();
+        final logoUrl = data?['logoUrl']?.toString();
+        final name = data?['name']?.toString() ?? 'Organization';
+        return Container(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            image: bannerUrl != null
+                ? DecorationImage(
+                    image: NetworkImage(bannerUrl),
+                    fit: BoxFit.cover,
+                    colorFilter: ColorFilter.mode(
+                      Colors.black.withOpacity(0.2),
+                      BlendMode.darken,
+                    ),
+                  )
+                : null,
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: Colors.white,
+                backgroundImage: logoUrl != null ? NetworkImage(logoUrl) : null,
+                child: logoUrl == null ? const Icon(Icons.apartment, color: Color(0xFF667EEA)) : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              FilledButton(
+                onPressed: () {
+                  OrganizationHelper().requestToJoinOrganization(orgId);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Join request sent')),
+                  );
+                },
+                child: const Text('Join'),
+              )
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -216,14 +289,42 @@ class _OrgAboutTab extends StatelessWidget {
   }
 }
 
+import 'package:orgami/screens/Organizations/join_requests_screen.dart';
+import 'package:orgami/screens/Organizations/role_permissions_screen.dart';
+
 class _OrgSettingsTab extends StatelessWidget {
   final String orgId;
   const _OrgSettingsTab({required this.orgId});
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Text('Settings for $orgId (Admins only)'),
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Admin Tools', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
+          ListTile(
+            leading: const Icon(Icons.group_add),
+            title: const Text('Join Requests'),
+            subtitle: const Text('Approve or decline organization join requests'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => JoinRequestsScreen(organizationId: orgId)),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.admin_panel_settings),
+            title: const Text('Roles & Permissions'),
+            subtitle: const Text('Manage member roles and permissions'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => RolePermissionsScreen(organizationId: orgId)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
