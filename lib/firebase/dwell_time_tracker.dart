@@ -50,6 +50,9 @@ class DwellTimeTracker {
         Logger.debug('Dwell tracking started for $eventId-${currentUser.uid}');
       }
 
+      // Begin monitoring location to auto-detect exit
+      startLocationMonitoring(eventId);
+
       return true;
     } catch (e) {
       if (kDebugMode) {
@@ -69,7 +72,7 @@ class DwellTimeTracker {
       DwellSession? session = _activeSessions.remove(sessionKey);
 
       if (session != null) {
-        await _recordDwellTime(session);
+        await _recordDwellTime(session, status: 'manual-stopped');
 
         if (kDebugMode) {
           Logger.debug(
@@ -169,7 +172,7 @@ class DwellTimeTracker {
         _activeSessions.remove(sessionKey);
 
         // Record dwell time
-        await _recordDwellTime(session);
+        await _recordDwellTime(session, status: 'completed');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -194,7 +197,7 @@ class DwellTimeTracker {
   }
 
   // Record dwell time to Firestore
-  static Future<void> _recordDwellTime(DwellSession session) async {
+  static Future<void> _recordDwellTime(DwellSession session, {String status = 'completed'}) async {
     try {
       final dwellTime = DateTime.now().difference(session.startTime);
 
@@ -211,6 +214,21 @@ class DwellTimeTracker {
             'longitude': session.startLocation.longitude,
           },
           'createdAt': FieldValue.serverTimestamp(),
+          'status': status,
+        });
+
+        // Update the main attendance record so organizers can see durations/status
+        final String attendanceDocId = '${session.eventId}-${session.userId}';
+        await _firestore.collection('Attendance').doc(attendanceDocId).update({
+          'exitTimestamp': Timestamp.fromDate(DateTime.now()),
+          'dwellTime': dwellTime.inMilliseconds,
+          'dwellStatus': status,
+          'dwellNotes': status == 'auto-stopped' ? 'Left geofence' : 'Stopped tracking',
+        }).catchError((_) {
+          // If the attendance record doesn't exist or update fails, just log
+          if (kDebugMode) {
+            Logger.error('Failed to update attendance dwell fields for $attendanceDocId');
+          }
         });
 
         if (kDebugMode) {
@@ -238,7 +256,7 @@ class DwellTimeTracker {
       _activeSessions.remove(sessionKey);
 
       // Record dwell time
-      await _recordDwellTime(session);
+      await _recordDwellTime(session, status: 'auto-stopped');
 
       if (kDebugMode) {
         Logger.error(
