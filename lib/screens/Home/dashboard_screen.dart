@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/Screens/Home/home_screen.dart';
+import 'package:orgami/Screens/Home/home_hub_screen.dart';
 import 'package:orgami/Screens/Home/account_screen.dart';
 import 'package:orgami/Screens/Home/notifications_screen.dart';
 import 'package:orgami/Screens/Messaging/messaging_screen.dart';
@@ -19,7 +19,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
 
     final List<Widget> _dashBoardScreens = [
-    const HomeScreen(),
+    const HomeHubScreen(),
     const OrganizationsTab(),
     const MessagingScreen(),
     const NotificationsScreen(),

@@ -5,6 +5,7 @@ import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
 
 class AccessListManagementWidget extends StatefulWidget {
   final EventModel eventModel;
@@ -75,8 +76,29 @@ class _AccessListManagementWidgetState extends State<AccessListManagementWidget>
   }
 
   void _shareInviteLink() {
-    final link = 'https://orgami.app/invite?eventId=${widget.eventModel.id}';
-    Share.share('Join my private event: $link');
+    _createLink().then((url) {
+      final link = url ?? 'https://orgami.app/invite?eventId=${widget.eventModel.id}';
+      Share.share('Join my private event: $link');
+    });
+  }
+
+  Future<String?> _createLink() async {
+    try {
+      final DynamicLinkParameters params = DynamicLinkParameters(
+        link: Uri.parse('https://orgami.app/invite?eventId=${widget.eventModel.id}'),
+        uriPrefix: 'https://orgamiapp.page.link',
+        androidParameters: const AndroidParameters(packageName: 'com.stormdeve.orgami'),
+        iosParameters: const IOSParameters(bundleId: 'com.stormdeve.orgami'),
+        socialMetaTagParameters: SocialMetaTagParameters(
+          title: widget.eventModel.title,
+          description: widget.eventModel.description,
+        ),
+      );
+      final short = await FirebaseDynamicLinks.instance.buildShortLink(params);
+      return short.shortUrl.toString();
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
