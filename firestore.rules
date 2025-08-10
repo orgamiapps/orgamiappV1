@@ -100,6 +100,20 @@ service cloud.firestore {
 
       allow write: if canWriteEvent();
       allow create: if request.auth != null && request.auth.uid == request.resource.data.customerUid;
+
+      // Private access request workflow for events
+      match /AccessRequests/{userId} {
+        function isHostOrCoHost() {
+          return request.auth != null && (
+            request.auth.uid == get(/databases/$(database)/documents/Events/$(eventId)).data.customerUid ||
+            request.auth.uid in get(/databases/$(database)/documents/Events/$(eventId)).data.coHosts
+          );
+        }
+
+        allow create: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null && (request.auth.uid == userId || isHostOrCoHost());
+        allow update, delete: if isHostOrCoHost();
+      }
     }
     
     // Organizations and membership rules
