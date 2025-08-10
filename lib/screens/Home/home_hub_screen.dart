@@ -34,20 +34,18 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
     setState(() => _searching = true);
     try {
       Query query = FirebaseFirestore.instance.collection('Organizations').limit(25);
-      final q = _searchCtlr.text.trim();
+      final q = _searchCtlr.text.trim().toLowerCase();
       if (q.isNotEmpty) {
-        // naive client filter after fetch for demo; can be enhanced with indexing later
+        final String end = q.substring(0, q.length - 1) + String.fromCharCode(q.codeUnitAt(q.length - 1) + 1);
+        query = query.orderBy('name_lowercase').startAt([q]).endBefore([end]);
+      } else {
+        query = query.orderBy('name_lowercase');
       }
       final snap = await query.get();
       final list = snap.docs.map((d) {
         final data = d.data() as Map<String, dynamic>;
         data['id'] = d.id;
         return data;
-      }).where((o) {
-        final ql = _searchCtlr.text.trim().toLowerCase();
-        if (ql.isEmpty) return true;
-        return (o['name']?.toString().toLowerCase().contains(ql) ?? false) ||
-            (o['category']?.toString().toLowerCase().contains(ql) ?? false);
       }).toList();
       setState(() => _discoverOrgs = list);
     } finally {

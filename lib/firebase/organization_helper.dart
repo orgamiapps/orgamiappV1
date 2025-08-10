@@ -67,6 +67,12 @@ class OrganizationHelper {
       );
       await orgRef.set(organization.toJson());
 
+      // Store lowercase fields for indexed search
+      await orgRef.update({
+        'name_lowercase': name.toLowerCase(),
+        'category_lowercase': (category ?? 'other').toLowerCase(),
+      });
+
       final memberRef = orgRef.collection('Members').doc(user.uid);
       final membership = OrganizationMembership(
         organizationId: orgRef.id,
