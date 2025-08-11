@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image/image.dart' as img;
+import 'package:path_provider/path_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:orgami/Utils/logger.dart';
@@ -74,6 +76,49 @@ class FirebaseStorageHelper {
         Logger.error('Error deleting profile picture: $e', e);
       }
       return false;
+    }
+  }
+
+  // Upload organization asset (logo or banner)
+  static Future<String?> uploadOrganizationImage({
+    required String organizationId,
+    required File imageFile,
+    required bool isBanner,
+  }) async {
+    try {
+      // Decode and compress
+      final bytes = await imageFile.readAsBytes();
+      img.Image? decoded = img.decodeImage(bytes);
+      if (decoded == null) return null;
+
+      // Target sizes
+      final int targetW = isBanner ? 1600 : 512;
+      final int targetH = isBanner ? 600 : 512;
+      decoded = img.copyResize(decoded, width: targetW, height: targetH, interpolation: img.Interpolation.cubic);
+
+      // Encode
+      final List<int> outBytes = isBanner
+          ? img.encodeJpg(decoded, quality: 80)
+          : img.encodePng(decoded, level: 6);
+
+      // Write to temp file
+      final dir = await getTemporaryDirectory();
+      final String fileName = isBanner ? 'banner' : 'logo';
+      final String tmpPath = '${dir.path}/${fileName}_${DateTime.now().millisecondsSinceEpoch}.${isBanner ? 'jpg' : 'png'}';
+      final File tmpFile = File(tmpPath)..writeAsBytesSync(outBytes);
+
+      final Reference ref = _storage.ref().child(
+        'organizations/$organizationId/${fileName}_${DateTime.now().millisecondsSinceEpoch}.${isBanner ? 'jpg' : 'png'}',
+      );
+      final UploadTask uploadTask = ref.putFile(tmpFile);
+      final TaskSnapshot snapshot = await uploadTask;
+      final String downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      if (kDebugMode) {
+        Logger.error('Error uploading organization image: $e', e);
+      }
+      return null;
     }
   }
 }

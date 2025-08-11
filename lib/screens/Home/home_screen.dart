@@ -31,6 +31,7 @@ import 'package:orgami/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:orgami/utils/location_helper.dart';
 import 'package:orgami/Utils/logger.dart';
+import 'package:orgami/screens/Events/select_event_type_screen.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -47,7 +48,8 @@ enum SortOption {
 enum SearchType { events, users }
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final bool showHeader;
+  const HomeScreen({super.key, this.showHeader = true});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -392,7 +394,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _onFabPressed() {
-    RouterClass.nextScreenNormal(context, const ChoseDateTimeScreen());
+    RouterClass.nextScreenNormal(context, const SelectEventTypeScreen());
   }
 
   Future<void> getCurrentLocation() async {
@@ -577,8 +579,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             parent: AlwaysScrollableScrollPhysics(),
           ),
           slivers: [
-            // Header Section as Sliver
-            SliverToBoxAdapter(child: _headerView()),
+            if (widget.showHeader)
+              // Header Section as Sliver
+              SliverToBoxAdapter(child: _headerView()),
             // Filter Section as Sliver
             SliverToBoxAdapter(child: _filterSection()),
             // Events Content as Sliver
@@ -620,7 +623,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                     ),
                     const Text(
-                      'Amazing Events',
+                      'New Events',
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,

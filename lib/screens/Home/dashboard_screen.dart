@@ -3,7 +3,7 @@ import 'package:orgami/Screens/Home/home_hub_screen.dart';
 import 'package:orgami/Screens/Home/account_screen.dart';
 import 'package:orgami/Screens/Home/notifications_screen.dart';
 import 'package:orgami/Screens/Messaging/messaging_screen.dart';
-import 'package:orgami/Screens/Organizations/organizations_tab.dart';
+import 'package:orgami/screens/Organizations/organizations_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -13,17 +13,17 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-    late final double _screenWidth = MediaQuery.of(context).size.width;
+  late final double _screenWidth = MediaQuery.of(context).size.width;
   late final double _screenHeight = MediaQuery.of(context).size.height;
 
   int _selectedIndex = 0;
 
-    final List<Widget> _dashBoardScreens = [
-    const HomeHubScreen(),
-    const OrganizationsTab(),
-    const MessagingScreen(),
-    const NotificationsScreen(),
-    const AccountScreen(),
+  final List<Widget> _dashBoardScreens = const [
+    HomeHubScreen(),
+    OrganizationsScreen(),
+    MessagingScreen(),
+    NotificationsScreen(),
+    AccountScreen(),
   ];
 
   @override
@@ -69,10 +69,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               backgroundColor: barColor,
               indicatorColor: primary.withOpacity(0.12),
               labelTextStyle: WidgetStateProperty.all(
-                const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
+                const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
               ),
               iconTheme: WidgetStateProperty.resolveWith((states) {
                 final bool selected = states.contains(WidgetState.selected);
@@ -89,7 +86,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onDestinationSelected: (index) => setState(() {
                 _selectedIndex = index;
               }),
-                            destinations: const [
+              destinations: const [
                 NavigationDestination(
                   icon: Icon(Icons.event_outlined),
                   selectedIcon: Icon(Icons.event),

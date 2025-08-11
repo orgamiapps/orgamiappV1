@@ -3,11 +3,15 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:orgami/firebase_options.dart';
 import 'package:orgami/Screens/Splash/splash_screen.dart';
 import 'package:orgami/Utils/logger.dart';
-
 import 'package:orgami/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:orgami/utils/error_handler.dart';
+import 'package:firebase_messaging/firebase_messaging.dart' as fcm;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:orgami/Services/notification_service.dart';
+import 'package:orgami/firebase/firebase_messaging_helper.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -23,6 +27,27 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+
+    // iOS/web foreground presentation options
+    if (kIsWeb || defaultTargetPlatform == TargetPlatform.iOS) {
+      await fcm.FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+    }
+
+    // Android 13+ notifications permission
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      final plugin = FlutterLocalNotificationsPlugin();
+      await plugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.requestNotificationsPermission();
+    }
+
+    // Initialize local notifications and messaging helper
+    await NotificationService.initialize();
+    await FirebaseMessagingHelper().initialize();
 
     Logger.success('Firebase initialized successfully');
   } catch (e) {

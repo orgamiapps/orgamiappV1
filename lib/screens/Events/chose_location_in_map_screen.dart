@@ -11,6 +11,8 @@ class ChoseLocationInMapScreen extends StatefulWidget {
   final int eventDurationHours;
   final List<String>? selectedSignInMethods;
   final String? manualCode;
+  final String? preselectedOrganizationId;
+  final bool forceOrganizationEvent;
 
   const ChoseLocationInMapScreen({
     super.key,
@@ -18,6 +20,8 @@ class ChoseLocationInMapScreen extends StatefulWidget {
     required this.eventDurationHours,
     this.selectedSignInMethods,
     this.manualCode,
+    this.preselectedOrganizationId,
+    this.forceOrganizationEvent = false,
   });
 
   @override
@@ -514,8 +518,10 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
                         radios: radius,
                         selectedSignInMethods:
                             widget.selectedSignInMethods ??
-                            ['qr_code', 'manual_code'],
+                            const ['qr_code', 'manual_code'],
                         manualCode: widget.manualCode,
+                        preselectedOrganizationId: widget.preselectedOrganizationId,
+                        forceOrganizationEvent: widget.forceOrganizationEvent,
                       ),
                     );
                   },

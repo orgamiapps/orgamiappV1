@@ -8,6 +8,48 @@ class OrganizationHelper {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  /// Live stream of organizations for the current user.
+  /// Combines memberships in Organizations/{org}/Members where status == 'approved'.
+  Stream<List<Map<String, String>>> streamUserOrganizationsLite() {
+    final user = _auth.currentUser;
+    if (user == null) {
+      return Stream.value(const <Map<String, String>>[]);
+    }
+
+    // Stream memberships, then resolve to org lite objects
+    final membershipQuery = _firestore
+        .collectionGroup('Members')
+        .where('userId', isEqualTo: user.uid)
+        .where('status', isEqualTo: 'approved');
+
+    return membershipQuery.snapshots().asyncMap((snap) async {
+      if (snap.docs.isEmpty) return <Map<String, String>>[];
+      final Set<String> orgIds = {
+        for (final d in snap.docs)
+          (d.data()['organizationId']?.toString() ?? ''),
+      }..removeWhere((e) => e.isEmpty);
+      if (orgIds.isEmpty) return <Map<String, String>>[];
+
+      final futures = orgIds.map(
+        (id) => _firestore.collection('Organizations').doc(id).get(),
+      );
+      final docs = await Future.wait(futures);
+      final List<Map<String, String>> list = [];
+      for (final doc in docs) {
+        if (!doc.exists) continue;
+        final data = doc.data()!;
+        final String name = (data['name'] ?? data['title'] ?? '').toString();
+        list.add({'id': doc.id, 'name': name});
+      }
+      list.sort(
+        (a, b) => (a['name'] ?? '').toLowerCase().compareTo(
+          (b['name'] ?? '').toLowerCase(),
+        ),
+      );
+      return list;
+    });
+  }
+
   Future<List<Map<String, String>>> getUserOrganizationsLite() async {
     final user = _auth.currentUser;
     if (user == null) return [];
@@ -42,6 +84,41 @@ class OrganizationHelper {
       Logger.error('getUserOrganizationsLite failed: $e');
       return [];
     }
+  }
+
+  /// Add or update a membership entry for a user in an organization.
+  Future<void> addUserToOrganization({
+    required String organizationId,
+    required String userId,
+    String role = 'Member',
+  }) async {
+    final memberRef = _firestore
+        .collection('Organizations')
+        .doc(organizationId)
+        .collection('Members')
+        .doc(userId);
+
+    await memberRef.set({
+      'organizationId': organizationId,
+      'userId': userId,
+      'role': role,
+      'permissions': <String>[],
+      'status': 'approved',
+      'joinedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  /// Remove a user from an organization.
+  Future<void> removeUserFromOrganization({
+    required String organizationId,
+    required String userId,
+  }) async {
+    final memberRef = _firestore
+        .collection('Organizations')
+        .doc(organizationId)
+        .collection('Members')
+        .doc(userId);
+    await memberRef.delete();
   }
 
   Future<String?> createOrganization({

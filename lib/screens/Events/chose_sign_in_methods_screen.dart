@@ -2,17 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:orgami/screens/Events/chose_location_in_map_screen.dart';
 import 'package:orgami/screens/Events/add_questions_prompt_screen.dart';
-import 'package:orgami/Screens/Events/Widget/sign_in_methods_selector.dart';
+import 'package:orgami/screens/Events/Widget/sign_in_methods_selector.dart';
 import 'package:orgami/Utils/router.dart';
 
 class ChoseSignInMethodsScreen extends StatefulWidget {
   final DateTime selectedDateTime;
   final int eventDurationHours;
+  final String? preselectedOrganizationId;
+  final bool forceOrganizationEvent;
 
   const ChoseSignInMethodsScreen({
     super.key,
     required this.selectedDateTime,
     required this.eventDurationHours,
+    this.preselectedOrganizationId,
+    this.forceOrganizationEvent = false,
   });
 
   @override
@@ -256,6 +260,8 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
                   eventDurationHours: widget.eventDurationHours,
                   selectedSignInMethods: _selectedSignInMethods,
                   manualCode: _manualCode,
+                  preselectedOrganizationId: widget.preselectedOrganizationId,
+                  forceOrganizationEvent: widget.forceOrganizationEvent,
                 ),
               );
             } else {
@@ -269,6 +275,8 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
                   radios: 10.0, // Default radius
                   selectedSignInMethods: _selectedSignInMethods,
                   manualCode: _manualCode,
+                  preselectedOrganizationId: widget.preselectedOrganizationId,
+                  forceOrganizationEvent: widget.forceOrganizationEvent,
                 ),
               );
             }

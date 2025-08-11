@@ -61,5 +61,22 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<Array>
+				<string>com.googleusercontent.apps.951311475019-vrmcjm9inlpdi66qupst3op5c81e74el</string>
+			</Array>
+		</dict>
+	</array>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>This app needs permission to add photos to your library</string>
+	<key>GMSApiKey</key>
+	<string>AIzaSyAf1t5cToh1UoF7R52vTSJxMajw8CvmVUA</string>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<true/>
 </dict>
 </plist>
