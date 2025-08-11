@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart' as fcm;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:io' show Platform;
 
 import 'package:orgami/models/message_model.dart';
 import 'package:orgami/models/customer_model.dart';
@@ -48,31 +49,46 @@ class FirebaseMessagingHelper {
         }
       }
 
-      // Initialize local notifications
-      await _initializeLocalNotifications();
+      // Initialize local notifications (mobile platforms)
+      if (!kIsWeb) {
+        await _initializeLocalNotifications();
+      }
 
-      // Get FCM token
-      String? fcmToken = await _messaging.getToken();
+      // Enable auto-init and get FCM token
+      await _messaging.setAutoInitEnabled(true);
+      String? fcmToken;
+      if (kIsWeb) {
+        // Web requires a VAPID key and service worker
+        fcmToken = await _messaging.getToken(
+          vapidKey: 'BCFlVkRk4wUzL3pNaP7bVYqg8uH3M2vYsmYcB5dOSdpnqjWcW1O9xv5v3kHcQ8bYl1o3tB6Qx4HjG3C2D5E6F7G8',
+        );
+      } else {
+        fcmToken = await _messaging.getToken();
+      }
       if (fcmToken != null) {
         await _saveTokenToFirestore(fcmToken);
       }
 
       // Listen for token refresh
       _messaging.onTokenRefresh.listen((token) {
-        fcmToken = token;
         _saveTokenToFirestore(token);
       });
 
-      // Handle background messages
-      fcm.FirebaseMessaging.onBackgroundMessage(
-        _firebaseMessagingBackgroundHandler,
-      );
+      // Handle background messages (mobile only)
+      if (!kIsWeb) {
+        fcm.FirebaseMessaging.onBackgroundMessage(
+          _firebaseMessagingBackgroundHandler,
+        );
+      }
 
       // Handle foreground messages
       fcm.FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
 
-      // Handle notification taps
-      fcm.FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
+      // Handle notification taps (mobile only)
+      if (!kIsWeb) {
+        fcm.FirebaseMessaging.onMessageOpenedApp
+            .listen(_handleNotificationTap);
+      }
 
       // Load user settings
       await _loadNotificationSettings();
