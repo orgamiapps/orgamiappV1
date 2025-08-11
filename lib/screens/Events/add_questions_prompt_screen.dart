@@ -12,6 +12,8 @@ class AddQuestionsPromptScreen extends StatefulWidget {
   final double radios;
   final List<String> selectedSignInMethods;
   final String? manualCode;
+  final String? preselectedOrganizationId;
+  final bool forceOrganizationEvent;
 
   const AddQuestionsPromptScreen({
     super.key,
@@ -21,6 +23,8 @@ class AddQuestionsPromptScreen extends StatefulWidget {
     required this.radios,
     required this.selectedSignInMethods,
     this.manualCode,
+    this.preselectedOrganizationId,
+    this.forceOrganizationEvent = false,
   });
 
   @override
@@ -262,6 +266,8 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
                     'radios': widget.radios,
                     'selectedSignInMethods': widget.selectedSignInMethods,
                     'manualCode': widget.manualCode,
+                    'preselectedOrganizationId': widget.preselectedOrganizationId,
+                    'forceOrganizationEvent': widget.forceOrganizationEvent,
                   },
                 ),
               );
@@ -285,6 +291,8 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
                   radios: widget.radios,
                   selectedSignInMethods: widget.selectedSignInMethods,
                   manualCode: widget.manualCode,
+                  preselectedOrganizationId: widget.preselectedOrganizationId,
+                  forceOrganizationEvent: widget.forceOrganizationEvent,
                 ),
               );
             },

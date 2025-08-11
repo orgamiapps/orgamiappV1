@@ -28,6 +28,8 @@ class CreateEventScreen extends StatefulWidget {
   final List<String>? selectedSignInMethods;
   final String? manualCode;
   final List<EventQuestionModel>? questions;
+  final String? preselectedOrganizationId;
+  final bool forceOrganizationEvent;
 
   const CreateEventScreen({
     super.key,
@@ -38,6 +40,8 @@ class CreateEventScreen extends StatefulWidget {
     this.selectedSignInMethods,
     this.manualCode,
     this.questions,
+    this.preselectedOrganizationId,
+    this.forceOrganizationEvent = false,
   });
 
   @override
@@ -148,6 +152,16 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
   void _handleSubmit() async {
     if (_formKey.currentState!.validate()) {
+      if (widget.forceOrganizationEvent && (_selectedOrganizationId == null || _selectedOrganizationId!.isEmpty)) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select an organization for this event.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
       _btnCtlr.start();
       if (_selectedImagePath != null) {
         // Upload local image
@@ -275,6 +289,9 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
     // Load user's organizations (lightweight)
     _loadUserOrganizations();
+
+    // Preselect organization if provided
+    _selectedOrganizationId = widget.preselectedOrganizationId;
 
     // Initialize animations
     _fadeController = AnimationController(
@@ -687,14 +704,17 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            children: const [
-              Icon(Icons.apartment, color: Color(0xFF667EEA), size: 20),
-              SizedBox(width: 8),
-              Text('Organization (optional)',
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A1A1A))),
+            children: [
+              const Icon(Icons.apartment, color: Color(0xFF667EEA), size: 20),
+              const SizedBox(width: 8),
+              Text(
+                widget.forceOrganizationEvent ? 'Organization (required)' : 'Organization (optional)',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1A1A1A),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
