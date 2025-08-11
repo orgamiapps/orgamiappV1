@@ -8,6 +8,9 @@ import 'package:orgami/screens/Organizations/role_permissions_screen.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
+import 'package:orgami/models/customer_model.dart';
+import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
+import 'package:orgami/controller/customer_controller.dart';
 
 class OrganizationProfileScreen extends StatelessWidget {
   final String organizationId;
@@ -367,31 +370,306 @@ class _OrgMembersTab extends StatelessWidget {
                   .doc(userId)
                   .get(),
               builder: (context, userSnap) {
-                final userData = userSnap.data?.data() as Map<String, dynamic>?;
-                final String displayName = (userData?['name'] ?? userId)
-                    .toString();
-                final String username = (userData?['username'] ?? '')
-                    .toString();
-                final String photoUrl = (userData?['profilePictureUrl'] ?? '')
-                    .toString();
-                final bool hasPhoto = photoUrl.isNotEmpty;
+                if (userSnap.connectionState == ConnectionState.waiting) {
+                  return const _MemberCardSkeleton();
+                }
 
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundImage: hasPhoto ? NetworkImage(photoUrl) : null,
-                    child: hasPhoto ? null : const Icon(Icons.person),
-                  ),
-                  title: Text(displayName),
-                  subtitle: username.isNotEmpty
-                      ? Text('@$username')
-                      : Text(role),
-                  trailing: username.isNotEmpty ? Text(role) : null,
+                final Map<String, dynamic>? userData =
+                    userSnap.data?.data() as Map<String, dynamic>?;
+                if (userData == null) {
+                  // In case user record is missing, show a graceful placeholder
+                  return const _MemberCard(
+                    name: 'Member',
+                    username: '',
+                    photoUrl: '',
+                    role: 'Member',
+                  );
+                }
+
+                final String displayName = (userData['name'] ?? 'Member')
+                    .toString();
+                final String username = (userData['username'] ?? '').toString();
+                final String photoUrl = (userData['profilePictureUrl'] ?? '')
+                    .toString();
+
+                return _MemberCard(
+                  name: displayName,
+                  username: username,
+                  photoUrl: photoUrl,
+                  role: role,
+                  userId: userId,
                 );
               },
             );
           },
         );
       },
+    );
+  }
+}
+
+class _MemberCard extends StatelessWidget {
+  final String name;
+  final String username;
+  final String photoUrl;
+  final String role;
+  final String? userId;
+  const _MemberCard({
+    required this.name,
+    required this.username,
+    required this.photoUrl,
+    required this.role,
+    this.userId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bool hasPhoto = photoUrl.isNotEmpty;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF64748B).withAlpha((0.1 * 255).round()),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        splashColor: const Color(0x33667EEA),
+        highlightColor: const Color(0x11667EEA),
+        onTap: userId == null
+            ? null
+            : () async {
+                try {
+                  final doc = await FirebaseFirestore.instance
+                      .collection('Customers')
+                      .doc(userId)
+                      .get();
+                  final Map<String, dynamic>? d = doc.data();
+                  if (d == null) return;
+                  // Parse createdAt robustly (mirrors model's factory logic)
+                  DateTime parsedCreatedAt = DateTime.now();
+                  final rawCreatedAt = d['createdAt'];
+                  if (rawCreatedAt is Timestamp) {
+                    parsedCreatedAt = rawCreatedAt.toDate();
+                  } else if (rawCreatedAt is DateTime) {
+                    parsedCreatedAt = rawCreatedAt;
+                  } else if (rawCreatedAt is String) {
+                    parsedCreatedAt =
+                        DateTime.tryParse(rawCreatedAt) ?? DateTime.now();
+                  }
+
+                  final user = CustomerModel(
+                    uid: (d['uid'] ?? userId).toString(),
+                    name: (d['name'] ?? '').toString(),
+                    email: (d['email'] ?? '').toString(),
+                    username: (d['username'] as String?),
+                    profilePictureUrl: (d['profilePictureUrl'] as String?),
+                    bio: (d['bio'] as String?),
+                    phoneNumber: (d['phoneNumber'] as String?),
+                    age: (d['age'] as int?),
+                    gender: (d['gender'] as String?),
+                    location: (d['location'] as String?),
+                    occupation: (d['occupation'] as String?),
+                    company: (d['company'] as String?),
+                    website: (d['website'] as String?),
+                    socialMediaLinks: (d['socialMediaLinks'] as String?),
+                    isDiscoverable: (d['isDiscoverable'] as bool?) ?? true,
+                    favorites: List<String>.from(d['favorites'] ?? const []),
+                    createdAt: parsedCreatedAt,
+                  );
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => UserProfileScreen(
+                        user: user,
+                        isOwnProfile:
+                            user.uid == CustomerController.logeInCustomer?.uid,
+                      ),
+                    ),
+                  );
+                } catch (_) {}
+              },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Hero(
+                tag: 'user_avatar_${userId ?? name}',
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(
+                      0xFF667EEA,
+                    ).withAlpha((0.1 * 255).round()),
+                  ),
+                  child: hasPhoto
+                      ? ClipOval(
+                          child: Image.network(
+                            photoUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Center(
+                              child: Text(
+                                name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                                style: const TextStyle(
+                                  color: Color(0xFF667EEA),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 20,
+                                  fontFamily: 'Roboto',
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                      : Center(
+                          child: Text(
+                            name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                            style: const TextStyle(
+                              color: Color(0xFF667EEA),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 20,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1E293B),
+                        fontFamily: 'Roboto',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (username.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '@$username',
+                        style: const TextStyle(
+                          color: Color(0xFF667EEA),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: 'Roboto',
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: role == 'Admin'
+                      ? const Color(0xFFEEF2FF)
+                      : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  role,
+                  style: TextStyle(
+                    color: role == 'Admin'
+                        ? const Color(0xFF667EEA)
+                        : const Color(0xFF64748B),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MemberCardSkeleton extends StatelessWidget {
+  const _MemberCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF64748B).withAlpha((0.1 * 255).round()),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.grey.shade300,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  height: 14,
+                  width: 160,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  height: 12,
+                  width: 120,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            width: 60,
+            height: 20,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
