@@ -31,6 +31,27 @@
 
   <title>orgami</title>
   <link rel="manifest" href="manifest.json">
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+  <script>
+    // Initialize Firebase for web (used by FCM on web)
+    const firebaseConfig = {
+      apiKey: 'AIzaSyAgxBhWgtmRA_cc-JcuMP8fXl7NjZIthOI',
+      appId: '1:951311475019:web:d65cfc2cbe6e987c89c8ce',
+      messagingSenderId: '951311475019',
+      projectId: 'orgami-66nxok',
+      authDomain: 'orgami-66nxok.firebaseapp.com',
+      storageBucket: 'orgami-66nxok.appspot.com',
+    };
+    if (typeof firebase !== 'undefined' && firebase.apps?.length === 0) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('firebase-messaging-sw.js');
+      });
+    }
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>

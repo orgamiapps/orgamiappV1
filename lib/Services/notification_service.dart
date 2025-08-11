@@ -19,6 +19,18 @@ class NotificationService {
           );
 
       await _notifications.initialize(initializationSettings);
+
+      // Create Android notification channel (Android 8+)
+      const AndroidNotificationChannel channel = AndroidNotificationChannel(
+        'orgami_channel',
+        'Orgami Notifications',
+        description: 'Notifications for Orgami app',
+        importance: Importance.high,
+      );
+      await _notifications
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(channel);
     } catch (e) {
       if (kDebugMode) {
         debugPrint('Error initializing notification service: $e');
