@@ -1250,6 +1250,7 @@ class _OrgSettingsTab extends StatelessWidget {
                 alignment: Alignment.centerRight,
                 child: ElevatedButton.icon(
                   onPressed: () async {
+                    final nav = Navigator.of(ctx);
                     final updates = <String, dynamic>{};
                     if (nameCtlr.text.trim().isNotEmpty) {
                       updates['name'] = nameCtlr.text.trim();
@@ -1272,7 +1273,7 @@ class _OrgSettingsTab extends StatelessWidget {
                           .doc(orgId)
                           .set(updates, SetOptions(merge: true));
                     }
-                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (nav.mounted) nav.pop();
                   },
                   icon: const Icon(Icons.save),
                   label: const Text('Save'),
