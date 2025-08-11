@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/screens/Events/single_event_screen.dart';
+import 'package:orgami/screens/Events/select_event_type_screen.dart';
 
 class HomeHubScreen extends StatefulWidget {
   const HomeHubScreen({super.key});
@@ -80,6 +81,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      floatingActionButton: _tabIndex == 1 ? _buildCreateFab() : null,
       body: SafeArea(
         child: Column(
           children: [
@@ -94,6 +96,42 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCreateFab() {
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+        ),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF667EEA).withOpacity(0.3),
+            spreadRadius: 2,
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(28),
+          onTap: () {
+            RouterClass.nextScreenNormal(
+              context,
+              const SelectEventTypeScreen(),
+            );
+          },
+          child: const Icon(Icons.add, color: Colors.white, size: 28),
         ),
       ),
     );
