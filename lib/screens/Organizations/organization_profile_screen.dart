@@ -39,19 +39,6 @@ class OrganizationProfileScreen extends StatelessWidget {
     } catch (_) {}
   }
 
-  void _openAdminTools(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => SafeArea(
-        child: SizedBox(
-          height: MediaQuery.of(ctx).size.height * 0.85,
-          child: _OrgSettingsTab(orgId: organizationId),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -90,7 +77,10 @@ class OrganizationProfileScreen extends StatelessWidget {
                     return IconButton(
                       tooltip: 'Admin tools',
                       icon: const Icon(Icons.settings),
-                      onPressed: () => _openAdminTools(context),
+                      onPressed: () => showOrgManagementModalForOrganization(
+                        context,
+                        organizationId,
+                      ),
                     );
                   },
                 );
@@ -445,6 +435,7 @@ class _MemberCard extends StatelessWidget {
         onTap: userId == null
             ? null
             : () async {
+                final navigator = Navigator.of(context);
                 try {
                   final doc = await FirebaseFirestore.instance
                       .collection('Customers')
@@ -483,7 +474,7 @@ class _MemberCard extends StatelessWidget {
                     favorites: List<String>.from(d['favorites'] ?? const []),
                     createdAt: parsedCreatedAt,
                   );
-                  Navigator.of(context).push(
+                  navigator.push(
                     MaterialPageRoute(
                       builder: (_) => UserProfileScreen(
                         user: user,
@@ -1321,4 +1312,20 @@ class _OrgSettingsTab extends StatelessWidget {
       }
     } catch (_) {}
   }
+}
+
+void showOrgManagementModalForOrganization(
+  BuildContext context,
+  String organizationId,
+) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    builder: (ctx) => SafeArea(
+      child: SizedBox(
+        height: MediaQuery.of(ctx).size.height * 0.85,
+        child: _OrgSettingsTab(orgId: organizationId),
+      ),
+    ),
+  );
 }
