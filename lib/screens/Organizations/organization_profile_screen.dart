@@ -5,31 +5,90 @@ import 'package:orgami/firebase/organization_helper.dart';
 import 'package:orgami/firebase/firebase_storage_helper.dart';
 import 'package:orgami/screens/Organizations/join_requests_screen.dart';
 import 'package:orgami/screens/Organizations/role_permissions_screen.dart';
+import 'package:share_plus/share_plus.dart';
 
 class OrganizationProfileScreen extends StatelessWidget {
   final String organizationId;
   const OrganizationProfileScreen({super.key, required this.organizationId});
 
+  Future<void> _shareOrganization(BuildContext context) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('Organizations')
+          .doc(organizationId)
+          .get();
+      final data = doc.data() as Map<String, dynamic>?;
+      final name = (data?['name'] ?? 'Organization').toString();
+      final category = (data?['category'] ?? 'Other').toString();
+      final desc = (data?['description'] ?? '').toString();
+      final buffer = StringBuffer()
+        ..writeln('Check out "$name" on Orgami')
+        ..writeln('Category: $category');
+      if (desc.trim().isNotEmpty) buffer.writeln(desc.trim());
+      buffer
+        ..writeln()
+        ..writeln('Open the app and search for this organization or use this ID: $organizationId');
+      await Share.share(buffer.toString(), subject: name);
+    } catch (_) {}
+  }
+
+  void _openAdminTools(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.of(ctx).size.height * 0.85,
+          child: _OrgSettingsTab(orgId: organizationId),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           leading: const BackButton(),
-          title: StreamBuilder<DocumentSnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('Organizations')
-                .doc(organizationId)
-                .snapshots(),
-            builder: (context, snapshot) {
-              final data = snapshot.data?.data() as Map<String, dynamic>?;
-              final name = data?['name']?.toString();
-              return Text(
-                (name != null && name.isNotEmpty) ? name : 'Organization',
-              );
-            },
-          ),
+          actions: [
+            IconButton(
+              tooltip: 'Share',
+              icon: const Icon(Icons.share_outlined),
+              onPressed: () => _shareOrganization(context),
+            ),
+            Builder(
+              builder: (context) {
+                final uid = FirebaseAuth.instance.currentUser?.uid;
+                if (uid == null) return const SizedBox.shrink();
+                final memberStream = FirebaseFirestore.instance
+                    .collection('Organizations')
+                    .doc(organizationId)
+                    .collection('Members')
+                    .doc(uid)
+                    .snapshots();
+                return StreamBuilder<DocumentSnapshot>(
+                  stream: memberStream,
+                  builder: (context, snap) {
+                    final data = snap.data?.data() as Map<String, dynamic>?;
+                    final role = (data?['role'] ?? '').toString();
+                    final List<dynamic> perms =
+                        (data?['permissions'] as List<dynamic>?) ?? const [];
+                    final bool canManage = role == 'Admin' ||
+                        perms.contains('ManageMembersRoles') ||
+                        perms.contains('ApproveJoinRequests');
+                    if (!canManage) return const SizedBox.shrink();
+                    return IconButton(
+                      tooltip: 'Admin tools',
+                      icon: const Icon(Icons.settings),
+                      onPressed: () => _openAdminTools(context),
+                    );
+                  },
+                );
+              },
+            ),
+          ],
         ),
         body: Column(
           children: [
@@ -39,7 +98,6 @@ class OrganizationProfileScreen extends StatelessWidget {
                 Tab(text: 'Events'),
                 Tab(text: 'Members'),
                 Tab(text: 'About'),
-                Tab(text: 'Settings'),
               ],
             ),
             Expanded(
@@ -48,7 +106,6 @@ class OrganizationProfileScreen extends StatelessWidget {
                   _OrgEventsTab(orgId: organizationId),
                   _OrgMembersTab(orgId: organizationId),
                   _OrgAboutTab(orgId: organizationId),
-                  _OrgSettingsTab(orgId: organizationId),
                 ],
               ),
             ),
