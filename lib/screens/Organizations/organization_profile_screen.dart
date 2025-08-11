@@ -52,6 +52,93 @@ class OrganizationProfileScreen extends StatelessWidget {
     );
   }
 
+  // Build a floating action button similar to the Manage Event button
+  Widget _buildManageFab(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return const SizedBox.shrink();
+    final memberStream = FirebaseFirestore.instance
+        .collection('Organizations')
+        .doc(organizationId)
+        .collection('Members')
+        .doc(uid)
+        .snapshots();
+
+    const Color primaryBlue = Color(0xFF667EEA);
+    const Color primaryPurple = Color(0xFF764BA2);
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: memberStream,
+      builder: (context, snap) {
+        final data = snap.data?.data() as Map<String, dynamic>?;
+        final role = (data?['role'] ?? '').toString();
+        final List<dynamic> perms =
+            (data?['permissions'] as List<dynamic>?) ?? const [];
+        final bool canManage =
+            role == 'Admin' ||
+            perms.contains('ManageMembersRoles') ||
+            perms.contains('ApproveJoinRequests');
+
+        if (!canManage) return const SizedBox.shrink();
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 24),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [primaryBlue, primaryPurple],
+            ),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: primaryBlue.withOpacity(0.4),
+                blurRadius: 15,
+                offset: const Offset(0, 6),
+              ),
+              BoxShadow(
+                color: primaryPurple.withOpacity(0.3),
+                blurRadius: 25,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: FloatingActionButton.extended(
+            onPressed: () => _openAdminTools(context),
+            backgroundColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            extendedPadding: const EdgeInsets.symmetric(horizontal: 24),
+            icon: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(
+                Icons.dashboard_outlined,
+                size: 18,
+                color: Colors.white,
+              ),
+            ),
+            label: const Text(
+              'Manage Organization',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Roboto',
+                fontSize: 16,
+                letterSpacing: 0.2,
+              ),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -65,39 +152,9 @@ class OrganizationProfileScreen extends StatelessWidget {
               icon: const Icon(Icons.share_outlined),
               onPressed: () => _shareOrganization(context),
             ),
-            Builder(
-              builder: (context) {
-                final uid = FirebaseAuth.instance.currentUser?.uid;
-                if (uid == null) return const SizedBox.shrink();
-                final memberStream = FirebaseFirestore.instance
-                    .collection('Organizations')
-                    .doc(organizationId)
-                    .collection('Members')
-                    .doc(uid)
-                    .snapshots();
-                return StreamBuilder<DocumentSnapshot>(
-                  stream: memberStream,
-                  builder: (context, snap) {
-                    final data = snap.data?.data() as Map<String, dynamic>?;
-                    final role = (data?['role'] ?? '').toString();
-                    final List<dynamic> perms =
-                        (data?['permissions'] as List<dynamic>?) ?? const [];
-                    final bool canManage =
-                        role == 'Admin' ||
-                        perms.contains('ManageMembersRoles') ||
-                        perms.contains('ApproveJoinRequests');
-                    if (!canManage) return const SizedBox.shrink();
-                    return IconButton(
-                      tooltip: 'Admin tools',
-                      icon: const Icon(Icons.settings),
-                      onPressed: () => _openAdminTools(context),
-                    );
-                  },
-                );
-              },
-            ),
           ],
         ),
+        floatingActionButton: _buildManageFab(context),
         body: Column(
           children: [
             _OrgHeader(orgId: organizationId),
