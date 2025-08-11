@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:orgami/Screens/Home/home_screen.dart' as legacy;
 import 'package:orgami/firebase/organization_helper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:orgami/Utils/router.dart';
+import 'package:orgami/models/event_model.dart';
+import 'package:orgami/screens/Events/single_event_screen.dart';
 
 class HomeHubScreen extends StatefulWidget {
   const HomeHubScreen({super.key});
@@ -11,7 +14,7 @@ class HomeHubScreen extends StatefulWidget {
 }
 
 class _HomeHubScreenState extends State<HomeHubScreen> {
-  int _tabIndex = 0; // 0: Public, 1: Orgs
+  int _tabIndex = 0; // 0: Public, 1: Org Events
   final TextEditingController _searchCtlr = TextEditingController();
   bool _searching = false;
   List<Map<String, String>> _myOrgs = [];
@@ -134,7 +137,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
       child: Row(
         children: [
           _segButton('Public', 0, primary, Icons.public),
-          _segButton('Orgs', 1, primary, Icons.apartment),
+          _segButton('Org Events', 1, primary, Icons.event),
         ],
       ),
     );
@@ -174,80 +177,122 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   Widget _buildOrgsTab() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('My Organizations', style: TextStyle(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 8),
-                _myOrgs.isEmpty
-                    ? Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: _cardDeco(),
-                        child: const Text('You have not joined any organizations yet'),
-                      )
-                    : SizedBox(
-                        height: 110,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _myOrgs.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 12),
-                          itemBuilder: (context, i) {
-                            final org = _myOrgs[i];
-                            return _pill(org['name'] ?? '', icon: Icons.apartment);
-                          },
-                        ),
-                      ),
-                const SizedBox(height: 16),
-                const Text('Discover Organizations', style: TextStyle(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 8),
-                _buildCategoryChips(),
-                const SizedBox(height: 8),
-              ],
-            ),
-          ),
-          SliverList.separated(
-            itemCount: _discoverOrgs.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, i) {
-              final o = _discoverOrgs[i];
-              return Container(
-                decoration: _cardDeco(),
-                child: ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.apartment)),
-                  title: Text(o['name']?.toString() ?? ''),
-                  subtitle: Text(o['category']?.toString() ?? 'Other'),
-                ),
-              );
-            },
-          )
-        ],
-      ),
+      child: _orgEventsList(),
     );
   }
 
-  Widget _buildCategoryChips() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: _categoryOptions.map((opt) {
-          final selected = (_selectedCategoryLower ?? '') == (opt['value'] ?? '');
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: Text(opt['label'] ?? ''),
-              selected: selected,
-              onSelected: (_) {
-                setState(() {
-                  _selectedCategoryLower = (opt['value'] ?? '').isEmpty ? null : opt['value'];
-                });
-                _discover();
-              },
+  Widget _orgEventsList() {
+    if (_myOrgs.isEmpty) {
+      return Center(
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: _cardDeco(),
+          child: const Text('Join an organization to see its events here'),
+        ),
+      );
+    }
+
+    final List<String> orgIds = _myOrgs.map((o) => o['id']!).toList();
+
+    // Firestore whereIn supports up to 10 items; split into chunks and merge streams.
+    List<List<String>> chunks = [];
+    for (var i = 0; i < orgIds.length; i += 10) {
+      chunks.add(orgIds.sublist(i, i + 10 > orgIds.length ? orgIds.length : i + 10));
+    }
+
+    return StreamBuilder<List<QuerySnapshot<Map<String, dynamic>>>>(
+      stream: Stream.fromFutures(chunks.map((chunk) => FirebaseFirestore.instance
+              .collection('Events')
+              .where('organizationId', whereIn: chunk)
+              .orderBy('selectedDateTime', descending: false)
+              .snapshots()
+              .first)) ,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Center(
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: _cardDeco(),
+              child: const Text('No upcoming org events'),
             ),
           );
-        }).toList(),
+        }
+
+        // Merge docs, map to simple list with sort
+        final docs = snapshot.data!
+            .expand((qs) => qs.docs)
+            .toList()
+            ..sort((a, b) {
+              final ad = (a.data()['selectedDateTime'] as Timestamp?)?.toDate() ?? DateTime(2100);
+              final bd = (b.data()['selectedDateTime'] as Timestamp?)?.toDate() ?? DateTime(2100);
+              return ad.compareTo(bd);
+            });
+
+        return ListView.separated(
+          itemCount: docs.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (context, i) {
+            final data = docs[i].data();
+            final model = _eventFromMap(docs[i].id, data);
+            return _eventTile(model);
+          },
+        );
+      },
+    );
+  }
+
+  Map<String, dynamic> _safe(Map<String, dynamic>? input) => input ?? {};
+
+  dynamic _getOrDefault(Map<String, dynamic> map, String key, dynamic fallback) {
+    return map.containsKey(key) ? map[key] : fallback;
+  }
+
+  EventModel _eventFromMap(String id, Map<String, dynamic>? raw) {
+    final map = _safe(raw);
+    return EventModel(
+      id: id,
+      groupName: _getOrDefault(map, 'groupName', ''),
+      title: _getOrDefault(map, 'title', ''),
+      description: _getOrDefault(map, 'description', ''),
+      location: _getOrDefault(map, 'location', ''),
+      customerUid: _getOrDefault(map, 'customerUid', ''),
+      imageUrl: _getOrDefault(map, 'imageUrl', ''),
+      selectedDateTime: (_getOrDefault(map, 'selectedDateTime', null) as Timestamp?)?.toDate() ?? DateTime.now(),
+      eventGenerateTime: (_getOrDefault(map, 'eventGenerateTime', null) as Timestamp?)?.toDate() ?? DateTime.now(),
+      status: _getOrDefault(map, 'status', ''),
+      getLocation: _getOrDefault(map, 'getLocation', true) == true,
+      radius: (_getOrDefault(map, 'radius', 0) as num).toDouble(),
+      longitude: (_getOrDefault(map, 'longitude', 0) as num).toDouble(),
+      latitude: (_getOrDefault(map, 'latitude', 0) as num).toDouble(),
+      private: _getOrDefault(map, 'private', false) == true,
+      categories: List<String>.from(_getOrDefault(map, 'categories', const [])),
+      eventDuration: _getOrDefault(map, 'eventDuration', 2),
+      signInMethods: List<String>.from(_getOrDefault(map, 'signInMethods', const ['qr_code', 'manual_code'])),
+      manualCode: map['manualCode'],
+      organizationId: map['organizationId'],
+      accessList: List<String>.from(_getOrDefault(map, 'accessList', const [])),
+    );
+  }
+
+  Widget _eventTile(EventModel model) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: _cardDeco(),
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text(model.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(model.location),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () {
+          // Reuse legacy event item navigation
+          // For simplicity, we navigate to the single event screen if available through Router
+          // The SingleEventListViewItem handles this normally; here we keep it minimal.
+          // You can replace this with the actual SingleEventListViewItem for richer UI.
+          RouterClass.nextScreenNormal(context, SingleEventScreen(eventModel: model));
+        },
       ),
     );
   }

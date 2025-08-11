@@ -4,7 +4,10 @@ import 'package:orgami/screens/Events/chose_sign_in_methods_screen.dart';
 import 'package:orgami/Utils/router.dart';
 
 class ChoseDateTimeScreen extends StatefulWidget {
-  const ChoseDateTimeScreen({super.key});
+  const ChoseDateTimeScreen({super.key, this.preselectedOrganizationId, this.forceOrganizationEvent = false});
+
+  final String? preselectedOrganizationId;
+  final bool forceOrganizationEvent;
 
   @override
   State<ChoseDateTimeScreen> createState() => _ChoseDateTimeScreenState();
@@ -491,6 +494,8 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
               ChoseSignInMethodsScreen(
                 selectedDateTime: startDateTime,
                 eventDurationHours: durationHours,
+                preselectedOrganizationId: widget.preselectedOrganizationId,
+                forceOrganizationEvent: widget.forceOrganizationEvent,
               ),
             );
           },

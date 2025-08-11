@@ -1743,7 +1743,11 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
           selectedSignInMethods:
               widget.eventCreationData!['selectedSignInMethods'],
           manualCode: widget.eventCreationData!['manualCode'],
-          questions: questionsList, // Pass the questions to CreateEventScreen
+          questions: questionsList,
+          preselectedOrganizationId:
+              widget.eventCreationData!['preselectedOrganizationId'],
+          forceOrganizationEvent:
+              widget.eventCreationData!['forceOrganizationEvent'] == true,
         ),
       );
     }
