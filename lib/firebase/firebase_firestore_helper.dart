@@ -2534,4 +2534,57 @@ class FirebaseFirestoreHelper {
       return [];
     }
   }
+
+  // ====== Private Event Access Request Workflow ======
+  Future<void> requestEventAccess({
+    required String eventId,
+    String? message,
+  }) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    await _firestore
+        .collection(EventModel.firebaseKey)
+        .doc(eventId)
+        .collection('AccessRequests')
+        .doc(uid)
+        .set({
+          'userId': uid,
+          'message': message ?? '',
+          'status': 'pending',
+          'createdAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+  }
+
+  Future<void> approveEventAccess({
+    required String eventId,
+    required String userId,
+  }) async {
+    final eventRef = _firestore.collection(EventModel.firebaseKey).doc(eventId);
+    await eventRef
+        .update({
+          'accessList': FieldValue.arrayUnion([userId]),
+        })
+        .catchError((_) {});
+
+    await eventRef.collection('AccessRequests').doc(userId).set({
+      'status': 'approved',
+      'reviewedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> declineEventAccess({
+    required String eventId,
+    required String userId,
+    String? reason,
+  }) async {
+    final eventRef = _firestore.collection(EventModel.firebaseKey).doc(eventId);
+    await eventRef.collection('AccessRequests').doc(userId).set({
+      'status': 'declined',
+      'reason': reason ?? '',
+      'reviewedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  // ====== End Private Event Access Request Workflow ======
 }

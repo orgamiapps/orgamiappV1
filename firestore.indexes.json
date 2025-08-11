@@ -106,6 +106,14 @@
         { "fieldPath": "receiverId", "order": "ASCENDING" },
         { "fieldPath": "isRead", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "Organizations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "category_lowercase", "order": "ASCENDING" },
+        { "fieldPath": "name_lowercase", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

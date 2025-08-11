@@ -46,6 +46,7 @@ import 'package:orgami/Screens/Events/edit_event_screen.dart';
 import 'package:orgami/Screens/Events/event_location_view_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:orgami/Screens/Events/Widget/access_list_management_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:orgami/Screens/MyProfile/badge_screen.dart';
 
@@ -72,6 +73,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   bool _justSignedIn =
       false; // Flag to prevent showing sign-in dialog immediately after sign-in
   int _selectedTabIndex = 0;
+  bool get _canManageEvent => eventModel.hasManagementPermissions(
+    FirebaseAuth.instance.currentUser?.uid ?? '',
+  );
 
   // _isLoading removed - no longer needed after removing manual code input
 
@@ -1620,6 +1624,59 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                             ),
                           ],
                         ),
+                        const SizedBox(height: 24),
+                        if (eventModel.private)
+                          _buildManagementSection(
+                            icon: Icons.lock,
+                            title: 'Private Access',
+                            color: const Color(0xFF8B5CF6),
+                            children: [
+                              _buildManagementOption(
+                                icon: Icons.person_add,
+                                title: 'Invite & Access List',
+                                subtitle: 'Add or remove people who can view',
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  showModalBottomSheet(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    builder: (_) => DraggableScrollableSheet(
+                                      initialChildSize: 0.85,
+                                      minChildSize: 0.5,
+                                      maxChildSize: 0.95,
+                                      expand: false,
+                                      builder: (_, __) =>
+                                          AccessListManagementWidget(
+                                            eventModel: eventModel,
+                                          ),
+                                    ),
+                                  ).then((_) => _showEventManagementModal());
+                                },
+                              ),
+                              _buildManagementOption(
+                                icon: Icons.person_search,
+                                title: 'Review Access Requests',
+                                subtitle: 'Approve or decline pending requests',
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  showModalBottomSheet(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    builder: (_) => DraggableScrollableSheet(
+                                      initialChildSize: 0.85,
+                                      minChildSize: 0.5,
+                                      maxChildSize: 0.95,
+                                      expand: false,
+                                      builder: (_, __) => _AccessRequestsList(
+                                        eventId: eventModel.id,
+                                      ),
+                                    ),
+                                  ).then((_) => _showEventManagementModal());
+                                },
+                              ),
+                            ],
+                          ),
+                        const SizedBox(height: 24),
                       ],
                     ),
                   ),
@@ -3192,6 +3249,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _buildPrivateAccessNotice(),
         Text(
           displayText,
           style: TextStyle(
@@ -4791,6 +4849,58 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       },
     );
   }
+
+  Widget _buildPrivateAccessNotice() {
+    final String uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final bool hasAccess =
+        !eventModel.private ||
+        eventModel.customerUid == uid ||
+        eventModel.coHosts.contains(uid) ||
+        eventModel.accessList.contains(uid);
+
+    if (hasAccess) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFF59E0B)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'This is a private event',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF92400E),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Request access from the host to view full details.',
+            style: TextStyle(color: Color(0xFF92400E)),
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.lock_open),
+            label: const Text('Request Access'),
+            onPressed: () async {
+              await FirebaseFirestoreHelper().requestEventAccess(
+                eventId: eventModel.id,
+              );
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Access request sent')),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Enhanced custom painter for drawing more realistic continent shapes on the globe
@@ -5087,5 +5197,71 @@ class ContinentPainter extends CustomPainter {
   @override
   bool shouldRepaint(ContinentPainter oldDelegate) {
     return oldDelegate.animationValue != animationValue;
+  }
+}
+
+class _AccessRequestsList extends StatelessWidget {
+  final String eventId;
+  const _AccessRequestsList({required this.eventId});
+
+  @override
+  Widget build(BuildContext context) {
+    final col = FirebaseFirestore.instance
+        .collection(EventModel.firebaseKey)
+        .doc(eventId)
+        .collection('AccessRequests')
+        .orderBy('createdAt', descending: true);
+
+    return Material(
+      child: SafeArea(
+        child: StreamBuilder<QuerySnapshot>(
+          stream: col.snapshots(),
+          builder: (context, snap) {
+            if (!snap.hasData)
+              return const Center(child: CircularProgressIndicator());
+            final docs = snap.data!.docs;
+            if (docs.isEmpty)
+              return const Center(child: Text('No pending requests'));
+            return ListView.separated(
+              itemCount: docs.length,
+              separatorBuilder: (_, __) => const Divider(height: 0),
+              itemBuilder: (context, i) {
+                final data = docs[i].data() as Map<String, dynamic>;
+                final userId = (data['userId'] ?? '').toString();
+                final status = (data['status'] ?? 'pending').toString();
+                return ListTile(
+                  leading: const CircleAvatar(child: Icon(Icons.person)),
+                  title: Text(userId),
+                  subtitle: Text('Status: $status'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.check, color: Colors.green),
+                        onPressed: () async {
+                          await FirebaseFirestoreHelper().approveEventAccess(
+                            eventId: eventId,
+                            userId: userId,
+                          );
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.red),
+                        onPressed: () async {
+                          await FirebaseFirestoreHelper().declineEventAccess(
+                            eventId: eventId,
+                            userId: userId,
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      ),
+    );
   }
 }

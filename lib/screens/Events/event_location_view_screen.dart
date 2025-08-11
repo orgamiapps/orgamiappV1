@@ -226,9 +226,9 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
           zoomControlsEnabled: false,
           mapToolbarEnabled: false,
           onMapCreated: _onMapCreated,
-          initialCameraPosition: CameraPosition(
-            target: widget.eventModel.getLatLng(),
-            zoom: 15.0,
+          initialCameraPosition: const CameraPosition(
+            target: LatLng(0, 0),
+            zoom: 1.3,
           ),
           markers: markers,
           circles: circles,
@@ -241,6 +241,49 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
           right: 20,
           child: Column(
             children: [
+              // Zoom to event button
+              Container(
+                width: 48,
+                height: 48,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      spreadRadius: 0,
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      final lat = widget.eventModel.latitude;
+                      final lng = widget.eventModel.longitude;
+                      if (lat == 0 || lng == 0) {
+                        ShowToast().showSnackBar('Location not set', context);
+                        return;
+                      }
+                      final latLng = widget.eventModel.getLatLng();
+                      mapController.animateCamera(
+                        CameraUpdate.newCameraPosition(
+                          CameraPosition(target: latLng, zoom: 16),
+                        ),
+                      );
+                    },
+                    child: const Icon(
+                      Icons.zoom_in_map,
+                      color: Color(0xFF667EEA),
+                      size: 24,
+                    ),
+                  ),
+                ),
+              ),
               // Zoom in button
               Container(
                 width: 48,
@@ -305,6 +348,74 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
                 ),
               ),
             ],
+          ),
+        ),
+        // Map controls
+        Positioned(
+          bottom: 20,
+          left: 20,
+          right: 20,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  spreadRadius: 0,
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Open in Maps
+                GestureDetector(
+                  onTap: _openInMaps,
+                  child: Row(
+                    children: [
+                      const Icon(Icons.map, color: Color(0xFF667EEA), size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Open in Maps',
+                        style: const TextStyle(
+                          color: Color(0xFF667EEA),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Share
+                GestureDetector(
+                  onTap: _shareLocation,
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.share,
+                        color: Color(0xFF667EEA),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Share',
+                        style: const TextStyle(
+                          color: Color(0xFF667EEA),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -561,6 +672,12 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
 
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
+    // Start with a globe view; do not auto-zoom to event
+    mapController.moveCamera(
+      CameraUpdate.newCameraPosition(
+        const CameraPosition(target: LatLng(0, 0), zoom: 1.3),
+      ),
+    );
   }
 
   /// Gets the address from latitude and longitude coordinates using reverse geocoding

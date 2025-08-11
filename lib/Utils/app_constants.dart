@@ -19,6 +19,16 @@ class AppConstants {
   static const String googlePlacesApiKey =
       'AIzaSyAf1t5cToh1UoF7R52vTSJxMajw8CvmVUA';
 
+  // Firebase Dynamic Links configuration
+  // Update these if your domain/package names differ
+  static const String dynamicLinksDomain = 'https://orgamiapp.page.link';
+  static const String androidPackageName = 'com.stormdeve.orgami';
+  static const String iosBundleId = 'com.stormdeve.orgami';
+
+  static Uri buildInviteUri(String eventId) {
+    return Uri.parse('https://orgami.app/invite?eventId=$eventId');
+  }
+
   static String getMilesSliderLabel(double value) {
     switch (value.round()) {
       case 0:
