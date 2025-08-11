@@ -5,31 +5,95 @@ import 'package:orgami/firebase/organization_helper.dart';
 import 'package:orgami/firebase/firebase_storage_helper.dart';
 import 'package:orgami/screens/Organizations/join_requests_screen.dart';
 import 'package:orgami/screens/Organizations/role_permissions_screen.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart';
 
 class OrganizationProfileScreen extends StatelessWidget {
   final String organizationId;
   const OrganizationProfileScreen({super.key, required this.organizationId});
 
+  Future<void> _shareOrganization(BuildContext context) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('Organizations')
+          .doc(organizationId)
+          .get();
+      final Map<String, dynamic>? data = doc.data();
+      final name = (data?['name'] ?? 'Organization').toString();
+      final category = (data?['category'] ?? 'Other').toString();
+      final desc = (data?['description'] ?? '').toString();
+      final buffer = StringBuffer()
+        ..writeln('Check out "$name" on Orgami')
+        ..writeln('Category: $category');
+      if (desc.trim().isNotEmpty) buffer.writeln(desc.trim());
+      buffer
+        ..writeln()
+        ..writeln(
+          'Open the app and search for this organization or use this ID: $organizationId',
+        );
+      await Share.share(buffer.toString(), subject: name);
+    } catch (_) {}
+  }
+
+  void _openAdminTools(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.of(ctx).size.height * 0.85,
+          child: _OrgSettingsTab(orgId: organizationId),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           leading: const BackButton(),
-          title: StreamBuilder<DocumentSnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('Organizations')
-                .doc(organizationId)
-                .snapshots(),
-            builder: (context, snapshot) {
-              final data = snapshot.data?.data() as Map<String, dynamic>?;
-              final name = data?['name']?.toString();
-              return Text(
-                (name != null && name.isNotEmpty) ? name : 'Organization',
-              );
-            },
-          ),
+          actions: [
+            IconButton(
+              tooltip: 'Share',
+              icon: const Icon(Icons.share_outlined),
+              onPressed: () => _shareOrganization(context),
+            ),
+            Builder(
+              builder: (context) {
+                final uid = FirebaseAuth.instance.currentUser?.uid;
+                if (uid == null) return const SizedBox.shrink();
+                final memberStream = FirebaseFirestore.instance
+                    .collection('Organizations')
+                    .doc(organizationId)
+                    .collection('Members')
+                    .doc(uid)
+                    .snapshots();
+                return StreamBuilder<DocumentSnapshot>(
+                  stream: memberStream,
+                  builder: (context, snap) {
+                    final data = snap.data?.data() as Map<String, dynamic>?;
+                    final role = (data?['role'] ?? '').toString();
+                    final List<dynamic> perms =
+                        (data?['permissions'] as List<dynamic>?) ?? const [];
+                    final bool canManage =
+                        role == 'Admin' ||
+                        perms.contains('ManageMembersRoles') ||
+                        perms.contains('ApproveJoinRequests');
+                    if (!canManage) return const SizedBox.shrink();
+                    return IconButton(
+                      tooltip: 'Admin tools',
+                      icon: const Icon(Icons.settings),
+                      onPressed: () => _openAdminTools(context),
+                    );
+                  },
+                );
+              },
+            ),
+          ],
         ),
         body: Column(
           children: [
@@ -39,7 +103,6 @@ class OrganizationProfileScreen extends StatelessWidget {
                 Tab(text: 'Events'),
                 Tab(text: 'Members'),
                 Tab(text: 'About'),
-                Tab(text: 'Settings'),
               ],
             ),
             Expanded(
@@ -48,7 +111,6 @@ class OrganizationProfileScreen extends StatelessWidget {
                   _OrgEventsTab(orgId: organizationId),
                   _OrgMembersTab(orgId: organizationId),
                   _OrgAboutTab(orgId: organizationId),
-                  _OrgSettingsTab(orgId: organizationId),
                 ],
               ),
             ),
@@ -340,9 +402,27 @@ class _OrgAboutTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final orgDoc = FirebaseFirestore.instance
+    final DocumentReference orgDoc = FirebaseFirestore.instance
         .collection('Organizations')
         .doc(orgId);
+
+    final Stream<int> membersCountStream = FirebaseFirestore.instance
+        .collection('Organizations')
+        .doc(orgId)
+        .collection('Members')
+        .snapshots()
+        .map((s) => s.docs.length);
+
+    final Query upcomingEventsQuery = FirebaseFirestore.instance
+        .collection('Events')
+        .where('organizationId', isEqualTo: orgId)
+        .where(
+          'selectedDateTime',
+          isGreaterThan: Timestamp.fromDate(DateTime.now()),
+        )
+        .orderBy('selectedDateTime')
+        .limit(3);
+
     return FutureBuilder<DocumentSnapshot>(
       future: orgDoc.get(),
       builder: (context, snapshot) {
@@ -352,24 +432,405 @@ class _OrgAboutTab extends StatelessWidget {
         if (!snapshot.hasData || !snapshot.data!.exists) {
           return const Center(child: Text('Organization not found'));
         }
-        final data = snapshot.data!.data() as Map<String, dynamic>;
-        return Padding(
+
+        final Map<String, dynamic> data =
+            snapshot.data!.data() as Map<String, dynamic>;
+
+        final String name = (data['name'] ?? '').toString();
+        final String description = (data['description'] ?? '').toString();
+        final String category = (data['category'] ?? 'Other').toString();
+        final String website = (data['website'] ?? '').toString();
+        final String email = (data['email'] ?? '').toString();
+        final String phone = (data['phone'] ?? '').toString();
+        final String address = (data['address'] ?? '').toString();
+        final String instagram = (data['instagram'] ?? '').toString();
+        final String twitter = (data['twitter'] ?? '').toString();
+        final String facebook = (data['facebook'] ?? '').toString();
+        final String linkedin = (data['linkedin'] ?? '').toString();
+
+        return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                data['name'] ?? '',
-                style: Theme.of(context).textTheme.titleLarge,
+              // About text card
+              _SectionCard(
+                title: 'About',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (name.isNotEmpty)
+                      Text(name, style: Theme.of(context).textTheme.titleLarge),
+                    if (description.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        description,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(height: 1.4),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-              const SizedBox(height: 8),
-              Text(data['description'] ?? ''),
-              const SizedBox(height: 16),
-              Text('Category: ${data['category'] ?? 'Other'}'),
+
+              const SizedBox(height: 12),
+
+              // Quick facts chips
+              _SectionCard(
+                title: 'At a glance',
+                child: StreamBuilder<int>(
+                  stream: membersCountStream,
+                  builder: (context, membersSnap) {
+                    final int membersCount = membersSnap.data ?? 0;
+                    return Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _InfoPill(
+                          icon: Icons.category,
+                          label: 'Category',
+                          value: category,
+                        ),
+                        _InfoPill(
+                          icon: Icons.people,
+                          label: 'Members',
+                          value: membersCount.toString(),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Contact and social links
+              if ([
+                website,
+                email,
+                phone,
+                address,
+                instagram,
+                twitter,
+                facebook,
+                linkedin,
+              ].any((e) => e.trim().isNotEmpty))
+                _SectionCard(
+                  title: 'Connect',
+                  child: Column(
+                    children: [
+                      if (website.isNotEmpty)
+                        _LinkTile(
+                          icon: Icons.language,
+                          label: website,
+                          onTap: () =>
+                              _launchUrl(Uri.parse(_normalizeUrl(website))),
+                        ),
+                      if (email.isNotEmpty)
+                        _LinkTile(
+                          icon: Icons.email_outlined,
+                          label: email,
+                          onTap: () =>
+                              _launchUrl(Uri(scheme: 'mailto', path: email)),
+                        ),
+                      if (phone.isNotEmpty)
+                        _LinkTile(
+                          icon: Icons.phone,
+                          label: phone,
+                          onTap: () =>
+                              _launchUrl(Uri(scheme: 'tel', path: phone)),
+                        ),
+                      if (address.isNotEmpty)
+                        _LinkTile(
+                          icon: Icons.place_outlined,
+                          label: address,
+                          onTap: () => _launchUrl(
+                            Uri.parse(
+                              'https://www.google.com/maps/search/?api=1&query=' +
+                                  Uri.encodeComponent(address),
+                            ),
+                          ),
+                        ),
+                      if (instagram.isNotEmpty)
+                        _LinkTile(
+                          icon: Icons.camera_alt_outlined,
+                          label: 'Instagram',
+                          onTap: () =>
+                              _launchUrl(Uri.parse(_normalizeUrl(instagram))),
+                        ),
+                      if (twitter.isNotEmpty)
+                        _LinkTile(
+                          icon: Icons.alternate_email,
+                          label: 'Twitter/X',
+                          onTap: () =>
+                              _launchUrl(Uri.parse(_normalizeUrl(twitter))),
+                        ),
+                      if (facebook.isNotEmpty)
+                        _LinkTile(
+                          icon: Icons.facebook,
+                          label: 'Facebook',
+                          onTap: () =>
+                              _launchUrl(Uri.parse(_normalizeUrl(facebook))),
+                        ),
+                      if (linkedin.isNotEmpty)
+                        _LinkTile(
+                          icon: Icons.business,
+                          label: 'LinkedIn',
+                          onTap: () =>
+                              _launchUrl(Uri.parse(_normalizeUrl(linkedin))),
+                        ),
+                    ],
+                  ),
+                ),
+
+              const SizedBox(height: 12),
+
+              // Admins preview
+              _SectionCard(
+                title: 'Admins',
+                child: SizedBox(
+                  height: 72,
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('Organizations')
+                        .doc(orgId)
+                        .collection('Members')
+                        .where('role', isEqualTo: 'Admin')
+                        .limit(10)
+                        .snapshots(),
+                    builder: (context, snap) {
+                      final docs = snap.data?.docs ?? const [];
+                      if (docs.isEmpty) {
+                        return const Center(
+                          child: Text('No admins listed yet'),
+                        );
+                      }
+                      return ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: docs.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 12),
+                        itemBuilder: (context, i) {
+                          final Map<String, dynamic> m =
+                              docs[i].data() as Map<String, dynamic>;
+                          final String userId = (m['userId'] ?? '').toString();
+                          return FutureBuilder<DocumentSnapshot>(
+                            future: FirebaseFirestore.instance
+                                .collection('Customers')
+                                .doc(userId)
+                                .get(),
+                            builder: (context, userSnap) {
+                              final Map<String, dynamic>? u =
+                                  userSnap.data?.data()
+                                      as Map<String, dynamic>?;
+                              final String name = (u?['name'] ?? 'Admin')
+                                  .toString();
+                              final String photo =
+                                  (u?['profilePictureUrl'] ?? '').toString();
+                              return _AdminChip(name: name, photoUrl: photo);
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Upcoming events preview
+              _SectionCard(
+                title: 'Upcoming events',
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: upcomingEventsQuery.snapshots(),
+                  builder: (context, snap) {
+                    if (snap.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: LinearProgressIndicator(),
+                      );
+                    }
+                    final events = snap.data?.docs ?? const [];
+                    if (events.isEmpty) {
+                      return const Text('No upcoming events');
+                    }
+                    return Column(
+                      children: events.map((d) {
+                        final Map<String, dynamic> e =
+                            d.data() as Map<String, dynamic>;
+                        final String title = (e['title'] ?? '').toString();
+                        final String location = (e['location'] ?? '')
+                            .toString();
+                        final Timestamp ts =
+                            (e['selectedDateTime'] ?? Timestamp.now())
+                                as Timestamp;
+                        final DateTime date = ts.toDate();
+                        final String when = DateFormat(
+                          'EEE, MMM d • h:mm a',
+                        ).format(date);
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(
+                            Icons.event,
+                            color: Color(0xFF667EEA),
+                          ),
+                          title: Text(
+                            title,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Text(
+                            [
+                              when,
+                              if (location.isNotEmpty) location,
+                            ].join(' • '),
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  },
+                ),
+              ),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+String _normalizeUrl(String value) {
+  final String v = value.trim();
+  if (v.isEmpty) return v;
+  if (v.startsWith('http://') || v.startsWith('https://')) return v;
+  return 'https://$v';
+}
+
+Future<void> _launchUrl(Uri uri) async {
+  try {
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      // ignore: avoid_print
+      print('Could not launch: $uri');
+    }
+  } catch (_) {}
+}
+
+class _SectionCard extends StatelessWidget {
+  final String title;
+  final Widget child;
+  const _SectionCard({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _InfoPill({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: const Color(0xFF667EEA)),
+          const SizedBox(width: 6),
+          Text(
+            '$label: $value',
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LinkTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  const _LinkTile({required this.icon, required this.label, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: const Color(0xFF667EEA)),
+      title: Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
+      trailing: const Icon(Icons.open_in_new, size: 18),
+      onTap: onTap,
+    );
+  }
+}
+
+class _AdminChip extends StatelessWidget {
+  final String name;
+  final String photoUrl;
+  const _AdminChip({required this.name, required this.photoUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    final bool hasPhoto = photoUrl.isNotEmpty;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        CircleAvatar(
+          radius: 22,
+          backgroundImage: hasPhoto ? NetworkImage(photoUrl) : null,
+          child: hasPhoto ? null : const Icon(Icons.person),
+        ),
+        const SizedBox(height: 6),
+        SizedBox(
+          width: 80,
+          child: Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12),
+          ),
+        ),
+      ],
     );
   }
 }
