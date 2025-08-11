@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/firebase/organization_helper.dart';
 import 'package:orgami/screens/Organizations/organization_profile_screen.dart';
+import 'package:orgami/screens/Organizations/create_organization_screen.dart';
 
 class OrganizationsScreen extends StatefulWidget {
   const OrganizationsScreen({super.key});
@@ -74,10 +75,26 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
     if (mounted) setState(() => _discoverOrgs = list);
   }
 
+  Future<void> _goToCreate() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const CreateOrganizationScreen()),
+    );
+    _initStreams();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Organizations')),
+      appBar: AppBar(
+        title: const Text('Organizations'),
+        actions: [
+          IconButton(
+            tooltip: 'Create Organization',
+            icon: const Icon(Icons.add_business),
+            onPressed: _goToCreate,
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -108,13 +125,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                     ),
                     const SizedBox(height: 8),
                     _myOrgs.isEmpty
-                        ? Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: _cardDeco(),
-                            child: const Text(
-                              'You have not joined any organizations yet',
-                            ),
-                          )
+                        ? _EmptyStateCard(onCreate: _goToCreate)
                         : SizedBox(
                             height: 110,
                             child: ListView.separated(
@@ -188,6 +199,11 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
           ),
         ),
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _goToCreate,
+        icon: const Icon(Icons.add),
+        label: const Text('Create Organization'),
+      ),
     );
   }
 
@@ -239,6 +255,43 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
         children: [
           if (icon != null) ...[Icon(icon, size: 16), const SizedBox(width: 6)],
           Text(text),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyStateCard extends StatelessWidget {
+  final VoidCallback onCreate;
+  const _EmptyStateCard({required this.onCreate});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, color: Color(0xFF6B7280)),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text('You have not joined any organizations yet.'),
+          ),
+          const SizedBox(width: 12),
+          FilledButton(
+            onPressed: onCreate,
+            child: const Text('Create'),
+          ),
         ],
       ),
     );
