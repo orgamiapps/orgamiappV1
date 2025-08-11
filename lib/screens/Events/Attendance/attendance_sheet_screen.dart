@@ -13,10 +13,8 @@ import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:orgami/Utils/dimensions.dart';
-import 'package:orgami/Utils/logger.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xcel;
-import 'package:excel/excel.dart' as excel;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -1548,57 +1546,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
     ShowToast().showNormalToast(msg: '$name added to attendance.');
   }
 
-  Future<void> exportToExcel(List<List<String>> data) async {
-    final excelDoc = excel.Excel.createExcel();
-    excel.Sheet sheetObject = excelDoc['Sheet1'];
-
-    excel.CellStyle cellStyle = excel.CellStyle(
-      backgroundColorHex: excel.ExcelColor.black,
-      fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
-    );
-
-    cellStyle.underline = excel.Underline.Single;
-
-    var cell = sheetObject.cell(excel.CellIndex.indexByString('A1'));
-    cell.value = null;
-    cell.value = excel.TextCellValue('Some Text');
-    cell.value = excel.IntCellValue(8);
-    cell.value = excel.BoolCellValue(true);
-    cell.value = excel.DoubleCellValue(13.37);
-    cell.value = excel.DateCellValue(year: 2023, month: 4, day: 20);
-    cell.value = excel.TimeCellValue(
-      hour: 20,
-      minute: 15,
-      second: 5,
-      millisecond: 0,
-    );
-    cell.value = excel.DateTimeCellValue(
-      year: 2023,
-      month: 4,
-      day: 20,
-      hour: 15,
-      minute: 1,
-    );
-    cell.cellStyle = cellStyle;
-
-    cell.cellStyle = (cell.cellStyle ?? excel.CellStyle()).copyWith(
-      numberFormat: excel.CustomNumericNumFormat(formatCode: '#,##0.00 \\m\\²'),
-    );
-
-    sheetObject.insertColumn(8);
-    sheetObject.removeColumn(18);
-    sheetObject.insertRow(82);
-    sheetObject.removeRow(80);
-
-    Directory appDocumentsDirectory = await getApplicationDocumentsDirectory();
-    String appDocumentsPath = appDocumentsDirectory.path;
-    String filePath = '$appDocumentsPath/example.xlsx';
-
-    excelDoc.save(fileName: eventModel.title);
-
-    ProcessResult result = await Process.run('open', [filePath]);
-    Logger.debug('Excel file opened: ${result.stdout}');
-  }
+  // Removed deprecated excel export example that depended on the 'excel' package.
 
   /// Checks if any attendees have dwell time data
   bool _hasDwellTimeData() {

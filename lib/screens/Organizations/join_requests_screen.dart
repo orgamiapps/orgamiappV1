@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:orgami/firebase/organization_helper.dart';
+import 'package:orgami/firebase/firebase_firestore_helper.dart';
+import 'package:orgami/models/customer_model.dart';
+import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
 
 class JoinRequestsScreen extends StatefulWidget {
   final String organizationId;
@@ -13,6 +16,7 @@ class _JoinRequestsScreenState extends State<JoinRequestsScreen> {
   final OrganizationHelper _helper = OrganizationHelper();
   bool _loading = true;
   List<Map<String, dynamic>> _requests = [];
+  Map<String, CustomerModel> _userById = {};
 
   @override
   void initState() {
@@ -22,8 +26,24 @@ class _JoinRequestsScreenState extends State<JoinRequestsScreen> {
 
   Future<void> _load() async {
     final items = await _helper.getJoinRequests(widget.organizationId);
+    // Fetch user profiles for requester IDs
+    final List<String> userIds = items
+        .map((r) => (r['userId'] ?? '').toString())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+
+    Map<String, CustomerModel> userMap = {};
+    if (userIds.isNotEmpty) {
+      final users = await FirebaseFirestoreHelper().getUsersByIds(userIds: userIds);
+      for (final u in users) {
+        userMap[u.uid] = u;
+      }
+    }
+
     if (mounted) setState(() {
       _requests = items;
+      _userById = userMap;
       _loading = false;
     });
   }
@@ -43,10 +63,36 @@ class _JoinRequestsScreenState extends State<JoinRequestsScreen> {
                     final r = _requests[i];
                     final userId = (r['userId'] ?? '').toString();
                     final status = (r['status'] ?? 'pending').toString();
+                    final user = _userById[userId];
+                    final title = user?.name ?? userId;
+                    final subtitle = user?.username != null && user!.username!.isNotEmpty
+                        ? 'Status: $status  ·  @${user.username}'
+                        : 'Status: $status';
+
                     return ListTile(
-                      leading: const CircleAvatar(child: Icon(Icons.person)),
-                      title: Text(userId),
-                      subtitle: Text('Status: $status'),
+                      leading: CircleAvatar(
+                        child: user?.profilePictureUrl == null
+                            ? const Icon(Icons.person)
+                            : null,
+                        backgroundImage: user?.profilePictureUrl != null
+                            ? NetworkImage(user!.profilePictureUrl!)
+                            : null,
+                      ),
+                      title: Text(title),
+                      subtitle: Text(subtitle),
+                      onTap: user != null
+                          ? () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => UserProfileScreen(
+                                    user: user,
+                                    isOwnProfile: false,
+                                  ),
+                                ),
+                              );
+                            }
+                          : null,
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [

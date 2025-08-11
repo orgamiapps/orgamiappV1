@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
@@ -32,7 +33,7 @@ class _SearchScreenState extends State<SearchScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     // Keep the search bar hint and UI in sync when swiping between tabs
     _tabController.addListener(() {
       if (mounted) setState(() {});
@@ -75,6 +76,7 @@ class _SearchScreenState extends State<SearchScreen>
                 controller: _tabController,
                 children: [
                   EventsList(searchQuery: _searchQuery),
+                  OrgEventsList(searchQuery: _searchQuery),
                   UsersList(searchQuery: _searchQuery),
                 ],
               ),
@@ -106,7 +108,7 @@ class _SearchScreenState extends State<SearchScreen>
         ),
       ),
       title: const Text(
-        'Search & Discover',
+        'Search',
         style: TextStyle(
           color: Color(0xFF1E293B),
           fontSize: 20,
@@ -155,9 +157,9 @@ class _SearchScreenState extends State<SearchScreen>
                 horizontal: 16,
               ),
               border: InputBorder.none,
-              hintText: _tabController.index == 0
-                  ? 'Find events by name, location, or category...'
-                  : 'Find users by name or username...',
+              hintText: _tabController.index == 2
+                  ? 'Find users by name or username...'
+                  : 'Find events by name, location, or category...',
               hintStyle: const TextStyle(
                 color: Color(0xFF64748B),
                 fontSize: 15,
@@ -238,7 +240,8 @@ class _SearchScreenState extends State<SearchScreen>
             fontFamily: 'Roboto',
           ),
           tabs: const [
-            Tab(text: 'Events'),
+            Tab(text: 'Public'),
+            Tab(text: 'Org Events'),
             Tab(text: 'Users'),
           ],
         ),
@@ -253,6 +256,246 @@ class EventsList extends StatefulWidget {
 
   @override
   State<EventsList> createState() => _EventsListState();
+}
+
+class OrgEventsList extends StatefulWidget {
+  final String searchQuery;
+  const OrgEventsList({super.key, required this.searchQuery});
+
+  @override
+  State<OrgEventsList> createState() => _OrgEventsListState();
+}
+
+class _OrgEventsListState extends State<OrgEventsList>
+    with AutomaticKeepAliveClientMixin {
+  List<EventModel> _allEvents = [];
+  List<EventModel> _filteredEvents = [];
+  bool _isLoading = false;
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOrgEvents();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant OrgEventsList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.searchQuery != widget.searchQuery) {
+      _filterEvents();
+    }
+  }
+
+  void _filterEvents() {
+    if (!mounted) return;
+    setState(() {
+      if (widget.searchQuery.isEmpty) {
+        _filteredEvents = List.from(_allEvents);
+      } else {
+        final searchLower = widget.searchQuery.toLowerCase();
+        _filteredEvents = _allEvents.where((event) {
+          return event.title.toLowerCase().contains(searchLower) ||
+              event.description.toLowerCase().contains(searchLower) ||
+              event.location.toLowerCase().contains(searchLower) ||
+              event.categories.any(
+                (category) => category.toLowerCase().contains(searchLower),
+              );
+        }).toList();
+      }
+    });
+  }
+
+  Future<void> _loadOrgEvents() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) {
+        if (mounted) {
+          setState(() {
+            _allEvents = [];
+            _filteredEvents = [];
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
+      // Fetch organization IDs where user is an approved member
+      final memberSnaps = await FirebaseFirestore.instance
+          .collectionGroup('Members')
+          .where('userId', isEqualTo: uid)
+          .where('status', isEqualTo: 'approved')
+          .limit(100)
+          .get();
+
+      final Set<String> orgIds = {
+        for (final d in memberSnaps.docs)
+          (d.data()['organizationId']?.toString() ?? ''),
+      }..removeWhere((e) => e.isEmpty);
+
+      List<EventModel> events = [];
+
+      // Query events created by these orgs (via organizationId field)
+      if (orgIds.isNotEmpty) {
+        final List<String> ids = orgIds.toList();
+        for (int i = 0; i < ids.length; i += 10) {
+          final chunk = ids.sublist(
+            i,
+            i + 10 > ids.length ? ids.length : i + 10,
+          );
+          final qs = await FirebaseFirestore.instance
+              .collection(EventModel.firebaseKey)
+              .where('organizationId', whereIn: chunk)
+              .where(
+                'selectedDateTime',
+                isGreaterThan: DateTime.now().subtract(
+                  const Duration(hours: 3),
+                ),
+              )
+              .orderBy('selectedDateTime')
+              .limit(50)
+              .get();
+          final chunkEvents = qs.docs.map((doc) {
+            final Map<String, dynamic> data = doc.data();
+            data['id'] = data['id'] ?? doc.id;
+            return EventModel.fromJson(data);
+          }).toList();
+          events.addAll(chunkEvents);
+        }
+      }
+
+      // Also include events where the user is the creator/admin
+      final createdQs = await FirebaseFirestore.instance
+          .collection(EventModel.firebaseKey)
+          .where('customerUid', isEqualTo: uid)
+          .where(
+            'selectedDateTime',
+            isGreaterThan: DateTime.now().subtract(const Duration(hours: 3)),
+          )
+          .orderBy('selectedDateTime')
+          .limit(50)
+          .get();
+      events.addAll(
+        createdQs.docs.map((doc) {
+          final Map<String, dynamic> data = doc.data();
+          data['id'] = data['id'] ?? doc.id;
+          return EventModel.fromJson(data);
+        }),
+      );
+
+      // De-duplicate by id
+      final Map<String, EventModel> idToEvent = {
+        for (final e in events) e.id: e,
+      };
+      final List<EventModel> unique = idToEvent.values.toList();
+
+      unique.sort((a, b) {
+        if (a.isFeatured && !b.isFeatured) return -1;
+        if (!a.isFeatured && b.isFeatured) return 1;
+        return a.selectedDateTime.compareTo(b.selectedDateTime);
+      });
+
+      if (mounted) {
+        setState(() {
+          _allEvents = unique;
+          _filteredEvents = List.from(_allEvents);
+          _isLoading = false;
+        });
+        _filterEvents();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _refresh() async {
+    await _loadOrgEvents();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+
+    if (_isLoading && _allEvents.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF667EEA)),
+      );
+    }
+
+    if (_filteredEvents.isEmpty && !_isLoading) {
+      return _buildEmptyState();
+    }
+
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      color: const Color(0xFF667EEA),
+      child: ListView.builder(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        itemCount: _filteredEvents.length,
+        itemBuilder: (context, index) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: SingleEventListViewItem(
+              eventModel: _filteredEvents[index],
+              onTap: () {},
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            SizedBox(height: 100),
+            Icon(Icons.event_busy, size: 60, color: Color(0xFF667EEA)),
+            SizedBox(height: 24),
+            Text(
+              'No Org Events Available',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1E293B),
+                fontFamily: 'Roboto',
+              ),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'Create or join an organization to see its events here',
+              style: TextStyle(
+                fontSize: 15,
+                color: Color(0xFF64748B),
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _EventsListState extends State<EventsList>

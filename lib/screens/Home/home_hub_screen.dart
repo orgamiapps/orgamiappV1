@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:orgami/Screens/Home/home_screen.dart' as legacy;
+import 'package:orgami/screens/Home/search_screen.dart';
+import 'package:orgami/screens/QRScanner/qr_scanner_flow_screen.dart';
 import 'package:orgami/firebase/organization_helper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/screens/Events/single_event_screen.dart';
+import 'package:orgami/screens/Events/select_event_type_screen.dart';
 
 class HomeHubScreen extends StatefulWidget {
   const HomeHubScreen({super.key});
@@ -80,20 +83,119 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      floatingActionButton: _tabIndex == 1 ? _buildCreateFab() : null,
       body: SafeArea(
         child: Column(
           children: [
+            _buildSimpleHeader(),
+            const SizedBox(height: 12),
             _buildSegmentedTabs(),
             const SizedBox(height: 12),
             Expanded(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 250),
                 child: _tabIndex == 0
-                    ? const legacy.HomeScreen()
+                    ? const legacy.HomeScreen(showHeader: false)
                     : _buildOrgsTab(),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCreateFab() {
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+        ),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF667EEA).withOpacity(0.3),
+            spreadRadius: 2,
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(28),
+          onTap: () {
+            RouterClass.nextScreenNormal(
+              context,
+              const SelectEventTypeScreen(),
+            );
+          },
+          child: const Icon(Icons.add, color: Colors.white, size: 28),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSimpleHeader() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Text(
+              'Discover',
+              style: TextStyle(
+                color: Color(0xFF1E293B),
+                fontWeight: FontWeight.w700,
+                fontSize: 22,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
+          _roundIconButton(
+            icon: Icons.qr_code_scanner,
+            onTap: () {
+              RouterClass.nextScreenNormal(
+                context,
+                const QRScannerFlowScreen(),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+          _roundIconButton(
+            icon: Icons.search,
+            onTap: () {
+              RouterClass.nextScreenNormal(context, const SearchScreen());
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _roundIconButton({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Icon(icon, color: const Color(0xFF1E293B), size: 20),
         ),
       ),
     );
