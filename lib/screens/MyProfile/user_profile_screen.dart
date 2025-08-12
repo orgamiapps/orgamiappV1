@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/models/event_model.dart';
@@ -249,7 +250,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
-                  Icons.share_outlined,
+                  CupertinoIcons.share,
                   color: AppThemeColor.pureWhiteColor,
                   size: 20,
                 ),
