@@ -161,6 +161,12 @@ service cloud.firestore {
       }
     }
     
+    // Collection group access for membership documents across organizations
+    // Needed for collectionGroup('Members') queries such as loading a user's organizations
+    match /{path=**}/Members/{memberId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+    
     // Allow event hosts and co-hosts to read/write their event analytics
     match /event_analytics/{eventId} {
       allow read, write: if request.auth != null && 
