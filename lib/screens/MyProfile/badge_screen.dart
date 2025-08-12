@@ -555,7 +555,7 @@ class _BadgeScreenState extends State<BadgeScreen>
         Expanded(
           child: ElevatedButton.icon(
             onPressed: _shareBadge,
-            icon: const Icon(Icons.share),
+            icon: const Icon(Icons.share_outlined),
             label: const Text('Share Badge'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryColor,
