@@ -340,10 +340,19 @@ class _OrgEventsListState extends State<OrgEventsList>
           .limit(100)
           .get();
 
-      final Set<String> orgIds = {
-        for (final d in memberSnaps.docs)
-          (d.data()['organizationId']?.toString() ?? ''),
-      }..removeWhere((e) => e.isEmpty);
+      // Resolve organization IDs robustly: prefer field, fall back to parent path (legacy docs)
+      final Set<String> orgIds = <String>{};
+      for (final d in memberSnaps.docs) {
+        final data = d.data();
+        final String? fromField = data['organizationId']?.toString();
+        final String? fromPath = d.reference.parent.parent?.id;
+        final String? resolved = (fromField != null && fromField.isNotEmpty)
+            ? fromField
+            : fromPath;
+        if (resolved != null && resolved.isNotEmpty) {
+          orgIds.add(resolved);
+        }
+      }
 
       List<EventModel> events = [];
 
