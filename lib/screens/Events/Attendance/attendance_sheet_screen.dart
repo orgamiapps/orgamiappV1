@@ -109,7 +109,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
           .setText(DateFormat('MMM dd, yyyy').format(item.attendanceDateTime));
       sheet
           .getRangeByIndex(i + 2, 4)
-          .setText(DateFormat('KK:mm a').format(item.attendanceDateTime));
+          .setText(DateFormat('h:mm a').format(item.attendanceDateTime));
       for (var element in item.answers) {
         String title = element.split('--ans--').first;
         String answer = element.split('--ans--').last;
@@ -155,7 +155,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
           .setText(DateFormat('MMM dd, yyyy').format(item.attendanceDateTime));
       sheet
           .getRangeByIndex(i + 2, 4)
-          .setText(DateFormat('KK:mm a').format(item.attendanceDateTime));
+          .setText(DateFormat('h:mm a').format(item.attendanceDateTime));
     }
 
     final List<int> bytes = workbook.saveAsStream();
@@ -745,7 +745,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Registered on ${DateFormat('MMM dd, yyyy').format(attendee.attendanceDateTime)} at ${DateFormat('KK:mm a').format(attendee.attendanceDateTime)}',
+                                  'Registered on ${DateFormat('MMM dd, yyyy').format(attendee.attendanceDateTime)} at ${DateFormat('h:mm a').format(attendee.attendanceDateTime)}',
                                   style: const TextStyle(
                                     color: AppThemeColor.dullFontColor,
                                     fontSize: 14,
@@ -1087,7 +1087,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
-                                      '${DateFormat('MMM dd, yyyy').format(attendee.attendanceDateTime)} at ${DateFormat('KK:mm a').format(attendee.attendanceDateTime)}',
+                                      '${DateFormat('MMM dd, yyyy').format(attendee.attendanceDateTime)} at ${DateFormat('h:mm a').format(attendee.attendanceDateTime)}',
                                       style: const TextStyle(
                                         color: AppThemeColor.dullFontColor,
                                         fontSize: 14,

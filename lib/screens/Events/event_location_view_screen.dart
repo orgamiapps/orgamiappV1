@@ -572,7 +572,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
                   const SizedBox(height: 2),
                   Text(
                     DateFormat(
-                      'EEEE, MMMM dd, yyyy • KK:mm a',
+                      'EEEE, MMMM dd, yyyy • h:mm a',
                     ).format(widget.eventModel.selectedDateTime),
                     style: const TextStyle(
                       color: Color(0xFF1A1A1A),
@@ -795,7 +795,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
           'Check out this event: $eventTitle\n'
           'Location: $location\n'
           'Date: ${DateFormat('EEEE, MMMM dd, yyyy').format(widget.eventModel.selectedDateTime)}\n'
-          'Time: ${DateFormat('KK:mm a').format(widget.eventModel.selectedDateTime)} – ${DateFormat('KK:mm a').format(widget.eventModel.eventEndTime)}\n'
+          'Time: ${DateFormat('h:mm a').format(widget.eventModel.selectedDateTime)} – ${DateFormat('h:mm a').format(widget.eventModel.eventEndTime)}\n'
           'Maps: https://www.google.com/maps/search/?api=1&query=$lat,$lng';
 
       // Use the existing share functionality

@@ -4,7 +4,11 @@ import 'package:orgami/screens/Events/chose_sign_in_methods_screen.dart';
 import 'package:orgami/Utils/router.dart';
 
 class ChoseDateTimeScreen extends StatefulWidget {
-  const ChoseDateTimeScreen({super.key, this.preselectedOrganizationId, this.forceOrganizationEvent = false});
+  const ChoseDateTimeScreen({
+    super.key,
+    this.preselectedOrganizationId,
+    this.forceOrganizationEvent = false,
+  });
 
   final String? preselectedOrganizationId;
   final bool forceOrganizationEvent;
@@ -288,7 +292,7 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
               icon: Icons.play_circle_fill_rounded,
               title: startTime != null ? 'Start Time' : 'Choose Start Time',
               subtitle: startTime != null
-                  ? DateFormat('KK:mm a').format(
+                  ? DateFormat('h:mm a').format(
                       DateTime(
                         selectedDate?.year ?? DateTime.now().year,
                         selectedDate?.month ?? DateTime.now().month,
@@ -307,7 +311,7 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
               icon: Icons.stop_circle_rounded,
               title: endTime != null ? 'End Time' : 'Choose End Time',
               subtitle: endTime != null
-                  ? DateFormat('KK:mm a').format(
+                  ? DateFormat('h:mm a').format(
                       DateTime(
                         selectedDate?.year ?? DateTime.now().year,
                         selectedDate?.month ?? DateTime.now().month,

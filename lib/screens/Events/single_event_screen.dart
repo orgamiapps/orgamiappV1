@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:orgami/models/customer_model.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
@@ -73,9 +74,6 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   bool _justSignedIn =
       false; // Flag to prevent showing sign-in dialog immediately after sign-in
   int _selectedTabIndex = 0;
-  bool get _canManageEvent => eventModel.hasManagementPermissions(
-    FirebaseAuth.instance.currentUser?.uid ?? '',
-  );
 
   // _isLoading removed - no longer needed after removing manual code input
 
@@ -115,6 +113,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   // Address lookup state (kept for background resolution if needed)
   String? _resolvedAddress;
   String? _creatorName;
+  String? _creatorUsername;
+  CustomerModel? _creatorUser;
 
   // Modern color palette
   static const Color _primaryBlue = Color(0xFF667EEA);
@@ -1210,7 +1210,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       );
       if (users.isNotEmpty && mounted) {
         setState(() {
+          _creatorUser = users.first;
           _creatorName = users.first.name;
+          _creatorUsername = users.first.username;
         });
       }
     } catch (e) {
@@ -1998,8 +2000,8 @@ ${eventModel.title}
 
  ${eventModel.description}
 
- 📅 ${DateFormat('EEEE, MMMM d, y').format(eventModel.selectedDateTime)}
- ⏰ ${DateFormat('KK:mm a').format(eventModel.selectedDateTime)} – ${DateFormat('KK:mm a').format(eventModel.eventEndTime)}
+  📅 ${DateFormat('EEEE, MMMM d, y').format(eventModel.selectedDateTime)}
+  ⏰ ${DateFormat('h:mm a').format(eventModel.selectedDateTime)} – ${DateFormat('h:mm a').format(eventModel.eventEndTime)}
 📍 ${eventModel.location}
 
 Join us at: $eventUrl
@@ -2868,107 +2870,131 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Title and Edit/Delete Buttons (for creators)
+              // Hosted by + Edit row ABOVE the title for better layout
               Row(
                 children: [
-                  Expanded(
-                    child: Text(
-                      eventModel.title,
-                      style: TextStyle(
-                        color: _darkText,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 28,
-                        fontFamily: 'Roboto',
-                        letterSpacing: -0.5,
-                        height: 1.2,
-                      ),
-                    ),
-                  ),
-                  if (_creatorName != null) ...[
-                    const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _backgroundColor,
+                  if (_creatorName != null)
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: _borderColor, width: 1),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.person_outline,
-                            color: _lightText,
-                            size: 16,
+                        mouseCursor: SystemMouseCursors.click,
+                        onTap: () {
+                          if (_creatorUser != null) {
+                            RouterClass.nextScreenNormal(
+                              context,
+                              UserProfileScreen(
+                                user: _creatorUser!,
+                                isOwnProfile:
+                                    CustomerController.logeInCustomer?.uid ==
+                                    _creatorUser!.uid,
+                              ),
+                            );
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Hosted by ${_creatorName!}',
-                            style: TextStyle(
-                              color: _lightText,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                              fontFamily: 'Roboto',
-                            ),
+                          decoration: BoxDecoration(
+                            color: _backgroundColor,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: _borderColor, width: 1),
                           ),
-                        ],
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.person_outline,
+                                color: _lightText,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              RichText(
+                                text: TextSpan(
+                                  style: TextStyle(
+                                    color: _lightText,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                    fontFamily: 'Roboto',
+                                  ),
+                                  children: [
+                                    const TextSpan(text: 'Hosted by '),
+                                    TextSpan(
+                                      text:
+                                          '@${_creatorUsername ?? (_creatorName ?? '')}',
+                                      style: const TextStyle(
+                                        color: _accentBlue,
+                                        decoration: TextDecoration.underline,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                  ],
+                  const Spacer(),
                   if (eventModel.hasManagementPermissions(
                     FirebaseAuth.instance.currentUser!.uid,
                   ))
-                    Row(
-                      children: [
-                        GestureDetector(
-                          onTap: () => RouterClass.nextScreenNormal(
-                            context,
-                            EditEventScreen(eventModel: eventModel),
-                          ),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(
-                                0xFF667EEA,
-                              ).withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFF667EEA),
-                                width: 1,
-                              ),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.edit,
-                                  color: Color(0xFF667EEA),
-                                  size: 16,
-                                ),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Edit',
-                                  style: TextStyle(
-                                    color: Color(0xFF667EEA),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    fontFamily: 'Roboto',
-                                  ),
-                                ),
-                              ],
-                            ),
+                    GestureDetector(
+                      onTap: () => RouterClass.nextScreenNormal(
+                        context,
+                        EditEventScreen(eventModel: eventModel),
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFF667EEA),
+                            width: 1,
                           ),
                         ),
-                        // Delete button moved to EditEventScreen
-                      ],
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.edit,
+                              color: Color(0xFF667EEA),
+                              size: 16,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'Edit',
+                              style: TextStyle(
+                                color: Color(0xFF667EEA),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Roboto',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                 ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                eventModel.title,
+                style: TextStyle(
+                  color: _darkText,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 28,
+                  fontFamily: 'Roboto',
+                  letterSpacing: -0.5,
+                  height: 1.2,
+                ),
               ),
               const SizedBox(height: 8),
               // Event Details
@@ -2984,7 +3010,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                 icon: Icons.access_time_rounded,
                 label: 'Time',
                 value:
-                    '${DateFormat('KK:mm a').format(eventModel.selectedDateTime)} – ${DateFormat('KK:mm a').format(eventModel.eventEndTime)}',
+                    '${DateFormat('h:mm a').format(eventModel.selectedDateTime)} – ${DateFormat('h:mm a').format(eventModel.eventEndTime)}',
               ),
               const SizedBox(height: 20),
               _buildLocationItem(),

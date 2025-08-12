@@ -1005,7 +1005,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                       icon: Icons.calendar_today,
                       label: 'Date & Time',
                       value: DateFormat(
-                        'EEEE, MMMM dd, yyyy\nKK:mm a',
+                        'EEEE, MMMM dd, yyyy\nh:mm a',
                       ).format(ticket.eventDateTime),
                     ),
                     _buildTicketDetailRow(

@@ -516,10 +516,10 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   }
 
   String get _timeRangeLabel {
-    final String start = DateFormat('KK:mm a').format(widget.selectedDateTime);
+    final String start = DateFormat('h:mm a').format(widget.selectedDateTime);
     final DateTime endDt =
         widget.selectedDateTime.add(Duration(hours: widget.eventDurationHours));
-    final String end = DateFormat('KK:mm a').format(endDt);
+    final String end = DateFormat('h:mm a').format(endDt);
     final String duration = '${widget.eventDurationHours}h';
     return '$start – $end ($duration)';
   }

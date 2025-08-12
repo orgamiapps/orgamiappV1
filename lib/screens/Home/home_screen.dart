@@ -13,7 +13,6 @@ import 'package:flutter/foundation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/Screens/Events/chose_date_time_screen.dart';
 import 'package:orgami/Screens/Events/single_event_screen.dart';
 import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
 import 'package:orgami/Utils/router.dart';
@@ -629,15 +628,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         fontFamily: 'Roboto',
                       ),
                     ),
-                    const Text(
-                      'New Events',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 24,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
+                     ShaderMask(
+                       shaderCallback: (Rect bounds) {
+                         return const LinearGradient(
+                           begin: Alignment.topLeft,
+                           end: Alignment.bottomRight,
+                           colors: [
+                             Color(0xFFFFFFFF),
+                             Color(0xFFDEE9FF),
+                           ],
+                         ).createShader(Rect.fromLTWH(0, 0, bounds.width, bounds.height));
+                       },
+                       blendMode: BlendMode.srcIn,
+                       child: const Text(
+                         'Amazing Events',
+                         style: TextStyle(
+                           color: Colors.white,
+                           fontWeight: FontWeight.bold,
+                           fontSize: 26,
+                           fontFamily: 'Roboto',
+                           letterSpacing: 0.3,
+                         ),
+                       ),
+                     ),
                   ],
                 ),
               ),
@@ -2449,7 +2462,7 @@ class _FeaturedEventCardState extends State<_FeaturedEventCard>
                                     ),
                                   ),
                                   child: Text(
-                                    '${DateFormat('MMM dd, KK:mm a').format(widget.event.selectedDateTime)} – ${DateFormat('KK:mm a').format(widget.event.eventEndTime)}',
+                                    '${DateFormat('MMM dd, h:mm a').format(widget.event.selectedDateTime)} – ${DateFormat('h:mm a').format(widget.event.eventEndTime)}',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w600,

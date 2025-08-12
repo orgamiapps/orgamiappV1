@@ -16,6 +16,7 @@ import 'package:orgami/Utils/logger.dart';
 class FirebaseMessagingHelper {
   static final FirebaseMessagingHelper _instance =
       FirebaseMessagingHelper._internal();
+  static bool _backgroundHandlerRegistered = false;
   factory FirebaseMessagingHelper() => _instance;
   FirebaseMessagingHelper._internal();
 
@@ -60,7 +61,8 @@ class FirebaseMessagingHelper {
       if (kIsWeb) {
         // Web requires a VAPID key and service worker
         fcmToken = await _messaging.getToken(
-          vapidKey: 'BCFlVkRk4wUzL3pNaP7bVYqg8uH3M2vYsmYcB5dOSdpnqjWcW1O9xv5v3kHcQ8bYl1o3tB6Qx4HjG3C2D5E6F7G8',
+          vapidKey:
+              'BCFlVkRk4wUzL3pNaP7bVYqg8uH3M2vYsmYcB5dOSdpnqjWcW1O9xv5v3kHcQ8bYl1o3tB6Qx4HjG3C2D5E6F7G8',
         );
       } else {
         fcmToken = await _messaging.getToken();
@@ -75,10 +77,11 @@ class FirebaseMessagingHelper {
       });
 
       // Handle background messages (mobile only)
-      if (!kIsWeb) {
+      if (!kIsWeb && !_backgroundHandlerRegistered) {
         fcm.FirebaseMessaging.onBackgroundMessage(
           _firebaseMessagingBackgroundHandler,
         );
+        _backgroundHandlerRegistered = true;
       }
 
       // Handle foreground messages
@@ -86,8 +89,7 @@ class FirebaseMessagingHelper {
 
       // Handle notification taps (mobile only)
       if (!kIsWeb) {
-        fcm.FirebaseMessaging.onMessageOpenedApp
-            .listen(_handleNotificationTap);
+        fcm.FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
       }
 
       // Load user settings
@@ -128,10 +130,10 @@ class FirebaseMessagingHelper {
     try {
       final user = _auth.currentUser;
       if (user != null) {
-        await _firestore.collection('users').doc(user.uid).update({
+        await _firestore.collection('users').doc(user.uid).set({
           'fcmToken': token,
           'lastTokenUpdate': FieldValue.serverTimestamp(),
-        });
+        }, SetOptions(merge: true));
         if (kDebugMode) {
           Logger.success('✅ FCM token saved to Firestore');
         }
