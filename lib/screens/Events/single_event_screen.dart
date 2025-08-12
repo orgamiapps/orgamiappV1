@@ -2969,38 +2969,6 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                 ],
               ),
               const SizedBox(height: 8),
-              // Organizer
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: _primaryBlue.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _primaryBlue.withValues(alpha: 0.15),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.group_outlined, color: _primaryBlue, size: 16),
-                    const SizedBox(width: 6),
-                    Text(
-                      eventModel.groupName,
-                      style: TextStyle(
-                        color: _primaryBlue,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
               // Event Details
               _buildDetailItem(
                 icon: Icons.calendar_month_rounded,
