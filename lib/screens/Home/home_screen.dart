@@ -2587,7 +2587,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
                 const Icon(Icons.tune, color: Color(0xFF667EEA), size: 24),
                 const SizedBox(width: 12),
                 const Text(
-                  'Filter/Sort Events',
+                  'Filters & Sort',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -2629,6 +2629,53 @@ class _FilterSortModalState extends State<_FilterSortModal> {
                 _buildSortSection(),
                 const SizedBox(height: 24),
               ],
+            ),
+          ),
+          // Footer actions
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+              child: Row(
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      _updateCategories([]);
+                      _updateSortOption(SortOption.none);
+                    },
+                    child: const Text(
+                      'Reset',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF667EEA),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      elevation: 0,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -2792,6 +2839,12 @@ class _FilterSortModalState extends State<_FilterSortModal> {
 
   // Build sort section
   Widget _buildSortSection() {
+    final options = [
+      SortOption.none, // Upcoming
+      SortOption.dateAddedDesc, // Newest
+      SortOption.titleAsc, // A–Z
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2800,7 +2853,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
             Icon(Icons.sort, color: const Color(0xFF667EEA), size: 20),
             const SizedBox(width: 8),
             const Text(
-              'Sort by',
+              'Sort',
               style: TextStyle(
                 color: Color(0xFF1A1A1A),
                 fontWeight: FontWeight.w600,
@@ -2810,27 +2863,41 @@ class _FilterSortModalState extends State<_FilterSortModal> {
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        // Default (Event Date Ascending)
-        _buildSortOptionGroup('Default', [SortOption.none]),
-        const SizedBox(height: 16),
-        // Date Added section
-        _buildSortOptionGroup('Date Added', [
-          SortOption.dateAddedDesc,
-          SortOption.dateAddedAsc,
-        ]),
-        const SizedBox(height: 16),
-        // Title section
-        _buildSortOptionGroup('Title', [
-          SortOption.titleAsc,
-          SortOption.titleDesc,
-        ]),
-        const SizedBox(height: 16),
-        // Event Date section
-        _buildSortOptionGroup('Event Date', [
-          SortOption.eventDateDesc,
-          SortOption.eventDateAsc,
-        ]),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: options.map((o) {
+            final isSelected = _currentSortOption == o;
+            return ChoiceChip(
+              selected: isSelected,
+              onSelected: (_) => _updateSortOption(o),
+              label: Text(
+                _getSortOptionText(o),
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+              avatar: Icon(
+                _getSortOptionIcon(o),
+                size: 18,
+                color: isSelected ? Colors.white : const Color(0xFF667EEA),
+              ),
+              labelPadding: const EdgeInsets.symmetric(horizontal: 8),
+              selectedColor: const Color(0xFF667EEA),
+              backgroundColor: Colors.grey[50],
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: isSelected
+                      ? const Color(0xFF667EEA)
+                      : const Color(0xFFE1E5E9),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
       ],
     );
   }
@@ -2932,17 +2999,17 @@ class _FilterSortModalState extends State<_FilterSortModal> {
   String _getSortOptionText(SortOption option) {
     switch (option) {
       case SortOption.none:
-        return 'Default (Event Date Ascending)';
+        return 'Upcoming';
       case SortOption.dateAddedAsc:
         return 'Date Added (Oldest First)';
       case SortOption.dateAddedDesc:
-        return 'Date Added (Newest First)';
+        return 'Newest';
       case SortOption.titleAsc:
-        return 'Title (A-Z)';
+        return 'A–Z';
       case SortOption.titleDesc:
         return 'Title (Z-A)';
       case SortOption.eventDateAsc:
-        return 'Event Date (Earliest First)';
+        return 'Upcoming';
       case SortOption.eventDateDesc:
         return 'Event Date (Latest First)';
     }
