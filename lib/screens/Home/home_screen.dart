@@ -585,7 +585,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             // Filter Section as Sliver
             SliverToBoxAdapter(child: _filterSection()),
             // Events Content as Sliver
-            SliverFillRemaining(hasScrollBody: false, child: _eventsView()),
+            SliverToBoxAdapter(child: _eventsView()),
           ],
         ),
       ),
@@ -1000,6 +1000,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         }
 
         return Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             // Featured Events Carousel - show if there are featured events (regardless of filter)
             if (featuredEvents.isNotEmpty)
@@ -1047,19 +1048,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         ),
         const SizedBox(height: 16),
-        CarouselSlider.builder(
-          itemCount: featuredEvents.length,
-          itemBuilder: (context, index, realIndex) {
-            return _buildFeaturedCard(featuredEvents[index]);
-          },
-          options: CarouselOptions(
-            height: 240,
-            viewportFraction: 0.85,
-            enableInfiniteScroll: false,
-            autoPlay: featuredEvents.length > 1,
-            autoPlayInterval: const Duration(seconds: 4),
-          ),
-        ),
+                 CarouselSlider.builder(
+           itemCount: featuredEvents.length,
+           itemBuilder: (context, index, realIndex) {
+             return _buildFeaturedCard(featuredEvents[index]);
+           },
+           options: CarouselOptions(
+             height: 232,
+             viewportFraction: 0.85,
+             enableInfiniteScroll: false,
+             autoPlay: featuredEvents.length > 1,
+             autoPlayInterval: const Duration(seconds: 4),
+           ),
+         ),
         const SizedBox(height: 24),
       ],
     );
@@ -1071,6 +1072,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildSkeletonLoading() {
     return ListView(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.all(24),
       children: [
         // Featured skeleton
@@ -1247,6 +1250,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: events.map((event) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
@@ -2230,14 +2234,14 @@ class _FeaturedEventCardState extends State<_FeaturedEventCard>
                 // Background Image
                 SizedBox(
                   width: double.infinity,
-                  height: 240,
+                  height: 232,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: CachedNetworkImage(
                       imageUrl: widget.event.imageUrl,
                       fit: BoxFit.cover,
                       width: double.infinity,
-                      height: 240,
+                      height: 232,
                       placeholder: (context, url) => Container(
                         color: const Color(0xFFF5F7FA),
                         child: const Center(
@@ -2276,7 +2280,7 @@ class _FeaturedEventCardState extends State<_FeaturedEventCard>
                 // Gradient Overlay
                 Container(
                   width: double.infinity,
-                  height: 240,
+                  height: 232,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
@@ -2453,11 +2457,11 @@ class _FeaturedEventCardState extends State<_FeaturedEventCard>
                                 ),
                               ),
                               const SizedBox(width: 12),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
+                                                         Container(
+                             padding: const EdgeInsets.symmetric(
+                               horizontal: 14,
+                               vertical: 6,
+                             ),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(12),

@@ -139,28 +139,29 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
   @override
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
-    return Card(
-      elevation: 5,
-      shadowColor: Colors.black.withValues(alpha: 0.1),
-      margin: const EdgeInsets.only(bottom: 20),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: widget.disableTap
-            ? null
-            : () {
-                widget.onTap?.call();
-                RouterClass.nextScreenNormal(
-                  context,
-                  SingleEventScreen(eventModel: widget.eventModel),
-                );
-              },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [_buildImageSection(), _buildContentSection(context)],
-        ),
-      ),
-    );
+         return Card(
+       elevation: 5,
+       shadowColor: Colors.black.withValues(alpha: 0.1),
+       margin: const EdgeInsets.only(bottom: 20),
+       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+       child: InkWell(
+         borderRadius: BorderRadius.circular(20),
+         onTap: widget.disableTap
+             ? null
+             : () {
+                 widget.onTap?.call();
+                 RouterClass.nextScreenNormal(
+                   context,
+                   SingleEventScreen(eventModel: widget.eventModel),
+                 );
+               },
+         child: Column(
+           mainAxisSize: MainAxisSize.min,
+           crossAxisAlignment: CrossAxisAlignment.start,
+           children: [_buildImageSection(), _buildContentSection(context)],
+         ),
+       ),
+     );
   }
 
   Widget _buildImageSection() {
@@ -171,11 +172,12 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
       ),
       child: Stack(
         children: [
-          AspectRatio(
-            aspectRatio: 16 / 9,
-            child: SafeNetworkImage(
-              imageUrl: widget.eventModel.imageUrl,
-              fit: BoxFit.cover,
+                     AspectRatio(
+             aspectRatio: 16 / 9,
+             child: SafeNetworkImage(
+               imageUrl: widget.eventModel.imageUrl,
+               fit: BoxFit.cover,
+               alignment: Alignment.topCenter,
               placeholder: Container(color: const Color(0xFFF5F7FA)),
               errorWidget: Container(
                 color: const Color(0xFFF5F7FA),
@@ -197,44 +199,44 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
     return AnimatedBuilder(
       animation: _favoriteController,
       builder: (context, child) {
-        return Transform.scale(
-          scale: _favoriteScaleAnimation.value,
-          child: GestureDetector(
-            onTap: _isLoadingFavorite ? null : _toggleFavorite,
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.9),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    blurRadius: 8,
-                  ),
-                ],
-              ),
-              child: _isLoadingFavorite
-                  ? const Center(
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Color(0xFF667EEA),
-                        ),
-                      ),
-                    )
-                  : Icon(
-                      _isFavorited ? Icons.bookmark : Icons.bookmark_border,
-                      color: _isFavorited
-                          ? const Color(0xFFE53E3E)
-                          : const Color(0xFF667EEA),
-                      size: 22,
-                    ),
-            ),
-          ),
-        );
+                          return Transform.scale(
+           scale: _favoriteScaleAnimation.value,
+           child: GestureDetector(
+             onTap: _isLoadingFavorite ? null : _toggleFavorite,
+             child: Container(
+               width: 36,
+               height: 36,
+               decoration: BoxDecoration(
+                 color: Colors.white.withValues(alpha: 0.9),
+                 shape: BoxShape.circle,
+                 boxShadow: [
+                   BoxShadow(
+                     color: Colors.black.withValues(alpha: 0.15),
+                     blurRadius: 8,
+                   ),
+                 ],
+               ),
+               child: _isLoadingFavorite
+                   ? const Center(
+                       child: SizedBox(
+                         width: 18,
+                         height: 18,
+                         child: CircularProgressIndicator(
+                           strokeWidth: 2,
+                           color: Color(0xFF667EEA),
+                         ),
+                       ),
+                     )
+                   : Icon(
+                       _isFavorited ? Icons.bookmark : Icons.bookmark_border,
+                       color: _isFavorited
+                           ? const Color(0xFFE53E3E)
+                           : const Color(0xFF667EEA),
+                       size: 20,
+                     ),
+             ),
+           ),
+         );
       },
     );
   }
@@ -265,11 +267,12 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
   }
 
   Widget _buildContentSection(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+         return Padding(
+       padding: const EdgeInsets.all(20),
+       child: Column(
+         mainAxisSize: MainAxisSize.min,
+         crossAxisAlignment: CrossAxisAlignment.start,
+         children: [
           Text(
             widget.eventModel.title,
             style: const TextStyle(
@@ -281,31 +284,31 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 12),
-          _buildInfoRow(
-            Icons.calendar_today,
-            DateFormat.yMMMMd().format(widget.eventModel.selectedDateTime),
-          ),
-          const SizedBox(height: 8),
-          _buildInfoRow(
-            Icons.access_time,
-            _formatTimeRange(
-              widget.eventModel.selectedDateTime,
-              widget.eventModel.eventEndTime,
-            ),
-          ),
-          const SizedBox(height: 8),
-          _buildLocationRow(context),
-          const SizedBox(height: 16),
-          Text(
+                     _buildInfoRow(
+             Icons.calendar_today,
+             DateFormat.yMMMMd().format(widget.eventModel.selectedDateTime),
+           ),
+           const SizedBox(height: 6),
+           _buildInfoRow(
+             Icons.access_time,
+             _formatTimeRange(
+               widget.eventModel.selectedDateTime,
+               widget.eventModel.eventEndTime,
+             ),
+           ),
+           const SizedBox(height: 6),
+           _buildLocationRow(context),
+           const SizedBox(height: 12),
+           Text(
             widget.eventModel.description,
             style: TextStyle(
               color: Colors.grey[600],
               fontSize: 14,
               height: 1.5,
             ),
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-          ),
+                         maxLines: 2,
+             overflow: TextOverflow.ellipsis,
+           ),
         ],
       ),
     );
