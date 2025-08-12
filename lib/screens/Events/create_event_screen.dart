@@ -19,6 +19,7 @@ import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
 import 'dart:io';
 import 'package:orgami/firebase/organization_helper.dart'; // ignore: unused_import
+import 'package:orgami/controller/customer_controller.dart';
 
 class CreateEventScreen extends StatefulWidget {
   final DateTime selectedDateTime;
@@ -293,6 +294,9 @@ class _CreateEventScreenState extends State<CreateEventScreen>
     // Preselect organization if provided
     _selectedOrganizationId = widget.preselectedOrganizationId;
 
+    // Prefill organizer with current user's name and make it immutable
+    _prefillOrganizerWithCurrentUser();
+
     // Initialize animations
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -310,6 +314,31 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
     _fadeController.forward();
     _slideController.forward();
+  }
+
+  Future<void> _prefillOrganizerWithCurrentUser() async {
+    try {
+      // Use cached logged-in customer name if available
+      final cachedName = CustomerController.logeInCustomer?.name;
+      if (cachedName != null && cachedName.isNotEmpty) {
+        groupNameEdtController.text = cachedName;
+        return;
+      }
+
+      // Fallback to Customers collection via helper
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        final customer =
+            await FirebaseFirestoreHelper().getSingleCustomer(customerId: uid);
+        final resolvedName = customer?.name ??
+            (FirebaseAuth.instance.currentUser?.displayName ?? '');
+        if (resolvedName.isNotEmpty) {
+          groupNameEdtController.text = resolvedName;
+        }
+      }
+    } catch (_) {
+      // Silently ignore; field will remain empty if name can't be resolved
+    }
   }
 
   Future<void> _loadUserOrganizations() async {
@@ -797,19 +826,15 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             ],
           ),
           const SizedBox(height: 20),
-          // Organizer Field
+          // Organizer Field (auto-filled, read-only)
           _buildTextField(
             controller: groupNameEdtController,
             label: 'Organizer',
-            hint: 'Type here...',
+            hint: 'Auto-filled from your profile',
             icon: Icons.person,
-            enableCapitalization: true,
-            validator: (value) {
-              if (value!.isEmpty) {
-                return 'Enter Organizer first!';
-              }
-              return null;
-            },
+            enableCapitalization: false,
+            validator: (_) => null,
+            readOnly: true,
           ),
           const SizedBox(height: 16),
           // Title Field
@@ -868,6 +893,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
     int maxLines = 1,
     String? Function(String?)? validator,
     bool enableCapitalization = false,
+    bool readOnly = false,
+    bool enabled = true,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -886,6 +913,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           controller: controller,
           maxLines: maxLines,
           validator: validator,
+          readOnly: readOnly,
+          enabled: enabled,
           textCapitalization: enableCapitalization
               ? TextCapitalization.words
               : TextCapitalization.none,
