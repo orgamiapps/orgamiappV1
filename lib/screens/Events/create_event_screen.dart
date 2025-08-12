@@ -643,14 +643,15 @@ class _CreateEventScreenState extends State<CreateEventScreen>
               ),
             ),
           ),
-          Checkbox(
+          Switch(
             value: isPublic,
             onChanged: (value) {
               setState(() {
-                privateEvent = !(value ?? false);
+                privateEvent = !value;
               });
             },
             activeColor: const Color(0xFF10B981),
+            activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
           ),
         ],
       ),
