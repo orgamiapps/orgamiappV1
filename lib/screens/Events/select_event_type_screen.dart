@@ -3,6 +3,7 @@ import 'package:orgami/Utils/router.dart';
 import 'package:orgami/screens/Events/chose_date_time_screen.dart';
 import 'package:orgami/screens/Events/select_organization_screen.dart';
 import 'package:orgami/firebase/organization_helper.dart';
+import 'dart:async';
 
 class SelectEventTypeScreen extends StatefulWidget {
   const SelectEventTypeScreen({super.key});
@@ -16,6 +17,8 @@ class _SelectEventTypeScreenState extends State<SelectEventTypeScreen> {
   bool _loadingOrgs = true;
   List<Map<String, String>> _orgs = const [];
   String? _selectedOrgId;
+  String? _errorText;
+  StreamSubscription<List<Map<String, String>>>? _orgsSub;
 
   @override
   void initState() {
@@ -23,16 +26,67 @@ class _SelectEventTypeScreenState extends State<SelectEventTypeScreen> {
     _loadOrganizations();
   }
 
+  @override
+  void dispose() {
+    _orgsSub?.cancel();
+    super.dispose();
+  }
+
   Future<void> _loadOrganizations() async {
-    final items = await OrganizationHelper().getUserOrganizationsLite();
-    if (!mounted) return;
     setState(() {
-      _orgs = items;
-      _loadingOrgs = false;
-      if (_orgs.length == 1) {
-        _selectedOrgId = _orgs.first['id'];
-      }
+      _loadingOrgs = true;
+      _errorText = null;
     });
+
+    final helper = OrganizationHelper();
+
+    // Prime with current snapshot (fast path) while also listening live
+    try {
+      final items = await helper.getUserOrganizationsLite();
+      if (!mounted) return;
+      setState(() {
+        _orgs = items;
+        _loadingOrgs = false;
+        if (_orgs.length == 1) {
+          _selectedOrgId = _orgs.first['id'];
+        } else if (_orgs.every((e) => e['id'] != _selectedOrgId)) {
+          _selectedOrgId = null;
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadingOrgs = false;
+          _errorText = 'Failed to load organizations';
+        });
+      }
+    }
+
+    // Live updates
+    _orgsSub?.cancel();
+    _orgsSub = helper.streamUserOrganizationsLite().listen(
+      (list) {
+        if (!mounted) return;
+        setState(() {
+          _orgs = list;
+          _loadingOrgs = false;
+          _errorText = null;
+          if (_orgs.length == 1) {
+            _selectedOrgId = _orgs.first['id'];
+          } else if (_orgs.every((e) => e['id'] != _selectedOrgId)) {
+            _selectedOrgId = null;
+          }
+        });
+      },
+      onError: (err) {
+        if (!mounted) return;
+        setState(() {
+          _loadingOrgs = false;
+          _errorText = 'Error receiving organization updates';
+        });
+      },
+      cancelOnError: false,
+    );
   }
 
   void _goToOrgDateTime() {
@@ -235,7 +289,7 @@ class _SelectEventTypeScreenState extends State<SelectEventTypeScreen> {
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                      children: const [
                         Text(
                           'Create Organization Event',
                           style: TextStyle(
@@ -244,8 +298,8 @@ class _SelectEventTypeScreenState extends State<SelectEventTypeScreen> {
                             fontSize: 16,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        const Text(
+                        SizedBox(height: 6),
+                        Text(
                           'Attach this event to one of your organizations',
                           style: TextStyle(
                             color: Color(0xFF6B7280),
@@ -303,6 +357,21 @@ class _SelectEventTypeScreenState extends State<SelectEventTypeScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                     )
+                  else if (_errorText != null)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _errorText!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: _loadOrganizations,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    )
                   else if (_orgs.isEmpty)
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -314,7 +383,6 @@ class _SelectEventTypeScreenState extends State<SelectEventTypeScreen> {
                         const SizedBox(height: 8),
                         TextButton(
                           onPressed: () {
-                            // Fallback to existing flow if needed
                             RouterClass.nextScreenNormal(
                               context,
                               const SelectOrganizationScreen(),
