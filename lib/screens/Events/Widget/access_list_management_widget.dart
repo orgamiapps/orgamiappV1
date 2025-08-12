@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/models/event_model.dart';
@@ -128,7 +129,7 @@ class _AccessListManagementWidgetState
                 ),
                 IconButton(
                   onPressed: _shareInviteLink,
-                  icon: const Icon(Icons.link),
+                  icon: const Icon(CupertinoIcons.share),
                   tooltip: 'Share Invite Link',
                 ),
               ],

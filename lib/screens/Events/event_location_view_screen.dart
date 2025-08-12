@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:orgami/models/event_model.dart';
@@ -397,7 +398,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
                   child: Row(
                     children: [
                       const Icon(
-                        Icons.share,
+                        CupertinoIcons.share,
                         color: Color(0xFF667EEA),
                         size: 20,
                       ),
@@ -649,7 +650,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.share, color: Colors.white, size: 20),
+                    const Icon(CupertinoIcons.share, color: Colors.white, size: 20),
                     const SizedBox(width: 8),
                     Text(
                       'Share Location',
