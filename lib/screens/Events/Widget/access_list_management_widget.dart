@@ -128,7 +128,7 @@ class _AccessListManagementWidgetState
                 ),
                 IconButton(
                   onPressed: _shareInviteLink,
-                  icon: const Icon(Icons.link),
+                  icon: const Icon(Icons.share_outlined),
                   tooltip: 'Share Invite Link',
                 ),
               ],

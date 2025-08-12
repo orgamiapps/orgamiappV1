@@ -304,7 +304,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                         elevation: 0,
                       ),
                       icon: const Icon(
-                        Icons.share_rounded,
+                        Icons.share_outlined,
                         color: Colors.white,
                       ),
                       label: const Text(
