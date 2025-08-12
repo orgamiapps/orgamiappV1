@@ -356,7 +356,7 @@ class _ShareQRDialogState extends State<ShareQRDialog>
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.share_rounded, color: Colors.white, size: 18),
+                  Icon(Icons.share_outlined, color: Colors.white, size: 18),
                   SizedBox(width: 8),
                   Text(
                     'Share QR & ID',

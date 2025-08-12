@@ -532,7 +532,7 @@ class _AccountScreenState extends State<AccountScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.share, color: const Color(0xFF667EEA), size: 18),
+              Icon(Icons.share_outlined, color: const Color(0xFF667EEA), size: 18),
               const SizedBox(width: 8),
               Text(
                 'Follow Us On',

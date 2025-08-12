@@ -320,7 +320,7 @@ class _QRCodeGeneratorScreenState extends State<QRCodeGeneratorScreen>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.share,
+                    Icons.share_outlined,
                     color: AppThemeColor.pureWhiteColor,
                     size: 20,
                   ),
