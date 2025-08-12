@@ -301,6 +301,54 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
     );
   }
 
+  // Empty state matching the Public tab's "No Events Yet" design
+  Widget _buildNoEventsYet() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(40),
+              ),
+              child: const Icon(
+                Icons.event_busy,
+                size: 40,
+                color: Color(0xFF667EEA),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'No Events Yet',
+              style: TextStyle(
+                color: Color(0xFF1A1A1A),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Events will appear here once they are created.\nCheck back soon!',
+              style: TextStyle(
+                color: Color(0xFF6B7280),
+                fontSize: 16,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _orgEventsList() {
     if (_myOrgs.isEmpty) {
       return Center(
@@ -337,33 +385,30 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
           return const Center(child: CircularProgressIndicator());
         }
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Center(
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: _cardDeco(),
-              child: const Text('No upcoming org events'),
-            ),
-          );
+          return _buildNoEventsYet();
         }
 
         // Merge docs, filter to upcoming, then sort by selectedDateTime
-        final DateTime threshold = DateTime.now().subtract(const Duration(hours: 3));
-        final docs = snapshot.data!
-            .expand((qs) => qs.docs)
-            .where((d) {
+        final DateTime threshold = DateTime.now().subtract(
+          const Duration(hours: 3),
+        );
+        final docs =
+            snapshot.data!.expand((qs) => qs.docs).where((d) {
               final dt = (d.data()['selectedDateTime'] as Timestamp?)?.toDate();
               return dt == null || dt.isAfter(threshold);
-            })
-            .toList()
-          ..sort((a, b) {
-            final ad =
-                (a.data()['selectedDateTime'] as Timestamp?)?.toDate() ??
-                DateTime(2100);
-            final bd =
-                (b.data()['selectedDateTime'] as Timestamp?)?.toDate() ??
-                DateTime(2100);
-            return ad.compareTo(bd);
-          });
+            }).toList()..sort((a, b) {
+              final ad =
+                  (a.data()['selectedDateTime'] as Timestamp?)?.toDate() ??
+                  DateTime(2100);
+              final bd =
+                  (b.data()['selectedDateTime'] as Timestamp?)?.toDate() ??
+                  DateTime(2100);
+              return ad.compareTo(bd);
+            });
+
+        if (docs.isEmpty) {
+          return _buildNoEventsYet();
+        }
 
         return ListView.separated(
           itemCount: docs.length,

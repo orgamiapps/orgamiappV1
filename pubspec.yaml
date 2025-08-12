@@ -26,6 +26,9 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # iOS-style icon glyphs (required for CupertinoIcons to render correctly)
+  cupertino_icons: ^1.0.8
+
   firebase_storage: ^13.0.0
   firebase_core: ^4.0.0
   firebase_auth: ^6.0.0

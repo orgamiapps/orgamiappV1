@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:orgami/firebase/organization_helper.dart';
 import 'package:orgami/firebase/firebase_storage_helper.dart';
@@ -148,13 +149,40 @@ class OrganizationProfileScreen extends StatelessWidget {
     return DefaultTabController(
       length: 3,
       child: Scaffold(
+        extendBodyBehindAppBar: true,
         appBar: AppBar(
-          leading: const BackButton(),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          systemOverlayStyle: SystemUiOverlayStyle.light,
+          leading: Padding(
+            padding: const EdgeInsets.only(left: 12, top: 8, bottom: 8),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                color: Colors.black87,
+                onPressed: () => Navigator.of(context).maybePop(),
+              ),
+            ),
+          ),
           actions: [
-            IconButton(
-              tooltip: 'Share',
-              icon: const Icon(CupertinoIcons.share),
-              onPressed: () => _shareOrganization(context),
+            Padding(
+              padding: const EdgeInsets.only(right: 12, top: 8, bottom: 8),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: IconButton(
+                  tooltip: 'Share',
+                  icon: const Icon(CupertinoIcons.share),
+                  color: Colors.black87,
+                  onPressed: () => _shareOrganization(context),
+                ),
+              ),
             ),
           ],
         ),
@@ -202,59 +230,117 @@ class _OrgHeader extends StatelessWidget {
         final logoUrl = data?['logoUrl']?.toString();
         final name = data?['name']?.toString() ?? 'Organization';
         final category = data?['category']?.toString() ?? 'Other';
-        return Container(
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            image: bannerUrl != null
-                ? DecorationImage(
-                    image: NetworkImage(bannerUrl),
-                    fit: BoxFit.cover,
-                    colorFilter: ColorFilter.mode(
-                      Colors.black.withOpacity(0.2),
-                      BlendMode.darken,
+        final bool isLoading =
+            snapshot.connectionState == ConnectionState.waiting;
+        final bool hasBanner = (bannerUrl != null && bannerUrl.isNotEmpty);
+
+        // Create a modern header made of two parts:
+        // 1) A banner that reaches all the way to the very top (under the transparent AppBar)
+        // 2) A white details section with dark text sitting directly beneath the banner
+        final double topChromeHeight =
+            MediaQuery.of(context).padding.top + kToolbarHeight;
+        final double bannerHeight = topChromeHeight + 120; // visual weight
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: bannerHeight,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Placeholder/gradient or loading background
+                  Container(
+                    decoration: BoxDecoration(
+                      color: isLoading ? const Color(0x19000000) : null,
+                      gradient: (!isLoading && !hasBanner)
+                          ? const LinearGradient(
+                              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : null,
                     ),
-                  )
-                : null,
-          ),
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: Colors.white,
-                backgroundImage: logoUrl != null ? NetworkImage(logoUrl) : null,
-                child: logoUrl == null
-                    ? const Icon(Icons.apartment, color: Color(0xFF667EEA))
-                    : null,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                  ),
+
+                  // Banner image layer with smooth fade-in
+                  if (hasBanner)
+                    Positioned.fill(
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: Image.network(
+                              bannerUrl,
+                              fit: BoxFit.cover,
+                              frameBuilder: (context, child, frame, wasSync) {
+                                if (wasSync) return child;
+                                return AnimatedOpacity(
+                                  opacity: frame == null ? 0 : 1,
+                                  duration: const Duration(milliseconds: 250),
+                                  curve: Curves.easeInOut,
+                                  child: child,
+                                );
+                              },
+                              errorBuilder: (_, __, ___) =>
+                                  const SizedBox.shrink(),
+                            ),
+                          ),
+                          Positioned.fill(
+                            child: Container(
+                              color: Colors.black.withOpacity(0.2),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      category,
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-                  ],
-                ),
+                ],
               ),
-              _JoinAction(orgId: orgId),
-            ],
-          ),
+            ),
+
+            // Details section (white background, dark text)
+            Container(
+              width: double.infinity,
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: const Color(0xFFE5E7EB),
+                    backgroundImage: (logoUrl != null && logoUrl.isNotEmpty)
+                        ? NetworkImage(logoUrl)
+                        : null,
+                    child: (logoUrl == null || logoUrl.isEmpty)
+                        ? const Icon(Icons.apartment, color: Color(0xFF667EEA))
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: const TextStyle(
+                            color: Colors.black87,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          category,
+                          style: const TextStyle(color: Colors.black54),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _JoinAction(orgId: orgId),
+                ],
+              ),
+            ),
+          ],
         );
       },
     );
@@ -334,7 +420,10 @@ class _JoinActionState extends State<_JoinAction> {
       return const SizedBox(
         height: 36,
         width: 36,
-        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: Color(0xFF667EEA),
+        ),
       );
     }
     if (_isMember) {

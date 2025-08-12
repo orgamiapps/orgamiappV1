@@ -14,6 +14,7 @@ import 'package:orgami/Screens/MyProfile/badge_screen.dart';
 import 'package:orgami/Screens/MyProfile/Widgets/professional_badge_widget.dart';
 import 'package:orgami/models/badge_model.dart';
 import 'package:orgami/Services/badge_service.dart';
+import 'package:orgami/Screens/Home/account_details_screen.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -561,9 +562,29 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                   fontFamily: 'Roboto',
                 ),
               ),
-              const Spacer(),
-              // Empty container for balance
-              const SizedBox(width: 36),
+              // Account Details (Edit) button
+              GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const AccountDetailsScreen(),
+                    ),
+                  );
+                },
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: const Icon(
+                    Icons.edit,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),

@@ -19,7 +19,7 @@ import 'package:orgami/Utils/web_view_page.dart';
 
 import 'package:orgami/Screens/MyProfile/my_profile_screen.dart';
 import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
-import 'package:orgami/Screens/Home/account_details_screen.dart';
+
 import 'package:orgami/Screens/Home/attendee_notification_screen.dart';
 
 
@@ -157,15 +157,7 @@ class _AccountScreenState extends State<AccountScreen> {
             onTap: () =>
                 RouterClass.nextScreenNormal(context, MyProfileScreen()),
           ),
-          _buildDivider(),
-          _buildSettingsItem(
-            icon: Icons.account_circle,
-            title: 'Account Details',
-            subtitle: 'Manage your personal information',
-            onTap: () =>
-                RouterClass.nextScreenNormal(context, AccountDetailsScreen()),
-          ),
-          _buildDivider(),
+
           _buildSettingsItem(
             icon: Icons.analytics_rounded,
             title: 'Analytics Dashboard',

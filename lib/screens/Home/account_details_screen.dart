@@ -8,6 +8,9 @@ import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
+import 'dart:convert';
+import 'package:orgami/firebase/firebase_storage_helper.dart';
+import 'package:orgami/Screens/Authentication/forgot_password_screen.dart';
 
 class AccountDetailsScreen extends StatefulWidget {
   const AccountDetailsScreen({super.key});
@@ -16,7 +19,8 @@ class AccountDetailsScreen extends StatefulWidget {
   State<AccountDetailsScreen> createState() => _AccountDetailsScreenState();
 }
 
-class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
+class _AccountDetailsScreenState extends State<AccountDetailsScreen>
+    with SingleTickerProviderStateMixin {
   late final double _screenWidth = MediaQuery.of(context).size.width;
   late final double _screenHeight = MediaQuery.of(context).size.height;
 
@@ -35,6 +39,13 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   final TextEditingController _companyController = TextEditingController();
   final TextEditingController _websiteController = TextEditingController();
   final TextEditingController _bioController = TextEditingController();
+  // Social links controllers
+  final TextEditingController _twitterController = TextEditingController();
+  final TextEditingController _instagramController = TextEditingController();
+  final TextEditingController _linkedinController = TextEditingController();
+  final TextEditingController _facebookController = TextEditingController();
+  final TextEditingController _youtubeController = TextEditingController();
+  final TextEditingController _tiktokController = TextEditingController();
 
   // Focus nodes for better UX
   final FocusNode _nameFocus = FocusNode();
@@ -47,6 +58,12 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   final FocusNode _companyFocus = FocusNode();
   final FocusNode _websiteFocus = FocusNode();
   final FocusNode _bioFocus = FocusNode();
+  final FocusNode _twitterFocus = FocusNode();
+  final FocusNode _instagramFocus = FocusNode();
+  final FocusNode _linkedinFocus = FocusNode();
+  final FocusNode _facebookFocus = FocusNode();
+  final FocusNode _youtubeFocus = FocusNode();
+  final FocusNode _tiktokFocus = FocusNode();
 
   String? _selectedGender;
   // bool _isLoading = false; // Unused field
@@ -58,14 +75,24 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
     'Prefer not to say',
   ];
 
+  // Privacy & notification preferences
+  bool _isDiscoverable = true;
+  bool _notifyEventReminders = true;
+  bool _notifyMessages = true;
+  bool _notifyAnnouncements = true;
+
+  late TabController _tabController;
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadUserData();
   }
 
   @override
   void dispose() {
+    _tabController.dispose();
     _nameController.dispose();
     _emailController.dispose();
     _usernameController.dispose(); // Dispose new username controller
@@ -76,6 +103,12 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
     _companyController.dispose();
     _websiteController.dispose();
     _bioController.dispose();
+    _twitterController.dispose();
+    _instagramController.dispose();
+    _linkedinController.dispose();
+    _facebookController.dispose();
+    _youtubeController.dispose();
+    _tiktokController.dispose();
 
     _nameFocus.dispose();
     _emailFocus.dispose();
@@ -87,6 +120,12 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
     _companyFocus.dispose();
     _websiteFocus.dispose();
     _bioFocus.dispose();
+    _twitterFocus.dispose();
+    _instagramFocus.dispose();
+    _linkedinFocus.dispose();
+    _facebookFocus.dispose();
+    _youtubeFocus.dispose();
+    _tiktokFocus.dispose();
     super.dispose();
   }
 
@@ -96,20 +135,16 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
       _nameController.text = customer.name;
       _emailController.text = customer.email;
 
-      // Check if user has a username, if not generate one
+      // Ensure username exists; if not, generate
       if (customer.username == null || customer.username!.isEmpty) {
         final firestoreHelper = FirebaseFirestoreHelper();
         final newUsername = await firestoreHelper
             .generateUsernameForExistingUser(customer.name);
-
-        // Update the customer model and save to Firestore
         customer.username = newUsername;
         await firestoreHelper.updateUsername(
           userId: customer.uid,
           newUsername: newUsername,
         );
-
-        // Update the controller
         CustomerController.logeInCustomer = customer;
       }
 
@@ -122,8 +157,46 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
       _websiteController.text = customer.website ?? '';
       _bioController.text = customer.bio ?? '';
       _selectedGender = customer.gender;
+      _isDiscoverable = customer.isDiscoverable;
 
-      setState(() {}); // Refresh the UI
+      // Parse social links (stored as JSON string or map)
+      try {
+        final raw = customer.socialMediaLinks;
+        if (raw != null && raw.isNotEmpty) {
+          Map<String, dynamic> m;
+          try {
+            m = json.decode(raw) as Map<String, dynamic>;
+          } catch (_) {
+            // If the field was accidentally stored as a map
+            m = {};
+          }
+          _twitterController.text = (m['twitter'] ?? '').toString();
+          _instagramController.text = (m['instagram'] ?? '').toString();
+          _linkedinController.text = (m['linkedin'] ?? '').toString();
+          _facebookController.text = (m['facebook'] ?? '').toString();
+          _youtubeController.text = (m['youtube'] ?? '').toString();
+          _tiktokController.text = (m['tiktok'] ?? '').toString();
+        }
+      } catch (_) {}
+
+      // Load notification preferences from Firestore if present
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection(CustomerModel.firebaseKey)
+            .doc(customer.uid)
+            .get();
+        final data = doc.data();
+        if (data != null && data['notificationPreferences'] is Map) {
+          final prefs = Map<String, dynamic>.from(
+            data['notificationPreferences'],
+          );
+          _notifyEventReminders = (prefs['eventReminders'] ?? true) == true;
+          _notifyMessages = (prefs['messages'] ?? true) == true;
+          _notifyAnnouncements = (prefs['announcements'] ?? true) == true;
+        }
+      } catch (_) {}
+
+      if (mounted) setState(() {});
     }
   }
 
@@ -132,10 +205,6 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
       _btnCtlr.reset();
       return;
     }
-
-    // setState(() {
-    //   _isLoading = true;
-    // }); // Unused assignment
 
     try {
       final customer = CustomerController.logeInCustomer!;
@@ -168,12 +237,35 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
       customer.bio = _bioController.text.trim().isEmpty
           ? null
           : _bioController.text.trim();
+      customer.isDiscoverable = _isDiscoverable;
+
+      // Build social links JSON for storage
+      final social = <String, String>{};
+      void putIfNotEmpty(String key, String value) {
+        if (value.trim().isNotEmpty) social[key] = value.trim();
+      }
+
+      putIfNotEmpty('twitter', _twitterController.text);
+      putIfNotEmpty('instagram', _instagramController.text);
+      putIfNotEmpty('linkedin', _linkedinController.text);
+      putIfNotEmpty('facebook', _facebookController.text);
+      putIfNotEmpty('youtube', _youtubeController.text);
+      putIfNotEmpty('tiktok', _tiktokController.text);
+      customer.socialMediaLinks = social.isEmpty ? null : json.encode(social);
+
+      // Prepare update map (merge in notification preferences)
+      final Map<String, dynamic> updateData = CustomerModel.getMap(customer);
+      updateData['notificationPreferences'] = {
+        'eventReminders': _notifyEventReminders,
+        'messages': _notifyMessages,
+        'announcements': _notifyAnnouncements,
+      };
 
       // Update in Firestore
       await FirebaseFirestore.instance
           .collection(CustomerModel.firebaseKey)
           .doc(customer.uid)
-          .update(CustomerModel.getMap(customer));
+          .update(updateData);
 
       _btnCtlr.success();
       ShowToast().showNormalToast(msg: 'Account details updated successfully!');
@@ -188,9 +280,6 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
       });
     } catch (e) {
       _btnCtlr.reset();
-      // setState(() {
-      //   _isLoading = false;
-      // }); // Unused assignment
       ShowToast().showNormalToast(msg: 'Failed to update account details: $e');
     }
   }
@@ -226,11 +315,14 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 60),
               _headerSection(),
-              const SizedBox(height: 32),
-              _accountDetailsForm(),
+              const SizedBox(height: 24),
+              _buildTabs(),
+              const SizedBox(height: 16),
+              _buildTabViews(),
             ],
           ),
         ),
@@ -239,6 +331,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   }
 
   Widget _headerSection() {
+    final user = CustomerController.logeInCustomer;
     return Column(
       children: [
         Container(
@@ -254,10 +347,78 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
               ),
             ],
           ),
-          child: Icon(
-            Icons.account_circle,
-            size: 60,
-            color: AppThemeColor.darkBlueColor,
+          child: Column(
+            children: [
+              SizedBox(
+                width: 96,
+                height: 96,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: ClipOval(
+                        child:
+                            (user?.profilePictureUrl != null &&
+                                (user!.profilePictureUrl!.isNotEmpty))
+                            ? Image.network(
+                                user.profilePictureUrl!,
+                                fit: BoxFit.cover,
+                              )
+                            : Container(
+                                color: const Color(0xFFE1E5E9),
+                                child: const Icon(
+                                  Icons.person,
+                                  size: 40,
+                                  color: Color(0xFF9CA3AF),
+                                ),
+                              ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: _changeProfilePhoto,
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: AppThemeColor.darkBlueColor,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.12),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.camera_alt,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TextButton(
+                    onPressed: _changeProfilePhoto,
+                    child: const Text('Change Photo'),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: _removeProfilePhoto,
+                    child: const Text('Remove'),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 24),
@@ -367,6 +528,62 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
             ),
             const SizedBox(height: 16),
             _buildBioField(),
+            const SizedBox(height: 32),
+
+            // Social Links
+            _buildSectionHeader('Social Links', Icons.link, Colors.blueGrey),
+            const SizedBox(height: 16),
+            _buildSocialLinksFields(),
+            const SizedBox(height: 32),
+
+            // Privacy
+            _buildSectionHeader('Privacy', Icons.lock_outline, Colors.teal),
+            const SizedBox(height: 12),
+            _buildSwitchTile(
+              title: 'Make my profile discoverable',
+              subtitle: 'Allow others to find me by name or username',
+              value: _isDiscoverable,
+              onChanged: (v) => setState(() => _isDiscoverable = v),
+              icon: Icons.search,
+            ),
+            const SizedBox(height: 24),
+
+            // Notifications
+            _buildSectionHeader(
+              'Notifications',
+              Icons.notifications_outlined,
+              Colors.indigo,
+            ),
+            const SizedBox(height: 12),
+            _buildSwitchTile(
+              title: 'Event reminders',
+              subtitle: 'Get reminders for upcoming events',
+              value: _notifyEventReminders,
+              onChanged: (v) => setState(() => _notifyEventReminders = v),
+              icon: Icons.event,
+            ),
+            const SizedBox(height: 12),
+            _buildSwitchTile(
+              title: 'Messages',
+              subtitle: 'Receive notifications for new messages',
+              value: _notifyMessages,
+              onChanged: (v) => setState(() => _notifyMessages = v),
+              icon: Icons.message,
+            ),
+            const SizedBox(height: 12),
+            _buildSwitchTile(
+              title: 'Announcements',
+              subtitle: 'Important updates and news',
+              value: _notifyAnnouncements,
+              onChanged: (v) => setState(() => _notifyAnnouncements = v),
+              icon: Icons.campaign_outlined,
+            ),
+            const SizedBox(height: 32),
+
+            // Security
+            _buildSectionHeader('Security', Icons.security, Colors.redAccent),
+            const SizedBox(height: 12),
+            _buildChangePasswordButton(),
             const SizedBox(height: 32),
 
             _buildSaveButton(),
@@ -781,6 +998,286 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
             fontWeight: FontWeight.w600,
             color: Colors.white,
           ),
+        ),
+      ),
+    );
+  }
+
+  // New: social links composite widget
+  Widget _buildSocialLinksFields() {
+    return Column(
+      children: [
+        _buildTextField(
+          controller: _twitterController,
+          focusNode: _twitterFocus,
+          label: 'Twitter / X',
+          hint: 'https://x.com/your-handle',
+          icon: Icons.alternate_email,
+          keyboardType: TextInputType.url,
+        ),
+        const SizedBox(height: 16),
+        _buildTextField(
+          controller: _instagramController,
+          focusNode: _instagramFocus,
+          label: 'Instagram',
+          hint: 'https://instagram.com/your-handle',
+          icon: Icons.camera_alt_outlined,
+          keyboardType: TextInputType.url,
+        ),
+        const SizedBox(height: 16),
+        _buildTextField(
+          controller: _linkedinController,
+          focusNode: _linkedinFocus,
+          label: 'LinkedIn',
+          hint: 'https://linkedin.com/in/your-id',
+          icon: Icons.business_center_outlined,
+          keyboardType: TextInputType.url,
+        ),
+        const SizedBox(height: 16),
+        _buildTextField(
+          controller: _facebookController,
+          focusNode: _facebookFocus,
+          label: 'Facebook',
+          hint: 'https://facebook.com/your-id',
+          icon: Icons.facebook,
+          keyboardType: TextInputType.url,
+        ),
+        const SizedBox(height: 16),
+        _buildTextField(
+          controller: _youtubeController,
+          focusNode: _youtubeFocus,
+          label: 'YouTube',
+          hint: 'https://youtube.com/@your-channel',
+          icon: Icons.ondemand_video,
+          keyboardType: TextInputType.url,
+        ),
+        const SizedBox(height: 16),
+        _buildTextField(
+          controller: _tiktokController,
+          focusNode: _tiktokFocus,
+          label: 'TikTok',
+          hint: 'https://tiktok.com/@your-handle',
+          icon: Icons.music_note,
+          keyboardType: TextInputType.url,
+        ),
+      ],
+    );
+  }
+
+  // New: switch tile
+  Widget _buildSwitchTile({
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.grey.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppThemeColor.lightBlueColor.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: AppThemeColor.darkBlueColor, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: AppThemeColor.lightGrayColor,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: AppThemeColor.darkBlueColor,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // New: change password
+  Widget _buildChangePasswordButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+          );
+        },
+        icon: const Icon(Icons.password),
+        label: const Text('Change password'),
+      ),
+    );
+  }
+
+  // New: photo actions
+  Future<void> _changeProfilePhoto() async {
+    final user = CustomerController.logeInCustomer;
+    if (user == null) return;
+    final file = await FirebaseStorageHelper.pickImageFromGallery();
+    if (file == null) return;
+
+    final url = await FirebaseStorageHelper.uploadProfilePicture(
+      user.uid,
+      file,
+    );
+    if (url == null) {
+      ShowToast().showNormalToast(msg: 'Failed to upload photo');
+      return;
+    }
+
+    await FirebaseFirestore.instance
+        .collection(CustomerModel.firebaseKey)
+        .doc(user.uid)
+        .update({'profilePictureUrl': url});
+
+    setState(() {
+      CustomerController.logeInCustomer = CustomerController.logeInCustomer!
+        ..profilePictureUrl = url;
+    });
+    ShowToast().showNormalToast(msg: 'Profile photo updated');
+  }
+
+  Future<void> _removeProfilePhoto() async {
+    final user = CustomerController.logeInCustomer;
+    if (user == null) return;
+    await FirebaseStorageHelper.deleteProfilePicture(user.uid);
+
+    await FirebaseFirestore.instance
+        .collection(CustomerModel.firebaseKey)
+        .doc(user.uid)
+        .update({'profilePictureUrl': FieldValue.delete()});
+
+    setState(() {
+      CustomerController.logeInCustomer = CustomerController.logeInCustomer!
+        ..profilePictureUrl = null;
+    });
+    ShowToast().showNormalToast(msg: 'Profile photo removed');
+  }
+
+  Widget _buildTabs() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: TabBar(
+        controller: _tabController,
+        indicator: BoxDecoration(
+          color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        labelColor: AppThemeColor.darkBlueColor,
+        unselectedLabelColor: AppThemeColor.lightGrayColor,
+        tabs: const [
+          Tab(text: 'Public Profile'),
+          Tab(text: 'Account Details'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabViews() {
+    // Render active tab only to avoid unbounded height within SingleChildScrollView
+    return _tabController.index == 0
+        ? _publicProfileForm()
+        : _accountDetailsForm();
+  }
+
+  // Public Profile tab content
+  Widget _publicProfileForm() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 25,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Form(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Profile Information',
+              style: TextStyle(
+                color: AppThemeColor.darkBlueColor,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 24),
+            _buildNameField(),
+            const SizedBox(height: 20),
+            _buildUsernameField(),
+            const SizedBox(height: 20),
+            _buildBioField(),
+            const SizedBox(height: 20),
+            _buildGenderField(),
+            const SizedBox(height: 20),
+            _buildAgeField(),
+            const SizedBox(height: 20),
+            _buildLocationField(),
+            const SizedBox(height: 20),
+            _buildOccupationField(),
+            const SizedBox(height: 20),
+            _buildCompanyField(),
+            const SizedBox(height: 20),
+            _buildWebsiteField(),
+            const SizedBox(height: 24),
+            _buildSectionHeader('Social Links', Icons.link, Colors.blueGrey),
+            const SizedBox(height: 16),
+            _buildSocialLinksFields(),
+            const SizedBox(height: 24),
+            _buildSectionHeader('Privacy', Icons.lock_outline, Colors.teal),
+            const SizedBox(height: 12),
+            _buildSwitchTile(
+              title: 'Make my profile discoverable',
+              subtitle: 'Allow others to find me by name or username',
+              value: _isDiscoverable,
+              onChanged: (v) => setState(() => _isDiscoverable = v),
+              icon: Icons.search,
+            ),
+          ],
         ),
       ),
     );
