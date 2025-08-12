@@ -23,24 +23,59 @@ class OrganizationHelper {
         .where('status', isEqualTo: 'approved');
 
     return membershipQuery.snapshots().asyncMap((snap) async {
-      if (snap.docs.isEmpty) return <Map<String, String>>[];
-      final Set<String> orgIds = {
-        for (final d in snap.docs)
-          (d.data()['organizationId']?.toString() ?? ''),
-      }..removeWhere((e) => e.isEmpty);
+      if (snap.docs.isEmpty) {
+        // Even if there are no membership docs, include organizations the user owns
+        final owned = await _firestore
+            .collection('Organizations')
+            .where('createdBy', isEqualTo: user.uid)
+            .get();
+        final List<Map<String, String>> ownedList = owned.docs
+            .map((d) => {'id': d.id, 'name': (d.data()['name'] ?? d.data()['title'] ?? '').toString()})
+            .toList();
+        ownedList.sort((a, b) => (a['name'] ?? '').toLowerCase().compareTo((b['name'] ?? '').toLowerCase()));
+        return ownedList;
+      }
+
+      final Set<String> orgIds = {};
+      for (final d in snap.docs) {
+        // Prefer field, but fall back to parent path (Organizations/{orgId}/Members/{uid})
+        final data = d.data();
+        final String? idFromField = data['organizationId']?.toString();
+        final String? idFromPath = d.reference.parent.parent?.id;
+        final resolvedId = (idFromField != null && idFromField.isNotEmpty)
+            ? idFromField
+            : (idFromPath ?? '');
+        if (resolvedId.isNotEmpty) orgIds.add(resolvedId);
+      }
+
+      // Also include orgs the user owns (creator/admin) in case membership doc is missing
+      try {
+        final owned = await _firestore
+            .collection('Organizations')
+            .where('createdBy', isEqualTo: user.uid)
+            .get();
+        for (final d in owned.docs) {
+          orgIds.add(d.id);
+        }
+      } catch (_) {}
+
       if (orgIds.isEmpty) return <Map<String, String>>[];
 
       final futures = orgIds.map(
         (id) => _firestore.collection('Organizations').doc(id).get(),
       );
       final docs = await Future.wait(futures);
-      final List<Map<String, String>> list = [];
+      final Map<String, String> idToName = {};
       for (final doc in docs) {
         if (!doc.exists) continue;
         final data = doc.data()!;
         final String name = (data['name'] ?? data['title'] ?? '').toString();
-        list.add({'id': doc.id, 'name': name});
+        idToName[doc.id] = name;
       }
+
+      final list = idToName.entries
+          .map((e) => {'id': e.key, 'name': e.value})
+          .toList();
       list.sort(
         (a, b) => (a['name'] ?? '').toLowerCase().compareTo(
           (b['name'] ?? '').toLowerCase(),
@@ -62,23 +97,50 @@ class OrganizationHelper {
           .limit(50)
           .get();
 
-      final List<Map<String, String>> result = [];
+      final Map<String, String> idToName = {};
+
       for (final doc in query.docs) {
         try {
-          final orgId = doc.data()['organizationId'] as String?;
+          final data = doc.data();
+          final String? orgIdFromField = data['organizationId'] as String?;
+          final String? orgIdFromPath = doc.reference.parent.parent?.id;
+          final String? orgId = (orgIdFromField != null && orgIdFromField.isNotEmpty)
+              ? orgIdFromField
+              : orgIdFromPath;
           if (orgId == null) continue;
+
           final orgSnap = await _firestore
               .collection('Organizations')
               .doc(orgId)
               .get();
           if (orgSnap.exists) {
             final name = orgSnap.data()!['name']?.toString() ?? '';
-            result.add({'id': orgId, 'name': name});
+            idToName[orgId] = name;
           }
         } catch (e) {
           Logger.error('Error resolving organization from membership: $e');
         }
       }
+
+      // Also include organizations owned by the user (createdBy == uid)
+      try {
+        final ownedQuery = await _firestore
+            .collection('Organizations')
+            .where('createdBy', isEqualTo: user.uid)
+            .get();
+        for (final d in ownedQuery.docs) {
+          final data = d.data();
+          final String name = (data['name'] ?? data['title'] ?? '').toString();
+          idToName[d.id] = name;
+        }
+      } catch (e) {
+        Logger.error('Error loading owned organizations: $e');
+      }
+
+      final result = idToName.entries
+          .map((e) => {'id': e.key, 'name': e.value})
+          .toList();
+      result.sort((a, b) => (a['name'] ?? '').toLowerCase().compareTo((b['name'] ?? '').toLowerCase()));
       return result;
     } catch (e) {
       Logger.error('getUserOrganizationsLite failed: $e');
