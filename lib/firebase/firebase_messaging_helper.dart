@@ -16,6 +16,7 @@ import 'package:orgami/Utils/logger.dart';
 class FirebaseMessagingHelper {
   static final FirebaseMessagingHelper _instance =
       FirebaseMessagingHelper._internal();
+  static bool _backgroundHandlerRegistered = false;
   factory FirebaseMessagingHelper() => _instance;
   FirebaseMessagingHelper._internal();
 
@@ -75,10 +76,11 @@ class FirebaseMessagingHelper {
       });
 
       // Handle background messages (mobile only)
-      if (!kIsWeb) {
+      if (!kIsWeb && !_backgroundHandlerRegistered) {
         fcm.FirebaseMessaging.onBackgroundMessage(
           _firebaseMessagingBackgroundHandler,
         );
+        _backgroundHandlerRegistered = true;
       }
 
       // Handle foreground messages
@@ -128,10 +130,10 @@ class FirebaseMessagingHelper {
     try {
       final user = _auth.currentUser;
       if (user != null) {
-        await _firestore.collection('users').doc(user.uid).update({
+        await _firestore.collection('users').doc(user.uid).set({
           'fcmToken': token,
           'lastTokenUpdate': FieldValue.serverTimestamp(),
-        });
+        }, SetOptions(merge: true));
         if (kDebugMode) {
           Logger.success('✅ FCM token saved to Firestore');
         }
