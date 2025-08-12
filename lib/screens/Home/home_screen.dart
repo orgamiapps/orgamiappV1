@@ -585,7 +585,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             // Filter Section as Sliver
             SliverToBoxAdapter(child: _filterSection()),
             // Events Content as Sliver
-            SliverFillRemaining(hasScrollBody: false, child: _eventsView()),
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _eventsView(),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -1070,55 +1077,58 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildSkeletonLoading() {
-    return ListView(
+    return Padding(
       padding: const EdgeInsets.all(24),
-      children: [
-        // Featured skeleton
-        Shimmer.fromColors(
-          baseColor: const Color(0xFFE1E5E9),
-          highlightColor: Colors.white,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                height: 24,
-                width: 150,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Featured skeleton
+          Shimmer.fromColors(
+            baseColor: const Color(0xFFE1E5E9),
+            highlightColor: Colors.white,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  height: 24,
+                  width: 150,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
+                const SizedBox(height: 16),
+                Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 24),
-        // Events skeleton
-        ...List.generate(
-          3,
-          (index) => Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Shimmer.fromColors(
-              baseColor: const Color(0xFFE1E5E9),
-              highlightColor: Colors.white,
-              child: Container(
-                height: 280,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
+          const SizedBox(height: 24),
+          // Events skeleton
+          ...List.generate(
+            3,
+            (index) => Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Shimmer.fromColors(
+                baseColor: const Color(0xFFE1E5E9),
+                highlightColor: Colors.white,
+                child: Container(
+                  height: 280,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

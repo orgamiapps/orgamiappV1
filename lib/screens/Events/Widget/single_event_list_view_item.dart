@@ -280,6 +280,8 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
+          const SizedBox(height: 8),
+          _buildOrganizerChip(widget.eventModel.groupName),
           const SizedBox(height: 12),
           _buildInfoRow(
             Icons.calendar_today,
@@ -309,6 +311,48 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
         ],
       ),
     );
+  }
+
+  Widget _buildOrganizerChip(String name) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF667EEA).withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF667EEA).withValues(alpha: 0.15),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.person_outline, color: Color(0xFF667EEA), size: 16),
+          const SizedBox(width: 6),
+          Text(
+            name,
+            style: const TextStyle(
+              color: Color(0xFF667EEA),
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Roboto',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+  }
+
+  @override
+  void setState(VoidCallback fn) {
+    if (mounted) {
+      super.setState(fn);
+    }
   }
 
   Widget _buildInfoRow(IconData icon, String text) {

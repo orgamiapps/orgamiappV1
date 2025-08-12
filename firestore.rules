@@ -68,7 +68,7 @@ service cloud.firestore {
          resource.data.customerUid == 'without_login');
     }
     
-        // Events access rules with public/private and organization scoping
+    // Events access rules with public/private and organization scoping
     match /Events/{eventId} {
       function isOrgMember(orgId) {
         return exists(/databases/$(database)/documents/Organizations/$(orgId)/Members/$(request.auth.uid));
@@ -128,8 +128,12 @@ service cloud.firestore {
 
       // Members subcollection
       match /Members/{userId} {
-        // Read allowed to members
-        allow read: if request.auth != null && exists(/databases/$(database)/documents/Organizations/$(orgId)/Members/$(request.auth.uid));
+        // Read allowed to members. Support both schemas: docId == uid OR field userId == uid
+        allow read: if request.auth != null && (
+          userId == request.auth.uid ||
+          (resource.data.userId != null && resource.data.userId == request.auth.uid) ||
+          exists(/databases/$(database)/documents/Organizations/$(orgId)/Members/$(request.auth.uid))
+        );
         // Creator can create their own initial membership; users can create their own doc (pending/approved handled by app)
         allow create: if request.auth != null && (
           request.auth.uid == userId ||
@@ -159,6 +163,12 @@ service cloud.firestore {
            'ApproveJoinRequests' in get(/databases/$(database)/documents/Organizations/$(orgId)/Members/$(request.auth.uid)).data.permissions)
         );
       }
+    }
+    
+    // Collection group access for membership documents across organizations
+    // Needed for collectionGroup('Members') queries such as loading a user's organizations
+    match /{path=**}/Members/{memberId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
     }
     
     // Allow event hosts and co-hosts to read/write their event analytics

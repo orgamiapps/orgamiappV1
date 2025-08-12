@@ -19,6 +19,7 @@ import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
 import 'dart:io';
 import 'package:orgami/firebase/organization_helper.dart'; // ignore: unused_import
+import 'package:orgami/controller/customer_controller.dart';
 
 class CreateEventScreen extends StatefulWidget {
   final DateTime selectedDateTime;
@@ -50,8 +51,8 @@ class CreateEventScreen extends StatefulWidget {
 
 class _CreateEventScreenState extends State<CreateEventScreen>
     with TickerProviderStateMixin {
-  late final double _screenWidth = MediaQuery.of(context).size.width;
-  late final double _screenHeight = MediaQuery.of(context).size.height;
+  double get _screenWidth => MediaQuery.of(context).size.width;
+  double get _screenHeight => MediaQuery.of(context).size.height;
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
@@ -292,6 +293,14 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
     // Preselect organization if provided
     _selectedOrganizationId = widget.preselectedOrganizationId;
+    // If this is explicitly an organization event flow, default to private until the
+    // creator checks the box to make it public.
+    if (widget.forceOrganizationEvent) {
+      privateEvent = true; // not public by default for org events
+    }
+
+    // Prefill organizer with current user's name and make it immutable
+    _prefillOrganizerWithCurrentUser();
 
     // Initialize animations
     _fadeController = AnimationController(
@@ -310,6 +319,31 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
     _fadeController.forward();
     _slideController.forward();
+  }
+
+  Future<void> _prefillOrganizerWithCurrentUser() async {
+    try {
+      // Use cached logged-in customer name if available
+      final cachedName = CustomerController.logeInCustomer?.name;
+      if (cachedName != null && cachedName.isNotEmpty) {
+        groupNameEdtController.text = cachedName;
+        return;
+      }
+
+      // Fallback to Customers collection via helper
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        final customer =
+            await FirebaseFirestoreHelper().getSingleCustomer(customerId: uid);
+        final resolvedName = customer?.name ??
+            (FirebaseAuth.instance.currentUser?.displayName ?? '');
+        if (resolvedName.isNotEmpty) {
+          groupNameEdtController.text = resolvedName;
+        }
+      }
+    } catch (_) {
+      // Silently ignore; field will remain empty if name can't be resolved
+    }
   }
 
   Future<void> _loadUserOrganizations() async {
@@ -429,8 +463,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
               // Organization selector
               _buildOrganizationSelector(),
               const SizedBox(height: 24),
-              // Private Event Toggle
-              _buildPrivateEventToggle(),
+              // Private/Public Toggle (depends on org context)
+              _buildVisibilityToggle(),
               const SizedBox(height: 24),
               // Categories Section
               _buildCategoriesSection(),
@@ -536,7 +570,70 @@ class _CreateEventScreenState extends State<CreateEventScreen>
     );
   }
 
-  Widget _buildPrivateEventToggle() {
+  bool get _isOrganizationContext =>
+      widget.forceOrganizationEvent ||
+      (_selectedOrganizationId != null && _selectedOrganizationId!.isNotEmpty);
+
+  Widget _buildVisibilityToggle() {
+    // For public events (no organization), show "Make this event private"
+    if (!_isOrganizationContext) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              spreadRadius: 0,
+              blurRadius: 20,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child:
+                  const Icon(Icons.lock, color: Color(0xFF667EEA), size: 20),
+            ),
+            const SizedBox(width: 16),
+            const Expanded(
+              child: Text(
+                'Make this event private',
+                style: TextStyle(
+                  color: Color(0xFF1A1A1A),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ),
+            Switch(
+              value: privateEvent,
+              onChanged: (value) {
+                setState(() {
+                  privateEvent = value;
+                });
+              },
+              activeColor: const Color(0xFF667EEA),
+              activeTrackColor:
+                  const Color(0xFF667EEA).withValues(alpha: 0.3),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // For organization events, show "Make this event public" with a checkbox
+    final bool isPublic = !privateEvent;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -558,15 +655,15 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+              color: const Color(0xFF10B981).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.lock, color: Color(0xFF667EEA), size: 20),
+            child: const Icon(Icons.public, color: Color(0xFF10B981), size: 20),
           ),
           const SizedBox(width: 16),
           const Expanded(
             child: Text(
-              'Private Event',
+              'Make this event public',
               style: TextStyle(
                 color: Color(0xFF1A1A1A),
                 fontWeight: FontWeight.w600,
@@ -576,14 +673,14 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             ),
           ),
           Switch(
-            value: privateEvent,
+            value: isPublic,
             onChanged: (value) {
               setState(() {
-                privateEvent = value;
+                privateEvent = !value;
               });
             },
-            activeColor: const Color(0xFF667EEA),
-            activeTrackColor: const Color(0xFF667EEA).withValues(alpha: 0.3),
+            activeColor: const Color(0xFF10B981),
+            activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
           ),
         ],
       ),
@@ -742,6 +839,11 @@ class _CreateEventScreenState extends State<CreateEventScreen>
               onChanged: (value) {
                 setState(() {
                   _selectedOrganizationId = value;
+                  // If selecting an organization, default to private until user opts-in to public
+                  if (_selectedOrganizationId != null &&
+                      _selectedOrganizationId!.isNotEmpty) {
+                    privateEvent = true;
+                  }
                 });
               },
             ),
@@ -797,19 +899,15 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             ],
           ),
           const SizedBox(height: 20),
-          // Organizer Field
+          // Organizer Field (auto-filled, read-only)
           _buildTextField(
             controller: groupNameEdtController,
             label: 'Organizer',
-            hint: 'Type here...',
+            hint: 'Auto-filled from your profile',
             icon: Icons.person,
-            enableCapitalization: true,
-            validator: (value) {
-              if (value!.isEmpty) {
-                return 'Enter Organizer first!';
-              }
-              return null;
-            },
+            enableCapitalization: false,
+            validator: (_) => null,
+            readOnly: true,
           ),
           const SizedBox(height: 16),
           // Title Field
@@ -868,6 +966,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
     int maxLines = 1,
     String? Function(String?)? validator,
     bool enableCapitalization = false,
+    bool readOnly = false,
+    bool enabled = true,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -886,6 +986,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           controller: controller,
           maxLines: maxLines,
           validator: validator,
+          readOnly: readOnly,
+          enabled: enabled,
           textCapitalization: enableCapitalization
               ? TextCapitalization.words
               : TextCapitalization.none,
@@ -1195,22 +1297,24 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                     ),
                   ],
                 ),
-                child: RoundedLoadingButton(
-                  animateOnTap: false,
-                  borderRadius: 16,
+                child: SizedBox(
                   width: double.infinity,
                   height: 56,
-                  controller: _btnCtlr,
-                  onPressed: () => _handleSubmit(),
-                  color: const Color(0xFF667EEA),
-                  elevation: 0,
-                  child: const Text(
-                    'Add New Event',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      fontFamily: 'Roboto',
+                  child: RoundedLoadingButton(
+                    animateOnTap: false,
+                    borderRadius: 16,
+                    controller: _btnCtlr,
+                    onPressed: () => _handleSubmit(),
+                    color: const Color(0xFF667EEA),
+                    elevation: 0,
+                    child: const Text(
+                      'Add New Event',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        fontFamily: 'Roboto',
+                      ),
                     ),
                   ),
                 ),

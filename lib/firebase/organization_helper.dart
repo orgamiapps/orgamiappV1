@@ -24,10 +24,21 @@ class OrganizationHelper {
 
     return membershipQuery.snapshots().asyncMap((snap) async {
       if (snap.docs.isEmpty) return <Map<String, String>>[];
-      final Set<String> orgIds = {
-        for (final d in snap.docs)
-          (d.data()['organizationId']?.toString() ?? ''),
-      }..removeWhere((e) => e.isEmpty);
+      // Resolve organization IDs from the membership docs. Prefer the stored
+      // field if present, but fall back to the parent path for legacy docs
+      // that may not have `organizationId` saved.
+      final Set<String> orgIds = <String>{};
+      for (final d in snap.docs) {
+        final String? fromField = d.data()['organizationId']?.toString();
+        final String? fromPath = d.reference.parent.parent?.id;
+        final String? resolved = (fromField != null && fromField.isNotEmpty)
+            ? fromField
+            : fromPath;
+        if (resolved != null && resolved.isNotEmpty) {
+          orgIds.add(resolved);
+        }
+      }
+      orgIds.removeWhere((e) => e.isEmpty);
       if (orgIds.isEmpty) return <Map<String, String>>[];
 
       final futures = orgIds.map(
@@ -65,8 +76,11 @@ class OrganizationHelper {
       final List<Map<String, String>> result = [];
       for (final doc in query.docs) {
         try {
-          final orgId = doc.data()['organizationId'] as String?;
-          if (orgId == null) continue;
+          // Prefer stored field, fall back to parent path id for legacy docs
+          final String? orgId =
+              (doc.data()['organizationId'] as String?) ??
+              doc.reference.parent.parent?.id;
+          if (orgId == null || orgId.isEmpty) continue;
           final orgSnap = await _firestore
               .collection('Organizations')
               .doc(orgId)

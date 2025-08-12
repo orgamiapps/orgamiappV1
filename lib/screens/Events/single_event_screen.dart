@@ -1057,41 +1057,43 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                 ],
               ),
               child: SafeArea(
-                child: RoundedLoadingButton(
-                  animateOnTap: true,
-                  borderRadius: 12,
+                child: SizedBox(
                   width: double.infinity,
-                  controller: modalBtnController,
-                  onPressed: () async {
-                    if (formKey.currentState!.validate()) {
-                      formKey.currentState!.save();
+                  child: RoundedLoadingButton(
+                    animateOnTap: true,
+                    borderRadius: 12,
+                    controller: modalBtnController,
+                    onPressed: () async {
+                      if (formKey.currentState!.validate()) {
+                        formKey.currentState!.save();
 
-                      // Collect answers
-                      for (int i = 0; i < questions.length; i++) {
-                        final answer = textControllers[i].text.trim();
-                        if (answer.isNotEmpty) {
-                          attendanceModel.answers.add(
-                            '${questions[i].questionTitle}--ans--$answer',
-                          );
+                        // Collect answers
+                        for (int i = 0; i < questions.length; i++) {
+                          final answer = textControllers[i].text.trim();
+                          if (answer.isNotEmpty) {
+                            attendanceModel.answers.add(
+                              '${questions[i].questionTitle}--ans--$answer',
+                            );
+                          }
                         }
-                      }
 
-                      // Close modal and perform sign-in
-                      Navigator.pop(context);
-                      await _performSignIn(attendanceModel);
-                    } else {
-                      modalBtnController.reset();
-                    }
-                  },
-                  color: AppThemeColor.darkBlueColor,
-                  elevation: 0,
-                  child: const Text(
-                    'Sign In',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                      fontFamily: 'Roboto',
+                        // Close modal and perform sign-in
+                        Navigator.pop(context);
+                        await _performSignIn(attendanceModel);
+                      } else {
+                        modalBtnController.reset();
+                      }
+                    },
+                    color: AppThemeColor.darkBlueColor,
+                    elevation: 0,
+                    child: const Text(
+                      'Sign In',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        fontFamily: 'Roboto',
+                      ),
                     ),
                   ),
                 ),
@@ -2969,38 +2971,6 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                 ],
               ),
               const SizedBox(height: 8),
-              // Organizer
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: _primaryBlue.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _primaryBlue.withValues(alpha: 0.15),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.group_outlined, color: _primaryBlue, size: 16),
-                    const SizedBox(width: 6),
-                    Text(
-                      eventModel.groupName,
-                      style: TextStyle(
-                        color: _primaryBlue,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
               // Event Details
               _buildDetailItem(
                 icon: Icons.calendar_month_rounded,
