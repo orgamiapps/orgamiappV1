@@ -1057,41 +1057,43 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                 ],
               ),
               child: SafeArea(
-                child: RoundedLoadingButton(
-                  animateOnTap: true,
-                  borderRadius: 12,
+                child: SizedBox(
                   width: double.infinity,
-                  controller: modalBtnController,
-                  onPressed: () async {
-                    if (formKey.currentState!.validate()) {
-                      formKey.currentState!.save();
+                  child: RoundedLoadingButton(
+                    animateOnTap: true,
+                    borderRadius: 12,
+                    controller: modalBtnController,
+                    onPressed: () async {
+                      if (formKey.currentState!.validate()) {
+                        formKey.currentState!.save();
 
-                      // Collect answers
-                      for (int i = 0; i < questions.length; i++) {
-                        final answer = textControllers[i].text.trim();
-                        if (answer.isNotEmpty) {
-                          attendanceModel.answers.add(
-                            '${questions[i].questionTitle}--ans--$answer',
-                          );
+                        // Collect answers
+                        for (int i = 0; i < questions.length; i++) {
+                          final answer = textControllers[i].text.trim();
+                          if (answer.isNotEmpty) {
+                            attendanceModel.answers.add(
+                              '${questions[i].questionTitle}--ans--$answer',
+                            );
+                          }
                         }
-                      }
 
-                      // Close modal and perform sign-in
-                      Navigator.pop(context);
-                      await _performSignIn(attendanceModel);
-                    } else {
-                      modalBtnController.reset();
-                    }
-                  },
-                  color: AppThemeColor.darkBlueColor,
-                  elevation: 0,
-                  child: const Text(
-                    'Sign In',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                      fontFamily: 'Roboto',
+                        // Close modal and perform sign-in
+                        Navigator.pop(context);
+                        await _performSignIn(attendanceModel);
+                      } else {
+                        modalBtnController.reset();
+                      }
+                    },
+                    color: AppThemeColor.darkBlueColor,
+                    elevation: 0,
+                    child: const Text(
+                      'Sign In',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        fontFamily: 'Roboto',
+                      ),
                     ),
                   ),
                 ),

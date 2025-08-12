@@ -50,8 +50,8 @@ class CreateEventScreen extends StatefulWidget {
 
 class _CreateEventScreenState extends State<CreateEventScreen>
     with TickerProviderStateMixin {
-  late final double _screenWidth = MediaQuery.of(context).size.width;
-  late final double _screenHeight = MediaQuery.of(context).size.height;
+  double get _screenWidth => MediaQuery.of(context).size.width;
+  double get _screenHeight => MediaQuery.of(context).size.height;
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
@@ -1195,22 +1195,24 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                     ),
                   ],
                 ),
-                child: RoundedLoadingButton(
-                  animateOnTap: false,
-                  borderRadius: 16,
+                child: SizedBox(
                   width: double.infinity,
                   height: 56,
-                  controller: _btnCtlr,
-                  onPressed: () => _handleSubmit(),
-                  color: const Color(0xFF667EEA),
-                  elevation: 0,
-                  child: const Text(
-                    'Add New Event',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      fontFamily: 'Roboto',
+                  child: RoundedLoadingButton(
+                    animateOnTap: false,
+                    borderRadius: 16,
+                    controller: _btnCtlr,
+                    onPressed: () => _handleSubmit(),
+                    color: const Color(0xFF667EEA),
+                    elevation: 0,
+                    child: const Text(
+                      'Add New Event',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        fontFamily: 'Roboto',
+                      ),
                     ),
                   ),
                 ),

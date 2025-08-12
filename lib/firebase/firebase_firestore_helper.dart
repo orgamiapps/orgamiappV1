@@ -390,82 +390,13 @@ class FirebaseFirestoreHelper {
     }
 
     try {
-      // Priority 1: Word-based IDs (most user-friendly)
-      String randomId = generateWordBasedId();
-      int attempts = 0;
-      const maxAttempts = 20; // More attempts for word-based IDs
-
-      // Check if the ID already exists
-      while (attempts < maxAttempts) {
-        DocumentSnapshot eventDoc = await _firestore
-            .collection(EventModel.firebaseKey)
-            .doc(randomId)
-            .get();
-
-        if (!eventDoc.exists) {
-          // ID is unique, return it
-          Logger.success('Generated unique word-based event ID: $randomId');
-          return randomId;
-        }
-
-        // ID exists, generate a new one
-        randomId = generateWordBasedId();
-        attempts++;
-      }
-
-      // Priority 2: Numeric IDs (fallback for high volume)
-      Logger.debug(
-        'Could not generate unique word-based ID, trying numeric...',
-      );
-      randomId = generateNumericId();
-      attempts = 0;
-
-      while (attempts < maxAttempts) {
-        DocumentSnapshot eventDoc = await _firestore
-            .collection(EventModel.firebaseKey)
-            .doc(randomId)
-            .get();
-
-        if (!eventDoc.exists) {
-          // ID is unique, return it
-          Logger.success('Generated unique numeric event ID: $randomId');
-          return randomId;
-        }
-
-        // ID exists, generate a new one
-        randomId = generateNumericId();
-        attempts++;
-      }
-
-      // Priority 3: Alphanumeric IDs
-      Logger.debug(
-        'Could not generate unique numeric ID, trying alphanumeric...',
-      );
-      randomId = generateRandomId();
-      attempts = 0;
-
-      while (attempts < maxAttempts) {
-        DocumentSnapshot eventDoc = await _firestore
-            .collection(EventModel.firebaseKey)
-            .doc(randomId)
-            .get();
-
-        if (!eventDoc.exists) {
-          // ID is unique, return it
-          Logger.success('Generated unique alphanumeric event ID: $randomId');
-          return randomId;
-        }
-
-        // ID exists, generate a new one
-        randomId = generateRandomId();
-        attempts++;
-      }
-
-      // Final fallback: use timestamp-based ID
-      Logger.warning(
-        'Could not generate unique ID after multiple attempts, using timestamp',
-      );
-      return DateTime.now().millisecondsSinceEpoch.toString();
+      // Avoid Firestore reads (blocked by rules for non-existent docs).
+      // Compose a robust, low-collision ID locally.
+      final wordId = generateWordBasedId(); // e.g. DISCOVER-585
+      final suffix = generateRandomId().substring(0, 2); // e.g. AB
+      final candidate = '$wordId$suffix'; // e.g. DISCOVER-585AB
+      Logger.success('Generated event ID (no read): $candidate');
+      return candidate;
     } catch (e) {
       Logger.error('Error generating event ID: $e', e);
       // Fallback: use timestamp as event ID
