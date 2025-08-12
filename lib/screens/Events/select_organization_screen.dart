@@ -13,15 +13,20 @@ class SelectOrganizationScreen extends StatefulWidget {
 class _SelectOrganizationScreenState extends State<SelectOrganizationScreen> {
   bool _loading = true;
   List<Map<String, String>> _orgs = const [];
+  Stream<List<Map<String, String>>>? _orgsStream;
+  late final OrganizationHelper _organizationHelper;
 
   @override
   void initState() {
     super.initState();
+    _organizationHelper = OrganizationHelper();
+    _orgsStream = _organizationHelper.streamUserOrganizationsLite();
+    _subscribe();
     _loadOrgs();
   }
 
   Future<void> _loadOrgs() async {
-    final list = await OrganizationHelper().getUserOrganizationsLite();
+    final list = await _organizationHelper.getUserOrganizationsLite();
     if (!mounted) return;
     setState(() {
       _orgs = list;
@@ -30,6 +35,19 @@ class _SelectOrganizationScreenState extends State<SelectOrganizationScreen> {
     if (list.length == 1) {
       _goToDateTime(list.first['id']!);
     }
+  }
+
+  void _subscribe() {
+    _orgsStream?.listen((list) {
+      if (!mounted) return;
+      setState(() {
+        _orgs = list;
+        _loading = false;
+      });
+      if (list.length == 1) {
+        _goToDateTime(list.first['id']!);
+      }
+    });
   }
 
   void _goToDateTime(String organizationId) {
@@ -46,6 +64,7 @@ class _SelectOrganizationScreenState extends State<SelectOrganizationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFAFBFC),
+      appBar: null,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -72,6 +91,12 @@ class _SelectOrganizationScreenState extends State<SelectOrganizationScreen> {
           ],
         ),
       ),
+      floatingActionButton: _loading
+          ? null
+          : FloatingActionButton(
+              onPressed: _loadOrgs,
+              child: const Icon(Icons.refresh),
+            ),
     );
   }
 
