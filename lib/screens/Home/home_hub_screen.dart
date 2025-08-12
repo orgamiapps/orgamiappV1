@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/screens/Events/single_event_screen.dart';
+import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:orgami/screens/Events/select_event_type_screen.dart';
 
 class HomeHubScreen extends StatefulWidget {
@@ -327,7 +328,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
           (chunk) => FirebaseFirestore.instance
               .collection('Events')
               .where('organizationId', whereIn: chunk)
-              .orderBy('selectedDateTime', descending: false)
+              .limit(100)
               .get(),
         ),
       ),
@@ -345,8 +346,15 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
           );
         }
 
-        // Merge docs, map to simple list with sort
-        final docs = snapshot.data!.expand((qs) => qs.docs).toList()
+        // Merge docs, filter to upcoming, then sort by selectedDateTime
+        final DateTime threshold = DateTime.now().subtract(const Duration(hours: 3));
+        final docs = snapshot.data!
+            .expand((qs) => qs.docs)
+            .where((d) {
+              final dt = (d.data()['selectedDateTime'] as Timestamp?)?.toDate();
+              return dt == null || dt.isAfter(threshold);
+            })
+            .toList()
           ..sort((a, b) {
             final ad =
                 (a.data()['selectedDateTime'] as Timestamp?)?.toDate() ??
@@ -416,24 +424,14 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   }
 
   Widget _eventTile(EventModel model) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: _cardDeco(),
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        title: Text(
-          model.title,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Text(model.location),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () {
-          RouterClass.nextScreenNormal(
-            context,
-            SingleEventScreen(eventModel: model),
-          );
-        },
-      ),
+    return SingleEventListViewItem(
+      eventModel: model,
+      onTap: () {
+        RouterClass.nextScreenNormal(
+          context,
+          SingleEventScreen(eventModel: model),
+        );
+      },
     );
   }
 

@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
+import 'package:orgami/screens/Events/single_event_screen.dart';
 import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
 import 'package:orgami/controller/customer_controller.dart';
 
@@ -332,18 +333,35 @@ class _OrgEventsListState extends State<OrgEventsList>
         return;
       }
 
-      // Fetch organization IDs where user is an approved member
-      final memberSnaps = await FirebaseFirestore.instance
+      // Fetch organization IDs where user is an approved member.
+      // Query by stored field userId (new schema)
+      final qByField = await FirebaseFirestore.instance
           .collectionGroup('Members')
           .where('userId', isEqualTo: uid)
           .where('status', isEqualTo: 'approved')
           .limit(100)
           .get();
 
-      final Set<String> orgIds = {
-        for (final d in memberSnaps.docs)
-          (d.data()['organizationId']?.toString() ?? ''),
-      }..removeWhere((e) => e.isEmpty);
+      // Also query by documentId == uid to support legacy docs without userId field
+      final qByDocId = await FirebaseFirestore.instance
+          .collectionGroup('Members')
+          .where(FieldPath.documentId, isEqualTo: uid)
+          .limit(100)
+          .get();
+
+      // Resolve organization IDs robustly: prefer field, fall back to parent path (legacy docs)
+      final Set<String> orgIds = <String>{};
+      for (final d in [...qByField.docs, ...qByDocId.docs]) {
+        final data = d.data();
+        final String? fromField = data['organizationId']?.toString();
+        final String? fromPath = d.reference.parent.parent?.id;
+        final String? resolved = (fromField != null && fromField.isNotEmpty)
+            ? fromField
+            : fromPath;
+        if (resolved != null && resolved.isNotEmpty) {
+          orgIds.add(resolved);
+        }
+      }
 
       List<EventModel> events = [];
 
@@ -355,17 +373,12 @@ class _OrgEventsListState extends State<OrgEventsList>
             i,
             i + 10 > ids.length ? ids.length : i + 10,
           );
+          // Avoid composite index requirement by fetching by organization only
+          // and then filtering/sorting on the client.
           final qs = await FirebaseFirestore.instance
               .collection(EventModel.firebaseKey)
               .where('organizationId', whereIn: chunk)
-              .where(
-                'selectedDateTime',
-                isGreaterThan: DateTime.now().subtract(
-                  const Duration(hours: 3),
-                ),
-              )
-              .orderBy('selectedDateTime')
-              .limit(50)
+              .limit(100)
               .get();
           final chunkEvents = qs.docs.map((doc) {
             final Map<String, dynamic> data = doc.data();
@@ -380,12 +393,7 @@ class _OrgEventsListState extends State<OrgEventsList>
       final createdQs = await FirebaseFirestore.instance
           .collection(EventModel.firebaseKey)
           .where('customerUid', isEqualTo: uid)
-          .where(
-            'selectedDateTime',
-            isGreaterThan: DateTime.now().subtract(const Duration(hours: 3)),
-          )
-          .orderBy('selectedDateTime')
-          .limit(50)
+          .limit(100)
           .get();
       events.addAll(
         createdQs.docs.map((doc) {
@@ -394,6 +402,14 @@ class _OrgEventsListState extends State<OrgEventsList>
           return EventModel.fromJson(data);
         }),
       );
+
+      // Filter to upcoming (with a small grace window) and then sort
+      final DateTime threshold = DateTime.now().subtract(
+        const Duration(hours: 3),
+      );
+      events = events
+          .where((e) => e.selectedDateTime.isAfter(threshold))
+          .toList();
 
       // De-duplicate by id
       final Map<String, EventModel> idToEvent = {
@@ -449,11 +465,18 @@ class _OrgEventsListState extends State<OrgEventsList>
         padding: const EdgeInsets.all(16),
         itemCount: _filteredEvents.length,
         itemBuilder: (context, index) {
+          final event = _filteredEvents[index];
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: SingleEventListViewItem(
-              eventModel: _filteredEvents[index],
-              onTap: () {},
+              eventModel: event,
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => SingleEventScreen(eventModel: event),
+                  ),
+                );
+              },
             ),
           );
         },

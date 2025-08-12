@@ -12,6 +12,9 @@ import 'package:intl/intl.dart';
 import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
 import 'package:orgami/controller/customer_controller.dart';
+import 'package:orgami/models/event_model.dart';
+import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
+import 'package:orgami/screens/Events/single_event_screen.dart';
 
 class OrganizationProfileScreen extends StatelessWidget {
   final String organizationId;
@@ -362,8 +365,7 @@ class _OrgEventsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final query = FirebaseFirestore.instance
         .collection('Events')
-        .where('organizationId', isEqualTo: orgId)
-        .orderBy('selectedDateTime');
+        .where('organizationId', isEqualTo: orgId);
 
     return StreamBuilder<QuerySnapshot>(
       stream: query.snapshots(),
@@ -374,16 +376,42 @@ class _OrgEventsTab extends StatelessWidget {
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return const Center(child: Text('No events yet'));
         }
-        final docs = snapshot.data!.docs;
-        return ListView.separated(
+        // Filter upcoming and sort client-side by selectedDateTime
+        final DateTime threshold = DateTime.now().subtract(
+          const Duration(hours: 3),
+        );
+        final docs =
+            snapshot.data!.docs.where((d) {
+              final dt = (d['selectedDateTime'] as Timestamp?)?.toDate();
+              return dt == null || dt.isAfter(threshold);
+            }).toList()..sort((a, b) {
+              final ad =
+                  (a['selectedDateTime'] as Timestamp?)?.toDate() ??
+                  DateTime(2100);
+              final bd =
+                  (b['selectedDateTime'] as Timestamp?)?.toDate() ??
+                  DateTime(2100);
+              return ad.compareTo(bd);
+            });
+        return ListView.builder(
           itemCount: docs.length,
-          separatorBuilder: (_, __) => const Divider(height: 0),
+          padding: const EdgeInsets.all(16),
           itemBuilder: (context, i) {
             final data = docs[i].data() as Map<String, dynamic>;
-            return ListTile(
-              leading: const Icon(Icons.event),
-              title: Text((data['title'] ?? '').toString()),
-              subtitle: Text((data['description'] ?? '').toString()),
+            data['id'] = data['id'] ?? docs[i].id;
+            final model = EventModel.fromJson(data);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: SingleEventListViewItem(
+                eventModel: model,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SingleEventScreen(eventModel: model),
+                    ),
+                  );
+                },
+              ),
             );
           },
         );
