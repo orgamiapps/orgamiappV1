@@ -292,6 +292,11 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
     // Preselect organization if provided
     _selectedOrganizationId = widget.preselectedOrganizationId;
+    // If this is explicitly an organization event flow, default to private until the
+    // creator checks the box to make it public.
+    if (widget.forceOrganizationEvent) {
+      privateEvent = true; // not public by default for org events
+    }
 
     // Initialize animations
     _fadeController = AnimationController(
@@ -429,8 +434,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
               // Organization selector
               _buildOrganizationSelector(),
               const SizedBox(height: 24),
-              // Private Event Toggle
-              _buildPrivateEventToggle(),
+              // Private/Public Toggle (depends on org context)
+              _buildVisibilityToggle(),
               const SizedBox(height: 24),
               // Categories Section
               _buildCategoriesSection(),
@@ -536,7 +541,70 @@ class _CreateEventScreenState extends State<CreateEventScreen>
     );
   }
 
-  Widget _buildPrivateEventToggle() {
+  bool get _isOrganizationContext =>
+      widget.forceOrganizationEvent ||
+      (_selectedOrganizationId != null && _selectedOrganizationId!.isNotEmpty);
+
+  Widget _buildVisibilityToggle() {
+    // For public events (no organization), show "Make this event private"
+    if (!_isOrganizationContext) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              spreadRadius: 0,
+              blurRadius: 20,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child:
+                  const Icon(Icons.lock, color: Color(0xFF667EEA), size: 20),
+            ),
+            const SizedBox(width: 16),
+            const Expanded(
+              child: Text(
+                'Make this event private',
+                style: TextStyle(
+                  color: Color(0xFF1A1A1A),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ),
+            Switch(
+              value: privateEvent,
+              onChanged: (value) {
+                setState(() {
+                  privateEvent = value;
+                });
+              },
+              activeColor: const Color(0xFF667EEA),
+              activeTrackColor:
+                  const Color(0xFF667EEA).withValues(alpha: 0.3),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // For organization events, show "Make this event public" with a checkbox
+    final bool isPublic = !privateEvent;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -558,15 +626,15 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+              color: const Color(0xFF10B981).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.lock, color: Color(0xFF667EEA), size: 20),
+            child: const Icon(Icons.public, color: Color(0xFF10B981), size: 20),
           ),
           const SizedBox(width: 16),
           const Expanded(
             child: Text(
-              'Private Event',
+              'Make this event public',
               style: TextStyle(
                 color: Color(0xFF1A1A1A),
                 fontWeight: FontWeight.w600,
@@ -576,14 +644,14 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             ),
           ),
           Switch(
-            value: privateEvent,
+            value: isPublic,
             onChanged: (value) {
               setState(() {
-                privateEvent = value;
+                privateEvent = !value;
               });
             },
-            activeColor: const Color(0xFF667EEA),
-            activeTrackColor: const Color(0xFF667EEA).withValues(alpha: 0.3),
+            activeColor: const Color(0xFF10B981),
+            activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
           ),
         ],
       ),
@@ -742,6 +810,11 @@ class _CreateEventScreenState extends State<CreateEventScreen>
               onChanged: (value) {
                 setState(() {
                   _selectedOrganizationId = value;
+                  // If selecting an organization, default to private until user opts-in to public
+                  if (_selectedOrganizationId != null &&
+                      _selectedOrganizationId!.isNotEmpty) {
+                    privateEvent = true;
+                  }
                 });
               },
             ),
