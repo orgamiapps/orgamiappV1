@@ -504,7 +504,7 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _buildActionButton(
-            icon: Icons.share,
+            icon: Icons.share_outlined,
             label: 'Share',
             onTap: widget.onShare,
           ),

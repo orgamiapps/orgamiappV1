@@ -1881,7 +1881,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                     child: Column(
                       children: [
                         _buildShareOption(
-                          icon: Icons.share,
+                          icon: Icons.share_outlined,
                           title: 'Share Event Details',
                           subtitle: 'Share event information with others',
                           onTap: () {
@@ -2412,7 +2412,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           ),
                           const SizedBox(width: 16),
                           _buildModernButton(
-                            icon: Icons.share_rounded,
+                            icon: Icons.share_outlined,
                             onTap: () => _showQuickShareOptions(),
                             tooltip: 'Share Event',
                           ),
@@ -2441,7 +2441,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           ),
                           const SizedBox(width: 16),
                           _buildModernButton(
-                            icon: Icons.share_rounded,
+                            icon: Icons.share_outlined,
                             onTap: () => _shareEventDetails(),
                             tooltip: 'Share Event',
                           ),
