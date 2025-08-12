@@ -1856,7 +1856,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(
-                          Icons.share,
+                          CupertinoIcons.share,
                           color: AppThemeColor.darkBlueColor,
                           size: 24,
                         ),
@@ -1885,7 +1885,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                     child: Column(
                       children: [
                         _buildShareOption(
-                          icon: Icons.share,
+                          icon: CupertinoIcons.share,
                           title: 'Share Event Details',
                           subtitle: 'Share event information with others',
                           onTap: () {
@@ -2416,7 +2416,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           ),
                           const SizedBox(width: 16),
                           _buildModernButton(
-                            icon: Icons.share_rounded,
+                            icon: CupertinoIcons.share,
                             onTap: () => _showQuickShareOptions(),
                             tooltip: 'Share Event',
                           ),
@@ -2445,7 +2445,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           ),
                           const SizedBox(width: 16),
                           _buildModernButton(
-                            icon: Icons.share_rounded,
+                            icon: CupertinoIcons.share,
                             onTap: () => _shareEventDetails(),
                             tooltip: 'Share Event',
                           ),

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:intl/intl.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/models/attendance_model.dart';
@@ -304,7 +305,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                         elevation: 0,
                       ),
                       icon: const Icon(
-                        Icons.share_rounded,
+                        CupertinoIcons.share,
                         color: Colors.white,
                       ),
                       label: const Text(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 // import 'package:flutter/services.dart'; // Unused
 import 'package:share_plus/share_plus.dart';
 import 'dart:io';
@@ -555,7 +556,7 @@ class _BadgeScreenState extends State<BadgeScreen>
         Expanded(
           child: ElevatedButton.icon(
             onPressed: _shareBadge,
-            icon: const Icon(Icons.share),
+            icon: const Icon(CupertinoIcons.share),
             label: const Text('Share Badge'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryColor,

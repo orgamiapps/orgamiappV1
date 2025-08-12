@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:orgami/firebase/organization_helper.dart';
 import 'package:orgami/firebase/firebase_storage_helper.dart';
 import 'package:orgami/screens/Organizations/join_requests_screen.dart';
@@ -149,7 +150,7 @@ class OrganizationProfileScreen extends StatelessWidget {
           actions: [
             IconButton(
               tooltip: 'Share',
-              icon: const Icon(Icons.share_outlined),
+              icon: const Icon(CupertinoIcons.share),
               onPressed: () => _shareOrganization(context),
             ),
           ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../models/badge_model.dart';
 import '../../../Utils/colors.dart';
@@ -504,7 +505,7 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _buildActionButton(
-            icon: Icons.share,
+            icon: CupertinoIcons.share,
             label: 'Share',
             onTap: widget.onShare,
           ),
