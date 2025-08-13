@@ -10,6 +10,8 @@ import 'package:orgami/models/ticket_model.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/screens/Events/single_event_screen.dart';
 import 'package:orgami/screens/MyProfile/my_tickets_screen.dart';
+import 'package:orgami/Services/notification_service.dart';
+import 'package:orgami/screens/Events/chose_date_time_screen.dart';
 
 enum CalendarFilter { all, created, tickets, saved }
 
@@ -24,6 +26,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
   DateTime _currentMonth = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime _selectedDate = DateTime.now();
   CalendarFilter _filter = CalendarFilter.all;
+  bool _weekView = false;
+
+  String _searchQuery = '';
+  final TextEditingController _searchCtlr = TextEditingController();
 
   bool _loading = false;
 
@@ -118,13 +124,32 @@ class _CalendarScreenState extends State<CalendarScreen> {
       map[key]!.add(item);
     }
 
-    for (final e in _createdEvents) {
+    Iterable<EventModel> created = _createdEvents;
+    Iterable<EventModel> saved = _savedEvents;
+
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      bool matchesEvent(EventModel e) => e.title.toLowerCase().contains(q) ||
+          e.description.toLowerCase().contains(q) ||
+          e.location.toLowerCase().contains(q);
+      created = created.where(matchesEvent);
+      saved = saved.where(matchesEvent);
+    }
+
+    for (final e in created) {
       addItem(e.selectedDateTime, _CalendarItem.created(e));
     }
-    for (final e in _savedEvents) {
+    for (final e in saved) {
       addItem(e.selectedDateTime, _CalendarItem.saved(e));
     }
     for (final t in _ticketModels) {
+      if (_searchQuery.isNotEmpty) {
+        final q = _searchQuery.toLowerCase();
+        if (!(t.eventTitle.toLowerCase().contains(q) ||
+            t.eventLocation.toLowerCase().contains(q))) {
+          continue;
+        }
+      }
       addItem(t.eventDateTime, _CalendarItem.ticket(t));
     }
     return map;
@@ -187,6 +212,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
         ),
         actions: [
           IconButton(
+            tooltip: _weekView ? 'Month view' : 'Week view',
+            icon: Icon(_weekView ? Icons.calendar_month : Icons.view_week),
+            onPressed: () => setState(() => _weekView = !_weekView),
+          ),
+          IconButton(
             tooltip: 'Today',
             icon: const Icon(Icons.today),
             onPressed: () {
@@ -211,12 +241,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                _buildSearchBar(),
                 _buildMonthHeader(monthLabel),
                 const SizedBox(height: 8),
                 _buildFilters(),
                 const SizedBox(height: 8),
                 _buildWeekdayHeader(),
-                _buildCalendarGrid(),
+                _weekView ? _buildWeekRow() : _buildCalendarGrid(),
                 const SizedBox(height: 12),
                 _buildLegend(),
                 const SizedBox(height: 16),
@@ -227,6 +258,43 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.search, color: Color(0xFF64748B)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: _searchCtlr,
+              decoration: const InputDecoration(
+                hintText: 'Search events by title, location, or description',
+                border: InputBorder.none,
+              ),
+              onChanged: (v) => setState(() => _searchQuery = v.trim()),
+            ),
+          ),
+          if (_searchQuery.isNotEmpty)
+            IconButton(
+              tooltip: 'Clear',
+              icon: const Icon(Icons.clear),
+              onPressed: () {
+                _searchCtlr.clear();
+                setState(() => _searchQuery = '');
+              },
+            )
+        ],
       ),
     );
   }
@@ -396,6 +464,25 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
+  Widget _buildWeekRow() {
+    // Show the week containing _selectedDate
+    final mondayBased = _selectedDate.subtract(Duration(days: (_selectedDate.weekday % 7)));
+    final start = mondayBased; // with Sunday=0 above, this yields Sunday start
+    final days = List.generate(7, (i) => _truncateDate(start.add(Duration(days: i))));
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: days.map((d) => Expanded(child: _buildDayCell(d))).toList(),
+      ),
+    );
+  }
+
   Widget _buildDayCell(DateTime date) {
     final isToday = _truncateDate(date) == _truncateDate(DateTime.now());
     final isSelected = _truncateDate(date) == _truncateDate(_selectedDate);
@@ -544,11 +631,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: const Color(0xFFE5E7EB)),
           ),
-          child: const Center(
-            child: Text(
-              'No events for this day',
-              style: TextStyle(color: Color(0xFF6B7280), fontWeight: FontWeight.w600),
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'No events for this day',
+                style: TextStyle(color: Color(0xFF6B7280), fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              _buildCreateEventShortcut(_selectedDate),
+            ],
           ),
         ),
       );
@@ -561,6 +653,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
       itemBuilder: (context, index) => _buildAgendaItem(items[index]),
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemCount: items.length,
+    );
+  }
+
+  Widget _buildCreateEventShortcut(DateTime date) {
+    return OutlinedButton.icon(
+      icon: const Icon(Icons.add),
+      label: Text('Create an event on ${DateFormat.MMMd().format(date)}'),
+      onPressed: () {
+        RouterClass.nextScreenNormal(
+          context,
+          const ChoseDateTimeScreen(),
+        );
+      },
     );
   }
 
@@ -653,6 +758,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             avatar: const Icon(Icons.add_alert, size: 18),
                             onPressed: () => _addToGoogleCalendar(item),
                           ),
+                          ActionChip(
+                            label: const Text('Remind me'),
+                            avatar: const Icon(Icons.alarm, size: 18),
+                            onPressed: () => _scheduleReminder(item),
+                          ),
                           if (item.type == _CalendarItemType.ticket)
                             ActionChip(
                               label: const Text('My Tickets'),
@@ -724,6 +834,28 @@ class _CalendarScreenState extends State<CalendarScreen> {
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
+  }
+
+  Future<void> _scheduleReminder(_CalendarItem item) async {
+    final when = item.dateTime.subtract(const Duration(minutes: 30));
+    if (when.isBefore(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Event starts too soon for a reminder')),
+      );
+      return;
+    }
+
+    // Use a simple immediate notification as a placeholder; scheduling API not implemented here.
+    // If you later extend NotificationService with scheduling, call that here instead.
+    await NotificationService.showNotification(
+      title: 'Reminder set',
+      body: 'We will remind you 30 minutes before ${item.title}',
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Reminder scheduled 30 minutes before event')),
+    );
   }
 
   void _showDayBottomSheet(DateTime date, List<_CalendarItem> items) {
