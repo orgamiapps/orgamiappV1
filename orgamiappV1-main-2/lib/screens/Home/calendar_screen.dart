@@ -1423,10 +1423,38 @@ class _PinnedHeaderDelegate extends SliverPersistentHeaderDelegate {
     final double range = (maxExtent - minExtent).clamp(1.0, double.infinity);
     final double t = (shrinkOffset / range).clamp(0.0, 1.0);
     final double elevation = 0.0 + 3.0 * t; // subtle shadow as it overlaps
-    return Material(
-      elevation: overlapsContent ? elevation : 0.0,
-      color: Colors.white,
-      child: builder(context, shrinkOffset > 0, overlapsContent),
+    final double fadeOpacity = overlapsContent ? (0.12 * t) : 0.0;
+    return Stack(
+      children: [
+        Material(
+          elevation: overlapsContent ? elevation : 0.0,
+          color: Colors.white,
+          child: builder(context, shrinkOffset > 0, overlapsContent),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 10,
+          child: IgnorePointer(
+            child: Opacity(
+              opacity: fadeOpacity,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0x00000000),
+                      Color(0x1A000000),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
