@@ -240,6 +240,17 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             onPressed: () => Navigator.pop(context),
           ),
           const Spacer(),
+          if (widget.isOwnProfile)
+            TextButton(
+              onPressed: () => _showEditProfileModal(),
+              child: const Text(
+                'Edit Profile',
+                style: TextStyle(
+                  color: AppThemeColor.pureWhiteColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           if (!widget.isOwnProfile &&
               CustomerController.logeInCustomer?.uid != widget.user.uid) ...[
             IconButton(
@@ -968,5 +979,150 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       ClipboardData(text: 'https://orgami.app/profile/${widget.user.uid}'),
     );
     ShowToast().showNormalToast(msg: 'Profile link copied to clipboard');
+  }
+
+  void _showEditProfileModal() {
+    final nameController = TextEditingController(text: widget.user.name);
+    final usernameController =
+        TextEditingController(text: widget.user.username ?? '');
+    final bioController = TextEditingController(text: widget.user.bio ?? '');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.85,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (context, scrollCtlr) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: AppThemeColor.pureWhiteColor,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(Dimensions.radiusLarge),
+                  topRight: Radius.circular(Dimensions.radiusLarge),
+                ),
+              ),
+              child: SingleChildScrollView(
+                controller: scrollCtlr,
+                padding: EdgeInsets.only(
+                  left: 24,
+                  right: 24,
+                  top: 16,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const Text(
+                      'Edit Profile',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: AppThemeColor.darkBlueColor,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Full Name',
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: usernameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Username',
+                        prefixIcon: Icon(Icons.alternate_email),
+                        hintText: 'yourname',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: bioController,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        labelText: 'Bio',
+                        alignLabelWithHint: true,
+                        prefixIcon: Icon(Icons.info_outline),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final current = CustomerController.logeInCustomer;
+                          if (current == null) {
+                            Navigator.pop(context);
+                            return;
+                          }
+
+                          // Save name and bio immediately
+                          await FirebaseFirestoreHelper().updateCustomerProfile(
+                            customerId: current.uid,
+                            name: nameController.text.trim(),
+                            bio: bioController.text.trim(),
+                          );
+
+                          // Save username if changed and not empty
+                          final newUsername = usernameController.text.trim();
+                          if (newUsername.isNotEmpty &&
+                              newUsername != (widget.user.username ?? '')) {
+                            await FirebaseFirestoreHelper().updateUsername(
+                              userId: current.uid,
+                              newUsername: newUsername,
+                            );
+                          }
+
+                          // Update local model so UI reflects immediately
+                          setState(() {
+                            widget.user.name = nameController.text.trim();
+                            widget.user.bio = bioController.text.trim();
+                            widget.user.username =
+                                newUsername.isEmpty ? null : newUsername;
+                          });
+
+                          if (mounted) Navigator.pop(context);
+                          ShowToast().showNormalToast(
+                            msg: 'Profile updated successfully',
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppThemeColor.darkBlueColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(Dimensions.radiusLarge),
+                          ),
+                        ),
+                        child: const Text('Save Changes'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 }

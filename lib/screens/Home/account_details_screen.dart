@@ -4,13 +4,13 @@ import 'package:flutter/services.dart';
 import 'package:orgami/controller/customer_controller.dart';
 import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/Utils/app_app_bar_view.dart';
-import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'dart:convert';
 import 'package:orgami/firebase/firebase_storage_helper.dart';
 import 'package:orgami/Screens/Authentication/forgot_password_screen.dart';
+import 'package:orgami/Utils/full_screen_image_viewer.dart';
 
 class AccountDetailsScreen extends StatefulWidget {
   const AccountDetailsScreen({super.key});
@@ -68,6 +68,9 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
   String? _selectedGender;
   // bool _isLoading = false; // Unused field
 
+  // UI micro-interactions
+  bool _isCameraPressed = false;
+
   final List<String> _genderOptions = [
     'Male',
     'Female',
@@ -86,7 +89,8 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    // Tabs removed; keep controller only if referenced elsewhere
+    _tabController = TabController(length: 1, vsync: this);
     _loadUserData();
   }
 
@@ -129,7 +133,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
     super.dispose();
   }
 
-  void _loadUserData() async {
+  Future<void> _loadUserData() async {
     if (CustomerController.logeInCustomer != null) {
       final customer = CustomerController.logeInCustomer!;
       _nameController.text = customer.name;
@@ -268,7 +272,24 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
           .update(updateData);
 
       _btnCtlr.success();
-      ShowToast().showNormalToast(msg: 'Account details updated successfully!');
+      // Haptic + snackbar style feedback
+      if (mounted) {
+        HapticFeedback.mediumImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            content: Row(
+              children: const [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Expanded(child: Text('Account details updated successfully!')),
+              ],
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
 
       // Update the local customer data
       CustomerController.logeInCustomer = customer;
@@ -287,11 +308,14 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
           _bodyView(),
-          AppAppBarView.appBarWithOnlyBackButton(context: context),
+          AppAppBarView.appBarWithOnlyBackButton(
+            context: context,
+            backButtonColor: Theme.of(context).colorScheme.primary,
+          ),
         ],
       ),
     );
@@ -306,24 +330,29 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Colors.white,
-            AppThemeColor.lightBlueColor.withValues(alpha: 0.3),
+            Theme.of(context).colorScheme.surface,
+            Theme.of(context).colorScheme.surfaceContainerHighest,
           ],
         ),
       ),
       child: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 60),
-              _headerSection(),
-              const SizedBox(height: 24),
-              _buildTabs(),
-              const SizedBox(height: 16),
-              _buildTabViews(),
-            ],
+        child: RefreshIndicator(
+          onRefresh: _loadUserData,
+          color: Theme.of(context).colorScheme.primary,
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 60),
+                _headerSection(),
+                const SizedBox(height: 24),
+                // Only Account Details remain; tabs removed
+                _accountDetailsForm(),
+              ],
+            ),
           ),
         ),
       ),
@@ -332,70 +361,108 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
 
   Widget _headerSection() {
     final user = CustomerController.logeInCustomer;
+    final cs = Theme.of(context).colorScheme;
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                cs.primary.withValues(alpha: 0.12),
+                cs.secondary.withValues(alpha: 0.12),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(24),
           ),
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
           child: Column(
             children: [
               SizedBox(
-                width: 96,
-                height: 96,
+                width: 112,
+                height: 112,
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: ClipOval(
-                        child:
-                            (user?.profilePictureUrl != null &&
-                                (user!.profilePictureUrl!.isNotEmpty))
-                            ? Image.network(
-                                user.profilePictureUrl!,
-                                fit: BoxFit.cover,
-                              )
-                            : Container(
-                                color: const Color(0xFFE1E5E9),
-                                child: const Icon(
-                                  Icons.person,
-                                  size: 40,
-                                  color: Color(0xFF9CA3AF),
-                                ),
+                      child: GestureDetector(
+                        onTap: () {
+                          final url = user?.profilePictureUrl;
+                          if (url == null || url.isEmpty) return;
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => FullScreenImageViewer(
+                                imageUrl: url,
+                                heroTag: 'profile-hero',
                               ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [cs.primary, cs.secondary],
+                            ),
+                          ),
+                          padding: const EdgeInsets.all(3),
+                          child: Hero(
+                            tag: 'profile-hero',
+                            child: ClipOval(
+                              child:
+                                  (user?.profilePictureUrl != null &&
+                                      (user!.profilePictureUrl!.isNotEmpty))
+                                  ? Image.network(
+                                      user.profilePictureUrl!,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Container(
+                                      color: cs.outlineVariant,
+                                      child: Icon(
+                                        Icons.person,
+                                        size: 44,
+                                        color: cs.outline,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                     Positioned(
                       bottom: 0,
                       right: 0,
                       child: GestureDetector(
+                        onTapDown: (_) =>
+                            setState(() => _isCameraPressed = true),
+                        onTapCancel: () =>
+                            setState(() => _isCameraPressed = false),
+                        onTapUp: (_) =>
+                            setState(() => _isCameraPressed = false),
                         onTap: _changeProfilePhoto,
-                        child: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: AppThemeColor.darkBlueColor,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.12),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.camera_alt,
-                            color: Colors.white,
-                            size: 16,
+                        child: AnimatedScale(
+                          scale: _isCameraPressed ? 0.92 : 1.0,
+                          duration: const Duration(milliseconds: 120),
+                          curve: Curves.easeOut,
+                          child: Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: cs.primary,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.12),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              Icons.camera_alt,
+                              color: cs.onPrimary,
+                              size: 16,
+                            ),
                           ),
                         ),
                       ),
@@ -403,15 +470,15 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              const SizedBox(height: 14),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 12,
                 children: [
-                  TextButton(
+                  FilledButton.tonal(
                     onPressed: _changeProfilePhoto,
                     child: const Text('Change Photo'),
                   ),
-                  const SizedBox(width: 8),
                   TextButton(
                     onPressed: _removeProfilePhoto,
                     child: const Text('Remove'),
@@ -425,7 +492,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
         Text(
           'Account Details',
           style: TextStyle(
-            color: AppThemeColor.darkBlueColor,
+            color: cs.primary,
             fontSize: 28,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.5,
@@ -436,7 +503,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
           'Update your personal information and preferences',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: AppThemeColor.dullFontColor,
+            color: cs.onSurfaceVariant,
             fontSize: 16,
             fontWeight: FontWeight.w400,
             height: 1.5,
@@ -447,173 +514,183 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
   }
 
   Widget _accountDetailsForm() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 25,
-            offset: const Offset(0, 8),
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Form(
+          key: _formKey,
+          child: AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Personal Information',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Required Fields Section
+                _buildSectionHeader(
+                  'Required Information',
+                  Icons.star,
+                  Colors.orange,
+                ),
+                const SizedBox(height: 16),
+                _buildNameField(),
+                const SizedBox(height: 20),
+                _buildEmailField(),
+                const SizedBox(height: 32),
+
+                // Optional Fields Section
+                _buildSectionHeader(
+                  'Additional Information (Optional)',
+                  Icons.info_outline,
+                  Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(height: 16),
+                _buildUsernameField(), // Add new username field
+                const SizedBox(height: 20),
+                _buildPhoneField(),
+                const SizedBox(height: 20),
+                _buildAgeField(),
+                const SizedBox(height: 20),
+                _buildGenderField(),
+                const SizedBox(height: 20),
+                _buildLocationField(),
+                const SizedBox(height: 32),
+
+                // Professional Information Section
+                _buildSectionHeader(
+                  'Professional Information',
+                  Icons.work,
+                  Colors.green,
+                ),
+                const SizedBox(height: 16),
+                _buildOccupationField(),
+                const SizedBox(height: 20),
+                _buildCompanyField(),
+                const SizedBox(height: 20),
+                _buildWebsiteField(),
+                const SizedBox(height: 32),
+
+                // Bio Section
+                _buildSectionHeader(
+                  'About You',
+                  Icons.person_outline,
+                  Colors.purple,
+                ),
+                const SizedBox(height: 16),
+                _buildBioField(),
+                const SizedBox(height: 32),
+
+                // Social Links
+                _buildSectionHeader(
+                  'Social Links',
+                  Icons.link,
+                  Colors.blueGrey,
+                ),
+                const SizedBox(height: 16),
+                _buildSocialLinksFields(),
+                const SizedBox(height: 32),
+
+                // Privacy
+                _buildSectionHeader('Privacy', Icons.lock_outline, Colors.teal),
+                const SizedBox(height: 12),
+                _buildSwitchTile(
+                  title: 'Make my profile discoverable',
+                  subtitle: 'Allow others to find me by name or username',
+                  value: _isDiscoverable,
+                  onChanged: (v) => setState(() => _isDiscoverable = v),
+                  icon: Icons.search,
+                ),
+                const SizedBox(height: 24),
+
+                // Notifications
+                _buildSectionHeader(
+                  'Notifications',
+                  Icons.notifications_outlined,
+                  Colors.indigo,
+                ),
+                const SizedBox(height: 12),
+                _buildSwitchTile(
+                  title: 'Event reminders',
+                  subtitle: 'Get reminders for upcoming events',
+                  value: _notifyEventReminders,
+                  onChanged: (v) => setState(() => _notifyEventReminders = v),
+                  icon: Icons.event,
+                ),
+                const SizedBox(height: 12),
+                _buildSwitchTile(
+                  title: 'Messages',
+                  subtitle: 'Receive notifications for new messages',
+                  value: _notifyMessages,
+                  onChanged: (v) => setState(() => _notifyMessages = v),
+                  icon: Icons.message,
+                ),
+                const SizedBox(height: 12),
+                _buildSwitchTile(
+                  title: 'Announcements',
+                  subtitle: 'Important updates and news',
+                  value: _notifyAnnouncements,
+                  onChanged: (v) => setState(() => _notifyAnnouncements = v),
+                  icon: Icons.campaign_outlined,
+                ),
+                const SizedBox(height: 32),
+
+                // Security
+                _buildSectionHeader(
+                  'Security',
+                  Icons.security,
+                  Colors.redAccent,
+                ),
+                const SizedBox(height: 12),
+                _buildChangePasswordButton(),
+                const SizedBox(height: 32),
+
+                _buildSaveButton(),
+              ],
+            ),
           ),
-        ],
-      ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Personal Information',
-              style: TextStyle(
-                color: AppThemeColor.darkBlueColor,
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Required Fields Section
-            _buildSectionHeader(
-              'Required Information',
-              Icons.star,
-              Colors.orange,
-            ),
-            const SizedBox(height: 16),
-            _buildNameField(),
-            const SizedBox(height: 20),
-            _buildEmailField(),
-            const SizedBox(height: 32),
-
-            // Optional Fields Section
-            _buildSectionHeader(
-              'Additional Information (Optional)',
-              Icons.info_outline,
-              AppThemeColor.darkBlueColor,
-            ),
-            const SizedBox(height: 16),
-            _buildUsernameField(), // Add new username field
-            const SizedBox(height: 20),
-            _buildPhoneField(),
-            const SizedBox(height: 20),
-            _buildAgeField(),
-            const SizedBox(height: 20),
-            _buildGenderField(),
-            const SizedBox(height: 20),
-            _buildLocationField(),
-            const SizedBox(height: 32),
-
-            // Professional Information Section
-            _buildSectionHeader(
-              'Professional Information',
-              Icons.work,
-              Colors.green,
-            ),
-            const SizedBox(height: 16),
-            _buildOccupationField(),
-            const SizedBox(height: 20),
-            _buildCompanyField(),
-            const SizedBox(height: 20),
-            _buildWebsiteField(),
-            const SizedBox(height: 32),
-
-            // Bio Section
-            _buildSectionHeader(
-              'About You',
-              Icons.person_outline,
-              Colors.purple,
-            ),
-            const SizedBox(height: 16),
-            _buildBioField(),
-            const SizedBox(height: 32),
-
-            // Social Links
-            _buildSectionHeader('Social Links', Icons.link, Colors.blueGrey),
-            const SizedBox(height: 16),
-            _buildSocialLinksFields(),
-            const SizedBox(height: 32),
-
-            // Privacy
-            _buildSectionHeader('Privacy', Icons.lock_outline, Colors.teal),
-            const SizedBox(height: 12),
-            _buildSwitchTile(
-              title: 'Make my profile discoverable',
-              subtitle: 'Allow others to find me by name or username',
-              value: _isDiscoverable,
-              onChanged: (v) => setState(() => _isDiscoverable = v),
-              icon: Icons.search,
-            ),
-            const SizedBox(height: 24),
-
-            // Notifications
-            _buildSectionHeader(
-              'Notifications',
-              Icons.notifications_outlined,
-              Colors.indigo,
-            ),
-            const SizedBox(height: 12),
-            _buildSwitchTile(
-              title: 'Event reminders',
-              subtitle: 'Get reminders for upcoming events',
-              value: _notifyEventReminders,
-              onChanged: (v) => setState(() => _notifyEventReminders = v),
-              icon: Icons.event,
-            ),
-            const SizedBox(height: 12),
-            _buildSwitchTile(
-              title: 'Messages',
-              subtitle: 'Receive notifications for new messages',
-              value: _notifyMessages,
-              onChanged: (v) => setState(() => _notifyMessages = v),
-              icon: Icons.message,
-            ),
-            const SizedBox(height: 12),
-            _buildSwitchTile(
-              title: 'Announcements',
-              subtitle: 'Important updates and news',
-              value: _notifyAnnouncements,
-              onChanged: (v) => setState(() => _notifyAnnouncements = v),
-              icon: Icons.campaign_outlined,
-            ),
-            const SizedBox(height: 32),
-
-            // Security
-            _buildSectionHeader('Security', Icons.security, Colors.redAccent),
-            const SizedBox(height: 12),
-            _buildChangePasswordButton(),
-            const SizedBox(height: 32),
-
-            _buildSaveButton(),
-          ],
         ),
       ),
     );
   }
 
   Widget _buildSectionHeader(String title, IconData icon, Color color) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [cs.primary, cs.secondary]),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: cs.onPrimary, size: 16),
           ),
-          child: Icon(icon, color: color, size: 16),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          title,
-          style: TextStyle(
-            color: AppThemeColor.darkBlueColor,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+          const SizedBox(width: 12),
+          Text(
+            title,
+            style: TextStyle(
+              color: cs.onSurface,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -740,49 +817,26 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
         Text(
           'Gender',
           style: TextStyle(
-            color: AppThemeColor.darkBlueColor,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 14,
             fontWeight: FontWeight.w500,
           ),
         ),
         const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.grey.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+        DropdownButtonFormField<String>(
+          value: _selectedGender,
+          decoration: InputDecoration(
+            hintText: 'Select your gender (optional)',
+            prefixIcon: const Icon(Icons.person_outline),
           ),
-          child: DropdownButtonFormField<String>(
-            value: _selectedGender,
-            decoration: InputDecoration(
-              hintText: 'Select your gender (optional)',
-              hintStyle: TextStyle(
-                color: AppThemeColor.lightGrayColor,
-                fontSize: 16,
-              ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
-              ),
-              prefixIcon: Icon(
-                Icons.person_outline,
-                color: AppThemeColor.lightGrayColor,
-                size: 20,
-              ),
-            ),
-            items: _genderOptions.map((String gender) {
-              return DropdownMenuItem<String>(
-                value: gender,
-                child: Text(gender),
-              );
-            }).toList(),
-            onChanged: (String? newValue) {
-              setState(() {
-                _selectedGender = newValue;
-              });
-            },
-          ),
+          items: _genderOptions.map((String gender) {
+            return DropdownMenuItem<String>(value: gender, child: Text(gender));
+          }).toList(),
+          onChanged: (String? newValue) {
+            setState(() {
+              _selectedGender = newValue;
+            });
+          },
         ),
       ],
     );
@@ -848,59 +902,22 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
         Text(
           'Bio',
           style: TextStyle(
-            color: AppThemeColor.darkBlueColor,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 14,
             fontWeight: FontWeight.w500,
           ),
         ),
         const SizedBox(height: 8),
-        Focus(
-          onFocusChange: (hasFocus) {
-            setState(() {});
-          },
-          child: TextFormField(
-            controller: _bioController,
-            focusNode: _bioFocus,
-            maxLines: 4,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
-            decoration: InputDecoration(
-              hintText: 'Tell us a bit about yourself (optional)',
-              hintStyle: TextStyle(
-                color: AppThemeColor.lightGrayColor,
-                fontSize: 16,
-              ),
-              filled: true,
-              fillColor: _bioFocus.hasFocus
-                  ? AppThemeColor.lightBlueColor.withValues(alpha: 0.1)
-                  : Colors.grey.withValues(alpha: 0.05),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: AppThemeColor.darkBlueColor,
-                  width: 2,
-                ),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
-              ),
-              prefixIcon: Padding(
-                padding: const EdgeInsets.only(bottom: 40),
-                child: Icon(
-                  Icons.edit_note_outlined,
-                  color: _bioFocus.hasFocus
-                      ? AppThemeColor.darkBlueColor
-                      : AppThemeColor.lightGrayColor,
-                  size: 20,
-                ),
-              ),
-            ),
-            inputFormatters: [LengthLimitingTextInputFormatter(500)],
+        TextFormField(
+          controller: _bioController,
+          focusNode: _bioFocus,
+          maxLines: 4,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+          decoration: const InputDecoration(
+            hintText: 'Tell us a bit about yourself (optional)',
+            prefixIcon: Icon(Icons.edit_note_outlined),
           ),
+          inputFormatters: [LengthLimitingTextInputFormatter(500)],
         ),
       ],
     );
@@ -923,58 +940,30 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
         Text(
           label,
           style: TextStyle(
-            color: AppThemeColor.darkBlueColor,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 14,
             fontWeight: FontWeight.w500,
           ),
         ),
         const SizedBox(height: 8),
-        Focus(
-          onFocusChange: (hasFocus) {
-            setState(() {});
-          },
-          child: TextFormField(
-            controller: controller,
-            focusNode: focusNode,
-            keyboardType: keyboardType,
-            textCapitalization: textCapitalization ?? TextCapitalization.none,
-            inputFormatters: inputFormatters,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: TextStyle(
-                color: AppThemeColor.lightGrayColor,
-                fontSize: 16,
-              ),
-              filled: true,
-              fillColor: focusNode.hasFocus
-                  ? AppThemeColor.lightBlueColor.withValues(alpha: 0.1)
-                  : Colors.grey.withValues(alpha: 0.05),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: AppThemeColor.darkBlueColor,
-                  width: 2,
-                ),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
-              ),
-              prefixIcon: Icon(
-                icon,
-                color: focusNode.hasFocus
-                    ? AppThemeColor.darkBlueColor
-                    : AppThemeColor.lightGrayColor,
-                size: 20,
-              ),
+        TextFormField(
+          controller: controller,
+          focusNode: focusNode,
+          keyboardType: keyboardType,
+          textCapitalization: textCapitalization ?? TextCapitalization.none,
+          inputFormatters: inputFormatters,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+          decoration: InputDecoration(
+            hintText: hint,
+            prefixIcon: Icon(
+              icon,
+              color: focusNode.hasFocus
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.outline,
+              size: 20,
             ),
-            validator: validator,
           ),
+          validator: validator,
         ),
       ],
     );
@@ -989,7 +978,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
         borderRadius: 12,
         controller: _btnCtlr,
         onPressed: _saveAccountDetails,
-        color: AppThemeColor.darkBlueColor,
+        color: Theme.of(context).colorScheme.primary,
         elevation: 0,
         child: const Text(
           'Save Changes',
@@ -1075,7 +1064,9 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.grey.withValues(alpha: 0.05),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -1083,10 +1074,14 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppThemeColor.lightBlueColor.withValues(alpha: 0.5),
+              color: Theme.of(context).colorScheme.primaryContainer,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: AppThemeColor.darkBlueColor, size: 18),
+            child: Icon(
+              icon,
+              color: Theme.of(context).colorScheme.onPrimaryContainer,
+              size: 18,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1104,7 +1099,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
                 Text(
                   subtitle,
                   style: TextStyle(
-                    color: AppThemeColor.lightGrayColor,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 12,
                   ),
                 ),
@@ -1114,7 +1109,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: AppThemeColor.darkBlueColor,
+            activeColor: Theme.of(context).colorScheme.primary,
           ),
         ],
       ),
@@ -1182,104 +1177,5 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
     ShowToast().showNormalToast(msg: 'Profile photo removed');
   }
 
-  Widget _buildTabs() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: TabBar(
-        controller: _tabController,
-        indicator: BoxDecoration(
-          color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        labelColor: AppThemeColor.darkBlueColor,
-        unselectedLabelColor: AppThemeColor.lightGrayColor,
-        tabs: const [
-          Tab(text: 'Public Profile'),
-          Tab(text: 'Account Details'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabViews() {
-    // Render active tab only to avoid unbounded height within SingleChildScrollView
-    return _tabController.index == 0
-        ? _publicProfileForm()
-        : _accountDetailsForm();
-  }
-
-  // Public Profile tab content
-  Widget _publicProfileForm() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 25,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Form(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Profile Information',
-              style: TextStyle(
-                color: AppThemeColor.darkBlueColor,
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 24),
-            _buildNameField(),
-            const SizedBox(height: 20),
-            _buildUsernameField(),
-            const SizedBox(height: 20),
-            _buildBioField(),
-            const SizedBox(height: 20),
-            _buildGenderField(),
-            const SizedBox(height: 20),
-            _buildAgeField(),
-            const SizedBox(height: 20),
-            _buildLocationField(),
-            const SizedBox(height: 20),
-            _buildOccupationField(),
-            const SizedBox(height: 20),
-            _buildCompanyField(),
-            const SizedBox(height: 20),
-            _buildWebsiteField(),
-            const SizedBox(height: 24),
-            _buildSectionHeader('Social Links', Icons.link, Colors.blueGrey),
-            const SizedBox(height: 16),
-            _buildSocialLinksFields(),
-            const SizedBox(height: 24),
-            _buildSectionHeader('Privacy', Icons.lock_outline, Colors.teal),
-            const SizedBox(height: 12),
-            _buildSwitchTile(
-              title: 'Make my profile discoverable',
-              subtitle: 'Allow others to find me by name or username',
-              value: _isDiscoverable,
-              onChanged: (v) => setState(() => _isDiscoverable = v),
-              icon: Icons.search,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // Tabs removed; public profile editing now accessed from profile screen modal.
 }

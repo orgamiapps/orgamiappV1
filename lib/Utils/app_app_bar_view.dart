@@ -31,7 +31,7 @@ class AppAppBarView {
     );
   }
 
-  static Widget appBarWithOnlyBackButton({required BuildContext context}) {
+  static Widget appBarWithOnlyBackButton({required BuildContext context, Color? backButtonColor}) {
     return SafeArea(
       child: Row(
         children: [
@@ -42,7 +42,7 @@ class AppAppBarView {
               child: AppButtons.roundedButton(
                 iconData: Icons.arrow_back_ios_rounded,
                 iconColor: AppThemeColor.pureWhiteColor,
-                backgroundColor: AppThemeColor.darkGreenColor,
+                backgroundColor: backButtonColor ?? AppThemeColor.darkGreenColor,
               ),
             ),
           ),

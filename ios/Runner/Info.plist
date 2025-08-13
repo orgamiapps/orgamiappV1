@@ -67,9 +67,9 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
-			<Array>
+			<array>
 				<string>com.googleusercontent.apps.951311475019-vrmcjm9inlpdi66qupst3op5c81e74el</string>
-			</Array>
+			</array>
 		</dict>
 	</array>
 	<key>NSPhotoLibraryAddUsageDescription</key>

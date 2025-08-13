@@ -47,6 +47,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   UserBadgeModel? _userBadge;
   bool _isBadgeLoading = false;
   final BadgeService _badgeService = BadgeService();
+  bool _isBadgeExpanded = false;
 
   // Selection state
   bool isSelectionMode = false;
@@ -578,11 +579,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                     color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(18),
                   ),
-                  child: const Icon(
-                    Icons.edit,
-                    color: Colors.white,
-                    size: 18,
-                  ),
+                  child: const Icon(Icons.edit, color: Colors.white, size: 18),
                 ),
               ),
             ],
@@ -794,24 +791,38 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.military_tech,
-                    color: const Color(0xFF667EEA),
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'My Badge',
-                    style: TextStyle(
-                      color: Color(0xFF1A1A1A),
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                      fontFamily: 'Roboto',
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _isBadgeExpanded = !_isBadgeExpanded;
+                  });
+                },
+                behavior: HitTestBehavior.opaque,
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.military_tech,
+                      color: const Color(0xFF667EEA),
+                      size: 18,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    const Text(
+                      'My Badge',
+                      style: TextStyle(
+                        color: Color(0xFF1A1A1A),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      _isBadgeExpanded ? Icons.expand_less : Icons.expand_more,
+                      color: const Color(0xFF667EEA),
+                      size: 18,
+                    ),
+                  ],
+                ),
               ),
               GestureDetector(
                 onTap: _navigateToBadgeScreen,
@@ -848,24 +859,38 @@ class _MyProfileScreenState extends State<MyProfileScreen>
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Center(
-            child: GestureDetector(
-              onTap: _navigateToBadgeScreen,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final availableWidth = constraints.maxWidth;
-                  final badgeWidth = availableWidth.clamp(260.0, 360.0);
-                  final badgeHeight = badgeWidth * (180 / 280);
-                  return ProfessionalBadgeWidget(
-                    badge: _userBadge!,
-                    width: badgeWidth,
-                    height: badgeHeight,
-                    showActions: false,
-                  );
-                },
-              ),
+          AnimatedCrossFade(
+            firstChild: Column(
+              children: [
+                const SizedBox(height: 16),
+                Center(
+                  child: GestureDetector(
+                    onTap: _navigateToBadgeScreen,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final availableWidth = constraints.maxWidth;
+                        final double badgeWidth = availableWidth.clamp(
+                          260.0,
+                          360.0,
+                        );
+                        final double badgeHeight = badgeWidth * (180 / 280);
+                        return ProfessionalBadgeWidget(
+                          badge: _userBadge!,
+                          width: badgeWidth,
+                          height: badgeHeight,
+                          showActions: false,
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ),
+            secondChild: const SizedBox.shrink(),
+            crossFadeState: _isBadgeExpanded
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
+            duration: const Duration(milliseconds: 200),
           ),
         ],
       ),
@@ -1676,7 +1701,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
                 const Icon(Icons.tune, color: Color(0xFF667EEA), size: 24),
                 const SizedBox(width: 12),
                 const Text(
-                  'Filter/Sort Events',
+                  'Filters & Sort',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -1718,6 +1743,53 @@ class _FilterSortModalState extends State<_FilterSortModal> {
                 _buildSortSection(),
                 const SizedBox(height: 24),
               ],
+            ),
+          ),
+          // Footer actions
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+              child: Row(
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      _updateCategories([]);
+                      _updateSortOption(SortOption.none);
+                    },
+                    child: const Text(
+                      'Reset',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF667EEA),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      elevation: 0,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -1879,8 +1951,14 @@ class _FilterSortModalState extends State<_FilterSortModal> {
     );
   }
 
-  // Build sort section
+  // Build sort section (pill-style like Home screen)
   Widget _buildSortSection() {
+    final options = [
+      SortOption.none, // Tab-tailored default
+      SortOption.dateAddedDesc, // Newest
+      SortOption.titleAsc, // A–Z
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1889,7 +1967,7 @@ class _FilterSortModalState extends State<_FilterSortModal> {
             Icon(Icons.sort, color: const Color(0xFF667EEA), size: 20),
             const SizedBox(width: 8),
             const Text(
-              'Sort by',
+              'Sort',
               style: TextStyle(
                 color: Color(0xFF1A1A1A),
                 fontWeight: FontWeight.w600,
@@ -1899,108 +1977,46 @@ class _FilterSortModalState extends State<_FilterSortModal> {
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        // Default (No Sorting)
-        _buildSortOptionGroup('Default', [SortOption.none]),
-        const SizedBox(height: 16),
-        // Date Added section
-        _buildSortOptionGroup('Date Added', [
-          SortOption.dateAddedDesc,
-          SortOption.dateAddedAsc,
-        ]),
-        const SizedBox(height: 16),
-        // Title section
-        _buildSortOptionGroup('Title', [
-          SortOption.titleAsc,
-          SortOption.titleDesc,
-        ]),
-        const SizedBox(height: 16),
-        // Event Date section
-        _buildSortOptionGroup('Event Date', [
-          SortOption.eventDateDesc,
-          SortOption.eventDateAsc,
-        ]),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: options.map((o) {
+            final isSelected = _currentSortOption == o;
+            return ChoiceChip(
+              selected: isSelected,
+              onSelected: (_) => _updateSortOption(o),
+              label: Text(
+                _getSortOptionText(o),
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+              avatar: Icon(
+                _getSortOptionIcon(o),
+                size: 18,
+                color: isSelected ? Colors.white : const Color(0xFF667EEA),
+              ),
+              labelPadding: const EdgeInsets.symmetric(horizontal: 8),
+              selectedColor: const Color(0xFF667EEA),
+              backgroundColor: Colors.grey[50],
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: isSelected
+                      ? const Color(0xFF667EEA)
+                      : const Color(0xFFE1E5E9),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
       ],
     );
   }
 
-  // Build sort option group
-  Widget _buildSortOptionGroup(String title, List<SortOption> options) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Text(
-            title,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[600],
-              fontFamily: 'Roboto',
-            ),
-          ),
-        ),
-        ...options.map((option) {
-          bool isSelected = _currentSortOption == option;
-          return GestureDetector(
-            onTap: () {
-              _updateSortOption(option);
-            },
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? const Color(0xFF667EEA).withValues(alpha: 0.1)
-                    : Colors.grey[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isSelected
-                      ? const Color(0xFF667EEA)
-                      : Colors.grey[200]!,
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    _getSortOptionIcon(option),
-                    color: isSelected
-                        ? const Color(0xFF667EEA)
-                        : Colors.grey[600],
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      _getSortOptionText(option),
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: isSelected
-                            ? FontWeight.w600
-                            : FontWeight.w500,
-                        color: isSelected
-                            ? const Color(0xFF1A1A1A)
-                            : Colors.grey[700],
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                  ),
-                  if (isSelected)
-                    const Icon(
-                      Icons.check_circle,
-                      color: Color(0xFF667EEA),
-                      size: 20,
-                    ),
-                ],
-              ),
-            ),
-          );
-        }),
-      ],
-    );
-  }
+  // (legacy grouped sort widget removed in favor of pill-style chips)
 
   IconData _getCategoryIcon(String category) {
     switch (category) {
@@ -2029,9 +2045,9 @@ class _FilterSortModalState extends State<_FilterSortModal> {
       case SortOption.dateAddedAsc:
         return 'Date Added (Oldest First)';
       case SortOption.dateAddedDesc:
-        return 'Date Added (Newest First)';
+        return 'Newest';
       case SortOption.titleAsc:
-        return 'Title (A-Z)';
+        return 'A–Z';
       case SortOption.titleDesc:
         return 'Title (Z-A)';
       case SortOption.eventDateAsc:
