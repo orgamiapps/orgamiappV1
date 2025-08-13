@@ -47,6 +47,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   late PageController _monthPageController;
   static const int _kMonthPageCount = 1200;
   static const int _kMonthBaseIndex = _kMonthPageCount ~/ 2;
+  late DateTime _pagerAnchorMonth;
 
   int get _monthPageIndex => _monthPageController.hasClients
       ? _monthPageController.page?.round() ?? _kMonthBaseIndex
@@ -58,6 +59,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     _loadData();
     _eventController = EventController();
     _monthPageController = PageController(initialPage: _kMonthBaseIndex);
+    _pagerAnchorMonth = DateTime(_currentMonth.year, _currentMonth.month);
   }
 
   @override
@@ -346,6 +348,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             tooltip: 'Add event',
             icon: const Icon(Icons.add),
             onPressed: () {
+              HapticFeedback.heavyImpact();
               RouterClass.nextScreenNormal(context, const ChoseDateTimeScreen());
             },
           ),
@@ -383,9 +386,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
       lastDate: DateTime(2100),
     );
     if (picked == null) return;
-    final deltaMonths = (picked.year - _currentMonth.year) * 12 + (picked.month - _currentMonth.month);
     if (_viewMode == ViewMode.month) {
-      final target = (_monthPageIndex + deltaMonths).clamp(0, _kMonthPageCount - 1);
+      final monthsFromAnchor =
+          (picked.year - _pagerAnchorMonth.year) * 12 + (picked.month - _pagerAnchorMonth.month);
+      final target = (_kMonthBaseIndex + monthsFromAnchor).clamp(0, _kMonthPageCount - 1);
       _monthPageController.jumpToPage(target);
     }
     setState(() {
@@ -496,14 +500,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ),
           Expanded(
             child: Center(
-              child: Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF1E293B),
-                ),
-              ),
+              child: _viewMode == ViewMode.month
+                  ? _buildFadingMonthLabel()
+                  : Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
             ),
           ),
           IconButton(
@@ -695,7 +701,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   DateTime _monthFromIndex(int index) {
     final delta = index - _kMonthBaseIndex;
-    return DateTime(_currentMonth.year, _currentMonth.month + delta);
+    return DateTime(_pagerAnchorMonth.year, _pagerAnchorMonth.month + delta);
   }
 
   Widget _buildMonthGridFor(DateTime month) {
@@ -1274,12 +1280,26 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       icon: const Icon(Icons.add),
                       tooltip: 'New Event',
                       onPressed: () {
-                        final DateTime initial = DateTime(date.year, date.month, date.day, 19, 0);
+                        // Smart default: next top-of-hour for today, else 9:00 AM
+                        DateTime initial;
+                        final now = DateTime.now();
+                        if (DateUtils.isSameDay(now, date)) {
+                          final nextHour = now.add(const Duration(hours: 1));
+                          initial = DateTime(
+                            date.year,
+                            date.month,
+                            date.day,
+                            nextHour.hour,
+                            0,
+                          );
+                        } else {
+                          initial = DateTime(date.year, date.month, date.day, 9, 0);
+                        }
                         Navigator.pop(context);
+                        HapticFeedback.heavyImpact();
                         RouterClass.nextScreenNormal(
                           context,
                           ChoseDateTimeScreen(
-                            // prefill start date/time via new parameter (see screen edits)
                             initialDateTime: initial,
                           ),
                         );
@@ -1314,6 +1334,43 @@ class _CalendarScreenState extends State<CalendarScreen> {
       liveTimeIndicatorSettings: LiveTimeIndicatorSettings(color: Colors.red),
       timeLineWidth: 56.0,
       onPageChange: (date, page) => setState(() => _selectedDate = date),
+    );
+  }
+
+  // Sticky fading month label for pager scroll
+  Widget _buildFadingMonthLabel() {
+    final textStyle = const TextStyle(
+      fontSize: 18,
+      fontWeight: FontWeight.w800,
+      color: Color(0xFF1E293B),
+    );
+    return AnimatedBuilder(
+      animation: _monthPageController,
+      builder: (context, _) {
+        final double page = _monthPageController.hasClients
+            ? (_monthPageController.page ?? _kMonthBaseIndex.toDouble())
+            : _kMonthBaseIndex.toDouble();
+        final int base = page.floor();
+        final double frac = page - base;
+        final DateTime m1 = _monthFromIndex(base);
+        final DateTime m2 = _monthFromIndex(base + 1);
+        return SizedBox(
+          height: 22,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Opacity(
+                opacity: 1 - frac,
+                child: Text(DateFormat.yMMMM().format(m1), style: textStyle),
+              ),
+              Opacity(
+                opacity: frac,
+                child: Text(DateFormat.yMMMM().format(m2), style: textStyle),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
