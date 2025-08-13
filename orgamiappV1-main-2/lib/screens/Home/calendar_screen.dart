@@ -357,21 +357,26 @@ class _CalendarScreenState extends State<CalendarScreen> {
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadData,
-          child: SingleChildScrollView(
+          child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildSearchBar(),
-                _buildHeader(),
-                const SizedBox(height: 8),
-                if (_viewMode == ViewMode.month) _buildWeekdayHeader(),
-                calendarWidget,
-                const SizedBox(height: 8),
-                _buildAgendaCollapsible(selectedItems),
-                const SizedBox(height: 24),
-              ],
-            ),
+            slivers: [
+              SliverToBoxAdapter(child: _buildSearchBar()),
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _PinnedHeaderDelegate(
+                  minExtent: 56,
+                  maxExtent: 64,
+                  builder: (context, shrink, overlaps) => _buildHeader(),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 8)),
+              if (_viewMode == ViewMode.month)
+                SliverToBoxAdapter(child: _buildWeekdayHeader()),
+              SliverToBoxAdapter(child: calendarWidget),
+              const SliverToBoxAdapter(child: SizedBox(height: 8)),
+              SliverToBoxAdapter(child: _buildAgendaCollapsible(selectedItems)),
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            ],
           ),
         ),
       ),
@@ -1398,4 +1403,34 @@ class _CalendarItem {
   String get title => event?.title ?? ticket!.eventTitle;
   String? get location => event?.location ?? ticket!.eventLocation;
   String? get description => event?.description;
+}
+
+class _PinnedHeaderDelegate extends SliverPersistentHeaderDelegate {
+  _PinnedHeaderDelegate({
+    required this.minExtent,
+    required this.maxExtent,
+    required this.builder,
+  });
+
+  @override
+  final double minExtent;
+  @override
+  final double maxExtent;
+  final Widget Function(BuildContext context, bool shrinkOffset, bool overlaps) builder;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Material(
+      elevation: overlapsContent ? 1 : 0,
+      color: Colors.white,
+      child: builder(context, shrinkOffset > 0, overlapsContent),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _PinnedHeaderDelegate oldDelegate) {
+    return minExtent != oldDelegate.minExtent ||
+        maxExtent != oldDelegate.maxExtent ||
+        builder != oldDelegate.builder;
+  }
 }
