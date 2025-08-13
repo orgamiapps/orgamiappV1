@@ -265,244 +265,134 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
 
   Widget _buildTicketCard(TicketModel ticket) {
     final bool isUsed = ticket.isUsed;
-    final Color accent = isUsed
+    final Color statusColor = isUsed
         ? const Color(0xFF6B7280)
-        : const Color(0xFF9C27B0);
+        : const Color(0xFF10B981);
+    final String statusText = isUsed ? 'Used' : 'Active';
 
-    return GestureDetector(
-      onTap: () => _showTicketDetail(ticket),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.10),
-              blurRadius: 22,
-              spreadRadius: 2,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      margin: const EdgeInsets.only(bottom: 16),
+      child: InkWell(
+        onTap: () => _showTicketDetail(ticket),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
             children: [
-              // Gradient background (deep, high-contrast)
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF1E1B4B), // indigo-950 base
-                      Color(0xFF4338CA), // indigo-700 mid (brand primary lean)
-                      Color(0xFF7C3AED), // violet-600 highlight
-                    ],
-                    stops: const [0.0, 0.55, 1.0],
-                  ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: CachedNetworkImage(
+                  imageUrl: ticket.eventImageUrl,
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) =>
+                      Container(width: 80, height: 80, color: Colors.grey[200]),
+                  errorWidget: (context, url, error) => Icon(Icons.error),
                 ),
               ),
-              // Contrast overlay
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      const Color(0xFF000000).withValues(alpha: 0.28),
-                      const Color(0xFF000000).withValues(alpha: 0.18),
-                    ],
-                  ),
-                ),
-              ),
-              // Perforation notches
-              Positioned(
-                left: -12,
-                top: 78,
-                child: Container(
-                  width: 24,
-                  height: 24,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-              Positioned(
-                right: -12,
-                top: 78,
-                child: Container(
-                  width: 24,
-                  height: 24,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-              // Content
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Event image
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: CachedNetworkImage(
-                        imageUrl: ticket.eventImageUrl,
-                        width: 64,
-                        height: 64,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          width: 64,
-                          height: 64,
-                          color: Colors.white.withValues(alpha: 0.15),
-                          child: const Center(
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        ),
-                        errorWidget: (context, url, error) => Container(
-                          width: 64,
-                          height: 64,
-                          color: Colors.white.withValues(alpha: 0.15),
-                          child: const Icon(
-                            Icons.image_not_supported,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    // Details
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  ticket.eventTitle,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isUsed
-                                      ? const Color(0xFFE11D48)
-                                      : const Color(0xFF10B981),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.15),
-                                  ),
-                                ),
-                                child: Text(
-                                  isUsed ? 'USED' : 'ACTIVE',
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            ticket.eventLocation,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            ticket.eventTitle,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.white.withValues(alpha: 0.96),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: statusColor.withOpacity(0.5),
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            DateFormat(
-                              'EEE, MMM dd • h:mm a',
-                            ).format(ticket.eventDateTime),
+                          child: Text(
+                            statusText,
                             style: TextStyle(
+                              color: statusColor,
+                              fontWeight: FontWeight.bold,
                               fontSize: 12,
-                              color: Colors.white.withValues(alpha: 0.94),
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          // QR and code
-                          Row(
-                            children: [
-                              Container(
-                                width: 34,
-                                height: 34,
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.45),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.35),
-                                  ),
-                                ),
-                                child: const Icon(
-                                  Icons.qr_code,
-                                  color: Colors.white,
-                                  size: 18,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  'Ticket Code: ${ticket.ticketCode}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white.withValues(alpha: 0.98),
-                                  ),
-                                ),
-                              ),
-                              const Icon(
-                                Icons.arrow_forward_ios,
-                                size: 16,
-                                color: Colors.white,
-                              ),
-                            ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today,
+                          size: 16,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          DateFormat(
+                            'MMM dd - h:mm a',
+                          ).format(ticket.eventDateTime),
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 14,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          size: 16,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            ticket.eventLocation,
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 14,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.qr_code, size: 16, color: Colors.grey[600]),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Ticket Code: ${ticket.ticketCode}',
+                          style: TextStyle(
+                            color: Colors.grey[800],
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
-                ),
-              ),
-              // Subtle holographic sweep
-              Positioned.fill(
-                child: IgnorePointer(
-                  ignoring: true,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.white.withValues(alpha: 0.006),
-                          Colors.transparent,
-                          accent.withValues(alpha: 0.02),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
                 ),
               ),
             ],
@@ -551,329 +441,260 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   }
 
   Widget _buildTicketDetailDialog(TicketModel ticket) {
-    final double screenWidth = MediaQuery.of(context).size.width;
-    final double screenHeight = MediaQuery.of(context).size.height;
-    final double dialogMaxWidth = screenWidth >= 600 ? 560.0 : 420.0;
-    final double dialogMaxHeight = screenHeight * 0.86; // nearly full screen
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Container(
-        width: double.infinity,
-        constraints: BoxConstraints(
-          maxWidth: dialogMaxWidth,
-          maxHeight: dialogMaxHeight,
-        ),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.2),
-              spreadRadius: 0,
-              blurRadius: 20,
-              offset: const Offset(0, 10),
+      insetPadding: const EdgeInsets.all(24),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final maxHeight = constraints.maxHeight;
+          final imageHeight = maxHeight * 0.25;
+          final qrSize = maxHeight * 0.3;
+
+          return Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: RepaintBoundary(
-          key: ticketShareKey,
-          child: SizedBox(
-            height: dialogMaxHeight,
-            child: Column(
-              mainAxisSize: MainAxisSize.max,
-              children: [
-                // Header with close button
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF667EEA), Color(0xFF9C27B0)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(24),
-                      topRight: Radius.circular(24),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Stack(
+                children: [
+                  // Premium gradient background
+                  Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                      ),
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.confirmation_number,
-                        color: Colors.white,
-                        size: 24,
+                  // White ticket area with shape
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 32,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Row(
-                          children: [
-                            const Expanded(
-                              child: Text(
-                                'Event Ticket',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'Roboto',
-                                ),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.35),
-                                ),
-                              ),
-                              child: Text(
-                                ticket.isUsed ? 'USED' : 'ACTIVE',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12,
-                                ),
-                              ),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 5),
                             ),
                           ],
                         ),
-                      ),
-                      IconButton(
-                        onPressed: () => _shareTicket(ticket),
-                        icon: const Icon(
-                          Icons.ios_share_outlined,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                        tooltip: 'Share Ticket',
-                      ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(
-                          Icons.close,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Large ticket content area that fills remaining height
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final double ticketHeight = constraints.maxHeight;
-                        final double imageHeight = ticketHeight * 0.38;
-                        final double qrSize = (ticketHeight * 0.34) < 140.0
-                            ? 140.0
-                            : ((ticketHeight * 0.34) > 260.0
-                                  ? 260.0
-                                  : (ticketHeight * 0.34));
-                        return Stack(
-                          children: [
-                            Container(
-                              height: ticketHeight,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.06),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 8),
+                        child: LayoutBuilder(
+                          builder: (context, ticketConstraints) {
+                            final ticketHeight = ticketConstraints.maxHeight;
+                            final notchTop = imageHeight + 16; // Position notches below image
+                            return Stack(
+                              children: [
+                                // Notches
+                                Positioned(
+                                  left: -12,
+                                  top: notchTop,
+                                  child: Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF667EEA),
+                                      shape: BoxShape.circle,
+                                    ),
                                   ),
-                                ],
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: CachedNetworkImage(
-                                        imageUrl: ticket.eventImageUrl,
-                                        height: imageHeight,
-                                        width: double.infinity,
-                                        fit: BoxFit.cover,
-                                        placeholder: (context, url) =>
-                                            Container(
-                                              height: imageHeight,
-                                              color: const Color(0xFFF5F7FA),
-                                            ),
-                                        errorWidget: (context, url, error) =>
-                                            Container(
-                                              height: imageHeight,
-                                              color: const Color(0xFFF5F7FA),
-                                              child: const Icon(
-                                                Icons.image_not_supported,
-                                                color: Color(0xFF667EEA),
+                                ),
+                                Positioned(
+                                  right: -12,
+                                  top: notchTop,
+                                  child: Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF667EEA),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                                // Content
+                                SingleChildScrollView(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(20),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        // Event Image
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(12),
+                                          child: CachedNetworkImage(
+                                            imageUrl: ticket.eventImageUrl,
+                                            height: imageHeight,
+                                            width: double.infinity,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        // Title and Status
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                ticket.eventTitle,
+                                                style: const TextStyle(
+                                                  fontSize: 24,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF1F2937),
+                                                ),
                                               ),
                                             ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      ticket.eventTitle,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF111827),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 8,
-                                      children: [
-                                        _buildCompactChip(
-                                          icon: Icons.location_on,
-                                          text: ticket.eventLocation,
-                                          color: const Color(0xFF667EEA),
-                                        ),
-                                        _buildCompactChip(
-                                          icon: Icons.calendar_today,
-                                          text: DateFormat(
-                                            'EEE, MMM dd • h:mm a',
-                                          ).format(ticket.eventDateTime),
-                                          color: const Color(0xFF9C27B0),
-                                        ),
-                                        _buildCompactChip(
-                                          icon: Icons.person,
-                                          text: ticket.customerName,
-                                          color: const Color(0xFF0EA5E9),
-                                        ),
-                                        _buildCompactChip(
-                                          icon: Icons.confirmation_number,
-                                          text: 'Code ${ticket.ticketCode}',
-                                          color: const Color(0xFF10B981),
-                                        ),
-                                        _buildCompactChip(
-                                          icon: Icons.schedule,
-                                          text:
-                                              "Issued ${DateFormat('MMM dd, yyyy • h:mm a').format(ticket.issuedDateTime)}",
-                                          color: const Color(0xFFF59E0B),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 14),
-                                    Expanded(
-                                      child: Center(
-                                        child: ticket.isUsed
-                                            ? Column(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: const [
-                                                  Icon(
-                                                    Icons.check_circle,
-                                                    color: Color(0xFFEF4444),
-                                                    size: 56,
-                                                  ),
-                                                  SizedBox(height: 8),
-                                                  Text(
-                                                    'Ticket Used',
-                                                    style: TextStyle(
-                                                      color: Color(0xFFEF4444),
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                    ),
-                                                  ),
-                                                ],
-                                              )
-                                            : Container(
-                                                padding: const EdgeInsets.all(
-                                                  12,
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 16,
+                                                vertical: 8,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: ticket.isUsed
+                                                    ? Colors.red[100]
+                                                    : Colors.green[100],
+                                                borderRadius: BorderRadius.circular(
+                                                  20,
                                                 ),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.white,
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                  boxShadow: [
-                                                    BoxShadow(
-                                                      color: Colors.black
-                                                          .withValues(
-                                                            alpha: 0.05,
-                                                          ),
-                                                      blurRadius: 10,
-                                                      offset: const Offset(
-                                                        0,
-                                                        6,
+                                              ),
+                                              child: Text(
+                                                ticket.isUsed ? 'USED' : 'ACTIVE',
+                                                style: TextStyle(
+                                                  color: ticket.isUsed
+                                                      ? Colors.red
+                                                      : Colors.green,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 16),
+                                        // Details
+                                        _buildDetailRow(
+                                          Icons.calendar_today,
+                                          DateFormat(
+                                            'MMMM dd, yyyy - h:mm a',
+                                          ).format(ticket.eventDateTime),
+                                        ),
+                                        _buildDetailRow(
+                                          Icons.location_on,
+                                          ticket.eventLocation,
+                                        ),
+                                        _buildDetailRow(
+                                          Icons.person,
+                                          ticket.customerName,
+                                        ),
+                                        _buildDetailRow(
+                                          Icons.confirmation_number,
+                                          'Code: ${ticket.ticketCode}',
+                                        ),
+                                        _buildDetailRow(
+                                          Icons.access_time,
+                                          'Issued: ${DateFormat('MMMM dd, yyyy').format(ticket.issuedDateTime)}',
+                                        ),
+                                        const SizedBox(height: 24),
+                                        // QR Code
+                                        Center(
+                                          child: ticket.isUsed
+                                              ? const Column(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.check_circle,
+                                                      size: 80,
+                                                      color: Colors.red,
+                                                    ),
+                                                    SizedBox(height: 8),
+                                                    Text(
+                                                      'Ticket Already Used',
+                                                      style: TextStyle(
+                                                        fontSize: 18,
+                                                        color: Colors.red,
+                                                        fontWeight: FontWeight.bold,
                                                       ),
                                                     ),
                                                   ],
-                                                ),
-                                                child: QrImageView(
+                                                )
+                                              : QrImageView(
                                                   data: ticket.qrCodeData,
                                                   version: QrVersions.auto,
                                                   size: qrSize,
+                                                  gapless: false,
                                                   backgroundColor: Colors.white,
-                                                  eyeStyle: const QrEyeStyle(
-                                                    eyeShape: QrEyeShape.square,
-                                                    color: Color(0xFF111827),
-                                                  ),
-                                                  dataModuleStyle:
-                                                      const QrDataModuleStyle(
-                                                        dataModuleShape:
-                                                            QrDataModuleShape
-                                                                .square,
-                                                        color: Color(
-                                                          0xFF111827,
-                                                        ),
-                                                      ),
                                                 ),
-                                              ),
-                                      ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        // Footer
+                                        const Center(
+                                          child: Text(
+                                            'Show QR to event organizer\nPowered by Orgami',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              color: Colors.grey,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
+                                  ),
                                 ),
-                              ),
-                            ),
-                            Positioned(
-                              left: -12,
-                              top: (ticketHeight / 2) - 12,
-                              child: Container(
-                                width: 24,
-                                height: 24,
-                                decoration: const BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              right: -12,
-                              top: (ticketHeight / 2) - 12,
-                              child: Container(
-                                width: 24,
-                                height: 24,
-                                decoration: const BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
+                              ],
+                            );
+                          },
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  // Close button
+                  Positioned(
+                    right: 16,
+                    top: 16,
+                    child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
-                const SizedBox(height: 8),
-              ],
-            ), // Column
-          ), // SizedBox
-        ), // RepaintBoundary
-      ), // Container
+  Widget _buildDetailRow(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, color: const Color(0xFF667EEA), size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 16, color: Color(0xFF4B5563)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
