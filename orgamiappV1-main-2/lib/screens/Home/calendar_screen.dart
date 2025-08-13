@@ -42,12 +42,27 @@ class _CalendarScreenState extends State<CalendarScreen> {
   List<TicketModel> _ticketModels = [];
   final Map<String, EventModel> _eventCache = {};
   late EventController _eventController;
+  late PageController _monthPageController;
+  static const int _kMonthPageCount = 1200;
+  static const int _kMonthBaseIndex = _kMonthPageCount ~/ 2;
+
+  int get _monthPageIndex => _monthPageController.hasClients
+      ? _monthPageController.page?.round() ?? _kMonthBaseIndex
+      : _kMonthBaseIndex;
 
   @override
   void initState() {
     super.initState();
     _loadData();
     _eventController = EventController();
+    _monthPageController = PageController(initialPage: _kMonthBaseIndex);
+  }
+
+  @override
+  void dispose() {
+    _searchCtlr.dispose();
+    _monthPageController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -241,14 +256,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Color _markerColorFor(_CalendarItemType t) {
-    switch (t) {
-      case _CalendarItemType.created:
-        return const Color(0xFF10B981); // emerald
-      case _CalendarItemType.ticket:
-        return const Color(0xFF3B82F6); // blue
-      case _CalendarItemType.saved:
-        return const Color(0xFF8B5CF6); // violet
-    }
+    // Unified color for all events in month view to match requested design
+    return const Color(0xFF8B5CF6); // violet
   }
 
   String _labelForFilter(CalendarFilter f) {
@@ -271,7 +280,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final selectedItems = _itemsForDate(_selectedDate);
 
     Widget calendarWidget = switch (_viewMode) {
-      ViewMode.month => _buildCalendarGrid(),
+      ViewMode.month => _buildMonthPager(context),
       ViewMode.week => _buildWeekRow(),
       ViewMode.day => _buildDayView(),
     };
@@ -334,12 +343,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          RouterClass.nextScreenNormal(context, const ChoseDateTimeScreen());
-        },
-        child: const Icon(Icons.add),
-      ),
+
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadData,
@@ -351,20 +355,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 _buildSearchBar(),
                 _buildHeader(),
                 const SizedBox(height: 8),
-                _buildFilters(),
-                const SizedBox(height: 8),
-                if (_viewMode == ViewMode.day) ...[
-                  _buildWeekRow(),
-                  const SizedBox(height: 8),
-                ] else ...[
-                  _buildWeekdayHeader(),
-                ],
+                if (_viewMode == ViewMode.month) _buildWeekdayHeader(),
                 calendarWidget,
-                const SizedBox(height: 12),
-                _buildLegend(),
                 const SizedBox(height: 16),
-                if (_viewMode != ViewMode.day) _buildAgendaHeader(),
-                if (_viewMode != ViewMode.day) _buildAgendaList(selectedItems),
+                _buildAgendaHeader(),
+                _buildAgendaList(selectedItems),
                 const SizedBox(height: 24),
               ],
             ),
@@ -450,26 +445,27 @@ class _CalendarScreenState extends State<CalendarScreen> {
             tooltip: 'Previous',
             icon: const Icon(Icons.chevron_left),
             onPressed: () {
-              setState(() {
-                switch (_viewMode) {
-                  case ViewMode.month:
-                    _currentMonth = DateTime(
-                      _currentMonth.year,
-                      _currentMonth.month - 1,
-                    );
-                    break;
-                  case ViewMode.week:
-                    _selectedDate = _selectedDate.subtract(
-                      const Duration(days: 7),
-                    );
-                    break;
-                  case ViewMode.day:
-                    _selectedDate = _selectedDate.subtract(
-                      const Duration(days: 1),
-                    );
-                    break;
-                }
-              });
+              if (_viewMode == ViewMode.month) {
+                final target = (_monthPageIndex - 1).clamp(0, _kMonthPageCount - 1);
+                _monthPageController.animateToPage(
+                  target,
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOut,
+                );
+              } else {
+                setState(() {
+                  switch (_viewMode) {
+                    case ViewMode.week:
+                      _selectedDate = _selectedDate.subtract(const Duration(days: 7));
+                      break;
+                    case ViewMode.day:
+                      _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+                      break;
+                    case ViewMode.month:
+                      break;
+                  }
+                });
+              }
             },
           ),
           Expanded(
@@ -488,32 +484,37 @@ class _CalendarScreenState extends State<CalendarScreen> {
             tooltip: 'Next',
             icon: const Icon(Icons.chevron_right),
             onPressed: () {
-              setState(() {
-                switch (_viewMode) {
-                  case ViewMode.month:
-                    _currentMonth = DateTime(
-                      _currentMonth.year,
-                      _currentMonth.month + 1,
-                    );
-                    break;
-                  case ViewMode.week:
-                    _selectedDate = _selectedDate.add(const Duration(days: 7));
-                    break;
-                  case ViewMode.day:
-                    _selectedDate = _selectedDate.add(const Duration(days: 1));
-                    break;
-                }
-              });
+              if (_viewMode == ViewMode.month) {
+                final target = (_monthPageIndex + 1).clamp(0, _kMonthPageCount - 1);
+                _monthPageController.animateToPage(
+                  target,
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOut,
+                );
+              } else {
+                setState(() {
+                  switch (_viewMode) {
+                    case ViewMode.week:
+                      _selectedDate = _selectedDate.add(const Duration(days: 7));
+                      break;
+                    case ViewMode.day:
+                      _selectedDate = _selectedDate.add(const Duration(days: 1));
+                      break;
+                    case ViewMode.month:
+                      break;
+                  }
+                });
+              }
             },
           ),
           const SizedBox(width: 8),
           TextButton.icon(
             onPressed: () {
+              if (_viewMode == ViewMode.month) {
+                _monthPageController.jumpToPage(_kMonthBaseIndex);
+              }
               setState(() {
-                _currentMonth = DateTime(
-                  DateTime.now().year,
-                  DateTime.now().month,
-                );
+                _currentMonth = DateTime(DateTime.now().year, DateTime.now().month);
                 _selectedDate = DateTime.now();
               });
             },
@@ -631,6 +632,73 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
+  // Month pager (vertical, virtually infinite)
+  Widget _buildMonthPager(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final double gridPaddingH = 16 + 8 + 8; // outer + inner
+    final double cellWidth = (media.size.width - gridPaddingH - (6 * 6)) / 7;
+    final double cellHeight = cellWidth * 0.9; // slightly squarer like iOS
+    final double gridHeight = (cellHeight + 14) * 6 + 16; // 6 weeks max
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: SizedBox(
+        height: gridHeight,
+        child: PageView.builder(
+          controller: _monthPageController,
+          scrollDirection: Axis.vertical,
+          itemCount: _kMonthPageCount,
+          onPageChanged: (index) {
+            final month = _monthFromIndex(index);
+            setState(() {
+              _currentMonth = DateTime(month.year, month.month);
+            });
+          },
+          itemBuilder: (context, index) {
+            final month = _monthFromIndex(index);
+            return _buildMonthGridFor(month);
+          },
+        ),
+      ),
+    );
+  }
+
+  DateTime _monthFromIndex(int index) {
+    final delta = index - _kMonthBaseIndex;
+    return DateTime(_currentMonth.year, _currentMonth.month + delta);
+  }
+
+  Widget _buildMonthGridFor(DateTime month) {
+    final firstDay = _startOfMonth(month);
+    final totalDays = _daysInMonth(month);
+    final startWeekday = firstDay.weekday % 7; // 0=Sun
+
+    final cells = <Widget>[];
+    for (int i = 0; i < startWeekday; i++) {
+      cells.add(const SizedBox());
+    }
+    for (int day = 1; day <= totalDays; day++) {
+      final date = DateTime(month.year, month.month, day);
+      cells.add(_buildDayCell(date));
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: GridView.count(
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisCount: 7,
+        shrinkWrap: true,
+        mainAxisSpacing: 6,
+        crossAxisSpacing: 6,
+        children: cells,
+      ),
+    );
+  }
+
   Widget _buildWeekRow() {
     // Show the week containing _selectedDate
     final mondayBased = _selectedDate.subtract(
@@ -662,8 +730,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     return GestureDetector(
       onTap: () => setState(() {
-        _selectedDate = date;
-        _viewMode = ViewMode.day;
+        _selectedDate = date; // stay in month and show agenda below
       }),
       onLongPress: items.isEmpty
           ? null
@@ -1007,18 +1074,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Widget _chipForType(_CalendarItemType t) {
-    final text = t == _CalendarItemType.created
-        ? 'Created by You'
-        : t == _CalendarItemType.ticket
-        ? 'Have Ticket'
-        : 'Saved';
-    final color = _markerColorFor(t);
-    return Chip(
-      label: Text(text),
-      labelStyle: TextStyle(color: color, fontWeight: FontWeight.w600),
-      backgroundColor: color.withOpacity(0.1),
-      side: BorderSide(color: color.withOpacity(0.2)),
-    );
+    return const SizedBox.shrink();
   }
 
   Future<void> _openItem(_CalendarItem item) async {
