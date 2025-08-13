@@ -8,10 +8,12 @@ class ChoseDateTimeScreen extends StatefulWidget {
     super.key,
     this.preselectedOrganizationId,
     this.forceOrganizationEvent = false,
+    this.initialDateTime,
   });
 
   final String? preselectedOrganizationId;
   final bool forceOrganizationEvent;
+  final DateTime? initialDateTime;
 
   @override
   State<ChoseDateTimeScreen> createState() => _ChoseDateTimeScreenState();
@@ -149,6 +151,14 @@ class _ChoseDateTimeScreenState extends State<ChoseDateTimeScreen>
   @override
   void initState() {
     super.initState();
+
+    // Prefill from initialDateTime if provided
+    if (widget.initialDateTime != null) {
+      final dt = widget.initialDateTime!;
+      selectedDate = DateTime(dt.year, dt.month, dt.day);
+      startTime = TimeOfDay(hour: dt.hour, minute: dt.minute);
+      endTime = TimeOfDay(hour: (dt.hour + 1) % 24, minute: dt.minute);
+    }
 
     // Initialize fade animation
     _fadeController = AnimationController(
