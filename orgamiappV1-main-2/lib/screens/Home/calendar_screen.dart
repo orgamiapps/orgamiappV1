@@ -1420,8 +1420,11 @@ class _PinnedHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final double range = (maxExtent - minExtent).clamp(1.0, double.infinity);
+    final double t = (shrinkOffset / range).clamp(0.0, 1.0);
+    final double elevation = 0.0 + 3.0 * t; // subtle shadow as it overlaps
     return Material(
-      elevation: overlapsContent ? 1 : 0,
+      elevation: overlapsContent ? elevation : 0.0,
       color: Colors.white,
       child: builder(context, shrinkOffset > 0, overlapsContent),
     );
