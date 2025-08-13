@@ -4,11 +4,12 @@ import 'package:orgami/screens/Home/search_screen.dart';
 import 'package:orgami/screens/QRScanner/qr_scanner_flow_screen.dart';
 import 'package:orgami/firebase/organization_helper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:orgami/Utils/router.dart';
+import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/screens/Events/single_event_screen.dart';
 import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:orgami/screens/Events/select_event_type_screen.dart';
+import 'package:orgami/screens/Home/calendar_screen.dart';
 
 class HomeHubScreen extends StatefulWidget {
   const HomeHubScreen({super.key});
@@ -191,6 +192,16 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
               ],
             ),
           ),
+          _roundIconButton(
+            icon: Icons.event,
+            onTap: () {
+              RouterClass.nextScreenNormal(
+                context,
+                const CalendarScreen(),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
           _roundIconButton(
             icon: Icons.qr_code_scanner,
             onTap: () {
