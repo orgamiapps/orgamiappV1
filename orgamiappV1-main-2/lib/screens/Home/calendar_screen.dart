@@ -13,6 +13,7 @@ import 'package:orgami/screens/MyProfile/my_tickets_screen.dart';
 import 'package:orgami/Services/notification_service.dart';
 import 'package:orgami/screens/Events/chose_date_time_screen.dart';
 import 'package:calendar_view/calendar_view.dart';
+import 'package:flutter/services.dart';
 
 enum CalendarFilter { all, created, tickets, saved }
 
@@ -35,6 +36,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   final TextEditingController _searchCtlr = TextEditingController();
 
   bool _loading = false;
+  bool _agendaExpanded = true;
 
   // Data sources
   List<EventModel> _createdEvents = [];
@@ -317,16 +319,22 @@ class _CalendarScreenState extends State<CalendarScreen> {
             }),
           ),
           IconButton(
+            tooltip: 'Jump to date',
+            icon: const Icon(Icons.date_range),
+            onPressed: _jumpToDate,
+          ),
+          IconButton(
             tooltip: 'Today',
             icon: const Icon(Icons.today),
             onPressed: () {
+              if (_viewMode == ViewMode.month) {
+                _monthPageController.jumpToPage(_kMonthBaseIndex);
+              }
               setState(() {
-                _currentMonth = DateTime(
-                  DateTime.now().year,
-                  DateTime.now().month,
-                );
+                _currentMonth = DateTime(DateTime.now().year, DateTime.now().month);
                 _selectedDate = DateTime.now();
               });
+              HapticFeedback.selectionClick();
             },
           ),
           IconButton(
@@ -343,7 +351,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ),
         ],
       ),
-
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadData,
@@ -357,9 +364,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 const SizedBox(height: 8),
                 if (_viewMode == ViewMode.month) _buildWeekdayHeader(),
                 calendarWidget,
-                const SizedBox(height: 16),
-                _buildAgendaHeader(),
-                _buildAgendaList(selectedItems),
+                const SizedBox(height: 8),
+                _buildAgendaCollapsible(selectedItems),
                 const SizedBox(height: 24),
               ],
             ),
@@ -367,6 +373,26 @@ class _CalendarScreenState extends State<CalendarScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _jumpToDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null) return;
+    final deltaMonths = (picked.year - _currentMonth.year) * 12 + (picked.month - _currentMonth.month);
+    if (_viewMode == ViewMode.month) {
+      final target = (_monthPageIndex + deltaMonths).clamp(0, _kMonthPageCount - 1);
+      _monthPageController.jumpToPage(target);
+    }
+    setState(() {
+      _currentMonth = DateTime(picked.year, picked.month);
+      _selectedDate = picked;
+    });
+    HapticFeedback.selectionClick();
   }
 
   Widget _buildSearchBar() {
@@ -729,12 +755,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final items = _itemsForDate(date);
 
     return GestureDetector(
-      onTap: () => setState(() {
-        _selectedDate = date; // stay in month and show agenda below
-      }),
-      onLongPress: items.isEmpty
-          ? null
-          : () => _showDayBottomSheet(date, items),
+      onTap: () {
+        setState(() {
+          _selectedDate = date; // stay in month and show agenda below
+        });
+        HapticFeedback.selectionClick();
+      },
+      onLongPress: () => _showDayBottomSheet(date, items),
       child: Container(
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFFEEF2FF) : Colors.white,
@@ -778,6 +805,80 @@ class _CalendarScreenState extends State<CalendarScreen> {
               _buildEventBars(items),
           ],
         ),
+      ),
+    );
+  }
+
+  // Collapsible agenda tray
+  Widget _buildAgendaCollapsible(List<_CalendarItem> items) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              setState(() => _agendaExpanded = !_agendaExpanded);
+              HapticFeedback.lightImpact();
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Column(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE5E7EB),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Text(
+                        DateFormat.yMMMMEEEEd().format(_selectedDate),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1F2937),
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(
+                        _agendaExpanded
+                            ? Icons.expand_less
+                            : Icons.expand_more,
+                        color: const Color(0xFF9CA3AF),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 200),
+            crossFadeState:
+                _agendaExpanded ? CrossFadeState.showFirst : CrossFadeState.showSecond,
+            firstChild: Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _buildAgendaList(items),
+            ),
+            secondChild: const SizedBox(height: 0),
+          ),
+        ],
       ),
     );
   }
@@ -1169,6 +1270,21 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       ),
                     ),
                     const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.add),
+                      tooltip: 'New Event',
+                      onPressed: () {
+                        final DateTime initial = DateTime(date.year, date.month, date.day, 19, 0);
+                        Navigator.pop(context);
+                        RouterClass.nextScreenNormal(
+                          context,
+                          ChoseDateTimeScreen(
+                            // prefill start date/time via new parameter (see screen edits)
+                            initialDateTime: initial,
+                          ),
+                        );
+                      },
+                    ),
                     IconButton(
                       icon: const Icon(Icons.close),
                       onPressed: () => Navigator.pop(context),
