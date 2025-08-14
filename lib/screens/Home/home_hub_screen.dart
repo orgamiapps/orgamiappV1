@@ -195,10 +195,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
           _roundIconButton(
             icon: Icons.event,
             onTap: () {
-              RouterClass.nextScreenNormal(
-                context,
-                const CalendarScreen(),
-              );
+              RouterClass.nextScreenNormal(context, const CalendarScreen());
             },
           ),
           const SizedBox(width: 8),
@@ -264,7 +261,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
       child: Row(
         children: [
           _segButton('Public', 0, primary, Icons.public),
-          _segButton('Org Events', 1, primary, Icons.event),
+          _segButton('Org Events', 1, primary, Icons.diversity_3),
         ],
       ),
     );

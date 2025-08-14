@@ -323,8 +323,11 @@ class _CalendarScreenState extends State<CalendarScreen>
     _monthAnimationController.forward();
     _dayViewAnimationController.forward();
 
-    // Scroll to current hour if today
-    if (_isSameDay(day, DateTime.now())) {
+    // Scroll to first event if present; otherwise, to current time when today
+    final hasEvents = _getEventsForDay(day).isNotEmpty;
+    if (hasEvents) {
+      _scrollToFirstEvent(day);
+    } else if (_isSameDay(day, DateTime.now())) {
       _scrollToCurrentTime();
     }
   }
@@ -355,6 +358,22 @@ class _CalendarScreenState extends State<CalendarScreen>
           curve: Curves.easeOut,
         );
       }
+    });
+  }
+
+  void _scrollToFirstEvent(DateTime day) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_dayViewScrollController.hasClients) return;
+      final events = _getEventsForDay(day);
+      if (events.isEmpty) return;
+      events.sort((a, b) => a.selectedDateTime.compareTo(b.selectedDateTime));
+      final first = events.first.selectedDateTime;
+      final position = (first.hour * 80.0) + (first.minute * 80.0 / 60) - 100;
+      _dayViewScrollController.animateTo(
+        position.clamp(0.0, _dayViewScrollController.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeOut,
+      );
     });
   }
 
@@ -821,12 +840,16 @@ class _CalendarScreenState extends State<CalendarScreen>
             setState(() {
               _selectedDate = _selectedDate!.add(const Duration(days: 1));
             });
+            // After date change, scroll to first event if any
+            _scrollToFirstEvent(_selectedDate!);
             HapticFeedback.lightImpact();
           } else if (details.primaryVelocity! > 300) {
             // Swipe right - previous day
             setState(() {
               _selectedDate = _selectedDate!.subtract(const Duration(days: 1));
             });
+            // After date change, scroll to first event if any
+            _scrollToFirstEvent(_selectedDate!);
             HapticFeedback.lightImpact();
           }
         }

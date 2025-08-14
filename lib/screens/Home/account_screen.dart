@@ -17,7 +17,6 @@ import 'package:orgami/Utils/theme_provider.dart';
 
 import 'package:orgami/Utils/web_view_page.dart';
 
-import 'package:orgami/Screens/MyProfile/my_profile_screen.dart';
 import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
 
 import 'package:orgami/Screens/Home/attendee_notification_screen.dart';
@@ -150,13 +149,7 @@ class _AccountScreenState extends State<AccountScreen> {
       ),
       child: Column(
         children: [
-          _buildSettingsItem(
-            icon: Icons.person,
-            title: 'My Profile',
-            subtitle: 'View and edit your profile',
-            onTap: () =>
-                RouterClass.nextScreenNormal(context, MyProfileScreen()),
-          ),
+          // Profile moved to bottom app bar
 
           _buildSettingsItem(
             icon: Icons.analytics_rounded,

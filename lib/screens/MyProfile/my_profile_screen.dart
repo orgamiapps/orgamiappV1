@@ -28,7 +28,9 @@ enum SortOption {
 }
 
 class MyProfileScreen extends StatefulWidget {
-  const MyProfileScreen({super.key});
+  final bool showBackButton;
+
+  const MyProfileScreen({super.key, this.showBackButton = true});
 
   @override
   State<MyProfileScreen> createState() => _MyProfileScreenState();
@@ -528,31 +530,34 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           // Back Button and Header Row
           Row(
             children: [
-              GestureDetector(
-                onTap: () {
-                  if (isSelectionMode) {
-                    setState(() {
-                      isSelectionMode = false;
-                      selectedEventIds.clear();
-                    });
-                  } else {
-                    Navigator.of(context).pop();
-                  }
-                },
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(18),
+              if (widget.showBackButton)
+                GestureDetector(
+                  onTap: () {
+                    if (isSelectionMode) {
+                      setState(() {
+                        isSelectionMode = false;
+                        selectedEventIds.clear();
+                      });
+                    } else {
+                      Navigator.of(context).pop();
+                    }
+                  },
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Icon(
+                      isSelectionMode ? Icons.close : Icons.arrow_back,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                   ),
-                  child: Icon(
-                    isSelectionMode ? Icons.close : Icons.arrow_back,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                ),
-              ),
+                )
+              else
+                const SizedBox(width: 36, height: 36),
               const Spacer(),
               Text(
                 isSelectionMode ? '${selectedEventIds.length} selected' : '',

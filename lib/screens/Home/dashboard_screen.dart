@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:orgami/Screens/Home/home_hub_screen.dart';
-import 'package:orgami/Screens/Home/account_screen.dart';
+import 'package:orgami/screens/MyProfile/my_profile_screen.dart';
 import 'package:orgami/Screens/Home/notifications_screen.dart';
 import 'package:orgami/Screens/Messaging/messaging_screen.dart';
 import 'package:orgami/screens/Organizations/organizations_screen.dart';
+import 'package:orgami/Screens/Home/account_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -23,6 +24,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     HomeHubScreen(),
     OrganizationsScreen(),
     MessagingScreen(),
+    MyProfileScreen(showBackButton: false),
     NotificationsScreen(),
     AccountScreen(),
   ];
@@ -105,9 +107,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               }),
               destinations: const [
                 NavigationDestination(
-                  icon: Icon(Icons.event_outlined),
-                  selectedIcon: Icon(Icons.event),
-                  label: 'Events',
+                  icon: Icon(Icons.home_outlined),
+                  selectedIcon: Icon(Icons.home),
+                  label: 'Home',
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.apartment_outlined),
@@ -115,9 +117,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   label: 'Orgs',
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.chat_bubble_outline),
-                  selectedIcon: Icon(Icons.chat_bubble),
+                  icon: Icon(Icons.forum_outlined),
+                  selectedIcon: Icon(Icons.forum),
                   label: 'Messages',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.person_outline),
+                  selectedIcon: Icon(Icons.person),
+                  label: 'Profile',
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.notifications_none),
@@ -127,7 +134,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 NavigationDestination(
                   icon: Icon(Icons.menu),
                   selectedIcon: Icon(Icons.menu),
-                  label: 'Menu',
+                  label: 'Account',
                 ),
               ],
             ),
