@@ -807,9 +807,10 @@ class _CalendarScreenState extends State<CalendarScreen>
     // Sort events by start time
     events.sort((a, b) => a.selectedDateTime.compareTo(b.selectedDateTime));
 
-    // Check if selected date is today
+    // Check if selected date is today / future
     final isToday =
         _selectedDate != null && _isSameDay(_selectedDate!, DateTime.now());
+    // Future/past distinction not needed for UI anymore
 
     return GestureDetector(
       onHorizontalDragEnd: (details) {
@@ -847,112 +848,104 @@ class _CalendarScreenState extends State<CalendarScreen>
               ),
             ),
             Expanded(
-              child: events.isEmpty
-                  ? _buildEmptyDayView()
-                  : CustomScrollView(
-                      controller: _dayViewScrollController,
-                      slivers: [
-                        SliverToBoxAdapter(
-                          child: Container(
-                            height: 24 * 80.0, // Total height for 24 hours
-                            margin: const EdgeInsets.only(
-                              left: 16,
-                              right: 16,
-                              bottom: 80,
-                            ),
-                            child: Stack(
-                              children: [
-                                // Hour lines and labels
-                                Column(
-                                  children: List.generate(24, (hour) {
-                                    return Container(
-                                      height: 80,
-                                      decoration: BoxDecoration(
-                                        border: Border(
-                                          top: BorderSide(
-                                            color: hour == 0
-                                                ? const Color(0xFFD1D5DB)
-                                                : const Color(0xFFE5E7EB),
-                                            width: hour == 0 ? 1.5 : 1,
-                                          ),
-                                        ),
-                                      ),
-                                      child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          // Time label
-                                          SizedBox(
-                                            width: 56,
-                                            child: Padding(
-                                              padding: const EdgeInsets.only(
-                                                top: 2,
-                                              ),
-                                              child: Text(
-                                                hour == 0
-                                                    ? '12 AM'
-                                                    : hour < 12
-                                                    ? '$hour AM'
-                                                    : hour == 12
-                                                    ? '12 PM'
-                                                    : '${hour - 12} PM',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: const Color(
-                                                    0xFF6B7280,
-                                                  ),
-                                                  fontWeight:
-                                                      hour == 0 || hour == 12
-                                                      ? FontWeight.w600
-                                                      : FontWeight.normal,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          // Space for events
-                                          const Expanded(child: SizedBox()),
-                                        ],
-                                      ),
-                                    );
-                                  }),
-                                ),
-                                // Events overlay
-                                ...events
-                                    .map((event) => _buildEventBlock(event))
-                                    .toList(),
-                                // Current time indicator (only if today)
-                                if (isToday)
-                                  Positioned(
-                                    top:
-                                        (_currentTime.hour * 80.0) +
-                                        (_currentTime.minute * 80.0 / 60),
-                                    left: 0,
-                                    right: 0,
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 10,
-                                          height: 10,
-                                          decoration: const BoxDecoration(
-                                            color: Color(0xFFEF4444),
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                        Expanded(
-                                          child: Container(
-                                            height: 2,
-                                            color: const Color(0xFFEF4444),
-                                          ),
-                                        ),
-                                      ],
+              child: CustomScrollView(
+                controller: _dayViewScrollController,
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Container(
+                      height: 24 * 80.0, // Total height for 24 hours
+                      margin: const EdgeInsets.only(
+                        left: 16,
+                        right: 16,
+                        bottom: 80,
+                      ),
+                      child: Stack(
+                        children: [
+                          // Hour lines and labels
+                          Column(
+                            children: List.generate(24, (hour) {
+                              return Container(
+                                height: 80,
+                                decoration: BoxDecoration(
+                                  border: Border(
+                                    top: BorderSide(
+                                      color: hour == 0
+                                          ? const Color(0xFFD1D5DB)
+                                          : const Color(0xFFE5E7EB),
+                                      width: hour == 0 ? 1.5 : 1,
                                     ),
                                   ),
-                              ],
-                            ),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Time label
+                                    SizedBox(
+                                      width: 56,
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(top: 2),
+                                        child: Text(
+                                          hour == 0
+                                              ? '12 AM'
+                                              : hour < 12
+                                              ? '$hour AM'
+                                              : hour == 12
+                                              ? '12 PM'
+                                              : '${hour - 12} PM',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: const Color(0xFF6B7280),
+                                            fontWeight: hour == 0 || hour == 12
+                                                ? FontWeight.w600
+                                                : FontWeight.normal,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    // Space for events
+                                    const Expanded(child: SizedBox()),
+                                  ],
+                                ),
+                              );
+                            }),
                           ),
-                        ),
-                      ],
+                          // Events overlay
+                          ...events
+                              .map((event) => _buildEventBlock(event))
+                              .toList(),
+                          // Current time indicator (only if today)
+                          if (isToday)
+                            Positioned(
+                              top:
+                                  (_currentTime.hour * 80.0) +
+                                  (_currentTime.minute * 80.0 / 60),
+                              left: 0,
+                              right: 0,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFEF4444),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Container(
+                                      height: 2,
+                                      color: const Color(0xFFEF4444),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -1070,63 +1063,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     );
   }
 
-  Widget _buildEmptyDayView() {
-    return Center(
-      child: Container(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF3F4F6),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.event_available,
-                size: 48,
-                color: Color(0xFF9CA3AF),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'No events scheduled',
-              style: TextStyle(
-                color: Color(0xFF111827),
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _selectedDate != null
-                  ? DateFormat('EEEE, MMMM d, yyyy').format(_selectedDate!)
-                  : '',
-              style: const TextStyle(color: Color(0xFF6B7280), fontSize: 14),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () => _createEvent(),
-              icon: const Icon(Icons.add, size: 20),
-              label: const Text('Create Event'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF667EEA),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // Removed empty day message per UX: show hours grid only with no message
 
   // Helper method to get event color based on type/category
   Color _getEventColor(EventModel event) {
