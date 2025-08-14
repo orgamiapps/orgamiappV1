@@ -886,41 +886,168 @@ exports.sendEventUpdateNotifications = onDocumentUpdated("Events/{eventId}", asy
       // Check user's notification settings
       const settingsDoc = await db.collection("users")
         .doc(userId)
-        .collection("notificationSettings")
-        .doc("settings")
+        .collection("settings")
+        .doc("notifications")
         .get();
 
-      let shouldSendTicketNotification = true;
+      // respect user toggle for event changes (fallback to true)
+      const settings = settingsDoc.exists ? settingsDoc.data() : {};
+      const shouldSendEventChange = settings.eventChanges !== false;
+      if (!shouldSendEventChange) continue;
 
-      if (settingsDoc.exists) {
-        const settings = settingsDoc.data();
-        shouldSendTicketNotification = settings.ticketUpdates !== false;
+      let updateMessage = "Event details have been updated";
+      if (hasLocationChanged) {
+        updateMessage = "Event location has changed";
+      } else if (hasDateTimeChanged) {
+        updateMessage = "Event date/time has changed";
+      } else if (hasTitleChanged) {
+        updateMessage = "Event title has been updated";
       }
 
-      if (shouldSendTicketNotification) {
-        let updateMessage = "Event details have been updated";
-        if (hasLocationChanged) {
-          updateMessage = "Event location has changed";
-        } else if (hasDateTimeChanged) {
-          updateMessage = "Event date/time has changed";
-        } else if (hasTitleChanged) {
-          updateMessage = "Event title has been updated";
-        }
-
-        await sendNotificationToUser(userId, {
-          type: "ticket_update",
-          title: "Event Updated",
-          body: `${updateMessage}: "${afterData.eventTitle || "Event"}"`,
-          eventId: eventId,
-          eventTitle: afterData.eventTitle || "Event",
-        }, db);
-      }
+      await sendNotificationToUser(userId, {
+        type: "event_changes",
+        title: "Event Updated",
+        body: `${updateMessage}: "${afterData.eventTitle || "Event"}"`,
+        eventId: eventId,
+        eventTitle: afterData.eventTitle || "Event",
+      }, db);
     }
 
     logger.info(`Sent event update notifications for event ${eventId}`);
 
   } catch (error) {
     logger.error("Error sending event update notifications:", error);
+  }
+});
+
+// Organizer feedback received (notify event creator)
+exports.notifyOrganizerOnFeedback = onDocumentCreated("event_feedback/{docId}", async (event) => {
+  try {
+    const feedback = event.data.data();
+    const eventId = feedback.eventId;
+    const db = admin.firestore();
+
+    const eventDoc = await db.collection("Events").doc(eventId).get();
+    if (!eventDoc.exists) return;
+    const eventData = eventDoc.data();
+    const creatorId = eventData.customerUid || eventData.createdBy;
+    if (!creatorId) return;
+
+    // respect organizerFeedback toggle
+    const settingsDoc = await db.collection("users").doc(creatorId).collection("settings").doc("notifications").get();
+    const settings = settingsDoc.exists ? settingsDoc.data() : {};
+    if (settings.organizerFeedback === false) return;
+
+    await sendNotificationToUser(creatorId, {
+      type: "organizer_feedback",
+      title: "New feedback received",
+      body: `Your event "${eventData.title || eventData.eventTitle || "Event"}" received new feedback`,
+      eventId: eventId,
+      eventTitle: eventData.title || eventData.eventTitle || "Event",
+    }, db);
+  } catch (error) {
+    logger.error("Error notifying organizer on feedback:", error);
+  }
+});
+
+// Organization: notify admins on new join request
+exports.notifyOrgAdminsOnJoinRequest = onDocumentCreated("Organizations/{orgId}/JoinRequests/{userId}", async (event) => {
+  try {
+    const orgId = event.params.orgId;
+    const db = admin.firestore();
+    // Find admin members
+    const membersSnap = await db.collection("Organizations").doc(orgId).collection("Members")
+      .where("role", "in", ["Admin", "Owner"]).get();
+    for (const m of membersSnap.docs) {
+      const adminId = m.id;
+      const settingsDoc = await db.collection("users").doc(adminId).collection("settings").doc("notifications").get();
+      const settings = settingsDoc.exists ? settingsDoc.data() : {};
+      if (settings.organizationUpdates === false) continue;
+      await sendNotificationToUser(adminId, {
+        type: "org_update",
+        title: "New join request",
+        body: "A user requested to join your organization",
+        data: { organizationId: orgId },
+      }, db);
+    }
+  } catch (error) {
+    logger.error("Error notifying org admins on join request:", error);
+  }
+});
+
+// Organization: notify requester on approval/decline and members on role changes
+exports.notifyOrgMembershipChanges = onDocumentWritten("Organizations/{orgId}/Members/{userId}", async (event) => {
+  try {
+    const orgId = event.params.orgId;
+    const userId = event.params.userId;
+    const db = admin.firestore();
+
+    const afterExists = event.data.after.exists;
+    const beforeData = event.data.before.exists ? event.data.before.data() : null;
+    const afterData = afterExists ? event.data.after.data() : null;
+
+    // If status changed to approved/declined, inform the user
+    if (afterExists && beforeData && beforeData.status !== afterData.status) {
+      const settingsDoc = await db.collection("users").doc(userId).collection("settings").doc("notifications").get();
+      const settings = settingsDoc.exists ? settingsDoc.data() : {};
+      if (settings.organizationUpdates !== false) {
+        const approved = afterData.status === "approved";
+        await sendNotificationToUser(userId, {
+          type: "org_update",
+          title: approved ? "Join request approved" : "Join request updated",
+          body: approved ? "You have been approved to join the organization" : `Your status is now ${afterData.status}`,
+          data: { organizationId: orgId },
+        }, db);
+      }
+    }
+
+    // If role changes, notify the user
+    if (afterExists && beforeData && beforeData.role !== afterData.role) {
+      const settingsDoc = await db.collection("users").doc(userId).collection("settings").doc("notifications").get();
+      const settings = settingsDoc.exists ? settingsDoc.data() : {};
+      if (settings.organizationUpdates !== false) {
+        await sendNotificationToUser(userId, {
+          type: "org_update",
+          title: "Role changed",
+          body: `Your role is now ${afterData.role}`,
+          data: { organizationId: orgId },
+        }, db);
+      }
+    }
+  } catch (error) {
+    logger.error("Error notifying org membership changes:", error);
+  }
+});
+
+// Messaging: mentions-only notifications (basic @username detection)
+exports.sendMentionNotifications = onDocumentCreated("Messages/{messageId}", async (event) => {
+  try {
+    const msg = event.data.data();
+    const db = admin.firestore();
+    const content = (msg.content || "").toString();
+    const receiverId = msg.receiverId;
+    const senderId = msg.senderId;
+    if (!content.includes("@")) return;
+
+    // Very basic: if content contains receiver's @username, notify as mention
+    const receiverDoc = await db.collection("Customers").doc(receiverId).get();
+    if (!receiverDoc.exists) return;
+    const username = receiverDoc.data().username;
+    if (!username || !content.includes(`@${username}`)) return;
+
+    const settingsDoc = await db.collection("users").doc(receiverId).collection("settings").doc("notifications").get();
+    const settings = settingsDoc.exists ? settingsDoc.data() : {};
+    if (settings.messageMentions === false) return;
+
+    const conversationId = `${Math.min(senderId, receiverId)}_${Math.max(senderId, receiverId)}`;
+    await sendNotificationToUser(receiverId, {
+      type: "message_mention",
+      title: "You were mentioned",
+      body: content.length > 50 ? content.substring(0,50) + "..." : content,
+      data: { conversationId },
+    }, db);
+  } catch (error) {
+    logger.error("Error sending mention notifications:", error);
   }
 });
 
@@ -988,6 +1115,8 @@ async function sendNotificationToUser(userId, notificationData, db) {
         type: notificationData.type,
         eventId: notificationData.eventId || "",
         eventTitle: notificationData.eventTitle || "",
+        conversationId: (notificationData.data && notificationData.data.conversationId) ? notificationData.data.conversationId : "",
+        organizationId: (notificationData.data && notificationData.data.organizationId) ? notificationData.data.organizationId : "",
         click_action: "FLUTTER_NOTIFICATION_CLICK",
       },
       android: {

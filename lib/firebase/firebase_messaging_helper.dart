@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io' show Platform;
+import 'dart:typed_data' show Int64List;
 
 import 'package:orgami/models/message_model.dart';
 import 'package:orgami/models/customer_model.dart';
@@ -226,10 +227,24 @@ class FirebaseMessagingHelper {
     // Handle navigation based on notification type
     final type = data['type'];
     final eventId = data['eventId'];
+    final conversationId = data['conversationId'];
+    final organizationId = data['organizationId'];
 
     switch (type) {
       case 'event_reminder':
-        // Navigate to event details
+        _openEventIfPossible(eventId);
+        break;
+      case 'event_changes':
+        // Time/venue/agenda updates; cancellations/reschedules
+        if (_settings?.eventChanges == true) {
+          _openEventIfPossible(eventId);
+        }
+        break;
+      case 'geofence_checkin':
+        // Near venue; prompt event screen
+        if (_settings?.geofenceCheckIn == true) {
+          _openEventIfPossible(eventId);
+        }
         break;
       case 'new_event':
         // Navigate to events list
@@ -237,8 +252,24 @@ class FirebaseMessagingHelper {
       case 'ticket_update':
         // Navigate to tickets
         break;
+      case 'message_mention':
+        if (_settings?.messageMentions == true && conversationId != null) {
+          _openChatIfPossible(conversationId);
+        }
+        break;
+      case 'org_update':
+        // Join requests/approvals/role changes
+        if (_settings?.organizationUpdates == true) {
+          _openOrganizationIfPossible(organizationId);
+        }
+        break;
+      case 'organizer_feedback':
+        if (_settings?.organizerFeedback == true) {
+          _navigateToFeedbackScreen(eventId);
+        }
+        break;
       case 'event_feedback':
-        // Navigate to feedback screen
+        // Post-event attendee feedback prompt
         _navigateToFeedbackScreen(eventId);
         break;
       default:
@@ -265,10 +296,31 @@ class FirebaseMessagingHelper {
     });
   }
 
+  void _openEventIfPossible(String? eventId) {
+    if (eventId == null) return;
+    // Store pending event for later consumption; UI can read and navigate
+    FirebaseFirestore.instance.collection('Events').doc(eventId).get().then((d) {
+      if (d.exists) {
+        _pendingFeedbackEvent = EventModel.fromJson(d);
+      }
+    });
+  }
+
+  void _openChatIfPossible(String conversationId) {
+    // No global navigator here; consuming UI should handle route from payload
+  }
+
+  void _openOrganizationIfPossible(String? organizationId) {
+    // No global navigator here; consuming UI should handle route from payload
+  }
+
   Future<void> _showLocalNotification(fcm.RemoteMessage message) async {
     if (_localNotifications == null) return;
 
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+    final bool playSound = _settings?.soundEnabled ?? true;
+    final bool enableVibration = _settings?.vibrationEnabled ?? true;
+
+    final AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
           'orgami_channel',
           'Orgami Notifications',
@@ -276,16 +328,21 @@ class FirebaseMessagingHelper {
           importance: Importance.max,
           priority: Priority.high,
           showWhen: true,
+          playSound: playSound,
+          enableVibration: enableVibration,
+          vibrationPattern: enableVibration
+              ? Int64List.fromList([0, 250, 150, 250])
+              : null,
         );
 
-    const DarwinNotificationDetails iOSPlatformChannelSpecifics =
+    final DarwinNotificationDetails iOSPlatformChannelSpecifics =
         DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
-          presentSound: true,
+          presentSound: playSound,
         );
 
-    const NotificationDetails platformChannelSpecifics = NotificationDetails(
+    final NotificationDetails platformChannelSpecifics = NotificationDetails(
       android: androidPlatformChannelSpecifics,
       iOS: iOSPlatformChannelSpecifics,
     );
@@ -938,6 +995,98 @@ class FirebaseMessagingHelper {
               .map((doc) => NotificationModel.fromFirestore(doc))
               .toList(),
         );
+  }
+
+  // Add a notification directly to the user's inbox (client-side helper)
+  Future<void> addNotificationToInbox({
+    required String title,
+    required String body,
+    String type = 'general',
+    String? eventId,
+    String? eventTitle,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('notifications')
+          .add({
+        'title': title,
+        'body': body,
+        'type': type,
+        'eventId': eventId,
+        'eventTitle': eventTitle,
+        'createdAt': FieldValue.serverTimestamp(),
+        'isRead': false,
+        'data': data ?? <String, dynamic>{},
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        Logger.error('❌ Error adding notification to inbox: $e');
+      }
+    }
+  }
+
+  // Bulk mark all notifications as read
+  Future<void> markAllNotificationsAsRead() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+      final query = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('notifications')
+          .where('isRead', isEqualTo: false)
+          .get();
+      final batch = _firestore.batch();
+      for (final doc in query.docs) {
+        batch.update(doc.reference, {'isRead': true});
+      }
+      await batch.commit();
+    } catch (e) {
+      if (kDebugMode) {
+        Logger.error('❌ Error marking all notifications as read: $e');
+      }
+    }
+  }
+
+  // Bulk clear all notifications
+  Future<void> clearAllNotifications() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+      final query = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('notifications')
+          .get();
+      final batch = _firestore.batch();
+      for (final doc in query.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    } catch (e) {
+      if (kDebugMode) {
+        Logger.error('❌ Error clearing notifications: $e');
+      }
+    }
+  }
+
+  // Expose permission request to allow manual trigger from Settings UI
+  Future<fcm.NotificationSettings> requestPermissions() async {
+    final settings = await _messaging.requestPermission(
+      alert: true,
+      announcement: false,
+      badge: true,
+      carPlay: false,
+      criticalAlert: false,
+      provisional: false,
+      sound: true,
+    );
+    return settings;
   }
 
   Future<void> subscribeToTopic(String topic) async {

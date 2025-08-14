@@ -3,6 +3,12 @@ import 'package:orgami/firebase/firebase_messaging_helper.dart';
 import 'package:orgami/models/notification_model.dart';
 import 'package:intl/intl.dart';
 import 'package:orgami/screens/Home/notification_settings_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:orgami/models/event_model.dart';
+import 'package:orgami/screens/Events/single_event_screen.dart';
+import 'package:orgami/screens/Messaging/chat_screen.dart';
+import 'package:orgami/screens/Organizations/organization_profile_screen.dart';
+import 'package:orgami/screens/Events/event_feedback_management_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -47,6 +53,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.done_all),
+            tooltip: 'Mark all read',
+            onPressed: () async {
+              await _messagingHelper.markAllNotificationsAsRead();
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_sweep_outlined),
+            tooltip: 'Clear all',
+            onPressed: () async {
+              await _messagingHelper.clearAllNotifications();
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
@@ -190,49 +210,54 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 24),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const NotificationSettingsScreen(),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF667EEA).withAlpha(25),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: const Color(0xFF667EEA).withAlpha(76),
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.settings_outlined,
-                                size: 16,
-                                color: const Color(0xFF667EEA),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const NotificationSettingsScreen(),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Manage notifications',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF667EEA),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF667EEA).withAlpha(25),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: const Color(0xFF667EEA).withAlpha(76),
+                                  width: 1,
                                 ),
                               ),
-                            ],
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Icon(
+                                    Icons.settings_outlined,
+                                    size: 16,
+                                    color: Color(0xFF667EEA),
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Manage notifications',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF667EEA),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),
@@ -426,10 +451,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     switch (type) {
       case 'event_reminder':
         return Colors.orange;
+      case 'event_changes':
+        return Colors.deepOrange;
+      case 'geofence_checkin':
+        return Colors.teal;
       case 'new_event':
         return Colors.green;
       case 'ticket_update':
         return Colors.blue;
+      case 'message_mention':
+        return Colors.purple;
+      case 'org_update':
+        return Colors.indigo;
+      case 'organizer_feedback':
+        return Colors.amber;
       default:
         return Colors.grey;
     }
@@ -439,41 +474,100 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     switch (type) {
       case 'event_reminder':
         return Icons.event;
+      case 'event_changes':
+        return Icons.event_repeat;
+      case 'geofence_checkin':
+        return Icons.my_location;
       case 'new_event':
         return Icons.add_circle;
       case 'ticket_update':
         return Icons.confirmation_number;
+      case 'message_mention':
+        return Icons.alternate_email;
+      case 'org_update':
+        return Icons.account_tree;
+      case 'organizer_feedback':
+        return Icons.feedback_outlined;
       default:
         return Icons.notifications;
     }
   }
 
-  void _handleNotificationTap(NotificationModel notification) {
-    // Handle navigation based on notification type
+  void _handleNotificationTap(NotificationModel notification) async {
     switch (notification.type) {
       case 'event_reminder':
-        if (notification.eventId != null) {
-          // Navigate to event details
-          // Navigator.push(context, MaterialPageRoute(
-          //   builder: (context) => SingleEventScreen(eventId: notification.eventId!),
-          // ));
-        }
+      case 'event_changes':
+      case 'geofence_checkin':
+        await _openEvent(notification.eventId);
         break;
       case 'new_event':
-        // Navigate to events list
-        // Navigator.push(context, MaterialPageRoute(
-        //   builder: (context) => SearchScreen(),
-        // ));
+        // Future: navigate to discovery
         break;
       case 'ticket_update':
-        // Navigate to tickets
-        // Navigator.push(context, MaterialPageRoute(
-        //   builder: (context) => MyTicketsScreen(),
-        // ));
+        // Future: navigate to tickets
+        break;
+      case 'message_mention':
+        final conversationId = notification.data?['conversationId'] as String?;
+        if (conversationId != null && context.mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ChatScreen(conversationId: conversationId),
+            ),
+          );
+        }
+        break;
+      case 'org_update':
+        final orgId = notification.data?['organizationId'] as String?;
+        if (orgId != null && context.mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => OrganizationProfileScreen(organizationId: orgId),
+            ),
+          );
+        }
+        break;
+      case 'organizer_feedback':
+        await _openFeedbackManagement(notification.eventId);
+        break;
+      case 'event_feedback':
+        // Attendee feedback prompt handled elsewhere
         break;
       default:
-        // Stay on notifications screen
         break;
     }
+  }
+
+  Future<void> _openEvent(String? eventId) async {
+    if (eventId == null) return;
+    final doc = await FirebaseFirestore.instance
+        .collection(EventModel.firebaseKey)
+        .doc(eventId)
+        .get();
+    if (!doc.exists) return;
+    final event = EventModel.fromJson(doc);
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => SingleEventScreen(eventModel: event)),
+    );
+  }
+
+  Future<void> _openFeedbackManagement(String? eventId) async {
+    if (eventId == null) return;
+    final doc = await FirebaseFirestore.instance
+        .collection(EventModel.firebaseKey)
+        .doc(eventId)
+        .get();
+    if (!doc.exists) return;
+    final event = EventModel.fromJson(doc);
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EventFeedbackManagementScreen(eventModel: event),
+      ),
+    );
   }
 }
