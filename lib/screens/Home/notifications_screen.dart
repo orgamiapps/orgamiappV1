@@ -3,6 +3,14 @@ import 'package:orgami/firebase/firebase_messaging_helper.dart';
 import 'package:orgami/models/notification_model.dart';
 import 'package:intl/intl.dart';
 import 'package:orgami/screens/Home/notification_settings_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:orgami/models/event_model.dart';
+import 'package:orgami/screens/Events/single_event_screen.dart';
+import 'package:orgami/screens/Messaging/chat_screen.dart';
+import 'package:orgami/screens/Organizations/organization_profile_screen.dart';
+import 'package:orgami/screens/Events/event_feedback_management_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:async';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -15,15 +23,115 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   final FirebaseMessagingHelper _messagingHelper = FirebaseMessagingHelper();
   bool _isLoading = true;
 
+  // Infinite scroll state
+  final ScrollController _scrollController = ScrollController();
+  final List<NotificationModel> _items = [];
+  final Set<String> _ids = <String>{};
+  DocumentSnapshot? _lastDoc;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  StreamSubscription<QuerySnapshot>? _realtimeSub;
+
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadInitial();
+    _scrollController.addListener(() {
+      if (!_hasMore || _isLoadingMore) return;
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 200) {
+        _loadMore();
+      }
+    });
   }
 
-  Future<void> _loadData() async {
+  @override
+  void dispose() {
+    _realtimeSub?.cancel();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadInitial() async {
     setState(() {
+      _isLoading = true;
+      _items.clear();
+      _ids.clear();
+      _lastDoc = null;
+      _hasMore = true;
+    });
+    final page = await _messagingHelper.fetchUserNotificationsPage(
+      pageSize: 20,
+    );
+    setState(() {
+      _items.addAll(page.items);
+      _ids.addAll(page.items.map((e) => e.id));
+      _lastDoc = page.lastDoc;
+      _hasMore = page.items.length >= 20;
       _isLoading = false;
+    });
+    _startRealtimeTopListener();
+  }
+
+  void _startRealtimeTopListener() {
+    _realtimeSub?.cancel();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    _realtimeSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('notifications')
+        .orderBy('createdAt', descending: true)
+        .limit(20)
+        .snapshots()
+        .listen((snapshot) {
+          for (final change in snapshot.docChanges) {
+            if (change.type == DocumentChangeType.added) {
+              final model = NotificationModel.fromFirestore(change.doc);
+              if (!_ids.contains(model.id)) {
+                setState(() {
+                  _items.insert(0, model);
+                  _ids.add(model.id);
+                });
+              }
+            } else if (change.type == DocumentChangeType.modified) {
+              final model = NotificationModel.fromFirestore(change.doc);
+              final index = _items.indexWhere((n) => n.id == model.id);
+              if (index != -1) {
+                setState(() {
+                  _items[index] = model;
+                });
+              }
+            } else if (change.type == DocumentChangeType.removed) {
+              final removedId = change.doc.id;
+              final index = _items.indexWhere((n) => n.id == removedId);
+              if (index != -1) {
+                setState(() {
+                  _items.removeAt(index);
+                  _ids.remove(removedId);
+                });
+              }
+            }
+          }
+        });
+  }
+
+  Future<void> _loadMore() async {
+    if (!_hasMore || _isLoadingMore) return;
+    setState(() => _isLoadingMore = true);
+    final page = await _messagingHelper.fetchUserNotificationsPage(
+      startAfter: _lastDoc,
+      pageSize: 20,
+    );
+    setState(() {
+      for (final it in page.items) {
+        if (_ids.add(it.id)) {
+          _items.add(it);
+        }
+      }
+      _lastDoc = page.lastDoc;
+      _hasMore = page.items.length >= 20;
+      _isLoadingMore = false;
     });
   }
 
@@ -48,6 +156,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         elevation: 0,
         actions: [
           IconButton(
+            icon: const Icon(Icons.done_all),
+            tooltip: 'Mark all read',
+            onPressed: () async {
+              await _messagingHelper.markAllNotificationsAsRead();
+              await _loadInitial();
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_sweep_outlined),
+            tooltip: 'Clear all',
+            onPressed: () async {
+              await _messagingHelper.clearAllNotifications();
+              await _loadInitial();
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
               Navigator.push(
@@ -62,202 +186,159 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [_buildNotificationsList()],
+          : RefreshIndicator(
+              onRefresh: _loadInitial,
+              child: CustomScrollView(
+                controller: _scrollController,
+                slivers: [
+                  SliverToBoxAdapter(child: _buildHeader()),
+                  if (_items.isEmpty)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _buildEmptyState(),
+                    ),
+                  if (_items.isNotEmpty)
+                    SliverList(
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        if (index >= _items.length) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 24),
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        }
+                        return _buildNotificationTile(_items[index]);
+                      }, childCount: _items.length + (_hasMore ? 1 : 0)),
+                    ),
+                ],
               ),
             ),
     );
   }
 
-  Widget _buildNotificationsList() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withAlpha(25),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.notifications_outlined,
-                  color: Color(0xFF667EEA),
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Recent Notifications',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black87,
-                ),
-              ),
-            ],
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF667EEA).withAlpha(25),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.notifications_outlined,
+              color: Color(0xFF667EEA),
+              size: 20,
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
-        StreamBuilder<List<NotificationModel>>(
-          stream: _messagingHelper.getUserNotifications(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const SizedBox(
-                height: 200,
-                child: Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Color(0xFF667EEA),
+          const SizedBox(width: 12),
+          const Text(
+            'Recent Notifications',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return SizedBox(
+      height: 300,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.notifications_none_outlined,
+                size: 64,
+                color: Colors.grey[400],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'All caught up!',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You\'re up to date with all your notifications',
+              style: TextStyle(fontSize: 16, color: Colors.grey[500]),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            const NotificationSettingsScreen(),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF667EEA).withAlpha(25),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFF667EEA).withAlpha(76),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(
+                          Icons.settings_outlined,
+                          size: 16,
+                          color: Color(0xFF667EEA),
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Manage notifications',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF667EEA),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              );
-            }
-
-            if (snapshot.hasError) {
-              return SizedBox(
-                height: 200,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        size: 48,
-                        color: Colors.red[300],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Error loading notifications',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.red[700],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Please try again later',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-
-            final notifications = snapshot.data ?? [];
-
-            if (notifications.isEmpty) {
-              return SizedBox(
-                height: 300,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.notifications_none_outlined,
-                          size: 64,
-                          color: Colors.grey[400],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'All caught up!',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'You\'re up to date with all your notifications',
-                        style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const NotificationSettingsScreen(),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF667EEA).withAlpha(25),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: const Color(0xFF667EEA).withAlpha(76),
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.settings_outlined,
-                                size: 16,
-                                color: const Color(0xFF667EEA),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Manage notifications',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF667EEA),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-
-            return ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: notifications.length,
-              itemBuilder: (context, index) {
-                final notification = notifications[index];
-                return _buildNotificationTile(notification);
-              },
-            );
-          },
+              ],
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
   Widget _buildNotificationTile(NotificationModel notification) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 12, left: 16, right: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -426,10 +507,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     switch (type) {
       case 'event_reminder':
         return Colors.orange;
+      case 'event_changes':
+        return Colors.deepOrange;
+      case 'geofence_checkin':
+        return Colors.teal;
       case 'new_event':
         return Colors.green;
       case 'ticket_update':
         return Colors.blue;
+      case 'message_mention':
+        return Colors.purple;
+      case 'org_update':
+        return Colors.indigo;
+      case 'organizer_feedback':
+        return Colors.amber;
       default:
         return Colors.grey;
     }
@@ -439,41 +530,97 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     switch (type) {
       case 'event_reminder':
         return Icons.event;
+      case 'event_changes':
+        return Icons.event_repeat;
+      case 'geofence_checkin':
+        return Icons.my_location;
       case 'new_event':
         return Icons.add_circle;
       case 'ticket_update':
         return Icons.confirmation_number;
+      case 'message_mention':
+        return Icons.alternate_email;
+      case 'org_update':
+        return Icons.account_tree;
+      case 'organizer_feedback':
+        return Icons.feedback_outlined;
       default:
         return Icons.notifications;
     }
   }
 
-  void _handleNotificationTap(NotificationModel notification) {
-    // Handle navigation based on notification type
+  void _handleNotificationTap(NotificationModel notification) async {
     switch (notification.type) {
       case 'event_reminder':
-        if (notification.eventId != null) {
-          // Navigate to event details
-          // Navigator.push(context, MaterialPageRoute(
-          //   builder: (context) => SingleEventScreen(eventId: notification.eventId!),
-          // ));
-        }
+      case 'event_changes':
+      case 'geofence_checkin':
+        await _openEvent(notification.eventId);
         break;
       case 'new_event':
-        // Navigate to events list
-        // Navigator.push(context, MaterialPageRoute(
-        //   builder: (context) => SearchScreen(),
-        // ));
         break;
       case 'ticket_update':
-        // Navigate to tickets
-        // Navigator.push(context, MaterialPageRoute(
-        //   builder: (context) => MyTicketsScreen(),
-        // ));
+        break;
+      case 'message_mention':
+        final conversationId = notification.data?['conversationId'] as String?;
+        if (conversationId != null && context.mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ChatScreen(conversationId: conversationId),
+            ),
+          );
+        }
+        break;
+      case 'org_update':
+        final orgId = notification.data?['organizationId'] as String?;
+        if (orgId != null && context.mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => OrganizationProfileScreen(organizationId: orgId),
+            ),
+          );
+        }
+        break;
+      case 'organizer_feedback':
+        await _openFeedbackManagement(notification.eventId);
+        break;
+      case 'event_feedback':
         break;
       default:
-        // Stay on notifications screen
         break;
     }
+  }
+
+  Future<void> _openEvent(String? eventId) async {
+    if (eventId == null) return;
+    final doc = await FirebaseFirestore.instance
+        .collection(EventModel.firebaseKey)
+        .doc(eventId)
+        .get();
+    if (!doc.exists) return;
+    final event = EventModel.fromJson(doc);
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => SingleEventScreen(eventModel: event)),
+    );
+  }
+
+  Future<void> _openFeedbackManagement(String? eventId) async {
+    if (eventId == null) return;
+    final doc = await FirebaseFirestore.instance
+        .collection(EventModel.firebaseKey)
+        .doc(eventId)
+        .get();
+    if (!doc.exists) return;
+    final event = EventModel.fromJson(doc);
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EventFeedbackManagementScreen(eventModel: event),
+      ),
+    );
   }
 }
