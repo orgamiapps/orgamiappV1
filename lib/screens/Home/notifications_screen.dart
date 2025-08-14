@@ -3,6 +3,12 @@ import 'package:orgami/firebase/firebase_messaging_helper.dart';
 import 'package:orgami/models/notification_model.dart';
 import 'package:intl/intl.dart';
 import 'package:orgami/screens/Home/notification_settings_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:orgami/models/event_model.dart';
+import 'package:orgami/screens/Events/single_event_screen.dart';
+import 'package:orgami/screens/Messaging/chat_screen.dart';
+import 'package:orgami/screens/Organizations/organization_profile_screen.dart';
+import 'package:orgami/screens/Events/event_feedback_management_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -445,10 +451,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     switch (type) {
       case 'event_reminder':
         return Colors.orange;
+      case 'event_changes':
+        return Colors.deepOrange;
+      case 'geofence_checkin':
+        return Colors.teal;
       case 'new_event':
         return Colors.green;
       case 'ticket_update':
         return Colors.blue;
+      case 'message_mention':
+        return Colors.purple;
+      case 'org_update':
+        return Colors.indigo;
+      case 'organizer_feedback':
+        return Colors.amber;
       default:
         return Colors.grey;
     }
@@ -458,41 +474,100 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     switch (type) {
       case 'event_reminder':
         return Icons.event;
+      case 'event_changes':
+        return Icons.event_repeat;
+      case 'geofence_checkin':
+        return Icons.my_location;
       case 'new_event':
         return Icons.add_circle;
       case 'ticket_update':
         return Icons.confirmation_number;
+      case 'message_mention':
+        return Icons.alternate_email;
+      case 'org_update':
+        return Icons.account_tree;
+      case 'organizer_feedback':
+        return Icons.feedback_outlined;
       default:
         return Icons.notifications;
     }
   }
 
-  void _handleNotificationTap(NotificationModel notification) {
-    // Handle navigation based on notification type
+  void _handleNotificationTap(NotificationModel notification) async {
     switch (notification.type) {
       case 'event_reminder':
-        if (notification.eventId != null) {
-          // Navigate to event details
-          // Navigator.push(context, MaterialPageRoute(
-          //   builder: (context) => SingleEventScreen(eventId: notification.eventId!),
-          // ));
-        }
+      case 'event_changes':
+      case 'geofence_checkin':
+        await _openEvent(notification.eventId);
         break;
       case 'new_event':
-        // Navigate to events list
-        // Navigator.push(context, MaterialPageRoute(
-        //   builder: (context) => SearchScreen(),
-        // ));
+        // Future: navigate to discovery
         break;
       case 'ticket_update':
-        // Navigate to tickets
-        // Navigator.push(context, MaterialPageRoute(
-        //   builder: (context) => MyTicketsScreen(),
-        // ));
+        // Future: navigate to tickets
+        break;
+      case 'message_mention':
+        final conversationId = notification.data?['conversationId'] as String?;
+        if (conversationId != null && context.mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ChatScreen(conversationId: conversationId),
+            ),
+          );
+        }
+        break;
+      case 'org_update':
+        final orgId = notification.data?['organizationId'] as String?;
+        if (orgId != null && context.mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => OrganizationProfileScreen(organizationId: orgId),
+            ),
+          );
+        }
+        break;
+      case 'organizer_feedback':
+        await _openFeedbackManagement(notification.eventId);
+        break;
+      case 'event_feedback':
+        // Attendee feedback prompt handled elsewhere
         break;
       default:
-        // Stay on notifications screen
         break;
     }
+  }
+
+  Future<void> _openEvent(String? eventId) async {
+    if (eventId == null) return;
+    final doc = await FirebaseFirestore.instance
+        .collection(EventModel.firebaseKey)
+        .doc(eventId)
+        .get();
+    if (!doc.exists) return;
+    final event = EventModel.fromJson(doc);
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => SingleEventScreen(eventModel: event)),
+    );
+  }
+
+  Future<void> _openFeedbackManagement(String? eventId) async {
+    if (eventId == null) return;
+    final doc = await FirebaseFirestore.instance
+        .collection(EventModel.firebaseKey)
+        .doc(eventId)
+        .get();
+    if (!doc.exists) return;
+    final event = EventModel.fromJson(doc);
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EventFeedbackManagementScreen(eventModel: event),
+      ),
+    );
   }
 }

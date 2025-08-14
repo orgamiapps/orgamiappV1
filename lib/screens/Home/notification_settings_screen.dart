@@ -203,6 +203,25 @@ class _NotificationSettingsScreenState
             _buildReminderTimeSetting(),
             const Divider(),
             _buildSettingSwitch(
+              title: 'Event Changes',
+              subtitle:
+                  'Time, venue or agenda updates; cancellations and reschedules',
+              value: _settings!.eventChanges,
+              onChanged: (value) {
+                _updateSettings(_settings!.copyWith(eventChanges: value));
+              },
+            ),
+            const Divider(),
+            _buildSettingSwitch(
+              title: 'Geofenced Check-in',
+              subtitle: 'Prompt check-in when you\'re near the venue close to start',
+              value: _settings!.geofenceCheckIn,
+              onChanged: (value) {
+                _updateSettings(_settings!.copyWith(geofenceCheckIn: value));
+              },
+            ),
+            const Divider(),
+            _buildSettingSwitch(
               title: 'New Events',
               subtitle:
                   'Notifications about new events within ${_settings!.newEventsDistance} miles of your area',
@@ -214,21 +233,49 @@ class _NotificationSettingsScreenState
             const Divider(),
             _buildNewEventsDistanceSetting(),
             const Divider(),
+                        _buildSettingSwitch(
+               title: 'Ticket Updates',
+               subtitle: 'Get notified when you get a ticket or event details change',
+               value: _settings!.ticketUpdates,
+               onChanged: (value) {
+                 _updateSettings(_settings!.copyWith(ticketUpdates: value));
+               },
+             ),
+             const Divider(),
+             _buildSettingSwitch(
+               title: 'Event Feedback',
+               subtitle: 'Get reminded to rate and comment on events you attended',
+               value: _settings!.eventFeedback,
+               onChanged: (value) {
+                 _updateSettings(_settings!.copyWith(eventFeedback: value));
+               },
+             ),
+             const Divider(),
+             _buildSettingSwitch(
+               title: 'Message Mentions',
+               subtitle: 'Only @mentions and replies in chats',
+               value: _settings!.messageMentions,
+               onChanged: (value) {
+                 _updateSettings(_settings!.copyWith(messageMentions: value));
+               },
+             ),
+            const Divider(),
             _buildSettingSwitch(
-              title: 'Ticket Updates',
-              subtitle: 'Get notified when you get a ticket or event details change',
-              value: _settings!.ticketUpdates,
+              title: 'Organization Updates',
+              subtitle:
+                  'Join requests (admins), approvals/role changes (members)',
+              value: _settings!.organizationUpdates,
               onChanged: (value) {
-                _updateSettings(_settings!.copyWith(ticketUpdates: value));
+                _updateSettings(_settings!.copyWith(organizationUpdates: value));
               },
             ),
             const Divider(),
             _buildSettingSwitch(
-              title: 'Event Feedback',
-              subtitle: 'Get reminded to rate and comment on events you attended',
-              value: _settings!.eventFeedback,
+              title: 'Organizer Feedback',
+              subtitle: 'New ratings or comments on your events',
+              value: _settings!.organizerFeedback,
               onChanged: (value) {
-                _updateSettings(_settings!.copyWith(eventFeedback: value));
+                _updateSettings(_settings!.copyWith(organizerFeedback: value));
               },
             ),
             const Divider(),

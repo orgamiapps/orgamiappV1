@@ -227,10 +227,24 @@ class FirebaseMessagingHelper {
     // Handle navigation based on notification type
     final type = data['type'];
     final eventId = data['eventId'];
+    final conversationId = data['conversationId'];
+    final organizationId = data['organizationId'];
 
     switch (type) {
       case 'event_reminder':
-        // Navigate to event details
+        _openEventIfPossible(eventId);
+        break;
+      case 'event_changes':
+        // Time/venue/agenda updates; cancellations/reschedules
+        if (_settings?.eventChanges == true) {
+          _openEventIfPossible(eventId);
+        }
+        break;
+      case 'geofence_checkin':
+        // Near venue; prompt event screen
+        if (_settings?.geofenceCheckIn == true) {
+          _openEventIfPossible(eventId);
+        }
         break;
       case 'new_event':
         // Navigate to events list
@@ -238,8 +252,24 @@ class FirebaseMessagingHelper {
       case 'ticket_update':
         // Navigate to tickets
         break;
+      case 'message_mention':
+        if (_settings?.messageMentions == true && conversationId != null) {
+          _openChatIfPossible(conversationId);
+        }
+        break;
+      case 'org_update':
+        // Join requests/approvals/role changes
+        if (_settings?.organizationUpdates == true) {
+          _openOrganizationIfPossible(organizationId);
+        }
+        break;
+      case 'organizer_feedback':
+        if (_settings?.organizerFeedback == true) {
+          _navigateToFeedbackScreen(eventId);
+        }
+        break;
       case 'event_feedback':
-        // Navigate to feedback screen
+        // Post-event attendee feedback prompt
         _navigateToFeedbackScreen(eventId);
         break;
       default:
@@ -264,6 +294,24 @@ class FirebaseMessagingHelper {
         _pendingFeedbackEvent = eventModel;
       }
     });
+  }
+
+  void _openEventIfPossible(String? eventId) {
+    if (eventId == null) return;
+    // Store pending event for later consumption; UI can read and navigate
+    FirebaseFirestore.instance.collection('Events').doc(eventId).get().then((d) {
+      if (d.exists) {
+        _pendingFeedbackEvent = EventModel.fromJson(d);
+      }
+    });
+  }
+
+  void _openChatIfPossible(String conversationId) {
+    // No global navigator here; consuming UI should handle route from payload
+  }
+
+  void _openOrganizationIfPossible(String? organizationId) {
+    // No global navigator here; consuming UI should handle route from payload
   }
 
   Future<void> _showLocalNotification(fcm.RemoteMessage message) async {
