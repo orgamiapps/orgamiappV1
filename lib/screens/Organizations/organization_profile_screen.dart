@@ -450,6 +450,54 @@ class _OrgEventsTab extends StatelessWidget {
   final String orgId;
   const _OrgEventsTab({required this.orgId});
 
+  // Empty state matching the app's "No Events Yet" design
+  Widget _buildNoEventsYet() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(40),
+              ),
+              child: const Icon(
+                Icons.event_busy,
+                size: 40,
+                color: Color(0xFF667EEA),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'No Events Yet',
+              style: TextStyle(
+                color: Color(0xFF1A1A1A),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Events will appear here once they are created.\nCheck back soon!',
+              style: TextStyle(
+                color: Color(0xFF6B7280),
+                fontSize: 16,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final query = FirebaseFirestore.instance
@@ -463,7 +511,7 @@ class _OrgEventsTab extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(child: Text('No events yet'));
+          return _buildNoEventsYet();
         }
         // Filter upcoming and sort client-side by selectedDateTime
         final DateTime threshold = DateTime.now().subtract(
@@ -482,6 +530,9 @@ class _OrgEventsTab extends StatelessWidget {
                   DateTime(2100);
               return ad.compareTo(bd);
             });
+        if (docs.isEmpty) {
+          return _buildNoEventsYet();
+        }
         return ListView.builder(
           itemCount: docs.length,
           padding: const EdgeInsets.all(16),

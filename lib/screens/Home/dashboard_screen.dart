@@ -17,6 +17,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late final double _screenHeight = MediaQuery.of(context).size.height;
 
   int _selectedIndex = 0;
+  bool _hasScrolledContent = false;
 
   final List<Widget> _dashBoardScreens = const [
     HomeHubScreen(),
@@ -29,7 +30,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(child: _bodyView()),
+      body: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          // Track if any vertical scrollable in the subtree has scrolled from top
+          final bool isVertical = notification.metrics.axis == Axis.vertical;
+          if (isVertical) {
+            final bool scrolled = notification.metrics.pixels > 0.0;
+            if (scrolled != _hasScrolledContent) {
+              setState(() => _hasScrolledContent = scrolled);
+            }
+          }
+          return false;
+        },
+        child: SafeArea(child: _bodyView()),
+      ),
       bottomNavigationBar: _buildModernBottomBar(),
     );
   }
@@ -56,13 +70,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           decoration: BoxDecoration(
             color: barColor,
             borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
+            boxShadow: _hasScrolledContent
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 16,
+                      spreadRadius: 0,
+                      offset: const Offset(0, 6),
+                    ),
+                  ]
+                : [],
           ),
           child: NavigationBarTheme(
             data: NavigationBarThemeData(
