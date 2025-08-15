@@ -76,6 +76,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   List<CustomerModel> _defaultUsers = [];
   bool _isLoadingDefaultEvents = false;
   bool _isLoadingDefaultUsers = false;
+  bool _isFeaturedExpanded = true;
 
   // Sorting state
   SortOption currentSortOption =
@@ -135,6 +136,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
     );
   }
+
+  // Removed 'All' header per design
 
   // Sort events based on current sort option
   List<EventModel> _sortEvents(List<EventModel> events) {
@@ -1021,6 +1024,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             // Featured Events Carousel - show if there are featured events (regardless of filter)
             if (featuredEvents.isNotEmpty)
               _buildFeaturedCarousel(featuredEvents),
+            // Section separator indicating the list below is not featured
             // All Events List - show events in chronological order
             _buildEventsColumn(allEventsInChronologicalOrder),
           ],
@@ -1030,55 +1034,105 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildFeaturedCarousel(List<EventModel> featuredEvents) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Row(
-            children: [
-              AnimatedBuilder(
-                animation: _pulseAnimation,
-                builder: (context, child) {
-                  return Transform.scale(
-                    scale: _pulseAnimation.value,
-                    child: const Icon(
-                      Icons.star,
-                      color: Color(0xFFFF9800),
-                      size: 24,
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Featured Events',
-                style: TextStyle(
-                  color: Color(0xFF1A1A1A),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 22,
-                  fontFamily: 'Roboto',
+    return Container(
+      decoration: _isFeaturedExpanded
+          ? null
+          : BoxDecoration(
+              color: const Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(16),
+            ),
+      padding: _isFeaturedExpanded
+          ? EdgeInsets.zero
+          : const EdgeInsets.symmetric(vertical: 8),
+      margin: _isFeaturedExpanded
+          ? EdgeInsets.zero
+          : const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              children: [
+                AnimatedBuilder(
+                  animation: _pulseAnimation,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: _pulseAnimation.value,
+                      child: const Icon(
+                        Icons.star,
+                        color: Color(0xFFFF9800),
+                        size: 24,
+                      ),
+                    );
+                  },
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                const Text(
+                  'Featured Events',
+                  style: TextStyle(
+                    color: Color(0xFF1A1A1A),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 22,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _isFeaturedExpanded = !_isFeaturedExpanded;
+                    });
+                  },
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                      color: Colors.white,
+                    ),
+                    child: Icon(
+                      _isFeaturedExpanded
+                          ? Icons.expand_more
+                          : Icons.expand_less,
+                      color: const Color(0xFF1A1A1A),
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
-        CarouselSlider.builder(
-          itemCount: featuredEvents.length,
-          itemBuilder: (context, index, realIndex) {
-            return _buildFeaturedCard(featuredEvents[index]);
-          },
-          options: CarouselOptions(
-            height: 240,
-            viewportFraction: 0.85,
-            enableInfiniteScroll: false,
-            autoPlay: featuredEvents.length > 1,
-            autoPlayInterval: const Duration(seconds: 4),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            child: _isFeaturedExpanded
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 16),
+                      CarouselSlider.builder(
+                        itemCount: featuredEvents.length,
+                        itemBuilder: (context, index, realIndex) {
+                          return _buildFeaturedCard(featuredEvents[index]);
+                        },
+                        options: CarouselOptions(
+                          height: 240,
+                          viewportFraction: 0.85,
+                          enableInfiniteScroll: false,
+                          autoPlay: featuredEvents.length > 1,
+                          autoPlayInterval: const Duration(seconds: 4),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                  )
+                : const SizedBox.shrink(),
           ),
-        ),
-        const SizedBox(height: 24),
-      ],
+        ],
+      ),
     );
   }
 

@@ -38,7 +38,9 @@ class MessageModel {
       receiverId: d['receiverId'],
       conversationId: d['conversationId'] ?? _inferConversationId(d),
       content: d['content'],
-      timestamp: (d['timestamp'] as Timestamp).toDate(),
+      timestamp: d['timestamp'] != null 
+          ? (d['timestamp'] as Timestamp).toDate() 
+          : DateTime.now(),
       isRead: d['isRead'] ?? false,
       messageType: d['messageType'] ?? 'text',
       mediaUrl: d['mediaUrl'],

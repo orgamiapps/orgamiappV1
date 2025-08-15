@@ -1,7 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import 'package:provider/provider.dart';
 import 'package:orgami/controller/customer_controller.dart';
@@ -85,13 +84,7 @@ class _AccountScreenState extends State<AccountScreen> {
 
   Widget _bodyView() {
     return SingleChildScrollView(
-      child: Column(
-        children: [
-          _buildProfileHeader(),
-          _buildSettingsSection(),
-          _buildSocialMediaSection(),
-        ],
-      ),
+      child: Column(children: [_buildProfileHeader(), _buildSettingsSection()]),
     );
   }
 
@@ -195,14 +188,6 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
           _buildDivider(),
           _buildSettingsItem(
-            icon: Icons.delete_forever,
-            title: 'Delete Account',
-            subtitle: 'Permanently delete your account',
-            onTap: _confirmDeleteAccount,
-            isDestructive: true,
-          ),
-          _buildDivider(),
-          _buildSettingsItem(
             icon: Icons.sms_rounded,
             title: 'Send Notifications',
             subtitle: 'Send SMS notifications to previous attendees',
@@ -247,6 +232,14 @@ class _AccountScreenState extends State<AccountScreen> {
             subtitle: 'Share your thoughts with us',
             onTap: () =>
                 RouterClass.nextScreenNormal(context, FeedbackScreen()),
+          ),
+          _buildDivider(),
+          _buildSettingsItem(
+            icon: Icons.delete_forever,
+            title: 'Delete Account',
+            subtitle: 'Permanently delete your account',
+            onTap: _confirmDeleteAccount,
+            isDestructive: true,
           ),
           _buildDivider(),
           _buildSettingsItem(
@@ -574,84 +567,5 @@ class _AccountScreenState extends State<AccountScreen> {
 
   IconData _getThemeIcon(bool isDark) {
     return isDark ? Icons.dark_mode : Icons.light_mode;
-  }
-
-  Widget _buildSocialMediaSection() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            spreadRadius: 0,
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Icon(Icons.share, color: const Color(0xFF667EEA), size: 18),
-              const SizedBox(width: 8),
-              Text(
-                'Follow Us On',
-                style: TextStyle(
-                  color:
-                      Theme.of(context).textTheme.titleMedium?.color ??
-                      const Color(0xFF1A1A1A),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  fontFamily: 'Roboto',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildSocialMediaIcon(
-                FontAwesomeIcons.youtube,
-                const Color(0xFFFF0000),
-              ),
-              _buildSocialMediaIcon(
-                FontAwesomeIcons.instagram,
-                const Color(0xFFE4405F),
-              ),
-              _buildSocialMediaIcon(
-                FontAwesomeIcons.facebookF,
-                const Color(0xFF1877F2),
-              ),
-              _buildSocialMediaIcon(
-                FontAwesomeIcons.linkedinIn,
-                const Color(0xFF0A66C2),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSocialMediaIcon(IconData icon, Color color) {
-    return GestureDetector(
-      onTap: () {
-        // TODO: Add social media links
-      },
-      child: Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(icon, color: color, size: 24),
-      ),
-    );
   }
 }

@@ -536,7 +536,8 @@ class FirebaseMessagingHelper {
 
       final conversationData = {
         'lastMessage': lastMessage,
-        'lastMessageTime': lastMessageTime,
+        // Ensure server time is used for consistent ordering across devices
+        'lastMessageTime': FieldValue.serverTimestamp(),
         'lastMessageSenderId': lastMessageSenderId,
       };
 
@@ -582,10 +583,11 @@ class FirebaseMessagingHelper {
     }
 
     try {
-      // Prefer new schema: participantIds contains user
+      // Prefer new schema: participantIds contains user. With index in place, use server-side order for efficiency.
       final baseQuery = _firestore
           .collection('Conversations')
           .where('participantIds', arrayContains: userId)
+          .orderBy('lastMessageTime', descending: true)
           .snapshots();
 
       return baseQuery.asyncMap((snapshotNew) async {
@@ -623,8 +625,8 @@ class FirebaseMessagingHelper {
           for (final c in convNew) c.id: c,
           for (final c in convLegacy) c.id: c,
         };
-        final all = byId.values.toList();
-        all.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
+        final all = byId.values.toList()
+          ..sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
         return all;
       });
     } catch (e) {

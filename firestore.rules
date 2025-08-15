@@ -24,6 +24,12 @@ service cloud.firestore {
         allow update: if false;
       }
 
+      // Blocks subcollection: only the owner can read/write their own blocks
+      match /blocks/{blockedUserId} {
+        allow read, create, delete: if request.auth != null && request.auth.uid == userId;
+        allow update: if false; // updates not supported; delete+create instead
+      }
+
       // Following subcollection: allow public reads; only the owner can modify their following
       match /following/{followingId} {
         allow read: if request.auth != null;
@@ -305,7 +311,7 @@ service cloud.firestore {
       allow update: if request.auth != null &&
         resource.data.conversationId != null &&
         isConvParticipant(conversationDoc()) &&
-        request.resource.data.diff(resource.data).changedKeys().hasOnly(['isRead', 'readByUserIds']);
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readByUserIds']);
     }
     
     // Allow users to read/write their own user data for FCM tokens

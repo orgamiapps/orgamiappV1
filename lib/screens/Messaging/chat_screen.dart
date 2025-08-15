@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:orgami/models/message_model.dart';
 import 'package:orgami/models/customer_model.dart';
@@ -34,6 +35,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isSending = false;
   StreamSubscription<List<MessageModel>>? _messagesSubscription;
   ConversationModel? _conversation;
+  String? _swipedMessageId; // Track which message is currently swiped
 
   @override
   void initState() {
@@ -97,8 +99,8 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       // Get messages from Firestore
-      Stream<List<MessageModel>> messagesStream =
-          FirebaseMessagingHelper().getMessages(widget.conversationId);
+      Stream<List<MessageModel>> messagesStream = FirebaseMessagingHelper()
+          .getMessages(widget.conversationId);
 
       // Listen to the stream and get the first value
       List<MessageModel> messages = await messagesStream.first;
@@ -151,51 +153,51 @@ class _ChatScreenState extends State<ChatScreen> {
       _messagesSubscription = FirebaseMessagingHelper()
           .getMessages(widget.conversationId)
           .listen((newMessages) async {
-        try {
-          // Sort by timestamp (oldest first)
-          newMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-
-          // If group chat: hide messages from blocked users
-          final isGroup = _conversation?.isGroup == true;
-          if (isGroup) {
             try {
-              final blocksSnap = await _firestore
-                  .collection('Customers')
-                  .doc(currentUser.uid)
-                  .collection('blocks')
-                  .get();
-              final blocked = blocksSnap.docs.map((d) => d.id).toSet();
-              newMessages = newMessages
-                  .where((m) => !blocked.contains(m.senderId))
-                  .toList();
-            } catch (_) {}
-          }
-          if (mounted) {
-            setState(() {
-              _messages = newMessages;
-            });
+              // Sort by timestamp (oldest first)
+              newMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
-            // Mark messages as read
-            FirebaseMessagingHelper().markMessagesAsRead(
-              widget.conversationId,
-              currentUser.uid,
-            );
-
-            // Scroll to bottom for new messages
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (_scrollController.hasClients) {
-                _scrollController.animateTo(
-                  _scrollController.position.maxScrollExtent,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOut,
-                );
+              // If group chat: hide messages from blocked users
+              final isGroup = _conversation?.isGroup == true;
+              if (isGroup) {
+                try {
+                  final blocksSnap = await _firestore
+                      .collection('Customers')
+                      .doc(currentUser.uid)
+                      .collection('blocks')
+                      .get();
+                  final blocked = blocksSnap.docs.map((d) => d.id).toSet();
+                  newMessages = newMessages
+                      .where((m) => !blocked.contains(m.senderId))
+                      .toList();
+                } catch (_) {}
               }
-            });
-          }
-        } catch (e) {
-          if (kDebugMode) debugPrint('❌ Listen error: $e');
-        }
-      });
+              if (mounted) {
+                setState(() {
+                  _messages = newMessages;
+                });
+
+                // Mark messages as read
+                FirebaseMessagingHelper().markMessagesAsRead(
+                  widget.conversationId,
+                  currentUser.uid,
+                );
+
+                // Scroll to bottom for new messages
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (_scrollController.hasClients) {
+                    _scrollController.animateTo(
+                      _scrollController.position.maxScrollExtent,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOut,
+                    );
+                  }
+                });
+              }
+            } catch (e) {
+              if (kDebugMode) debugPrint('❌ Listen error: $e');
+            }
+          });
     } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ Error loading messages: $e');
@@ -217,7 +219,9 @@ class _ChatScreenState extends State<ChatScreen> {
       });
 
       if (kDebugMode) {
-        debugPrint('📤 Sending message to conversation ${widget.conversationId}: $message');
+        debugPrint(
+          '📤 Sending message to conversation ${widget.conversationId}: $message',
+        );
         debugPrint('📤 Conversation ID: ${widget.conversationId}');
       }
 
@@ -294,49 +298,118 @@ class _ChatScreenState extends State<ChatScreen> {
     final senderName = isGroup
         ? (_conversation?.participantInfo[message.senderId]?['name'] ?? '')
         : '';
+    final isLastMessage =
+        _messages.isNotEmpty && _messages.last.id == message.id;
+    final isSwipedOut = _swipedMessageId == message.id;
 
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Column(
-        crossAxisAlignment:
-            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          if (!isMe && isGroup && senderName.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(left: 12, bottom: 2),
-              child: Text(
-                senderName,
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
+    return GestureDetector(
+      onTap: () {
+        // Tap anywhere to close swiped message
+        if (_swipedMessageId != null) {
+          setState(() {
+            _swipedMessageId = null;
+          });
+        }
+      },
+      child: Align(
+        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+        child: Column(
+          crossAxisAlignment: isMe
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
+          children: [
+            if (!isMe && isGroup && senderName.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(left: 12, bottom: 2),
+                child: Text(
+                  senderName,
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ),
+            GestureDetector(
+              onHorizontalDragEnd: (details) {
+                // Swipe left to reveal timestamp
+                if (details.primaryVelocity! < -500) {
+                  setState(() {
+                    _swipedMessageId = isSwipedOut ? null : message.id;
+                  });
+                }
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
+                transform: Matrix4.translationValues(
+                  isSwipedOut ? -80.0 : 0.0,
+                  0.0,
+                  0.0,
+                ),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // Timestamp behind the message
+                    if (isSwipedOut)
+                      Positioned(
+                        right: isMe ? -70 : null,
+                        left: isMe ? null : -70,
+                        top: 0,
+                        bottom: 0,
+                        child: Container(
+                          width: 60,
+                          alignment: Alignment.center,
+                          child: Text(
+                            _formatDetailedTimestamp(message.timestamp),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                    // Message bubble
+                    Container(
+                      margin: const EdgeInsets.symmetric(
+                        vertical: 2,
+                        horizontal: 8,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 10,
+                        horizontal: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isMe
+                            ? const Color(0xFF0B93F6)
+                            : const Color(0xFFE5E5EA),
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(18),
+                          topRight: const Radius.circular(18),
+                          bottomLeft: Radius.circular(isMe ? 18 : 4),
+                          bottomRight: Radius.circular(isMe ? 4 : 18),
+                        ),
+                      ),
+                      child: Text(
+                        message.content,
+                        style: TextStyle(
+                          color: isMe ? Colors.white : Colors.black,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          Container(
-            margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-            decoration: BoxDecoration(
-              color: isMe ? const Color(0xFF0B93F6) : const Color(0xFFE5E5EA),
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(18),
-                topRight: const Radius.circular(18),
-                bottomLeft: Radius.circular(isMe ? 18 : 4),
-                bottomRight: Radius.circular(isMe ? 4 : 18),
+            // Delivered status for the most recent sent message
+            if (isMe && isLastMessage && !message.id.startsWith('local_'))
+              Padding(
+                padding: const EdgeInsets.only(right: 12, top: 2),
+                child: Text(
+                  'Delivered',
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                ),
               ),
-            ),
-            child: Text(
-              message.content,
-              style: TextStyle(
-                color: isMe ? Colors.white : Colors.black,
-                fontSize: 16,
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 12, right: 12, bottom: 4),
-            child: Text(
-              _formatTimestamp(message.timestamp),
-              style: const TextStyle(fontSize: 11, color: Colors.grey),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -407,19 +480,42 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  String _formatTimestamp(DateTime dt) {
+  String _formatDetailedTimestamp(DateTime dt) {
     final now = DateTime.now();
-    final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
+    final isToday =
+        dt.year == now.year && dt.month == now.month && dt.day == now.day;
+    final yesterday = now.subtract(const Duration(days: 1));
+    final isYesterday =
+        dt.year == yesterday.year &&
+        dt.month == yesterday.month &&
+        dt.day == yesterday.day;
+
+    final timeStr = TimeOfDay.fromDateTime(dt).format(context);
+
     if (isToday) {
-      return TimeOfDay.fromDateTime(dt).format(context);
+      return 'Today\n$timeStr';
+    } else if (isYesterday) {
+      return 'Yesterday\n$timeStr';
+    } else {
+      return '${dt.month}/${dt.day}/${dt.year}\n$timeStr';
     }
-    return '${dt.month}/${dt.day}/${dt.year} ${TimeOfDay.fromDateTime(dt).format(context)}';
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        titleTextStyle: const TextStyle(
+          color: Colors.black87,
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+        ),
         title: _buildAppBarTitle(),
         actions: [
           PopupMenuButton<String>(
@@ -440,6 +536,10 @@ class _ChatScreenState extends State<ChatScreen> {
             ],
           ),
         ],
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+        ),
       ),
       body: Column(
         children: [
@@ -515,8 +615,9 @@ class _ChatScreenState extends State<ChatScreen> {
     return Row(
       children: [
         CircleAvatar(
-          backgroundImage:
-              user.profilePictureUrl != null ? NetworkImage(user.profilePictureUrl!) : null,
+          backgroundImage: user.profilePictureUrl != null
+              ? NetworkImage(user.profilePictureUrl!)
+              : null,
           child: user.profilePictureUrl == null
               ? Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?')
               : null,
@@ -527,7 +628,10 @@ class _ChatScreenState extends State<ChatScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(user.name, style: const TextStyle(fontSize: 16)),
-              Text(user.email, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              Text(
+                user.email,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
             ],
           ),
         ),

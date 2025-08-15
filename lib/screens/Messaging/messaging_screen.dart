@@ -33,6 +33,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   Stream<List<ConversationModel>>? _conversationsStream;
+  StreamSubscription<List<ConversationModel>>? _conversationsSubscription;
   Timer? _timeoutTimer;
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
@@ -48,6 +49,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
   @override
   void dispose() {
     // Cancel any active streams and timers
+    _conversationsSubscription?.cancel();
     _conversationsStream = null;
     _timeoutTimer?.cancel();
     _searchController.dispose();
@@ -74,8 +76,8 @@ class _MessagingScreenState extends State<MessagingScreen> {
       // Create the stream
       _conversationsStream = _messagingHelper.getUserConversations(user.uid);
 
-      // Set up timeout timer
-      _timeoutTimer = Timer(const Duration(seconds: 10), () {
+      // Set up timeout timer (extend to allow index/backoff on slow networks)
+      _timeoutTimer = Timer(const Duration(seconds: 20), () {
         if (_isLoading) {
           Logger.warning('Timeout loading conversations');
           setState(() {
@@ -86,20 +88,26 @@ class _MessagingScreenState extends State<MessagingScreen> {
         }
       });
 
+      // Cancel any previous subscription before listening again
+      _conversationsSubscription?.cancel();
+
       // Listen to the stream with proper error handling
-      _conversationsStream!.listen(
+      _conversationsSubscription = _conversationsStream!.listen(
         (conversations) {
           _timeoutTimer?.cancel(); // Cancel timeout on success
           Logger.info('Received ${conversations.length} conversations');
           // Filter out conversations with blocked users (1-1 only)
-          final filtered = conversations.where((conv) {
-            if (conv.isGroup) {
-              // hide group conversation if any member (other than current user) is blocked
-              return !_isGroupMemberBlocked(conv);
-            }
-            final otherId = _getOtherParticipantId(conv);
-            return !_blockedUserIds.contains(otherId);
-          }).toList();
+          final filtered =
+              conversations.where((conv) {
+                if (conv.isGroup) {
+                  // hide group conversation if any member (other than current user) is blocked
+                  return !_isGroupMemberBlocked(conv);
+                }
+                final otherId = _getOtherParticipantId(conv);
+                return !_blockedUserIds.contains(otherId);
+              }).toList()..sort(
+                (a, b) => b.lastMessageTime.compareTo(a.lastMessageTime),
+              );
           setState(() {
             _conversations = filtered;
             _filteredConversations = filtered;
@@ -160,7 +168,8 @@ class _MessagingScreenState extends State<MessagingScreen> {
   void _onSearchChanged(String query) {
     if (query.isEmpty) {
       setState(() {
-        _filteredConversations = _conversations;
+        _filteredConversations = [..._conversations]
+          ..sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
       });
       return;
     }
@@ -176,7 +185,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
       return name.contains(lowercaseQuery) ||
           username.contains(lowercaseQuery) ||
           lastMessage.contains(lowercaseQuery);
-    }).toList();
+    }).toList()..sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
 
     setState(() {
       _filteredConversations = filtered;
@@ -282,6 +291,8 @@ class _MessagingScreenState extends State<MessagingScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
+        iconTheme: const IconThemeData(color: Colors.black87),
+        actionsIconTheme: const IconThemeData(color: Colors.black87),
         titleTextStyle: const TextStyle(
           color: Colors.black87,
           fontSize: 22,

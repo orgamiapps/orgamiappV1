@@ -236,7 +236,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ),
           const SizedBox(width: 12),
           const Text(
-            'Recent Notifications',
+            'Recent',
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w700,
