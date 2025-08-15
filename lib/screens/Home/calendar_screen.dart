@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:orgami/models/event_model.dart';
-import 'package:orgami/models/ticket_model.dart';
 import 'package:orgami/screens/Events/single_event_screen.dart';
 import 'package:orgami/screens/Events/chose_date_time_screen.dart';
 import 'package:orgami/Utils/Router.dart';
@@ -24,16 +23,12 @@ class _CalendarScreenState extends State<CalendarScreen>
   // Core state
   DateTime _currentMonth = DateTime.now();
   DateTime? _selectedDate;
-  String _filter = 'all'; // all, created, tickets, saved
   bool _isLoading = false;
   bool _isDayViewExpanded = false;
 
   // Data
   List<EventModel> _allEvents = [];
   List<EventModel> _filteredEvents = [];
-  List<String> _savedEventIds = [];
-  List<TicketModel> _myTickets = [];
-  Map<String, EventModel> _eventsCache = {};
 
   // Search
   final TextEditingController _searchController = TextEditingController();
@@ -198,40 +193,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         }
       }
 
-      // Load saved events
-      try {
-        final savedSnapshot = await FirebaseFirestore.instance
-            .collection('SavedEvents')
-            .where('userId', isEqualTo: user.uid)
-            .get();
-
-        _savedEventIds = savedSnapshot.docs
-            .map((doc) => doc.data()['eventId'] as String)
-            .toList();
-      } catch (e) {
-        print('Error loading saved events: $e');
-        _savedEventIds = [];
-      }
-
-      // Load tickets
-      try {
-        final ticketsSnapshot = await FirebaseFirestore.instance
-            .collection('Tickets')
-            .where('customerUid', isEqualTo: user.uid)
-            .get();
-
-        _myTickets = ticketsSnapshot.docs
-            .map((doc) => TicketModel.fromJson(doc.data()))
-            .toList();
-      } catch (e) {
-        print('Error loading tickets: $e');
-        _myTickets = [];
-      }
-
-      // Cache events by ID
-      for (var event in _allEvents) {
-        _eventsCache[event.id] = event;
-      }
+      // No additional per-user filters required; calendar always shows all events
 
       _applyFilter();
     } catch (e) {
@@ -255,26 +217,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     }
 
     setState(() {
-      switch (_filter) {
-        case 'created':
-          _filteredEvents = _allEvents
-              .where((e) => e.customerUid == user.uid)
-              .toList();
-          break;
-        case 'tickets':
-          final ticketEventIds = _myTickets.map((t) => t.eventId).toSet();
-          _filteredEvents = _allEvents
-              .where((e) => ticketEventIds.contains(e.id))
-              .toList();
-          break;
-        case 'saved':
-          _filteredEvents = _allEvents
-              .where((e) => _savedEventIds.contains(e.id))
-              .toList();
-          break;
-        default:
-          _filteredEvents = List.from(_allEvents);
-      }
+      _filteredEvents = List.from(_allEvents);
 
       // Apply search filter
       if (_searchController.text.isNotEmpty) {
@@ -404,7 +347,6 @@ class _CalendarScreenState extends State<CalendarScreen>
             Column(
               children: [
                 _buildHeader(),
-                if (!_isDayViewExpanded) _buildFilters(),
                 Expanded(
                   child: Stack(
                     children: [
@@ -542,55 +484,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     );
   }
 
-  Widget _buildFilters() {
-    return Container(
-      height: 44,
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        children: [
-          _buildFilterChip('All', 'all'),
-          const SizedBox(width: 8),
-          _buildFilterChip('Created', 'created'),
-          const SizedBox(width: 8),
-          _buildFilterChip('Tickets', 'tickets'),
-          const SizedBox(width: 8),
-          _buildFilterChip('Saved', 'saved'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(String label, String value) {
-    final isSelected = _filter == value;
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        setState(() => _filter = value);
-        _applyFilter();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF667EEA) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected
-                ? const Color(0xFF667EEA)
-                : const Color(0xFFE5E7EB),
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : const Color(0xFF6B7280),
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-          ),
-        ),
-      ),
-    );
-  }
+  // Filter chips removed per UX: calendar always shows all events
 
   Widget _buildMonthView() {
     return Column(

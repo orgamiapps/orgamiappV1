@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:orgami/models/message_model.dart';
 import 'package:provider/provider.dart';
@@ -274,37 +275,33 @@ class _MessagingScreenState extends State<MessagingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
     final theme = Theme.of(context);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(
-          'Messages',
-          style: TextStyle(
-            color: theme.appBarTheme.foregroundColor,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        titleTextStyle: const TextStyle(
+          color: Colors.black87,
+          fontSize: 22,
+          fontWeight: FontWeight.w600,
         ),
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: themeProvider.getGradientColors(context),
-            ),
-          ),
-        ),
-        iconTheme: IconThemeData(color: theme.appBarTheme.foregroundColor),
         elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        title: const Text('Messages'),
         actions: [
           IconButton(
             icon: Icon(_isSearching ? Icons.close : Icons.search),
-            onPressed: _isSearching ? _toggleSearch : _toggleSearch,
+            onPressed: _toggleSearch,
           ),
         ],
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+        ),
       ),
       body: Column(
         children: [

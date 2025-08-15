@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/firebase/organization_helper.dart';
 import 'package:orgami/screens/Organizations/organization_profile_screen.dart';
@@ -86,6 +87,17 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        titleTextStyle: const TextStyle(
+          color: Colors.black87,
+          fontSize: 22,
+          fontWeight: FontWeight.w600,
+        ),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
         title: const Text('Organizations'),
         actions: [
           IconButton(
@@ -94,6 +106,10 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
             onPressed: _goToCreate,
           ),
         ],
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+        ),
       ),
       body: SafeArea(
         child: Padding(
@@ -159,7 +175,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                           ),
                     const SizedBox(height: 16),
                     const Text(
-                      'Discover Organizations',
+                      'Discover',
                       style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 8),
@@ -199,11 +215,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _goToCreate,
-        icon: const Icon(Icons.add),
-        label: const Text('Create Organization'),
-      ),
+      floatingActionButton: null,
     );
   }
 

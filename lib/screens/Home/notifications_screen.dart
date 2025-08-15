@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:orgami/firebase/firebase_messaging_helper.dart';
 import 'package:orgami/models/notification_model.dart';
 import 'package:intl/intl.dart';
@@ -139,21 +140,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Notifications',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        titleTextStyle: const TextStyle(
+          color: Colors.black87,
+          fontSize: 22,
+          fontWeight: FontWeight.w600,
         ),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-            ),
-          ),
-        ),
-        iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        title: const Text('Notifications'),
         actions: [
           IconButton(
             icon: const Icon(Icons.done_all),
@@ -183,6 +181,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             },
           ),
         ],
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

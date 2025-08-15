@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:orgami/firebase/organization_helper.dart';
 import 'package:orgami/screens/Organizations/create_organization_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -38,7 +39,40 @@ class _OrganizationsTabState extends State<OrganizationsTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Organizations')),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        titleTextStyle: const TextStyle(
+          color: Colors.black87,
+          fontSize: 22,
+          fontWeight: FontWeight.w600,
+        ),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        title: const Text('Organizations'),
+        actions: [
+          IconButton(
+            tooltip: 'Create Organization',
+            icon: const Icon(Icons.add_business),
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const CreateOrganizationScreen(),
+                ),
+              );
+              if (!mounted) return;
+              _load();
+            },
+          ),
+        ],
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+        ),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _orgs.isEmpty
@@ -64,17 +98,7 @@ class _OrganizationsTabState extends State<OrganizationsTab> {
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CreateOrganizationScreen()),
-          );
-          _load();
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Create Organization'),
-      ),
+      floatingActionButton: null,
     );
   }
 }

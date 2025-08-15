@@ -3,7 +3,6 @@ import 'package:orgami/controller/customer_controller.dart';
 import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/models/event_model.dart';
-import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -518,58 +517,231 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-        ),
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1)),
       ),
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      child: Column(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Stack(
         children: [
-          // Back Button and Header Row
-          Row(
+          Column(
             children: [
-              if (widget.showBackButton)
-                GestureDetector(
-                  onTap: () {
-                    if (isSelectionMode) {
-                      setState(() {
-                        isSelectionMode = false;
-                        selectedEventIds.clear();
-                      });
-                    } else {
-                      Navigator.of(context).pop();
-                    }
-                  },
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(18),
+              if (widget.showBackButton || isSelectionMode)
+                Row(
+                  children: [
+                    if (widget.showBackButton)
+                      GestureDetector(
+                        onTap: () {
+                          if (isSelectionMode) {
+                            setState(() {
+                              isSelectionMode = false;
+                              selectedEventIds.clear();
+                            });
+                          } else {
+                            Navigator.of(context).pop();
+                          }
+                        },
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: Color(0xFFF3F4F6),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Icon(
+                            isSelectionMode ? Icons.close : Icons.arrow_back,
+                            color: Colors.black87,
+                            size: 18,
+                          ),
+                        ),
+                      )
+                    else
+                      const SizedBox(width: 36, height: 36),
+                    const Spacer(),
+                    Text(
+                      isSelectionMode
+                          ? '${selectedEventIds.length} selected'
+                          : '',
+                      style: const TextStyle(
+                        color: Color(0xFF1F2937),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        fontFamily: 'Roboto',
+                      ),
                     ),
-                    child: Icon(
-                      isSelectionMode ? Icons.close : Icons.arrow_back,
-                      color: Colors.white,
-                      size: 18,
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const AccountDetailsScreen(),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: const Icon(
+                          Icons.edit,
+                          color: Colors.black87,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              if (widget.showBackButton || isSelectionMode)
+                const SizedBox(height: 8),
+
+              // Compact Profile Section - Horizontal Layout
+              Row(
+                children: [
+                  // Profile Picture
+                  Stack(
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Color(0xFFE5E7EB),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.06),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: user?.profilePictureUrl != null
+                              ? Image.network(
+                                  user!.profilePictureUrl!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return _buildDefaultProfilePicture();
+                                  },
+                                )
+                              : _buildDefaultProfilePicture(),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.06),
+                                blurRadius: 6,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.camera_alt,
+                            color: Color(0xFF667EEA),
+                            size: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 16),
+
+                  // User Info - Vertical Stack
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user?.name ?? 'User',
+                          style: const TextStyle(
+                            color: Color(0xFF1A1A1A),
+                            fontSize: 22,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                        if (user?.username != null &&
+                            user!.username!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          GestureDetector(
+                            onTap: () {
+                              // Navigate to public profile view
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => UserProfileScreen(
+                                    user: user,
+                                    isOwnProfile: true,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Color(0xFFF3F4F6),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Color(0xFFE5E7EB),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '@${user.username}',
+                                    style: const TextStyle(
+                                      color: Color(0xFF1F2937),
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 16,
+                                      fontFamily: 'Roboto',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Welcome to your profile',
+                          style: TextStyle(
+                            color: Color(0xFF6B7280),
+                            fontWeight: FontWeight.w400,
+                            fontSize: 14,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                )
-              else
-                const SizedBox(width: 36, height: 36),
-              const Spacer(),
-              Text(
-                isSelectionMode ? '${selectedEventIds.length} selected' : '',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  fontFamily: 'Roboto',
-                ),
+                ],
               ),
-              // Account Details (Edit) button
-              GestureDetector(
+            ],
+          ),
+
+          // Overlay edit button when no back button
+          if (!widget.showBackButton && !isSelectionMode)
+            Positioned(
+              top: 8,
+              right: 16,
+              child: GestureDetector(
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -581,157 +753,17 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: Color(0xFFF3F4F6),
                     borderRadius: BorderRadius.circular(18),
                   ),
-                  child: const Icon(Icons.edit, color: Colors.white, size: 18),
+                  child: const Icon(
+                    Icons.edit,
+                    color: Colors.black87,
+                    size: 18,
+                  ),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Compact Profile Section - Horizontal Layout
-          Row(
-            children: [
-              // Profile Picture
-              Stack(
-                children: [
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 3),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.15),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: ClipOval(
-                      child: user?.profilePictureUrl != null
-                          ? Image.network(
-                              user!.profilePictureUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return _buildDefaultProfilePicture();
-                              },
-                            )
-                          : _buildDefaultProfilePicture(),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
-                            blurRadius: 4,
-                            offset: const Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.camera_alt,
-                        color: Color(0xFF667EEA),
-                        size: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 16),
-
-              // User Info - Vertical Stack
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      user?.name ?? 'User',
-                      style: const TextStyle(
-                        color: AppThemeColor.pureWhiteColor,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                    if (user?.username != null &&
-                        user!.username!.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      GestureDetector(
-                        onTap: () {
-                          // Navigate to public profile view
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => UserProfileScreen(
-                                user: user,
-                                isOwnProfile: true,
-                              ),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.3),
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                '@${user.username}',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 16,
-                                  fontFamily: 'Roboto',
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Icon(
-                                Icons.open_in_new,
-                                color: Colors.white.withValues(alpha: 0.7),
-                                size: 14,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 2),
-                    Text(
-                      'Welcome to your profile',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.8),
-                        fontWeight: FontWeight.w400,
-                        fontSize: 14,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
         ],
       ),
     );

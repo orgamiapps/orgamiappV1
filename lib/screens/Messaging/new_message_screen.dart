@@ -241,31 +241,26 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
     final theme = Theme.of(context);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(
-          _groupMode ? 'New Group' : 'New Message',
-          style: TextStyle(
-            color: theme.appBarTheme.foregroundColor,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        titleTextStyle: const TextStyle(
+          color: Colors.black87,
+          fontSize: 22,
+          fontWeight: FontWeight.w600,
         ),
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: themeProvider.getGradientColors(context),
-            ),
-          ),
-        ),
-        iconTheme: IconThemeData(color: theme.appBarTheme.foregroundColor),
         elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        title: Text(_groupMode ? 'New Group' : 'New Message'),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+        ),
       ),
       body: Column(
         children: [

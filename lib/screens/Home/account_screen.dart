@@ -11,7 +11,6 @@ import 'package:orgami/Screens/Feedback/feedback_screen.dart';
 
 import 'package:orgami/Screens/Home/analytics_dashboard_screen.dart';
 import 'package:orgami/Utils/app_constants.dart';
-import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:orgami/Utils/theme_provider.dart';
 
@@ -102,69 +101,58 @@ class _AccountScreenState extends State<AccountScreen> {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-        ),
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1)),
       ),
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      child: Column(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Row(
         children: [
-          // Header Row with Title and Profile Picture
-          Row(
-            children: [
-              // Account Title
-              const Text(
-                'Account',
-                style: TextStyle(
-                  color: AppThemeColor.pureWhiteColor,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Roboto',
+          const Text(
+            'Account',
+            style: TextStyle(
+              color: Color(0xFF1A1A1A),
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Roboto',
+            ),
+          ),
+          const Spacer(),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      UserProfileScreen(user: user!, isOwnProfile: true),
                 ),
-              ),
-              const Spacer(),
-              // Profile Picture
-              GestureDetector(
-                onTap: () {
-                  // Navigate to UserProfileScreen
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          UserProfileScreen(user: user!, isOwnProfile: true),
-                    ),
-                  );
-                },
-                child: Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.15),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+              );
+            },
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Color(0xFFE5E7EB), width: 1),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
                   ),
-                  child: ClipOval(
-                    child: user?.profilePictureUrl != null
-                        ? Image.network(
-                            user!.profilePictureUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return _buildDefaultProfilePicture();
-                            },
-                          )
-                        : _buildDefaultProfilePicture(),
-                  ),
-                ),
+                ],
               ),
-            ],
+              child: ClipOval(
+                child: user?.profilePictureUrl != null
+                    ? Image.network(
+                        user!.profilePictureUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return _buildDefaultProfilePicture();
+                        },
+                      )
+                    : _buildDefaultProfilePicture(),
+              ),
+            ),
           ),
         ],
       ),
