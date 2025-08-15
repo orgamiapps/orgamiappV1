@@ -8,6 +8,8 @@ class AppConstants {
   static const termsConditionsUrl = 'https://myorgami.com/terms-conditions/';
 
   static const companyEmail = 'orgami@myorgami.com';
+  static const supportUrl = 'https://myorgami.com/support';
+  static const cloudFunctionsRegion = 'us-central1';
 
   static DateFormat dateFormat = DateFormat("dd MMM yyyy, hh:mm a");
   static DateFormat dateFormat1 = DateFormat("dd MMM yyyy");
@@ -24,6 +26,10 @@ class AppConstants {
   static const String dynamicLinksDomain = 'https://orgamiapp.page.link';
   static const String androidPackageName = 'com.stormdeve.orgami';
   static const String iosBundleId = 'com.stormdeve.orgami';
+
+  // Feature flags
+  // Toggle to re-enable Apple Sign-In when Apple Developer setup is complete.
+  static const bool enableAppleSignIn = false;
 
   static Uri buildInviteUri(String eventId) {
     return Uri.parse('https://orgami.app/invite?eventId=$eventId');

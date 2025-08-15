@@ -8,8 +8,9 @@
  */
 
 const {setGlobalOptions} = require("firebase-functions");
-const {onDocumentCreated, onDocumentUpdated} = require("firebase-functions/v2/firestore");
+const {onDocumentCreated, onDocumentUpdated, onDocumentWritten} = require("firebase-functions/v2/firestore");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
+const {onCall} = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 
 // Initialize Firebase Admin SDK
@@ -634,6 +635,95 @@ exports.sendScheduledNotifications = onSchedule({
 
   } catch (error) {
     logger.error("Error in sendScheduledNotifications:", error);
+  }
+});
+
+/**
+ * Callable function to fully delete a user's account and related data.
+ * Requires the caller to be authenticated. Deletes:
+ * - Auth user
+ * - Firestore docs in `Customers/{uid}`, `users/{uid}` and common related collections
+ * - Related documents in Tickets, Attendance, Conversations, Messages, Comments
+ */
+exports.deleteUserAccount = onCall({region: "us-central1"}, async (request) => {
+  const db = admin.firestore();
+  const uid = request.auth && request.auth.uid;
+  if (!uid) {
+    throw new Error("UNAUTHENTICATED: User must be signed in to delete account.");
+  }
+
+  // Helper to batch delete a query
+  async function batchDeleteQuery(query, batchSize = 300) {
+    const snap = await query.get();
+    if (snap.empty) return 0;
+    let deleted = 0;
+    const batches = [];
+    let batch = db.batch();
+    let opCount = 0;
+    for (const doc of snap.docs) {
+      batch.delete(doc.ref);
+      opCount++;
+      deleted++;
+      if (opCount === batchSize) {
+        batches.push(batch.commit());
+        batch = db.batch();
+        opCount = 0;
+      }
+    }
+    if (opCount > 0) batches.push(batch.commit());
+    await Promise.all(batches);
+    return deleted;
+  }
+
+  // Delete subcollection documents for a user document
+  async function deleteAllSubcollections(docRef) {
+    const subs = [
+      "notifications",
+      "settings",
+      "notificationSettings",
+      "followers",
+      "following",
+    ];
+    for (const name of subs) {
+      const subQuery = docRef.collection(name).limit(500);
+      // Repeat until empty
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const snap = await subQuery.get();
+        if (snap.empty) break;
+        const batch = db.batch();
+        snap.docs.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+    }
+  }
+
+  try {
+    // 1) Delete user-owned docs across top-level collections
+    await batchDeleteQuery(db.collection("Tickets").where("customerUid", "==", uid));
+    await batchDeleteQuery(db.collection("Attendance").where("customerUid", "==", uid));
+    await batchDeleteQuery(db.collection("Messages").where("senderId", "==", uid));
+    await batchDeleteQuery(db.collection("Messages").where("receiverId", "==", uid));
+    await batchDeleteQuery(db.collection("Comments").where("userId", "==", uid));
+
+    // Conversations by participantIds array
+    await batchDeleteQuery(db.collection("Conversations").where("participantIds", "arrayContains", uid));
+
+    // 2) Delete user docs in Customers and users + their subcollections
+    const customersRef = db.collection("Customers").doc(uid);
+    const usersRef = db.collection("users").doc(uid);
+    await deleteAllSubcollections(customersRef);
+    await deleteAllSubcollections(usersRef);
+    await customersRef.delete().catch(() => {});
+    await usersRef.delete().catch(() => {});
+
+    // 3) Finally, delete the auth user
+    await admin.auth().deleteUser(uid);
+
+    return {status: "ok"};
+  } catch (err) {
+    logger.error("Error deleting user account:", err);
+    throw new Error("INTERNAL: Failed to delete account. Please try again later.");
   }
 });
 
@@ -1474,4 +1564,67 @@ exports.sendMessageNotifications = onDocumentCreated("Messages/{messageId}", asy
   } catch (error) {
     logger.error("Error sending message notification:", error);
   }
+});
+
+/**
+ * Callable function to submit UGC reports (users/messages/comments/events)
+ * Body: { type: 'user'|'message'|'comment'|'event', targetUserId?, contentId?, reason?, details? }
+ */
+exports.submitUserReport = onCall({region: "us-central1"}, async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if (!uid) {
+    throw new Error("UNAUTHENTICATED: User must be signed in to report.");
+  }
+
+  const { type, targetUserId, contentId, reason, details } = request.data || {};
+  if (!type) {
+    throw new Error("INVALID_ARGUMENT: 'type' is required");
+  }
+
+  const db = admin.firestore();
+  const doc = {
+    type: String(type),
+    reporterUserId: uid,
+    targetUserId: targetUserId ? String(targetUserId) : null,
+    contentId: contentId ? String(contentId) : null,
+    reason: reason ? String(reason) : null,
+    details: details ? String(details) : null,
+    status: "open",
+    createdAt: admin.firestore.Timestamp.now(),
+  };
+  await db.collection("reports").add(doc);
+  return { status: "ok" };
+});
+
+/**
+ * Creator-only function to set admin claim on the creator account
+ */
+const CREATOR_EMAIL = "pr@mail.com"; // requested admin email
+
+exports.setSelfAdmin = onCall({ region: "us-central1" }, async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new Error("UNAUTHENTICATED");
+  const userRecord = await admin.auth().getUser(uid);
+  if (userRecord.email !== CREATOR_EMAIL) {
+    throw new Error("PERMISSION_DENIED: Creator only");
+  }
+  await admin.auth().setCustomUserClaims(uid, { admin: true });
+  return { status: "ok" };
+});
+
+/**
+ * Admin-only function: set admin claim by email (call after securing your own admin)
+ */
+exports.setAdminByEmail = onCall({ region: "us-central1" }, async (req) => {
+  const caller = req.auth?.token;
+  if (!caller || caller.admin !== true) {
+    throw new Error("PERMISSION_DENIED: Admins only");
+  }
+  const { email, admin } = req.data || {};
+  if (!email || typeof admin !== 'boolean') {
+    throw new Error("INVALID_ARGUMENT: { email, admin } required");
+  }
+  const user = await admin.auth().getUserByEmail(email);
+  await admin.auth().setCustomUserClaims(user.uid, { admin });
+  return { status: "ok" };
 });

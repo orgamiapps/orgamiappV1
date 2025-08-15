@@ -53,8 +53,6 @@
 	<string>This app needs camera access to scan QR codes</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app needs location access to show nearby events</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>This app needs microphone access for voice features</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app needs photo library access to upload images</string>
 	<key>UIBackgroundModes</key>

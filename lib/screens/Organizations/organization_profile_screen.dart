@@ -430,10 +430,21 @@ class _JoinActionState extends State<_JoinAction> {
       return Chip(label: Text(_role));
     }
     if (_hasPending) {
-      return const Chip(label: Text('Requested'));
+      return FilledButton(
+        onPressed: null,
+        style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xFFE5E7EB),
+          foregroundColor: const Color(0xFF6B7280),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        ),
+        child: const Text('Requested'),
+      );
     }
     return FilledButton(
       onPressed: () async {
+        setState(() {
+          _hasPending = true; // Immediate visual feedback
+        });
         await OrganizationHelper().requestToJoinOrganization(widget.orgId);
         if (!mounted) return;
         ScaffoldMessenger.of(

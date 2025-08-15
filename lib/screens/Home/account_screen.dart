@@ -16,11 +16,14 @@ import 'package:orgami/Utils/router.dart';
 import 'package:orgami/Utils/theme_provider.dart';
 
 import 'package:orgami/Utils/web_view_page.dart';
+import 'package:orgami/firebase/firebase_firestore_helper.dart';
+import 'package:orgami/Utils/toast.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
 
 import 'package:orgami/Screens/Home/attendee_notification_screen.dart';
-
+import 'package:orgami/screens/Home/blocked_users_screen.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -36,6 +39,49 @@ class _AccountScreenState extends State<AccountScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(child: _bodyView()),
     );
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Account'),
+        content: const Text(
+          'This will permanently delete your account and data. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      // Call Cloud Function to fully delete account and data
+      await FirebaseFirestoreHelper().deleteAccountViaCloudFunction(user.uid);
+
+      await FirebaseAuth.instance.signOut();
+      if (mounted) {
+        setState(() {
+          CustomerController.logeInCustomer = null;
+        });
+        RouterClass().appRest(context: context);
+      }
+    } catch (e) {
+      ShowToast().showNormalToast(
+        msg: 'Failed to delete account. Please try again.',
+      );
+    }
   }
 
   Widget _bodyView() {
@@ -150,7 +196,6 @@ class _AccountScreenState extends State<AccountScreen> {
       child: Column(
         children: [
           // Profile moved to bottom app bar
-
           _buildSettingsItem(
             icon: Icons.analytics_rounded,
             title: 'Analytics Dashboard',
@@ -162,12 +207,30 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
           _buildDivider(),
           _buildSettingsItem(
+            icon: Icons.delete_forever,
+            title: 'Delete Account',
+            subtitle: 'Permanently delete your account',
+            onTap: _confirmDeleteAccount,
+            isDestructive: true,
+          ),
+          _buildDivider(),
+          _buildSettingsItem(
             icon: Icons.sms_rounded,
             title: 'Send Notifications',
             subtitle: 'Send SMS notifications to previous attendees',
             onTap: () => RouterClass.nextScreenNormal(
               context,
               const AttendeeNotificationScreen(),
+            ),
+          ),
+          _buildDivider(),
+          _buildSettingsItem(
+            icon: Icons.block,
+            title: 'Blocked Users',
+            subtitle: 'Manage your blocked list',
+            onTap: () => RouterClass.nextScreenNormal(
+              context,
+              const BlockedUsersScreen(),
             ),
           ),
           _buildDivider(),
@@ -182,7 +245,10 @@ class _AccountScreenState extends State<AccountScreen> {
             icon: Icons.help,
             title: 'Help',
             subtitle: 'Get help and support',
-            onTap: () => {},
+            onTap: () => RouterClass.nextScreenNormal(
+              context,
+              WebViewPage(url: AppConstants.supportUrl, title: 'Support'),
+            ),
           ),
           _buildDivider(),
           _buildDarkModeToggle(),
@@ -221,6 +287,15 @@ class _AccountScreenState extends State<AccountScreen> {
             ),
           ),
           _buildDivider(),
+          if (FirebaseAuth.instance.currentUser?.email == 'pr@mail.com')
+            _buildSettingsItem(
+              icon: Icons.admin_panel_settings,
+              title: 'Grant Admin (Debug)',
+              subtitle: 'Sets admin claim for this account',
+              onTap: _setSelfAdmin,
+            ),
+          if (FirebaseAuth.instance.currentUser?.email == 'pr@mail.com')
+            _buildDivider(),
           _buildSettingsItem(
             icon: Icons.logout,
             title: 'Logout',
@@ -363,6 +438,22 @@ class _AccountScreenState extends State<AccountScreen> {
 
   String _getThemeModeText(bool isDark) {
     return isDark ? 'Dark mode enabled' : 'Light mode enabled';
+  }
+
+  Future<void> _setSelfAdmin() async {
+    try {
+      final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
+      final callable = functions.httpsCallable('setSelfAdmin');
+      await callable.call(<String, dynamic>{});
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Admin claim set. Please sign out and sign back in.'),
+        ),
+      );
+    } catch (e) {
+      ShowToast().showNormalToast(msg: 'Failed to set admin: $e');
+    }
   }
 
   void _showThemeSelector(BuildContext context, ThemeProvider themeProvider) {

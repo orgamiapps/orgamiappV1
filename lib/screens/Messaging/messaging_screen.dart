@@ -36,6 +36,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
   final Map<String, Map<String, dynamic>> _userInfoCache = {};
+  Set<String> _blockedUserIds = <String>{};
 
   @override
   void initState() {
@@ -66,6 +67,9 @@ class _MessagingScreenState extends State<MessagingScreen> {
 
       Logger.info('Loading conversations for user: ${user.uid}');
 
+      // Load blocked users set first
+      await _loadBlockedUsersSet(user.uid);
+
       // Create the stream
       _conversationsStream = _messagingHelper.getUserConversations(user.uid);
 
@@ -86,9 +90,18 @@ class _MessagingScreenState extends State<MessagingScreen> {
         (conversations) {
           _timeoutTimer?.cancel(); // Cancel timeout on success
           Logger.info('Received ${conversations.length} conversations');
+          // Filter out conversations with blocked users (1-1 only)
+          final filtered = conversations.where((conv) {
+            if (conv.isGroup) {
+              // hide group conversation if any member (other than current user) is blocked
+              return !_isGroupMemberBlocked(conv);
+            }
+            final otherId = _getOtherParticipantId(conv);
+            return !_blockedUserIds.contains(otherId);
+          }).toList();
           setState(() {
-            _conversations = conversations;
-            _filteredConversations = conversations;
+            _conversations = filtered;
+            _filteredConversations = filtered;
             _isLoading = false;
             _errorMessage = null;
           });
@@ -108,6 +121,20 @@ class _MessagingScreenState extends State<MessagingScreen> {
         _isLoading = false;
         _errorMessage = 'An error occurred while loading messages';
       });
+    }
+  }
+
+  Future<void> _loadBlockedUsersSet(String currentUserId) async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('Customers')
+          .doc(currentUserId)
+          .collection('blocks')
+          .get();
+      _blockedUserIds = snap.docs.map((d) => d.id).toSet();
+    } catch (e) {
+      Logger.error('Failed to load blocked users set: $e');
+      _blockedUserIds = <String>{};
     }
   }
 
@@ -169,6 +196,18 @@ class _MessagingScreenState extends State<MessagingScreen> {
       Logger.error('Error getting other participant ID: $e');
       return '';
     }
+  }
+
+  bool _isGroupMemberBlocked(ConversationModel conversation) {
+    // Returns true if any other participant (besides current user) is blocked
+    final currentUserId = _auth.currentUser?.uid;
+    if (currentUserId == null) return false;
+    for (final uid in conversation.participantIds) {
+      if (uid != currentUserId && _blockedUserIds.contains(uid)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   Map<String, dynamic> _getOtherParticipantInfo(

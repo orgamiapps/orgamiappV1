@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:orgami/controller/customer_controller.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/models/comment_model.dart';
 import 'package:orgami/models/event_model.dart';
@@ -34,9 +35,25 @@ class _CommentsSectionState extends State<CommentsSection> {
       });
 
       Logger.debug('Loading comments for event: ${widget.eventModel.id}');
-      final commentsList = await _firestoreHelper.getEventComments(
+      var commentsList = await _firestoreHelper.getEventComments(
         eventId: widget.eventModel.id,
       );
+
+      // Filter out comments from blocked users
+      final currentUserId = CustomerController.logeInCustomer?.uid;
+      if (currentUserId != null && currentUserId.isNotEmpty) {
+        try {
+          final blocksSnap = await FirebaseFirestore.instance
+              .collection('Customers')
+              .doc(currentUserId)
+              .collection('blocks')
+              .get();
+          final blocked = blocksSnap.docs.map((d) => d.id).toSet();
+          commentsList = commentsList
+              .where((c) => !blocked.contains(c.userId))
+              .toList();
+        } catch (_) {}
+      }
 
       Logger.debug('Loaded ${commentsList.length} comments');
       for (var comment in commentsList) {
@@ -512,6 +529,43 @@ class _CommentsModalState extends State<CommentsModal> {
                       fontFamily: 'Roboto',
                     ),
                   ),
+                  PopupMenuButton<String>(
+                    onSelected: (value) async {
+                      switch (value) {
+                        case 'report':
+                          await FirebaseFirestoreHelper().submitUserReport(
+                            type: 'comment',
+                            contentId: comment.id,
+                            targetUserId: comment.userId,
+                            reason: 'inappropriate_content',
+                          );
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Report submitted. Thank you.'),
+                            ),
+                          );
+                          break;
+                        case 'block':
+                          final blockerId =
+                              CustomerController.logeInCustomer!.uid;
+                          final blockedId = comment.userId;
+                          await FirebaseFirestoreHelper().blockUser(
+                            blockerId: blockerId,
+                            blockedUserId: blockedId,
+                          );
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('User blocked')),
+                          );
+                          break;
+                      }
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'report', child: Text('Report')),
+                      PopupMenuItem(value: 'block', child: Text('Block User')),
+                    ],
+                  ),
                 ],
               ),
               const SizedBox(height: 4),
@@ -558,12 +612,12 @@ class _CommentsModalState extends State<CommentsModal> {
         Navigator.pop(context); // Close comments modal first
         if (!mounted) return;
         RouterClass.nextScreenNormal(
-            context,
-            UserProfileScreen(
-              user: user,
-              isOwnProfile:
-                  CustomerController.logeInCustomer?.uid == user.uid,
-            ));
+          context,
+          UserProfileScreen(
+            user: user,
+            isOwnProfile: CustomerController.logeInCustomer?.uid == user.uid,
+          ),
+        );
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(

@@ -7,6 +7,7 @@ import 'package:orgami/models/message_model.dart';
 import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/firebase/firebase_messaging_helper.dart';
 import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/firebase/firebase_firestore_helper.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -149,10 +150,26 @@ class _ChatScreenState extends State<ChatScreen> {
 
       _messagesSubscription = FirebaseMessagingHelper()
           .getMessages(widget.conversationId)
-          .listen((newMessages) {
+          .listen((newMessages) async {
         try {
           // Sort by timestamp (oldest first)
           newMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+          // If group chat: hide messages from blocked users
+          final isGroup = _conversation?.isGroup == true;
+          if (isGroup) {
+            try {
+              final blocksSnap = await _firestore
+                  .collection('Customers')
+                  .doc(currentUser.uid)
+                  .collection('blocks')
+                  .get();
+              final blocked = blocksSnap.docs.map((d) => d.id).toSet();
+              newMessages = newMessages
+                  .where((m) => !blocked.contains(m.senderId))
+                  .toList();
+            } catch (_) {}
+          }
           if (mounted) {
             setState(() {
               _messages = newMessages;
@@ -405,11 +422,22 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         title: _buildAppBarTitle(),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.more_vert),
-            onPressed: () {
-              // Show more options
-            },
+          PopupMenuButton<String>(
+            onSelected: _handleMenuAction,
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'report_user',
+                child: Text('Report User'),
+              ),
+              const PopupMenuItem(
+                value: 'block_user',
+                child: Text('Block User'),
+              ),
+              const PopupMenuItem(
+                value: 'unblock_user',
+                child: Text('Unblock User'),
+              ),
+            ],
           ),
         ],
       ),
@@ -420,6 +448,49 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _handleMenuAction(String value) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+    final otherId = widget.otherParticipantInfo?.uid;
+
+    try {
+      switch (value) {
+        case 'report_user':
+          await FirebaseFirestoreHelper().submitUserReport(
+            type: 'user',
+            targetUserId: otherId,
+            reason: 'inappropriate_content',
+          );
+          if (mounted) {
+            ShowToast().showSnackBar('Report submitted. Thank you.', context);
+          }
+          break;
+        case 'block_user':
+          if (otherId != null && otherId.isNotEmpty) {
+            await FirebaseFirestoreHelper().blockUser(
+              blockerId: currentUser.uid,
+              blockedUserId: otherId,
+            );
+            if (mounted) {
+              ShowToast().showSnackBar('User blocked', context);
+            }
+          }
+          break;
+        case 'unblock_user':
+          if (otherId != null && otherId.isNotEmpty) {
+            await FirebaseFirestoreHelper().unblockUser(
+              blockerId: currentUser.uid,
+              blockedUserId: otherId,
+            );
+            if (mounted) {
+              ShowToast().showSnackBar('User unblocked', context);
+            }
+          }
+          break;
+      }
+    } catch (_) {}
   }
 
   Widget _buildAppBarTitle() {

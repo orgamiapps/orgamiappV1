@@ -11,13 +11,94 @@ import 'package:orgami/models/ticket_model.dart';
 import 'package:orgami/models/event_feedback_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:orgami/Utils/logger.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 class FirebaseFirestoreHelper {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static const String _functionsRegion = 'us-central1';
 
   // Cache for frequently accessed data
   static final Map<String, dynamic> _cache = {};
   static const Duration _cacheExpiry = Duration(minutes: 5);
+
+  /// UGC: Report content or user
+  Future<void> submitUserReport({
+    required String type, // user|message|comment|event
+    String? targetUserId,
+    String? contentId,
+    String? reason,
+    String? details,
+  }) async {
+    try {
+      final functions = FirebaseFunctions.instanceFor(region: _functionsRegion);
+      final callable = functions.httpsCallable('submitUserReport');
+      await callable.call({
+        'type': type,
+        'targetUserId': targetUserId,
+        'contentId': contentId,
+        'reason': reason,
+        'details': details,
+      });
+    } catch (e) {
+      Logger.error('Error submitting report', e);
+      rethrow;
+    }
+  }
+
+  /// UGC: Block a user (mutual exclusion in conversations/feeds client-side)
+  Future<void> blockUser({
+    required String blockerId,
+    required String blockedUserId,
+  }) async {
+    try {
+      await _firestore
+          .collection('Customers')
+          .doc(blockerId)
+          .collection('blocks')
+          .doc(blockedUserId)
+          .set({
+        'blockedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      Logger.error('Error blocking user', e);
+      rethrow;
+    }
+  }
+
+  Future<void> unblockUser({
+    required String blockerId,
+    required String blockedUserId,
+  }) async {
+    try {
+      await _firestore
+          .collection('Customers')
+          .doc(blockerId)
+          .collection('blocks')
+          .doc(blockedUserId)
+          .delete();
+    } catch (e) {
+      Logger.error('Error unblocking user', e);
+      rethrow;
+    }
+  }
+
+  Future<bool> isUserBlocked({
+    required String blockerId,
+    required String otherUserId,
+  }) async {
+    try {
+      final doc = await _firestore
+          .collection('Customers')
+          .doc(blockerId)
+          .collection('blocks')
+          .doc(otherUserId)
+          .get();
+      return doc.exists;
+    } catch (e) {
+      Logger.error('Error checking block status', e);
+      return false;
+    }
+  }
 
   /// Retrieves a single customer from Firestore with caching
   ///
@@ -61,6 +142,32 @@ class FirebaseFirestoreHelper {
     } catch (e) {
       Logger.error('Error getting customer data', e);
       return null;
+    }
+  }
+
+  // Soft-delete user (mark as deleted). For full deletion, implement a Cloud Function.
+  Future<void> markUserAsDeleted(String userId) async {
+    try {
+      await _firestore.collection('Customers').doc(userId).set({
+        'isDeleted': true,
+        'deletedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      Logger.error('Error marking user as deleted', e);
+      rethrow;
+    }
+  }
+
+  // Fully delete account via Cloud Function (recommended for App Store compliance)
+  Future<void> deleteAccountViaCloudFunction(String userId) async {
+    try {
+      // Use callable function to perform server-side deletion
+      final functions = FirebaseFunctions.instanceFor(region: _functionsRegion);
+      final callable = functions.httpsCallable('deleteUserAccount');
+      await callable.call(<String, dynamic>{});
+    } catch (e) {
+      Logger.error('Error calling deleteUserAccount function', e);
+      rethrow;
     }
   }
 

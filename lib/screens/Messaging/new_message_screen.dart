@@ -10,6 +10,7 @@ import 'package:orgami/Utils/toast.dart';
 import 'package:orgami/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:orgami/Utils/logger.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class NewMessageScreen extends StatefulWidget {
   const NewMessageScreen({super.key});
@@ -30,6 +31,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
   bool _isSearching = false;
   bool _groupMode = false;
   final Set<String> _selectedUserIds = {};
+  Set<String> _blockedUserIds = <String>{};
 
   @override
   void initState() {
@@ -54,10 +56,24 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
       final currentUser = _auth.currentUser;
       if (currentUser == null) return;
 
+      // load blocked set
+      try {
+        final bs = await FirebaseFirestore.instance
+            .collection('Customers')
+            .doc(currentUser.uid)
+            .collection('blocks')
+            .get();
+        _blockedUserIds = bs.docs.map((d) => d.id).toSet();
+      } catch (_) {}
+
       final users = await _messagingHelper.searchUsers('', currentUser.uid);
+      // filter out blocked users from selectable list
+      final filtered = users
+          .where((u) => !_blockedUserIds.contains(u.uid))
+          .toList();
       setState(() {
-        _allUsers = users;
-        _searchResults = users;
+        _allUsers = filtered;
+        _searchResults = filtered;
         _isLoading = false;
       });
     } catch (e) {
@@ -92,9 +108,12 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
         query,
         currentUser.uid,
       );
+      final filtered = results
+          .where((u) => !_blockedUserIds.contains(u.uid))
+          .toList();
       if (!mounted) return;
       setState(() {
-        _searchResults = results;
+        _searchResults = filtered;
       });
     } catch (e) {
       Logger.error('Error searching users: $e');

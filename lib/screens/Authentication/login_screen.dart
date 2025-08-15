@@ -8,7 +8,9 @@ import 'package:orgami/Utils/images.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:orgami/Utils/logger.dart';
+import 'package:orgami/Utils/app_constants.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
+import 'package:orgami/firebase/firebase_google_auth_helper.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -310,6 +312,8 @@ class _LoginScreenState extends State<LoginScreen>
             _buildPasswordField(),
             const SizedBox(height: 36),
             _buildLoginButton(),
+            const SizedBox(height: 16),
+            if (AppConstants.enableAppleSignIn) _buildAppleSignInButton(),
           ],
         ),
       ),
@@ -531,6 +535,47 @@ class _LoginScreenState extends State<LoginScreen>
             fontSize: 16,
             fontWeight: FontWeight.w500,
             decoration: TextDecoration.underline,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppleSignInButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(
+            color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        onPressed: () async {
+          final helper = FirebaseGoogleAuthHelper();
+          final user = await helper.loginWithApple();
+          if (user != null) {
+            try {
+              await FirebaseFirestoreHelper().ensureUserProfileCompleteness(
+                user.uid,
+              );
+              if (!mounted) return;
+              RouterClass().homeScreenRoute(context: context);
+            } catch (_) {}
+          } else {
+            ShowToast().showNormalToast(msg: 'Apple sign-in failed');
+          }
+        },
+        icon: const Icon(Icons.apple, size: 22, color: Colors.black),
+        label: const Text(
+          'Continue with Apple',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.black,
           ),
         ),
       ),
