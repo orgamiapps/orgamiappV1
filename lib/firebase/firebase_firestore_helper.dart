@@ -56,9 +56,7 @@ class FirebaseFirestoreHelper {
           .doc(blockerId)
           .collection('blocks')
           .doc(blockedUserId)
-          .set({
-        'blockedAt': FieldValue.serverTimestamp(),
-      });
+          .set({'blockedAt': FieldValue.serverTimestamp()});
     } catch (e) {
       Logger.error('Error blocking user', e);
       rethrow;
@@ -486,14 +484,6 @@ class FirebaseFirestoreHelper {
           (_) => chars.codeUnitAt(random.nextInt(chars.length)),
         ),
       );
-    }
-
-    // Generate a random numeric ID (easier to share verbally)
-    String generateNumericId() {
-      final random = Random();
-      // Generate a 6-digit number (100000 to 999999)
-      int randomNumber = random.nextInt(900000) + 100000;
-      return randomNumber.toString();
     }
 
     try {

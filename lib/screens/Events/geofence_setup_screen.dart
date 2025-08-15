@@ -75,42 +75,6 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
     super.dispose();
   }
 
-  /*
-  Future<void> _getCurrentLocation() async { // Unused method
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return Future.error('Location services are disabled.');
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        return Future.error('Location permissions are denied');
-      }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      return Future.error(
-        'Location permissions are permanently denied, we cannot request permissions.',
-      );
-    }
-
-    await Geolocator.getCurrentPosition().then((value) {
-      LatLng newLatLng = LatLng(value.latitude, value.longitude);
-      mapController.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(target: newLatLng, zoom: 15),
-        ),
-      );
-      _addMarker(newLatLng);
-    });
-  }
-  */
-
   void _addMarker(LatLng latLng) {
     setState(() {
       markers.clear();
@@ -321,9 +285,13 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: _isSearching ? 0.2 : 0.3),
+                      color: Colors.white.withValues(
+                        alpha: _isSearching ? 0.2 : 0.3,
+                      ),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -475,9 +443,15 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
               right: 12,
               child: Column(
                 children: [
-                  _mapIconBtn(Icons.add, () => mapController.animateCamera(CameraUpdate.zoomIn())),
+                  _mapIconBtn(
+                    Icons.add,
+                    () => mapController.animateCamera(CameraUpdate.zoomIn()),
+                  ),
                   const SizedBox(height: 8),
-                  _mapIconBtn(Icons.remove, () => mapController.animateCamera(CameraUpdate.zoomOut())),
+                  _mapIconBtn(
+                    Icons.remove,
+                    () => mapController.animateCamera(CameraUpdate.zoomOut()),
+                  ),
                 ],
               ),
             ),
@@ -487,7 +461,10 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
               left: 12,
               right: 12,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(10),

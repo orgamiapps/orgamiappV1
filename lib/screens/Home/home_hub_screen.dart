@@ -25,14 +25,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   List<Map<String, String>> _myOrgs = [];
   List<Map<String, dynamic>> _discoverOrgs = [];
   String? _selectedCategoryLower;
-  final List<Map<String, String>> _categoryOptions = const [
-    {'label': 'All', 'value': ''},
-    {'label': 'Business', 'value': 'business'},
-    {'label': 'Club', 'value': 'club'},
-    {'label': 'School', 'value': 'school'},
-    {'label': 'Sports', 'value': 'sports'},
-    {'label': 'Other', 'value': 'other'},
-  ];
+  // Removed unused _categoryOptions (old UI)
 
   @override
   void initState() {
@@ -305,7 +298,21 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   Widget _buildOrgsTab() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: _orgEventsList(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_searching) const LinearProgressIndicator(minHeight: 2),
+          if (_discoverOrgs.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 4),
+              child: Text(
+                'Organizations: ${_discoverOrgs.length}',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+              ),
+            ),
+          Expanded(child: _orgEventsList()),
+        ],
+      ),
     );
   }
 
@@ -500,17 +507,5 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
     ],
   );
 
-  Widget _pill(String text, {IconData? icon}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: _cardDeco(),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[Icon(icon, size: 16), const SizedBox(width: 6)],
-          Text(text),
-        ],
-      ),
-    );
-  }
+  // Removed unused _pill helper
 }

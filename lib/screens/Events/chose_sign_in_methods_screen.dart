@@ -6,15 +6,15 @@ import 'package:orgami/screens/Events/Widget/sign_in_methods_selector.dart';
 import 'package:orgami/Utils/router.dart';
 
 class ChoseSignInMethodsScreen extends StatefulWidget {
-  final DateTime selectedDateTime;
-  final int eventDurationHours;
+  final DateTime? selectedDateTime;
+  final int? eventDurationHours;
   final String? preselectedOrganizationId;
   final bool forceOrganizationEvent;
 
   const ChoseSignInMethodsScreen({
     super.key,
-    required this.selectedDateTime,
-    required this.eventDurationHours,
+    this.selectedDateTime,
+    this.eventDurationHours,
     this.preselectedOrganizationId,
     this.forceOrganizationEvent = false,
   });

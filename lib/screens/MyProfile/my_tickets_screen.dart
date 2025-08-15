@@ -390,6 +390,15 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
+                        const Spacer(),
+                        TextButton.icon(
+                          onPressed: () => _shareTicket(ticket),
+                          icon: const Icon(Icons.ios_share, size: 16),
+                          label: const Text('Share'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFF667EEA),
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -497,8 +506,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                         ),
                         child: LayoutBuilder(
                           builder: (context, ticketConstraints) {
-                            final ticketHeight = ticketConstraints.maxHeight;
-                            final notchTop = imageHeight + 16; // Position notches below image
+                            final notchTop =
+                                imageHeight +
+                                16; // Position notches below image
                             return Stack(
                               children: [
                                 // Notches
@@ -532,11 +542,14 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                                     padding: const EdgeInsets.all(20),
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         // Event Image
                                         ClipRRect(
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
                                           child: CachedNetworkImage(
                                             imageUrl: ticket.eventImageUrl,
                                             height: imageHeight,
@@ -561,20 +574,22 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                                               ),
                                             ),
                                             Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 16,
-                                                vertical: 8,
-                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 16,
+                                                    vertical: 8,
+                                                  ),
                                               decoration: BoxDecoration(
                                                 color: ticket.isUsed
                                                     ? Colors.red[100]
                                                     : Colors.green[100],
-                                                borderRadius: BorderRadius.circular(
-                                                  20,
-                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
                                               ),
                                               child: Text(
-                                                ticket.isUsed ? 'USED' : 'ACTIVE',
+                                                ticket.isUsed
+                                                    ? 'USED'
+                                                    : 'ACTIVE',
                                                 style: TextStyle(
                                                   color: ticket.isUsed
                                                       ? Colors.red
@@ -626,7 +641,8 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                                                       style: TextStyle(
                                                         fontSize: 18,
                                                         color: Colors.red,
-                                                        fontWeight: FontWeight.bold,
+                                                        fontWeight:
+                                                            FontWeight.bold,
                                                       ),
                                                     ),
                                                   ],
@@ -698,42 +714,5 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     );
   }
 
-  // Unused detailed row kept previously has been replaced with compact chips to
-  // ensure the ticket always fits height constraints. If needed later, it can
-  // be reintroduced with clamped font sizes.
-
-  Widget _buildCompactChip({
-    required IconData icon,
-    required String text,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              text,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: color,
-                fontFamily: 'Roboto',
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // Removed unused _buildCompactChip helper
 }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:orgami/Utils/router.dart';
-import 'package:orgami/screens/Events/chose_date_time_screen.dart';
+import 'package:orgami/screens/Events/chose_sign_in_methods_screen.dart';
 import 'package:orgami/screens/Events/select_organization_screen.dart';
 import 'package:orgami/firebase/organization_helper.dart';
 import 'dart:async';
@@ -93,7 +93,7 @@ class _SelectEventTypeScreenState extends State<SelectEventTypeScreen> {
     if (_selectedOrgId == null) return;
     RouterClass.nextScreenNormal(
       context,
-      ChoseDateTimeScreen(
+      ChoseSignInMethodsScreen(
         preselectedOrganizationId: _selectedOrgId,
         forceOrganizationEvent: true,
       ),
@@ -124,7 +124,7 @@ class _SelectEventTypeScreenState extends State<SelectEventTypeScreen> {
                         onTap: () {
                           RouterClass.nextScreenNormal(
                             context,
-                            const ChoseDateTimeScreen(),
+                            const ChoseSignInMethodsScreen(),
                           );
                         },
                       ),
@@ -233,10 +233,7 @@ class _SelectEventTypeScreenState extends State<SelectEventTypeScreen> {
                     const SizedBox(height: 6),
                     const Text(
                       'Visible to everyone on Orgami',
-                      style: TextStyle(
-                        color: Color(0xFF6B7280),
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(color: Color(0xFF6B7280), fontSize: 14),
                     ),
                   ],
                 ),
@@ -404,11 +401,15 @@ class _SelectEventTypeScreenState extends State<SelectEventTypeScreen> {
                         fillColor: const Color(0xFFF9FAFB),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE5E7EB),
+                          ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE5E7EB),
+                          ),
                         ),
                       ),
                       items: _orgs
@@ -419,14 +420,17 @@ class _SelectEventTypeScreenState extends State<SelectEventTypeScreen> {
                             ),
                           )
                           .toList(),
-                      onChanged: (value) => setState(() => _selectedOrgId = value),
+                      onChanged: (value) =>
+                          setState(() => _selectedOrgId = value),
                     ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: _selectedOrgId == null ? null : _goToOrgDateTime,
+                          onPressed: _selectedOrgId == null
+                              ? null
+                              : _goToOrgDateTime,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF10B981),
                             foregroundColor: Colors.white,
@@ -445,8 +449,9 @@ class _SelectEventTypeScreenState extends State<SelectEventTypeScreen> {
               ),
             ),
           ),
-          crossFadeState:
-              _orgExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          crossFadeState: _orgExpanded
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
           duration: const Duration(milliseconds: 250),
         ),
       ],

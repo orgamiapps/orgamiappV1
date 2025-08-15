@@ -22,8 +22,8 @@ import 'package:orgami/firebase/organization_helper.dart'; // ignore: unused_imp
 import 'package:orgami/controller/customer_controller.dart';
 
 class CreateEventScreen extends StatefulWidget {
-  final DateTime selectedDateTime;
-  final int eventDurationHours;
+  final DateTime? selectedDateTime;
+  final int? eventDurationHours;
   final LatLng selectedLocation;
   final double radios;
   final List<String>? selectedSignInMethods;
@@ -34,8 +34,8 @@ class CreateEventScreen extends StatefulWidget {
 
   const CreateEventScreen({
     super.key,
-    required this.selectedDateTime,
-    required this.eventDurationHours,
+    this.selectedDateTime,
+    this.eventDurationHours,
     required this.selectedLocation,
     required this.radios,
     this.selectedSignInMethods,
@@ -85,6 +85,30 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
   late AnimationController _slideController;
   late Animation<Offset> _slideAnimation;
+
+  // Inline date/time selection state
+  DateTime? _selectedDate;
+  TimeOfDay? _startTime;
+  TimeOfDay? _endTime;
+
+  bool get _hasDateTime =>
+      _selectedDate != null && _startTime != null && _endTime != null;
+
+  DateTime get _startDateTime => DateTime(
+    _selectedDate!.year,
+    _selectedDate!.month,
+    _selectedDate!.day,
+    _startTime!.hour,
+    _startTime!.minute,
+  );
+
+  int get _durationHours {
+    final int startMinutes = (_startTime!.hour * 60) + _startTime!.minute;
+    final int endMinutes = (_endTime!.hour * 60) + _endTime!.minute;
+    int hours = ((endMinutes - startMinutes) / 60).ceil();
+    if (hours < 1) hours = 1;
+    return hours;
+  }
 
   Future _pickImage() async {
     try {
@@ -153,7 +177,19 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
   void _handleSubmit() async {
     if (_formKey.currentState!.validate()) {
-      if (widget.forceOrganizationEvent && (_selectedOrganizationId == null || _selectedOrganizationId!.isEmpty)) {
+      if (!_hasDateTime) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select date, start time, and end time'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      if (widget.forceOrganizationEvent &&
+          (_selectedOrganizationId == null ||
+              _selectedOrganizationId!.isEmpty)) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -203,7 +239,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           location: locationEdtController.text,
           customerUid: FirebaseAuth.instance.currentUser!.uid,
           imageUrl: thumbnailUrlCtlr.text,
-          selectedDateTime: widget.selectedDateTime,
+          selectedDateTime: _startDateTime,
           eventGenerateTime: DateTime.now(),
           status: '',
           getLocation: true,
@@ -212,7 +248,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           latitude: widget.selectedLocation.latitude,
           private: privateEvent,
           categories: _selectedCategories,
-          eventDuration: widget.eventDurationHours,
+          eventDuration: _durationHours,
           organizationId: _selectedOrganizationId,
           accessList: privateEvent
               ? [FirebaseAuth.instance.currentUser!.uid]
@@ -319,6 +355,16 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
     _fadeController.forward();
     _slideController.forward();
+
+    // Prefill inline date/time from incoming values when available
+    if (widget.selectedDateTime != null) {
+      final dt = widget.selectedDateTime!;
+      _selectedDate = DateTime(dt.year, dt.month, dt.day);
+      _startTime = TimeOfDay(hour: dt.hour, minute: dt.minute);
+      final int duration = widget.eventDurationHours ?? 1;
+      final DateTime end = dt.add(Duration(hours: duration));
+      _endTime = TimeOfDay(hour: end.hour, minute: end.minute);
+    }
   }
 
   Future<void> _prefillOrganizerWithCurrentUser() async {
@@ -333,9 +379,11 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       // Fallback to Customers collection via helper
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid != null) {
-        final customer =
-            await FirebaseFirestoreHelper().getSingleCustomer(customerId: uid);
-        final resolvedName = customer?.name ??
+        final customer = await FirebaseFirestoreHelper().getSingleCustomer(
+          customerId: uid,
+        );
+        final resolvedName =
+            customer?.name ??
             (FirebaseAuth.instance.currentUser?.displayName ?? '');
         if (resolvedName.isNotEmpty) {
           groupNameEdtController.text = resolvedName;
@@ -457,9 +505,6 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Date and Time Summary
-              _buildSummaryCard(),
-              const SizedBox(height: 24),
               // Organization selector
               _buildOrganizationSelector(),
               const SizedBox(height: 24),
@@ -479,94 +524,195 @@ class _CreateEventScreenState extends State<CreateEventScreen>
     );
   }
 
-  Widget _buildSummaryCard() {
+  // _buildSummaryCard removed (inlined date/time pickers now used instead)
+
+  String get _timeRangeLabel {
+    final DateTime startDt = _startDateTime;
+    final String start = DateFormat('h:mm a').format(startDt);
+    final DateTime endDt = startDt.add(Duration(hours: _durationHours));
+    final String end = DateFormat('h:mm a').format(endDt);
+    final String duration = '${_durationHours}h';
+    return '$start – $end ($duration)';
+  }
+
+  // _buildSummaryItem removed (legacy summary UI no longer used)
+
+  Widget _buildInlineDateTimePicker() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            spreadRadius: 0,
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSummaryItem(
-            icon: Icons.calendar_month_rounded,
-            label: 'Date',
-            value: DateFormat(
-              'EEEE, MMMM dd, yyyy',
-            ).format(widget.selectedDateTime),
+          const Text(
+            'Date & Time',
+            style: TextStyle(
+              color: Color(0xFF1A1A1A),
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              fontFamily: 'Roboto',
+            ),
           ),
-          const SizedBox(height: 16),
-          _buildSummaryItem(
-            icon: Icons.access_time_rounded,
-            label: 'Time',
-            value: _timeRangeLabel,
+          const SizedBox(height: 12),
+          // Date on first row; times below to avoid overflow on smaller screens
+          _buildDateField(),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: _buildStartTimeField()),
+              const SizedBox(width: 12),
+              Expanded(child: _buildEndTimeField()),
+            ],
           ),
+          if (_hasDateTime) ...[
+            const SizedBox(height: 10),
+            Text(
+              _timeRangeLabel,
+              style: const TextStyle(
+                color: Color(0xFF667EEA),
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  String get _timeRangeLabel {
-    final String start = DateFormat('h:mm a').format(widget.selectedDateTime);
-    final DateTime endDt =
-        widget.selectedDateTime.add(Duration(hours: widget.eventDurationHours));
-    final String end = DateFormat('h:mm a').format(endDt);
-    final String duration = '${widget.eventDurationHours}h';
-    return '$start – $end ($duration)';
+  Widget _buildDateField() {
+    final String text = _selectedDate == null
+        ? 'Select Date'
+        : DateFormat('M/d/yyyy').format(_selectedDate!);
+    return _pickerButton(
+      icon: Icons.calendar_today,
+      label: text,
+      onTap: () async {
+        final DateTime? picked = await showDatePicker(
+          context: context,
+          initialDate: _selectedDate ?? DateTime.now(),
+          firstDate: DateTime.now(),
+          lastDate: DateTime(2026),
+        );
+        if (!mounted) return;
+        if (picked != null) {
+          setState(() => _selectedDate = picked);
+        }
+      },
+    );
   }
 
-  Widget _buildSummaryItem({
+  Widget _buildStartTimeField() {
+    final String text = _startTime == null
+        ? 'Start'
+        : DateFormat(
+            'h:mm a',
+          ).format(DateTime(0, 1, 1, _startTime!.hour, _startTime!.minute));
+    return _pickerButton(
+      icon: Icons.schedule,
+      label: text,
+      onTap: () async {
+        final TimeOfDay? picked = await showTimePicker(
+          context: context,
+          initialTime: _startTime ?? TimeOfDay.now(),
+        );
+        if (!mounted) return;
+        if (picked != null) {
+          setState(() {
+            _startTime = picked;
+            // reset end time if invalid
+            if (_endTime != null) {
+              final start = (_startTime!.hour * 60) + _startTime!.minute;
+              final end = (_endTime!.hour * 60) + _endTime!.minute;
+              if (end <= start) _endTime = null;
+            }
+          });
+        }
+      },
+    );
+  }
+
+  Widget _buildEndTimeField() {
+    final String text = _endTime == null
+        ? 'End'
+        : DateFormat(
+            'h:mm a',
+          ).format(DateTime(0, 1, 1, _endTime!.hour, _endTime!.minute));
+    return _pickerButton(
+      icon: Icons.schedule,
+      label: text,
+      onTap: () async {
+        final TimeOfDay initialEnd =
+            _endTime ??
+            (_startTime != null
+                ? TimeOfDay(
+                    hour: (_startTime!.hour + 1) % 24,
+                    minute: _startTime!.minute,
+                  )
+                : TimeOfDay.now());
+        final TimeOfDay? picked = await showTimePicker(
+          context: context,
+          initialTime: initialEnd,
+        );
+        if (!mounted) return;
+        if (picked != null) {
+          if (_startTime == null) {
+            setState(() => _endTime = picked);
+          } else {
+            final start = (_startTime!.hour * 60) + _startTime!.minute;
+            final end = (picked.hour * 60) + picked.minute;
+            if (end > start) {
+              setState(() => _endTime = picked);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('End time must be after start')),
+              );
+            }
+          }
+        }
+      },
+    );
+  }
+
+  Widget _pickerButton({
     required IconData icon,
     required String label,
-    required String value,
+    required VoidCallback onTap,
   }) {
-    return Row(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          height: 48,
           decoration: BoxDecoration(
-            color: const Color(0xFF667EEA).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
+            color: const Color(0xFFF9FAFB),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
           ),
-          child: Icon(icon, color: const Color(0xFF667EEA), size: 20),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Color(0xFF6B7280),
-                  fontSize: 12,
-                  fontFamily: 'Roboto',
-                ),
+              Row(
+                children: [
+                  Icon(icon, size: 18, color: const Color(0xFF667EEA)),
+                  const SizedBox(width: 8),
+                  Text(label),
+                ],
               ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: const TextStyle(
-                  color: Color(0xFF1A1A1A),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  fontFamily: 'Roboto',
-                ),
-              ),
+              const Icon(Icons.arrow_drop_down, color: Color(0xFF9CA3AF)),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
 
@@ -601,8 +747,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                 color: const Color(0xFF667EEA).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child:
-                  const Icon(Icons.lock, color: Color(0xFF667EEA), size: 20),
+              child: const Icon(Icons.lock, color: Color(0xFF667EEA), size: 20),
             ),
             const SizedBox(width: 16),
             const Expanded(
@@ -624,8 +769,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                 });
               },
               activeColor: const Color(0xFF667EEA),
-              activeTrackColor:
-                  const Color(0xFF667EEA).withValues(alpha: 0.3),
+              activeTrackColor: const Color(0xFF667EEA).withValues(alpha: 0.3),
             ),
           ],
         ),
@@ -805,7 +949,9 @@ class _CreateEventScreenState extends State<CreateEventScreen>
               const Icon(Icons.apartment, color: Color(0xFF667EEA), size: 20),
               const SizedBox(width: 8),
               Text(
-                widget.forceOrganizationEvent ? 'Organization (required)' : 'Organization (optional)',
+                widget.forceOrganizationEvent
+                    ? 'Organization (required)'
+                    : 'Organization (optional)',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -924,6 +1070,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
               return null;
             },
           ),
+          const SizedBox(height: 12),
+          _buildInlineDateTimePicker(),
           const SizedBox(height: 16),
           // Image Field
           _buildImageField(),

@@ -6,8 +6,8 @@ import 'package:orgami/screens/Events/create_event_screen.dart';
 import 'package:orgami/Utils/router.dart';
 
 class AddQuestionsPromptScreen extends StatefulWidget {
-  final DateTime selectedDateTime;
-  final int eventDurationHours;
+  final DateTime? selectedDateTime;
+  final int? eventDurationHours;
   final LatLng selectedLocation;
   final double radios;
   final List<String> selectedSignInMethods;
@@ -17,8 +17,8 @@ class AddQuestionsPromptScreen extends StatefulWidget {
 
   const AddQuestionsPromptScreen({
     super.key,
-    required this.selectedDateTime,
-    required this.eventDurationHours,
+    this.selectedDateTime,
+    this.eventDurationHours,
     required this.selectedLocation,
     required this.radios,
     required this.selectedSignInMethods,
@@ -241,7 +241,7 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
                     location: '',
                     customerUid: '',
                     imageUrl: '',
-                    selectedDateTime: widget.selectedDateTime,
+                    selectedDateTime: widget.selectedDateTime ?? DateTime.now(),
                     eventGenerateTime: DateTime.now(),
                     status: '',
                     getLocation: widget.selectedSignInMethods.contains(
@@ -252,7 +252,7 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
                     latitude: widget.selectedLocation.latitude,
                     private: false,
                     categories: [],
-                    eventDuration: widget.eventDurationHours,
+                    eventDuration: widget.eventDurationHours ?? 1,
                     signInMethods: widget.selectedSignInMethods,
                     manualCode: widget.manualCode,
                   ),

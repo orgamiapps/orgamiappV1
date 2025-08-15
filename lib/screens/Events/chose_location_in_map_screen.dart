@@ -7,8 +7,8 @@ import 'package:orgami/screens/Events/add_questions_prompt_screen.dart';
 import 'package:orgami/Utils/router.dart';
 
 class ChoseLocationInMapScreen extends StatefulWidget {
-  final DateTime selectedDateTime;
-  final int eventDurationHours;
+  final DateTime? selectedDateTime;
+  final int? eventDurationHours;
   final List<String>? selectedSignInMethods;
   final String? manualCode;
   final String? preselectedOrganizationId;
@@ -16,8 +16,8 @@ class ChoseLocationInMapScreen extends StatefulWidget {
 
   const ChoseLocationInMapScreen({
     super.key,
-    required this.selectedDateTime,
-    required this.eventDurationHours,
+    this.selectedDateTime,
+    this.eventDurationHours,
     this.selectedSignInMethods,
     this.manualCode,
     this.preselectedOrganizationId,
@@ -520,7 +520,8 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
                             widget.selectedSignInMethods ??
                             const ['qr_code', 'manual_code'],
                         manualCode: widget.manualCode,
-                        preselectedOrganizationId: widget.preselectedOrganizationId,
+                        preselectedOrganizationId:
+                            widget.preselectedOrganizationId,
                         forceOrganizationEvent: widget.forceOrganizationEvent,
                       ),
                     );

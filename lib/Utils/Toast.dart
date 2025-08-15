@@ -4,11 +4,6 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'Colors.dart';
 
 class ShowToast {
-  // void showSnackBar({required BuildContext context, required String msg}) {
-  //   var snackBar = SnackBar(content: Text(msg));
-  //   ScaffoldMessenger.of(context).showSnackBar(snackBar);
-  // }
-
   void showNormalToast({required String msg}) {
     Fluttertoast.showToast(
       msg: msg,

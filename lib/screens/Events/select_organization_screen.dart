@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:orgami/firebase/organization_helper.dart';
 import 'package:orgami/Utils/router.dart';
-import 'package:orgami/screens/Events/chose_date_time_screen.dart';
+import 'package:orgami/screens/Events/chose_sign_in_methods_screen.dart';
 
 class SelectOrganizationScreen extends StatefulWidget {
   const SelectOrganizationScreen({super.key});
 
   @override
-  State<SelectOrganizationScreen> createState() => _SelectOrganizationScreenState();
+  State<SelectOrganizationScreen> createState() =>
+      _SelectOrganizationScreenState();
 }
 
 class _SelectOrganizationScreenState extends State<SelectOrganizationScreen> {
@@ -35,7 +36,7 @@ class _SelectOrganizationScreenState extends State<SelectOrganizationScreen> {
   void _goToDateTime(String organizationId) {
     RouterClass.nextScreenNormal(
       context,
-      ChoseDateTimeScreen(
+      ChoseSignInMethodsScreen(
         preselectedOrganizationId: organizationId,
         forceOrganizationEvent: true,
       ),
@@ -55,19 +56,19 @@ class _SelectOrganizationScreenState extends State<SelectOrganizationScreen> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _orgs.isEmpty
-                      ? _emptyState()
-                      : ListView.separated(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _orgs.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 12),
-                          itemBuilder: (context, i) {
-                            final org = _orgs[i];
-                            return _orgTile(
-                              name: org['name'] ?? 'Organization',
-                              onTap: () => _goToDateTime(org['id']!),
-                            );
-                          },
-                        ),
+                  ? _emptyState()
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _orgs.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, i) {
+                        final org = _orgs[i];
+                        return _orgTile(
+                          name: org['name'] ?? 'Organization',
+                          onTap: () => _goToDateTime(org['id']!),
+                        );
+                      },
+                    ),
             ),
           ],
         ),
@@ -123,7 +124,10 @@ class _SelectOrganizationScreenState extends State<SelectOrganizationScreen> {
           SizedBox(height: 12),
           Text('You are not a member of any organizations yet.'),
           SizedBox(height: 4),
-          Text('Create a public event or join an organization to continue.', style: TextStyle(color: Color(0xFF6B7280))),
+          Text(
+            'Create a public event or join an organization to continue.',
+            style: TextStyle(color: Color(0xFF6B7280)),
+          ),
         ],
       ),
     );

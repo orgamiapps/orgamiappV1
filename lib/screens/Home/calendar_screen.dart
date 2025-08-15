@@ -6,7 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/screens/Events/single_event_screen.dart';
-import 'package:orgami/screens/Events/chose_date_time_screen.dart';
+import 'package:orgami/screens/Events/chose_sign_in_methods_screen.dart';
 import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/Utils/Toast.dart';
 import 'dart:async';
@@ -1091,10 +1091,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     HapticFeedback.mediumImpact();
     await RouterClass.nextScreenNormal(
       context,
-      ChoseDateTimeScreen(
-        preselectedOrganizationId: null,
-        forceOrganizationEvent: false,
-      ),
+      const ChoseSignInMethodsScreen(),
     );
     // Always refresh when returning from event creation
     if (mounted) {
