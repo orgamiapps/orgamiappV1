@@ -107,30 +107,32 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight:
-                      MediaQuery.of(context).size.height -
-                      MediaQuery.of(context).padding.top -
-                      MediaQuery.of(context).padding.bottom,
-                ),
-                child: IntrinsicHeight(
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 30),
-                      _buildLogoSection(),
-                      const SizedBox(height: 25),
-                      _buildWelcomeSection(),
-                      const SizedBox(height: 30),
-                      _buildQRCodeSection(),
-                      const Spacer(),
-                      _buildActionButtons(),
-                      const SizedBox(height: 30),
-                    ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
+                    child: SizedBox(
+                      height: constraints.maxHeight,
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 30),
+                          _buildLogoSection(),
+                          const SizedBox(height: 25),
+                          _buildWelcomeSection(),
+                          const SizedBox(height: 12),
+                          _buildQRCodeSection(),
+                          const Spacer(),
+                          _buildActionButtons(),
+                          const SizedBox(height: 30),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
         ),
@@ -141,19 +143,30 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
   Widget _buildLogoSection() {
     return ScaleTransition(
       scale: _logoScaleAnimation,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppThemeColor.darkBlueColor.withAlpha(25),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
+      child: RepaintBoundary(
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: AppThemeColor.darkBlueColor.withAlpha(18),
+                blurRadius: 10,
+                offset: const Offset(0, 6),
+              ),
+            ],
+            border: Border.all(
+              color: AppThemeColor.borderColor.withAlpha(180),
+              width: 0.8,
             ),
-          ],
+          ),
+          child: Image.asset(
+            Images.inAppLogo,
+            height: 50,
+            filterQuality: FilterQuality.medium,
+          ),
         ),
-        child: Image.asset(Images.inAppLogo, height: 50),
       ),
     );
   }
@@ -164,21 +177,11 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
       child: Column(
         children: [
           Text(
-            'Welcome!',
-            style: TextStyle(
-              color: AppThemeColor.darkBlueColor,
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Thanks for joining! Access or create your account below, and get started on your journey!',
+            'Create account or login to discover events and sign-in when you arrive at a location.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppThemeColor.dullFontColor,
-              fontSize: 16,
+              fontSize: 20,
               fontWeight: FontWeight.w400,
               height: 1.4,
             ),
@@ -194,74 +197,86 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
       child: GestureDetector(
         onTap: () =>
             RouterClass.nextScreenNormal(context, const QRScannerFlowScreen()),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [AppThemeColor.lightBlueColor, Colors.white],
+        child: RepaintBoundary(
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppThemeColor.lightBlueColor, Colors.white],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppThemeColor.darkBlueColor.withAlpha(20),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
-            boxShadow: [
-              BoxShadow(
-                color: AppThemeColor.darkBlueColor.withAlpha(20),
-                blurRadius: 20,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppThemeColor.darkBlueColor.withAlpha(25),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppThemeColor.darkBlueColor.withAlpha(25),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: ClipRect(
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      heightFactor: 0.75,
+                      child: Image.asset(
+                        Images.qrCode,
+                        height: 220,
+                        fit: BoxFit.cover,
+                      ),
                     ),
-                  ],
+                  ),
                 ),
-                child: Image.asset(Images.qrCode, height: 220),
-              ),
-              const SizedBox(height: 18),
-              RichText(
-                textAlign: TextAlign.center,
-                text: TextSpan(
-                  children: [
-                    TextSpan(
-                      text: 'Alternatively, ',
-                      style: TextStyle(
-                        color: AppThemeColor.dullFontColor,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w400,
+                const SizedBox(height: 18),
+                RichText(
+                  textAlign: TextAlign.center,
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: 'Or, ',
+                        style: TextStyle(
+                          color: AppThemeColor.dullFontColor,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w400,
+                        ),
                       ),
-                    ),
-                    TextSpan(
-                      text: 'Tap Here',
-                      style: TextStyle(
-                        color: AppThemeColor.darkGreenColor,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                      TextSpan(
+                        text: 'tap here',
+                        style: TextStyle(
+                          color: AppThemeColor.deepGreenColor,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    TextSpan(
-                      text:
-                          ' to scan a QR CODE or input Event Code to sign in!',
-                      style: TextStyle(
-                        color: AppThemeColor.dullFontColor,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w400,
+                      TextSpan(
+                        text:
+                            ' to scan a QR code or enter an event code for quick-sign in without an account.',
+                        style: TextStyle(
+                          color: AppThemeColor.dullFontColor,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w400,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -275,8 +290,10 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
         children: [
           _buildPrimaryButton(
             label: 'Create Account',
-            onTap: () =>
-                RouterClass.nextScreenNormal(context, const CreateAccountScreen()),
+            onTap: () => RouterClass.nextScreenNormal(
+              context,
+              const CreateAccountScreen(),
+            ),
             isPrimary: true,
           ),
           const SizedBox(height: 12),

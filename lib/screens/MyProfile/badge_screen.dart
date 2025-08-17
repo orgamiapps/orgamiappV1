@@ -303,8 +303,7 @@ class _BadgeScreenState extends State<BadgeScreen>
               _buildBadgeSection(),
               const SizedBox(height: 24),
               _buildStatsSection(),
-              const SizedBox(height: 24),
-              _buildAchievementsSection(),
+              // Achievements section removed per design update
               const SizedBox(height: 32),
               _buildActionButtons(),
               const SizedBox(height: 20),
@@ -478,77 +477,7 @@ class _BadgeScreenState extends State<BadgeScreen>
     );
   }
 
-  Widget _buildAchievementsSection() {
-    if (_badge!.achievements.isEmpty) {
-      return const SizedBox();
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
-            blurRadius: 10,
-            spreadRadius: 2,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Achievements',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _badge!.achievements.map((achievement) {
-              return Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.primaryColor.withValues(alpha: 0.8),
-                      AppColors.primaryColor,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primaryColor.withValues(alpha: 0.3),
-                      blurRadius: 4,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-                child: Text(
-                  achievement,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 12,
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
+  // Achievements UI removed per design update
 
   Widget _buildActionButtons() {
     return Row(

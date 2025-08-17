@@ -6,6 +6,8 @@ class AppThemeColor {
   static const Color pureBlackColor = Color(0xFF000000);
 
   static const Color darkGreenColor = Color(0xFF9CC092);
+  // Deeper, more saturated green for emphasis in call-to-action text
+  static const Color deepGreenColor = Color(0xFF2E7D32);
   static const Color darkBlueColor = Color(0xFF2C5A96);
   static const Color transparentBlueColor = Color(0x600C0C0C);
   static const Color orangeColor = Color(0xFFF27423);

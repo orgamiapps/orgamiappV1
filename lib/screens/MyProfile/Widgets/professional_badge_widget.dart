@@ -72,22 +72,7 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
     super.dispose();
   }
 
-  Color _getBadgeGradientColor() {
-    switch (widget.badge.badgeLevel) {
-      case 'Master Organizer':
-        return const Color(0xFFFFD700); // Gold
-      case 'Senior Event Host':
-        return const Color(0xFFC0C0C0); // Silver
-      case 'Event Specialist':
-        return const Color(0xFFCD7F32); // Bronze
-      case 'Active Member':
-        return const Color(0xFF4A90E2); // Blue
-      case 'Community Builder':
-        return const Color(0xFF50C878); // Green
-      default:
-        return const Color(0xFF9B59B6); // Purple
-    }
-  }
+  // Previous dynamic gradient based on badge level removed in favor of a consistent silver look
 
   @override
   Widget build(BuildContext context) {
@@ -136,7 +121,7 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
             offset: const Offset(0, 8),
           ),
           BoxShadow(
-            color: _getBadgeGradientColor().withValues(alpha: 0.2),
+            color: const Color(0xFFC0C0C0).withValues(alpha: 0.2),
             blurRadius: 30,
             spreadRadius: 5,
             offset: const Offset(0, 4),
@@ -159,19 +144,17 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
   }
 
   Widget _buildGradientBackground() {
-    final primaryColor = _getBadgeGradientColor();
+    // Use a silver-toned gradient for the badge background
+    const Color silverBase = Color(0xFFC0C0C0);
+    const Color silverDark = Color(0xFF9EA4AE);
+    const Color silverLight = Color(0xFFE8EBEF);
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            primaryColor,
-            primaryColor.withValues(alpha: 0.8),
-            Colors.white,
-            primaryColor.withValues(alpha: 0.6),
-          ],
-          stops: const [0.0, 0.3, 0.7, 1.0],
+          colors: [silverDark, silverBase, silverLight, silverBase],
+          stops: const [0.0, 0.4, 0.75, 1.0],
         ),
       ),
     );
@@ -274,7 +257,7 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
 
   Widget _buildHeader() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisAlignment: MainAxisAlignment.start,
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -299,23 +282,6 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
               ),
             ),
           ],
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.35),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-          ),
-          child: Text(
-            widget.badge.badgeLevel.toUpperCase(),
-            style: const TextStyle(
-              fontSize: 8,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              letterSpacing: 0.5,
-            ),
-          ),
         ),
       ],
     );
@@ -385,7 +351,6 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
           widget.badge.eventsAttended.toString(),
         ),
         _buildStatItem('Member Since', widget.badge.membershipDuration),
-        if (widget.badge.achievements.isNotEmpty) _buildAchievements(),
       ],
     );
   }
@@ -422,42 +387,6 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildAchievements() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Achievements',
-          style: TextStyle(
-            fontSize: 9,
-            color: Colors.white.withValues(alpha: 0.95),
-            fontWeight: FontWeight.bold,
-            shadows: _textShadows(small: true),
-          ),
-        ),
-        const SizedBox(height: 2),
-        Wrap(
-          spacing: 2,
-          runSpacing: 2,
-          children: widget.badge.achievements.take(3).map((achievement) {
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.35),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-              ),
-              child: Text(
-                achievement,
-                style: const TextStyle(fontSize: 7, color: Colors.white),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
     );
   }
 

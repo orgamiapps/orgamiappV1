@@ -593,11 +593,41 @@ class _OrgMembersTab extends StatelessWidget {
           return const Center(child: Text('No members yet'));
         }
         final docs = snapshot.data!.docs;
+        final adminDocs = docs.where((d) {
+          final data = d.data() as Map<String, dynamic>;
+          final String role = (data['role'] ?? '').toString();
+          final String roleLower = role.toLowerCase();
+          final List<dynamic> perms =
+              (data['permissions'] as List<dynamic>?) ?? const [];
+          final bool isAdminRole = {
+            'admin',
+            'owner',
+            'organizer',
+            'host',
+            'leader',
+            'moderator',
+          }.contains(roleLower);
+          final bool hasAdminPerms =
+              perms.contains('ManageMembersRoles') ||
+              perms.contains('ApproveJoinRequests');
+          return isAdminRole || hasAdminPerms;
+        }).toList();
+
         return ListView.separated(
-          itemCount: docs.length,
-          separatorBuilder: (_, __) => const Divider(height: 0),
+          itemCount: docs.length + 1, // +1 for admins header section
+          separatorBuilder: (context, index) {
+            if (index == 0) return const SizedBox.shrink();
+            return const Divider(height: 0);
+          },
           itemBuilder: (context, i) {
-            final data = docs[i].data() as Map<String, dynamic>;
+            if (i == 0) {
+              return _AdminsHorizontalSection(
+                orgId: orgId,
+                adminDocs: adminDocs,
+              );
+            }
+
+            final data = docs[i - 1].data() as Map<String, dynamic>;
             final String userId = (data['userId'] ?? '').toString();
             final String role = (data['role'] ?? 'Member').toString();
 
@@ -614,7 +644,6 @@ class _OrgMembersTab extends StatelessWidget {
                 final Map<String, dynamic>? userData =
                     userSnap.data?.data() as Map<String, dynamic>?;
                 if (userData == null) {
-                  // In case user record is missing, show a graceful placeholder
                   return const _MemberCard(
                     name: 'Member',
                     username: '',
@@ -641,6 +670,263 @@ class _OrgMembersTab extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _AdminsHorizontalSection extends StatelessWidget {
+  final String orgId;
+  final List<QueryDocumentSnapshot> adminDocs;
+  const _AdminsHorizontalSection({
+    required this.orgId,
+    required this.adminDocs,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (adminDocs.isEmpty) {
+      // Fallback: If admins are not explicitly marked in membership docs,
+      // try using organization creator and optional adminUids array.
+      final Future<DocumentSnapshot> orgFuture = FirebaseFirestore.instance
+          .collection('Organizations')
+          .doc(orgId)
+          .get();
+      return FutureBuilder<DocumentSnapshot>(
+        future: orgFuture,
+        builder: (context, snap) {
+          if (!snap.hasData) return const SizedBox.shrink();
+          final Map<String, dynamic>? data =
+              snap.data!.data() as Map<String, dynamic>?;
+          if (data == null) return const SizedBox.shrink();
+          final String createdBy = (data['createdBy'] ?? '').toString();
+          final List<dynamic> adminUidsDyn =
+              (data['adminUids'] as List<dynamic>?) ?? const [];
+          final List<String> adminUids = adminUidsDyn
+              .map((e) => e.toString())
+              .toSet()
+              .toList();
+          if (createdBy.isNotEmpty && !adminUids.contains(createdBy)) {
+            adminUids.insert(0, createdBy);
+          }
+          if (adminUids.isEmpty) return const SizedBox.shrink();
+
+          return _AdminsByUidList(adminUids: adminUids);
+        },
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Row(
+            children: const [
+              Icon(Icons.admin_panel_settings, color: Color(0xFF667EEA)),
+              SizedBox(width: 8),
+              Text(
+                'Admins',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 110,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: adminDocs.length,
+            itemBuilder: (context, index) {
+              final Map<String, dynamic> data =
+                  adminDocs[index].data() as Map<String, dynamic>;
+              final String userId = (data['userId'] ?? '').toString();
+              final String role = (data['role'] ?? 'Admin').toString();
+
+              return FutureBuilder<DocumentSnapshot>(
+                future: FirebaseFirestore.instance
+                    .collection('Customers')
+                    .doc(userId)
+                    .get(),
+                builder: (context, userSnap) {
+                  final Map<String, dynamic>? userData =
+                      userSnap.data?.data() as Map<String, dynamic>?;
+                  final String name = (userData?['name'] ?? 'Admin').toString();
+                  final String photoUrl = (userData?['profilePictureUrl'] ?? '')
+                      .toString();
+
+                  return Container(
+                    width: 90,
+                    margin: const EdgeInsets.only(right: 12),
+                    child: Column(
+                      children: [
+                        CircleAvatar(
+                          radius: 28,
+                          backgroundImage: photoUrl.isNotEmpty
+                              ? NetworkImage(photoUrl)
+                              : null,
+                          child: photoUrl.isEmpty
+                              ? const Icon(
+                                  Icons.person,
+                                  color: Color(0xFF667EEA),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: 90,
+                          child: Text(
+                            name,
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEEF2FF),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            role,
+                            style: const TextStyle(
+                              color: Color(0xFF667EEA),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AdminsByUidList extends StatelessWidget {
+  final List<String> adminUids;
+  const _AdminsByUidList({required this.adminUids});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Row(
+            children: const [
+              Icon(Icons.admin_panel_settings, color: Color(0xFF667EEA)),
+              SizedBox(width: 8),
+              Text(
+                'Admins',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 110,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: adminUids.length,
+            itemBuilder: (context, index) {
+              final String uid = adminUids[index];
+              return FutureBuilder<DocumentSnapshot>(
+                future: FirebaseFirestore.instance
+                    .collection('Customers')
+                    .doc(uid)
+                    .get(),
+                builder: (context, userSnap) {
+                  final Map<String, dynamic>? userData =
+                      userSnap.data?.data() as Map<String, dynamic>?;
+                  final String name = (userData?['name'] ?? 'Admin').toString();
+                  final String photoUrl = (userData?['profilePictureUrl'] ?? '')
+                      .toString();
+
+                  return Container(
+                    width: 90,
+                    margin: const EdgeInsets.only(right: 12),
+                    child: Column(
+                      children: [
+                        CircleAvatar(
+                          radius: 28,
+                          backgroundImage: photoUrl.isNotEmpty
+                              ? NetworkImage(photoUrl)
+                              : null,
+                          child: photoUrl.isEmpty
+                              ? const Icon(
+                                  Icons.person,
+                                  color: Color(0xFF667EEA),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: 90,
+                          child: Text(
+                            name,
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEEF2FF),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'Admin',
+                            style: TextStyle(
+                              color: Color(0xFF667EEA),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
