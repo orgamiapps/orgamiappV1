@@ -5,14 +5,14 @@ import 'package:orgami/firebase/organization_helper.dart';
 import 'package:orgami/screens/Organizations/organization_profile_screen.dart';
 import 'package:orgami/screens/Organizations/create_organization_screen.dart';
 
-class OrganizationsScreen extends StatefulWidget {
-  const OrganizationsScreen({super.key});
+class GroupsScreen extends StatefulWidget {
+  const GroupsScreen({super.key});
 
   @override
-  State<OrganizationsScreen> createState() => _OrganizationsScreenState();
+  State<GroupsScreen> createState() => _GroupsScreenState();
 }
 
-class _OrganizationsScreenState extends State<OrganizationsScreen> {
+class _GroupsScreenState extends State<GroupsScreen> {
   final TextEditingController _searchCtlr = TextEditingController();
   List<Map<String, String>> _myOrgs = [];
   List<Map<String, dynamic>> _discoverOrgs = [];
@@ -98,10 +98,10 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
-        title: const Text('Organizations'),
+        title: const Text('Groups'),
         actions: [
           IconButton(
-            tooltip: 'Create Organization',
+            tooltip: 'Create Group',
             icon: const Icon(Icons.add_business),
             onPressed: _goToCreate,
           ),
@@ -125,7 +125,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                       controller: _searchCtlr,
                       textInputAction: TextInputAction.search,
                       decoration: InputDecoration(
-                        hintText: 'Search organizations',
+                        hintText: 'Search groups',
                         prefixIcon: const Icon(Icons.search),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -136,7 +136,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'My Organizations',
+                      'My Groups',
                       style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 8),
@@ -297,7 +297,7 @@ class _EmptyStateCard extends StatelessWidget {
           const Icon(Icons.info_outline, color: Color(0xFF6B7280)),
           const SizedBox(width: 12),
           const Expanded(
-            child: Text('You have not joined any organizations yet.'),
+            child: Text('You have not joined any groups yet.'),
           ),
           const SizedBox(width: 12),
           FilledButton(onPressed: onCreate, child: const Text('Create')),
@@ -306,3 +306,4 @@ class _EmptyStateCard extends StatelessWidget {
     );
   }
 }
+
