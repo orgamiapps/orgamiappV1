@@ -6,6 +6,7 @@ import 'package:orgami/utils/colors.dart';
 import 'package:orgami/utils/images.dart';
 import 'package:orgami/utils/router.dart';
 import 'package:orgami/Screens/QRScanner/qr_scanner_flow_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SecondSplashScreen extends StatefulWidget {
   const SecondSplashScreen({super.key});
@@ -30,6 +31,17 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
   void initState() {
     super.initState();
     _initializeAnimations();
+    _redirectIfLoggedIn();
+  }
+
+  void _redirectIfLoggedIn() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        RouterClass().homeScreenRoute(context: context);
+      });
+    }
   }
 
   void _initializeAnimations() {
