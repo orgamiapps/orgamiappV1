@@ -51,10 +51,10 @@ class _OrganizationsTabState extends State<OrganizationsTab> {
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
-        title: const Text('Organizations'),
+        title: const Text('Groups'),
         actions: [
           IconButton(
-            tooltip: 'Create Organization',
+            tooltip: 'Create Group',
             icon: const Icon(Icons.add_business),
             onPressed: () async {
               await Navigator.push(
@@ -76,7 +76,7 @@ class _OrganizationsTabState extends State<OrganizationsTab> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _orgs.isEmpty
-          ? const Center(child: Text('No organizations yet'))
+          ? const Center(child: Text('No groups yet'))
           : ListView.separated(
               itemCount: _orgs.length,
               separatorBuilder: (_, __) => const Divider(height: 0),
