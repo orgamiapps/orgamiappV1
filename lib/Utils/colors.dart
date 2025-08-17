@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+export 'colors.dart';
+
 class AppThemeColor {
   static const Color dullWhiteColor = Color(0xFFE5E5E5);
   static const Color pureWhiteColor = Color(0xFFFFFFFF);
