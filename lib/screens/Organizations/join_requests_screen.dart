@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:orgami/firebase/organization_helper.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
+import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
 
 class JoinRequestsScreen extends StatefulWidget {
   final String organizationId;

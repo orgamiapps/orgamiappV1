@@ -48,6 +48,15 @@
         { "fieldPath": "selectedDateTime", "order": "ASCENDING" }
       ]
     },
+    // Added: Events by organizationId + selectedDateTime (for upcoming events per org)
+    {
+      "collectionGroup": "Events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationId", "order": "ASCENDING" },
+        { "fieldPath": "selectedDateTime", "order": "ASCENDING" }
+      ]
+    },
     {
       "collectionGroup": "Comments",
       "queryScope": "COLLECTION",
@@ -129,6 +138,34 @@
       "fields": [
         { "fieldPath": "category_lowercase", "order": "ASCENDING" },
         { "fieldPath": "name_lowercase", "order": "ASCENDING" }
+      ]
+    },
+    // Added: event_feedback by eventId + timestamp
+    {
+      "collectionGroup": "event_feedback",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eventId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    // Added: RecommendationAnalytics (userId + type + timestamp desc)
+    {
+      "collectionGroup": "RecommendationAnalytics",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    // Added: RecommendationPerformance (userId + timestamp desc)
+    {
+      "collectionGroup": "RecommendationPerformance",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
       ]
     }
   ],

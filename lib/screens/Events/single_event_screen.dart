@@ -19,21 +19,21 @@ import 'package:orgami/models/attendance_model.dart';
 
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/models/event_question_model.dart';
-import 'package:orgami/Screens/Events/Attendance/attendance_sheet_screen.dart';
+import 'package:orgami/screens/Events/Attendance/attendance_sheet_screen.dart';
 
-import 'package:orgami/Screens/Events/Widget/comments_section.dart';
+import 'package:orgami/screens/Events/Widget/comments_section.dart';
 
-import 'package:orgami/Screens/Events/ticket_management_screen.dart';
-import 'package:orgami/Screens/Events/ticket_scanner_screen.dart';
-import 'package:orgami/Screens/Events/event_analytics_screen.dart';
-import 'package:orgami/Screens/Events/event_feedback_screen.dart';
-import 'package:orgami/Screens/Events/event_feedback_management_screen.dart';
-import 'package:orgami/Screens/Home/attendee_notification_screen.dart';
-import 'package:orgami/Screens/MyProfile/my_tickets_screen.dart';
-import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
+import 'package:orgami/screens/Events/ticket_management_screen.dart';
+import 'package:orgami/screens/Events/ticket_scanner_screen.dart';
+import 'package:orgami/screens/Events/event_analytics_screen.dart';
+import 'package:orgami/screens/Events/event_feedback_screen.dart';
+import 'package:orgami/screens/Events/event_feedback_management_screen.dart';
+import 'package:orgami/screens/Home/attendee_notification_screen.dart';
+import 'package:orgami/screens/MyProfile/my_tickets_screen.dart';
+import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
 
-// import 'package:orgami/Screens/QRScanner/QrScannerScreenForLogedIn.dart';
-import 'package:orgami/Screens/QRScanner/qr_scanner_flow_screen.dart';
+// import 'package:orgami/screens/QRScanner/QrScannerScreenForLogedIn.dart';
+import 'package:orgami/screens/QRScanner/qr_scanner_flow_screen.dart';
 import 'package:orgami/utils/colors.dart';
 import 'package:orgami/utils/router.dart';
 import 'package:orgami/utils/toast.dart';
@@ -42,14 +42,16 @@ import 'package:orgami/utils/logger.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
 import 'package:orgami/screens/Events/chose_location_in_map_screen.dart';
-import 'package:orgami/Screens/Events/feature_event_screen.dart';
-import 'package:orgami/Screens/Events/edit_event_screen.dart';
-import 'package:orgami/Screens/Events/event_location_view_screen.dart';
+import 'package:orgami/screens/Events/feature_event_screen.dart';
+import 'package:orgami/screens/Events/edit_event_screen.dart';
+import 'package:orgami/screens/Events/event_location_view_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:orgami/Screens/Events/Widget/access_list_management_widget.dart';
+import 'package:orgami/screens/Events/Widget/access_list_management_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:orgami/Screens/MyProfile/badge_screen.dart';
+import 'package:orgami/screens/MyProfile/badge_screen.dart';
+import 'package:orgami/Utils/cached_image.dart';
+import 'package:orgami/Utils/cache_manager.dart';
 
 class SingleEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -2648,89 +2650,10 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(24),
-                child: CachedNetworkImage(
+                child: SafeNetworkImage(
                   imageUrl: eventModel.imageUrl,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  height: 220,
-                  placeholder: (context, url) => Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [_backgroundColor, _borderColor],
-                      ),
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          CircularProgressIndicator(
-                            color: _primaryBlue,
-                            strokeWidth: 3,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Loading image...',
-                            style: TextStyle(
-                              color: _lightText,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  errorWidget: (context, url, error) => Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [_backgroundColor, _borderColor],
-                      ),
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 64,
-                            height: 64,
-                            decoration: BoxDecoration(
-                              color: _primaryBlue.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(32),
-                            ),
-                            child: Icon(
-                              Icons.image_not_supported_outlined,
-                              color: _primaryBlue,
-                              size: 32,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Image not available',
-                            style: TextStyle(
-                              color: _mediumText,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Unable to load event image',
-                            style: TextStyle(
-                              color: _lightText,
-                              fontSize: 14,
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  cacheManager: AppImageCacheManager.instance,
+                  borderRadius: BorderRadius.circular(24),
                 ),
               ),
               // Gradient overlay for better text readability if needed

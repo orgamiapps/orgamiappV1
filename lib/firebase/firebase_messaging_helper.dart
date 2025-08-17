@@ -5,7 +5,6 @@ import 'package:firebase_messaging/firebase_messaging.dart' as fcm;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
-import 'dart:typed_data' show Int64List;
 
 import 'package:orgami/models/message_model.dart';
 import 'package:orgami/models/customer_model.dart';
@@ -338,7 +337,7 @@ class FirebaseMessagingHelper {
           playSound: playSound,
           enableVibration: enableVibration,
           vibrationPattern: enableVibration
-              ? Int64List.fromList([0, 250, 150, 250])
+              ? null
               : null,
         );
 

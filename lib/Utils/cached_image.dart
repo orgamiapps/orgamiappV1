@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 class SafeNetworkImage extends StatelessWidget {
   final String imageUrl;
@@ -10,6 +11,7 @@ class SafeNetworkImage extends StatelessWidget {
   final Widget? placeholder;
   final Widget? errorWidget;
   final BorderRadius? borderRadius;
+  final BaseCacheManager? cacheManager;
 
   const SafeNetworkImage({
     super.key,
@@ -20,6 +22,7 @@ class SafeNetworkImage extends StatelessWidget {
     this.placeholder,
     this.errorWidget,
     this.borderRadius,
+    this.cacheManager,
   });
 
   @override
@@ -33,6 +36,7 @@ class SafeNetworkImage extends StatelessWidget {
       width: width,
       height: height,
       fit: fit ?? BoxFit.cover,
+      cacheManager: cacheManager,
       placeholder: (context, url) {
         if (kDebugMode) {
           debugPrint('Loading image: $url');
@@ -76,6 +80,7 @@ class CachedImageWithFallback extends StatelessWidget {
   final Widget? placeholder;
   final Widget? errorWidget;
   final BorderRadius? borderRadius;
+  final BaseCacheManager? cacheManager;
 
   const CachedImageWithFallback({
     super.key,
@@ -87,6 +92,7 @@ class CachedImageWithFallback extends StatelessWidget {
     this.placeholder,
     this.errorWidget,
     this.borderRadius,
+    this.cacheManager,
   });
 
   @override
@@ -101,6 +107,7 @@ class CachedImageWithFallback extends StatelessWidget {
           placeholder: placeholder,
           errorWidget: errorWidget,
           borderRadius: borderRadius,
+          cacheManager: cacheManager,
         );
       }
       return _buildErrorWidget();
@@ -121,9 +128,11 @@ class CachedImageWithFallback extends StatelessWidget {
               placeholder: placeholder,
               errorWidget: errorWidget,
               borderRadius: borderRadius,
+              cacheManager: cacheManager,
             )
           : errorWidget,
       borderRadius: borderRadius,
+      cacheManager: cacheManager,
     );
   }
 

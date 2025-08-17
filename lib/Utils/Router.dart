@@ -1,11 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:orgami/screens/Home/dashboard_screen.dart';
+import 'package:orgami/screens/Home/analytics_dashboard_screen.dart';
 import 'package:orgami/screens/Splash/second_splash_screen.dart';
 
+@Deprecated('Use Nav in Utils/routes.dart instead')
 class RouterClass {
   static late BuildContext splashContext;
-
   Future<T?> appLogout<T>({required BuildContext context}) =>
       Navigator.of(context, rootNavigator: false).pushAndRemoveUntil(
         CupertinoPageRoute(
@@ -33,7 +33,9 @@ class RouterClass {
   Future<T?> homeScreenRoute<T>({required BuildContext context}) =>
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (splashContext) => const DashboardScreen()),
+        MaterialPageRoute(
+          builder: (splashContext) => const AnalyticsDashboardScreen(),
+        ),
         (route) => false,
       );
 

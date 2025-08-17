@@ -375,6 +375,7 @@ class _OrgEventsListState extends State<OrgEventsList>
           );
           // Avoid composite index requirement by fetching by organization only
           // and then filtering/sorting on the client.
+          // Note: Firestore whereIn supports up to 10 values; we chunk accordingly.
           final qs = await FirebaseFirestore.instance
               .collection(EventModel.firebaseKey)
               .where('organizationId', whereIn: chunk)
