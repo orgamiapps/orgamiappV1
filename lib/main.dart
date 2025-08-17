@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:orgami/firebase_options.dart';
-import 'package:orgami/Screens/Splash/splash_screen.dart';
+import 'package:orgami/screens/Splash/second_splash_screen.dart';
 import 'package:orgami/Utils/logger.dart';
 import 'package:orgami/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
@@ -85,7 +85,7 @@ class MyApp extends StatelessWidget {
           darkTheme: themeProvider.darkTheme,
           themeMode: themeProvider.themeMode,
           navigatorKey: appNavigatorKey,
-          home: homeOverride ?? const SplashScreen(),
+          home: homeOverride ?? const SecondSplashScreen(),
         );
       },
     );
