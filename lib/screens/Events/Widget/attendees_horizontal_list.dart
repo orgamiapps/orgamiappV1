@@ -15,8 +15,7 @@ class AttendeesHorizontalList extends StatefulWidget {
   const AttendeesHorizontalList({super.key, required this.eventModel});
 
   @override
-  State<AttendeesHorizontalList> createState() =>
-      _AttendeesHorizontalListState();
+  State<AttendeesHorizontalList> createState() => _AttendeesHorizontalListState();
 }
 
 class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
@@ -97,7 +96,7 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                        color: const Color(0xFF10B981).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
@@ -166,7 +165,7 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: Colors.grey.withValues(alpha: 0.1),
+                            color: Colors.grey.withOpacity(0.1),
                             width: 1,
                           ),
                         ),
@@ -200,10 +199,10 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
                                     color: isAnon
                                         ? const Color(
                                             0xFF6B7280,
-                                          ).withValues(alpha: 0.3)
+                                          ).withOpacity(0.3)
                                         : const Color(
                                             0xFF10B981,
-                                          ).withValues(alpha: 0.3),
+                                          ).withOpacity(0.3),
                                     spreadRadius: 0,
                                     blurRadius: 8,
                                     offset: const Offset(0, 4),
@@ -260,10 +259,9 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
                                           UserProfileScreen(
                                             user: customer,
                                             isOwnProfile:
-                                                CustomerController
-                                                    .logeInCustomer
-                                                    ?.uid ==
-                                                customer.uid,
+                                                CustomerController.logeInCustomer
+                                                        ?.uid ==
+                                                    customer.uid,
                                           ),
                                         );
                                       }
@@ -295,7 +293,7 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
                               decoration: BoxDecoration(
                                 color: const Color(
                                   0xFF10B981,
-                                ).withValues(alpha: 0.1),
+                                ).withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
@@ -349,7 +347,7 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: Colors.black.withOpacity(0.05),
                   spreadRadius: 0,
                   blurRadius: 10,
                   offset: const Offset(0, 2),
@@ -362,7 +360,7 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                    color: const Color(0xFF10B981).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
@@ -407,7 +405,7 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                        color: const Color(0xFF10B981).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: const Color(0xFF10B981),
@@ -511,10 +509,10 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
                                       color: isAnon
                                           ? const Color(
                                               0xFF6B7280,
-                                            ).withValues(alpha: 0.3)
+                                            ).withOpacity(0.3)
                                           : const Color(
                                               0xFF10B981,
-                                            ).withValues(alpha: 0.3),
+                                            ).withOpacity(0.3),
                                       spreadRadius: 0,
                                       blurRadius: 8,
                                       offset: const Offset(0, 4),

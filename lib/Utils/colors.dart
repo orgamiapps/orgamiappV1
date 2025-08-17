@@ -67,3 +67,16 @@ class AppColors {
   // Background color used in badge screen
   static const Color backgroundColor = AppThemeColor.backGroundColor;
 }
+
+// Compatibility shim: add Color.withValues(alpha: ...) used throughout the codebase
+extension ColorWithValues on Color {
+  Color withValues({double? alpha}) {
+    if (alpha == null) return this;
+    // If alpha is provided as 0.0–1.0, use withOpacity; if >1, treat as 0–255 and use withAlpha
+    if (alpha <= 1.0) {
+      return withOpacity(alpha);
+    }
+    final int a = alpha.round().clamp(0, 255);
+    return withAlpha(a);
+  }
+}

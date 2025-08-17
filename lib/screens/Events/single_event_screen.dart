@@ -34,10 +34,10 @@ import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
 
 // import 'package:orgami/Screens/QRScanner/QrScannerScreenForLogedIn.dart';
 import 'package:orgami/Screens/QRScanner/qr_scanner_flow_screen.dart';
-import 'package:orgami/utils/colors.dart';
-import 'package:orgami/utils/router.dart';
-import 'package:orgami/utils/toast.dart';
-import 'package:orgami/utils/logger.dart';
+import 'package:orgami/Utils/colors.dart';
+import 'package:orgami/Utils/router.dart';
+import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/logger.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
@@ -804,7 +804,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppThemeColor.dullBlueColor.withValues(alpha: 0.3),
+                color: AppThemeColor.dullBlueColor.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -818,7 +818,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                      color: AppThemeColor.darkBlueColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -886,7 +886,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.02),
+                            color: Colors.black.withOpacity(0.02),
                             spreadRadius: 0,
                             blurRadius: 4,
                             offset: const Offset(0, 2),
@@ -984,14 +984,11 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                             decoration: InputDecoration(
                               hintText: 'Type your answer here...',
                               hintStyle: TextStyle(
-                                color: AppThemeColor.dullFontColor.withValues(
-                                  alpha: 153,
-                                ),
+                                color: AppThemeColor.dullFontColor.withAlpha(153),
                                 fontFamily: 'Roboto',
                               ),
                               filled: true,
-                              fillColor: AppThemeColor.lightBlueColor
-                                  .withValues(alpha: 0.1),
+                              fillColor: AppThemeColor.lightBlueColor.withOpacity(0.1),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
@@ -1049,7 +1046,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    color: Colors.black.withOpacity(0.05),
                     spreadRadius: 0,
                     blurRadius: 10,
                     offset: const Offset(0, -2),
@@ -2312,13 +2309,13 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             borderRadius: BorderRadius.circular(28),
             boxShadow: [
               BoxShadow(
-                color: _primaryBlue.withValues(alpha: 0.4),
+                color: _primaryBlue.withOpacity(0.4),
                 spreadRadius: 0,
                 blurRadius: 15,
                 offset: const Offset(0, 6),
               ),
               BoxShadow(
-                color: _primaryPurple.withValues(alpha: 0.3),
+                color: _primaryPurple.withOpacity(0.3),
                 spreadRadius: 0,
                 blurRadius: 25,
                 offset: const Offset(0, 12),
