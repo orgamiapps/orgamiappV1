@@ -48,8 +48,8 @@ class ThemeProvider extends ChangeNotifier {
     cardTheme: CardThemeData(
       color: const Color(0xFFFFFFFF),
       surfaceTintColor: const Color(0xFF667EEA),
-      shadowColor: Colors.black.withValues(alpha: 0.1),
-      elevation: 1,
+      shadowColor: Colors.black.withOpacity(0.1),
+       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),
     appBarTheme: const AppBarTheme(
@@ -70,8 +70,8 @@ class ThemeProvider extends ChangeNotifier {
         backgroundColor: const Color(0xFF667EEA),
         foregroundColor: const Color(0xFFFFFFFF),
         elevation: 1,
-        shadowColor: Colors.black.withValues(alpha: 0.1),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shadowColor: Colors.black.withOpacity(0.1),
+         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       ),
     ),
@@ -113,7 +113,7 @@ class ThemeProvider extends ChangeNotifier {
       ),
       labelStyle: const TextStyle(color: Color(0xFF49454F)),
       hintStyle: TextStyle(
-        color: const Color(0xFF49454F).withValues(alpha: 0.6),
+        color: const Color(0xFF49454F).withOpacity(0.6),
       ),
     ),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(

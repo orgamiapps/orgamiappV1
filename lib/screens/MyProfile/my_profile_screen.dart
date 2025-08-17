@@ -611,10 +611,10 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                             width: 1,
                           ),
                           boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                             BoxShadow(
+                               color: Colors.black.withOpacity(0.06),
+                               blurRadius: 8,
+                               offset: const Offset(0, 2),
                             ),
                           ],
                         ),
@@ -641,7 +641,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.06),
+                                color: Colors.black.withOpacity(0.06),
                                 blurRadius: 6,
                                 offset: const Offset(0, 1),
                               ),
@@ -788,7 +788,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withOpacity(0.05),
               spreadRadius: 0,
               blurRadius: 20,
               offset: const Offset(0, 4),
@@ -869,7 +869,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                    color: const Color(0xFF667EEA).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
@@ -1186,7 +1186,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: Colors.black.withOpacity(0.05),
                   spreadRadius: 0,
                   blurRadius: 20,
                   offset: const Offset(0, 4),
@@ -1220,7 +1220,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         decoration: BoxDecoration(
           color: isActive
-              ? const Color(0xFF667EEA).withValues(alpha: 0.1)
+              ? const Color(0xFF667EEA).withOpacity(0.1)
               : Colors.white,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
@@ -1839,10 +1839,10 @@ class _FilterSortModalState extends State<_FilterSortModal> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+        color: const Color(0xFF667EEA).withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+          color: const Color(0xFF667EEA).withOpacity(0.3),
           width: 1,
         ),
       ),

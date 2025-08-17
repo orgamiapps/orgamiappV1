@@ -91,7 +91,7 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.2),
+                color: AppThemeColor.pureWhiteColor.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -131,7 +131,7 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
               borderRadius: BorderRadius.circular(60),
               boxShadow: [
                 BoxShadow(
-                  color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
+                  color: AppThemeColor.darkBlueColor.withOpacity(0.3),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -157,7 +157,7 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
           Text(
             'Choose how you\'d like to sign in to your event',
             style: TextStyle(
-              color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.8),
+              color: AppThemeColor.pureWhiteColor.withOpacity(0.8),
               fontSize: Dimensions.fontSizeDefault,
             ),
             textAlign: TextAlign.center,

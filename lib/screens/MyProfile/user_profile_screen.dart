@@ -228,7 +228,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             icon: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.3),
+                color: Colors.black.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
@@ -371,9 +371,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                       Text(
                         '@${widget.user.username}',
                         style: TextStyle(
-                          color: AppThemeColor.pureWhiteColor.withValues(
-                            alpha: 0.8,
-                          ),
+                          color: AppThemeColor.pureWhiteColor.withOpacity(0.8),
                           fontSize: 16,
                           fontFamily: 'Roboto',
                         ),
@@ -385,9 +383,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                       Text(
                         widget.user.bio!,
                         style: TextStyle(
-                          color: AppThemeColor.pureWhiteColor.withValues(
-                            alpha: 0.9,
-                          ),
+                           color: AppThemeColor.pureWhiteColor.withOpacity(0.9),
                           fontSize: 14,
                           fontFamily: 'Roboto',
                         ),

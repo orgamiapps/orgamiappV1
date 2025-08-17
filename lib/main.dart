@@ -6,7 +6,7 @@ import 'package:orgami/Utils/logger.dart';
 import 'package:orgami/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:orgami/utils/error_handler.dart';
+import 'package:orgami/Utils/error_handler.dart';
 import 'package:firebase_messaging/firebase_messaging.dart' as fcm;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
