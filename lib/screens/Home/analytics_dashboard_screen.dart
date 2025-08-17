@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:orgami/firebase/ai_analytics_helper.dart';
 import 'package:orgami/models/event_model.dart';
-import 'package:orgami/Screens/Events/event_analytics_screen.dart';
+import 'package:orgami/screens/Events/event_analytics_screen.dart';
 import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:orgami/Utils/router.dart';

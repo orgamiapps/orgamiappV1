@@ -7,16 +7,16 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:orgami/models/event_model.dart';
-import 'package:orgami/Screens/Events/single_event_screen.dart';
-import 'package:orgami/Screens/Events/Widget/delete_event_dialogue.dart';
+import 'package:orgami/screens/Events/single_event_screen.dart';
+import 'package:orgami/screens/Events/Widget/delete_event_dialogue.dart';
 
 import 'package:orgami/Utils/router.dart';
 import 'package:orgami/Utils/text_fields.dart';
 import 'package:orgami/Utils/toast.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
-import 'package:orgami/Screens/Events/Widget/sign_in_methods_selector.dart';
-import 'package:orgami/Screens/Events/geofence_setup_screen.dart';
+import 'package:orgami/screens/Events/Widget/sign_in_methods_selector.dart';
+import 'package:orgami/screens/Events/geofence_setup_screen.dart';
 import 'dart:io';
 import 'package:orgami/Utils/routes.dart';
 

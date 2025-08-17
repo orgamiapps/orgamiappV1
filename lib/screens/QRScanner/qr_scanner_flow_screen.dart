@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:orgami/controller/customer_controller.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/models/attendance_model.dart';
-import 'package:orgami/Screens/QRScanner/ans_questions_to_sign_in_event_screen.dart';
-import 'package:orgami/Screens/QRScanner/modern_qr_scanner_screen.dart';
+import 'package:orgami/screens/QRScanner/ans_questions_to_sign_in_event_screen.dart';
+import 'package:orgami/screens/QRScanner/modern_qr_scanner_screen.dart';
 import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:orgami/Screens/Events/single_event_screen.dart';
+import 'package:orgami/screens/Events/single_event_screen.dart';
 
 class QRScannerFlowScreen extends StatefulWidget {
   const QRScannerFlowScreen({super.key});

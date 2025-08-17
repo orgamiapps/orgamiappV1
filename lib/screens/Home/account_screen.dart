@@ -6,9 +6,9 @@ import 'package:provider/provider.dart';
 import 'package:orgami/controller/customer_controller.dart';
 // import 'package:orgami/firebase/FirebaseFirestoreHelper.dart'; // Unused import
 
-import 'package:orgami/Screens/Feedback/feedback_screen.dart';
+import 'package:orgami/screens/Feedback/feedback_screen.dart';
 
-import 'package:orgami/Screens/Home/analytics_dashboard_screen.dart';
+import 'package:orgami/screens/Home/analytics_dashboard_screen.dart';
 import 'package:orgami/Utils/app_constants.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:orgami/Utils/theme_provider.dart';
@@ -18,9 +18,9 @@ import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
-import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
+import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
 
-import 'package:orgami/Screens/Home/attendee_notification_screen.dart';
+import 'package:orgami/screens/Home/attendee_notification_screen.dart';
 import 'package:orgami/screens/Home/blocked_users_screen.dart';
 
 class AccountScreen extends StatefulWidget {
