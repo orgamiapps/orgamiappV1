@@ -50,6 +50,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:orgami/Screens/Events/Widget/access_list_management_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:orgami/Screens/MyProfile/badge_screen.dart';
+import 'package:orgami/Utils/cached_image.dart';
+import 'package:orgami/Utils/cache_manager.dart';
 
 class SingleEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -2648,89 +2650,10 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(24),
-                child: CachedNetworkImage(
+                child: SafeNetworkImage(
                   imageUrl: eventModel.imageUrl,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  height: 220,
-                  placeholder: (context, url) => Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [_backgroundColor, _borderColor],
-                      ),
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          CircularProgressIndicator(
-                            color: _primaryBlue,
-                            strokeWidth: 3,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Loading image...',
-                            style: TextStyle(
-                              color: _lightText,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  errorWidget: (context, url, error) => Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [_backgroundColor, _borderColor],
-                      ),
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 64,
-                            height: 64,
-                            decoration: BoxDecoration(
-                              color: _primaryBlue.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(32),
-                            ),
-                            child: Icon(
-                              Icons.image_not_supported_outlined,
-                              color: _primaryBlue,
-                              size: 32,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Image not available',
-                            style: TextStyle(
-                              color: _mediumText,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Unable to load event image',
-                            style: TextStyle(
-                              color: _lightText,
-                              fontSize: 14,
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  cacheManager: AppImageCacheManager.instance,
+                  borderRadius: BorderRadius.circular(24),
                 ),
               ),
               // Gradient overlay for better text readability if needed

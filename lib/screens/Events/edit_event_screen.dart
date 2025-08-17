@@ -18,6 +18,7 @@ import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 import 'package:orgami/Screens/Events/Widget/sign_in_methods_selector.dart';
 import 'package:orgami/Screens/Events/geofence_setup_screen.dart';
 import 'dart:io';
+import 'package:orgami/Utils/routes.dart';
 
 class EditEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -226,13 +227,7 @@ class _EditEventScreenState extends State<EditEventScreen>
           // Navigate back to the updated event
           Future.delayed(const Duration(seconds: 1), () {
             if (!mounted) return;
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    SingleEventScreen(eventModel: updatedEvent),
-              ),
-            );
+            Nav.toEvent(context, updatedEvent.id);
           });
         } else {
           _btnCtlr.error();

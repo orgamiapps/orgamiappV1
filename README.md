@@ -1,16 +1,22 @@
-# orgami
+# Orgami
 
-A new Flutter project.
+## Flavors and configuration
 
-## Getting Started
+Android flavors are configured: `dev`, `staging`, `prod`.
 
-This project is a starting point for a Flutter application.
+Run commands:
 
-A few resources to get you started if this is your first Flutter project:
+- Dev: `flutter run --flavor dev -t lib/main.dart`
+- Staging: `flutter run --flavor staging -t lib/main.dart`
+- Prod: `flutter run --flavor prod -t lib/main.dart`
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Environment variables:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- GOOGLE_MAPS_API_KEY: set in CI or local shell, consumed via Android manifest placeholders.
+- VAPID_KEY (Web FCM): provide at runtime or via `--dart-define=VAPID_KEY=...` when building web. The code path should read from env/defines before falling back.
+
+Firebase options per flavor: run `flutterfire configure` for each flavor and commit generated options, or maintain separate options files and select by flavor using `--dart-define=FLAVOR=dev|staging|prod`.
+
+## CI
+
+GitHub Actions workflow runs analyze, tests, and prints upgradable dependencies via `flutter pub outdated --mode=upgradable`.

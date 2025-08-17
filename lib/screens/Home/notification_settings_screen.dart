@@ -4,6 +4,8 @@ import 'package:orgami/models/notification_model.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:orgami/Services/notification_service.dart'; // Added import for NotificationService
 import 'dart:convert'; // Added import for json
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -17,6 +19,8 @@ class _NotificationSettingsScreenState
     extends State<NotificationSettingsScreen> {
   final FirebaseMessagingHelper _messagingHelper = FirebaseMessagingHelper();
   UserNotificationSettings? _settings;
+  bool _analyticsEnabled = false;
+  bool _crashlyticsEnabled = false;
 
   @override
   void initState() {
@@ -27,8 +31,26 @@ class _NotificationSettingsScreenState
   Future<void> _loadSettings() async {
     try {
       final settings = await _messagingHelper.getUserNotificationSettings();
+      bool analytics = false;
+      bool crashlytics = false;
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('settings')
+            .doc('privacy')
+            .get();
+        if (doc.exists) {
+          final data = doc.data() as Map<String, dynamic>;
+          analytics = (data['analyticsEnabled'] == true);
+          crashlytics = (data['crashlyticsEnabled'] == true);
+        }
+      }
       setState(() {
         _settings = settings;
+        _analyticsEnabled = analytics;
+        _crashlyticsEnabled = crashlytics;
       });
     } catch (e) {
       if (!mounted) return;
@@ -47,6 +69,36 @@ class _NotificationSettingsScreenState
     } catch (e) {
       if (!mounted) return;
       ShowToast().showSnackBar('Error updating settings: $e', context);
+    }
+  }
+
+  Future<void> _updatePrivacySettings({
+    bool? analyticsEnabled,
+    bool? crashlyticsEnabled,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      final updates = <String, dynamic>{};
+      if (analyticsEnabled != null) updates['analyticsEnabled'] = analyticsEnabled;
+      if (crashlyticsEnabled != null) {
+        updates['crashlyticsEnabled'] = crashlyticsEnabled;
+      }
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('settings')
+          .doc('privacy')
+          .set(updates, SetOptions(merge: true));
+      setState(() {
+        if (analyticsEnabled != null) _analyticsEnabled = analyticsEnabled;
+        if (crashlyticsEnabled != null) _crashlyticsEnabled = crashlyticsEnabled;
+      });
+      if (!mounted) return;
+      ShowToast().showSnackBar('Privacy settings updated', context);
+    } catch (e) {
+      if (!mounted) return;
+      ShowToast().showSnackBar('Error updating privacy settings: $e', context);
     }
   }
 
@@ -83,6 +135,8 @@ class _NotificationSettingsScreenState
                   _buildBehaviorCard(),
                   const SizedBox(height: 12),
                   _buildActionsCard(),
+                  const SizedBox(height: 12),
+                  _buildPrivacyCard(),
                 ],
               ),
             ),
@@ -408,6 +462,62 @@ class _NotificationSettingsScreenState
                   label: const Text('Send Test'),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrivacyCard() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF667EEA).withAlpha(25),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.privacy_tip_outlined,
+                    color: Color(0xFF667EEA),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Privacy & Consent',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              title: const Text('Enable Analytics'),
+              subtitle: const Text('Allow anonymous analytics collection'),
+              value: _analyticsEnabled,
+              onChanged: (value) {
+                _updatePrivacySettings(analyticsEnabled: value);
+              },
+              activeColor: const Color(0xFF667EEA),
+            ),
+            const Divider(),
+            SwitchListTile(
+              title: const Text('Enable Crashlytics'),
+              subtitle:
+                  const Text('Send crash reports to help us improve stability'),
+              value: _crashlyticsEnabled,
+              onChanged: (value) {
+                _updatePrivacySettings(crashlyticsEnabled: value);
+              },
+              activeColor: const Color(0xFF667EEA),
             ),
           ],
         ),

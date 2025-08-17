@@ -84,6 +84,9 @@ dependencies:
   provider: ^6.1.1
   mobile_scanner: ^7.0.1
   calendar_view: ^1.4.0
+  flutter_localizations:
+    sdk: flutter
+  flutter_cache_manager: ^3.3.2
 
 dev_dependencies:
   flutter_test:
@@ -98,7 +101,6 @@ dev_dependencies:
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
-
 # The following section is specific to Flutter packages.
 flutter:
 

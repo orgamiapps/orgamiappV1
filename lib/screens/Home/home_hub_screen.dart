@@ -378,6 +378,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
     final List<String> orgIds = _myOrgs.map((o) => o['id']!).toList();
 
     // Firestore whereIn supports up to 10 items; split into chunks and merge streams.
+    // Guard: if the set grows large, we still only query in chunks of 10.
     List<List<String>> chunks = [];
     for (var i = 0; i < orgIds.length; i += 10) {
       chunks.add(

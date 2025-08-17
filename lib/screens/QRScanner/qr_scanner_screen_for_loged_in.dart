@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:orgami/Permissions/permissions_helper.dart';
 import 'package:orgami/utils/colors.dart';
-import 'package:orgami/Screens/QRScanner/qr_scanner_flow_screen.dart';
+import 'package:orgami/Utils/routes.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
 
 class QrScannerScreenForLogedIn extends StatefulWidget {
@@ -35,9 +35,7 @@ class _QrScannerScreenForLogedInState extends State<QrScannerScreenForLogedIn> {
   Widget build(BuildContext context) {
     // Redirect to the new modern QR scanner flow
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const QRScannerFlowScreen()),
-      );
+      Nav.toQRScannerFlowReplacement(context);
     });
 
     return Scaffold(

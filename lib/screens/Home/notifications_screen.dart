@@ -12,6 +12,7 @@ import 'package:orgami/screens/Organizations/organization_profile_screen.dart';
 import 'package:orgami/screens/Events/event_feedback_management_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
+import 'package:orgami/Utils/routes.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -172,12 +173,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const NotificationSettingsScreen(),
-                ),
-              );
+              Nav.toNotificationsSettings(context);
             },
           ),
         ],
@@ -288,13 +284,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               children: [
                 GestureDetector(
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            const NotificationSettingsScreen(),
-                      ),
-                    );
+                    Nav.toNotificationsSettings(context);
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(
@@ -354,150 +344,154 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       ),
       child: Material(
         color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () {
-            if (!notification.isRead) {
-              _messagingHelper.markNotificationAsRead(notification.id);
-            }
-            _handleNotificationTap(notification);
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: _getNotificationColor(
-                      notification.type,
-                    ).withAlpha(25),
-                    borderRadius: BorderRadius.circular(12),
+        child: Semantics(
+          label: 'Notification: ${notification.title}',
+          button: true,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () {
+              if (!notification.isRead) {
+                _messagingHelper.markNotificationAsRead(notification.id);
+              }
+              _handleNotificationTap(notification);
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: _getNotificationColor(
+                        notification.type,
+                      ).withAlpha(25),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      _getNotificationIcon(notification.type),
+                      color: _getNotificationColor(notification.type),
+                      size: 24,
+                    ),
                   ),
-                  child: Icon(
-                    _getNotificationIcon(notification.type),
-                    color: _getNotificationColor(notification.type),
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              notification.title,
-                              style: TextStyle(
-                                fontWeight: notification.isRead
-                                    ? FontWeight.w500
-                                    : FontWeight.w700,
-                                fontSize: 16,
-                                color: notification.isRead
-                                    ? Colors.grey[600]
-                                    : Colors.black87,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                notification.title,
+                                style: TextStyle(
+                                  fontWeight: notification.isRead
+                                      ? FontWeight.w500
+                                      : FontWeight.w700,
+                                  fontSize: 16,
+                                  color: notification.isRead
+                                      ? Colors.grey[600]
+                                      : Colors.black87,
+                                ),
                               ),
                             ),
-                          ),
-                          if (!notification.isRead)
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF667EEA),
-                                shape: BoxShape.circle,
+                            if (!notification.isRead)
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF667EEA),
+                                  shape: BoxShape.circle,
+                                ),
                               ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        notification.body,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: notification.isRead
-                              ? Colors.grey[500]
-                              : Colors.grey[700],
-                          height: 1.3,
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.access_time,
-                            size: 12,
-                            color: Colors.grey[400],
+                        const SizedBox(height: 4),
+                        Text(
+                          notification.body,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: notification.isRead
+                                ? Colors.grey[500]
+                                : Colors.grey[700],
+                            height: 1.3,
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            DateFormat(
-                              'MMM dd, yyyy • HH:mm',
-                            ).format(notification.createdAt),
-                            style: TextStyle(
-                              fontSize: 12,
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.access_time,
+                              size: 12,
                               color: Colors.grey[400],
                             ),
-                          ),
-                          const Spacer(),
-                          PopupMenuButton<String>(
-                            icon: Icon(
-                              Icons.more_vert,
-                              size: 16,
-                              color: Colors.grey[400],
+                            const SizedBox(width: 4),
+                            Text(
+                              DateFormat(
+                                'MMM dd, yyyy • HH:mm',
+                              ).format(notification.createdAt),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[400],
+                              ),
                             ),
-                            onSelected: (value) {
-                              if (value == 'mark_read') {
-                                _messagingHelper.markNotificationAsRead(
-                                  notification.id,
-                                );
-                              } else if (value == 'delete') {
-                                _messagingHelper.deleteNotification(
-                                  notification.id,
-                                );
-                              }
-                            },
-                            itemBuilder: (context) => [
-                              if (!notification.isRead)
+                            const Spacer(),
+                            PopupMenuButton<String>(
+                              icon: Icon(
+                                Icons.more_vert,
+                                size: 16,
+                                color: Colors.grey[400],
+                              ),
+                              onSelected: (value) {
+                                if (value == 'mark_read') {
+                                  _messagingHelper.markNotificationAsRead(
+                                    notification.id,
+                                  );
+                                } else if (value == 'delete') {
+                                  _messagingHelper.deleteNotification(
+                                    notification.id,
+                                  );
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                if (!notification.isRead)
+                                  const PopupMenuItem(
+                                    value: 'mark_read',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.check, size: 18),
+                                        SizedBox(width: 8),
+                                        Text('Mark as read'),
+                                      ],
+                                    ),
+                                  ),
                                 const PopupMenuItem(
-                                  value: 'mark_read',
+                                  value: 'delete',
                                   child: Row(
                                     children: [
-                                      Icon(Icons.check, size: 18),
+                                      Icon(
+                                        Icons.delete,
+                                        size: 18,
+                                        color: Colors.red,
+                                      ),
                                       SizedBox(width: 8),
-                                      Text('Mark as read'),
+                                      Text(
+                                        'Delete',
+                                        style: TextStyle(color: Colors.red),
+                                      ),
                                     ],
                                   ),
                                 ),
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.delete,
-                                      size: 18,
-                                      color: Colors.red,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Delete',
-                                      style: TextStyle(color: Colors.red),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -556,7 +550,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'event_reminder':
       case 'event_changes':
       case 'geofence_checkin':
-        await _openEvent(notification.eventId);
+        if (notification.eventId != null) {
+          Nav.toEvent(context, notification.eventId!);
+        }
         break;
       case 'new_event':
         break;
@@ -565,64 +561,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'message_mention':
         final conversationId = notification.data?['conversationId'] as String?;
         if (conversationId != null && context.mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ChatScreen(conversationId: conversationId),
-            ),
-          );
+          Nav.toChat(context, conversationId);
         }
         break;
       case 'org_update':
         final orgId = notification.data?['organizationId'] as String?;
         if (orgId != null && context.mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => OrganizationProfileScreen(organizationId: orgId),
-            ),
-          );
+          Nav.toOrganization(context, orgId);
         }
         break;
       case 'organizer_feedback':
-        await _openFeedbackManagement(notification.eventId);
+        if (notification.eventId != null) {
+          Nav.toEventFeedbackManagement(context, notification.eventId!);
+        }
         break;
       case 'event_feedback':
         break;
       default:
         break;
     }
-  }
-
-  Future<void> _openEvent(String? eventId) async {
-    if (eventId == null) return;
-    final doc = await FirebaseFirestore.instance
-        .collection(EventModel.firebaseKey)
-        .doc(eventId)
-        .get();
-    if (!doc.exists) return;
-    final event = EventModel.fromJson(doc);
-    if (!mounted) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => SingleEventScreen(eventModel: event)),
-    );
-  }
-
-  Future<void> _openFeedbackManagement(String? eventId) async {
-    if (eventId == null) return;
-    final doc = await FirebaseFirestore.instance
-        .collection(EventModel.firebaseKey)
-        .doc(eventId)
-        .get();
-    if (!doc.exists) return;
-    final event = EventModel.fromJson(doc);
-    if (!mounted) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => EventFeedbackManagementScreen(eventModel: event),
-      ),
-    );
   }
 }

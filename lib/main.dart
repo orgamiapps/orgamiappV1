@@ -12,6 +12,11 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:orgami/Services/notification_service.dart';
 import 'package:orgami/firebase/firebase_messaging_helper.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -26,6 +31,12 @@ void main() async {
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
+    );
+
+    // Optional: increase Firestore local cache size with persistence
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
     );
 
     // iOS/web foreground presentation options
@@ -43,6 +54,32 @@ void main() async {
       await plugin.resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>()
           ?.requestNotificationsPermission();
+    }
+
+    // Analytics/Crashlytics consent gating
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      bool analyticsEnabled = false;
+      bool crashlyticsEnabled = false;
+      if (user != null) {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('settings')
+            .doc('privacy')
+            .get();
+        if (doc.exists) {
+          final data = doc.data() as Map<String, dynamic>;
+          analyticsEnabled = (data['analyticsEnabled'] == true);
+          crashlyticsEnabled = (data['crashlyticsEnabled'] == true);
+        }
+      }
+      await FirebaseAnalytics.instance
+          .setAnalyticsCollectionEnabled(analyticsEnabled);
+      await FirebaseCrashlytics.instance
+          .setCrashlyticsCollectionEnabled(crashlyticsEnabled);
+    } catch (e) {
+      Logger.warning('Consent gating init failed: $e');
     }
 
     // Initialize local notifications and messaging helper
@@ -86,6 +123,14 @@ class MyApp extends StatelessWidget {
           themeMode: themeProvider.themeMode,
           navigatorKey: appNavigatorKey,
           home: homeOverride ?? const SplashScreen(),
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('en'),
+          ],
         );
       },
     );
