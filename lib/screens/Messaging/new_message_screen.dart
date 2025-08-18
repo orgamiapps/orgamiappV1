@@ -758,12 +758,19 @@ class _NewMessageScreenState extends State<NewMessageScreen>
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDarkMode;
     final theme = Theme.of(context);
+    final bool isSelected = _selectedUserIds.contains(user.uid);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        border: Border.all(
+          color: _groupMode && isSelected
+              ? (isDark ? const Color(0xFF2C5A96) : const Color(0xFF667EEA))
+              : Colors.transparent,
+          width: _groupMode && isSelected ? 1.2 : 0.0,
+        ),
         boxShadow: [
           BoxShadow(
             color: isDark
@@ -776,14 +783,16 @@ class _NewMessageScreenState extends State<NewMessageScreen>
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
-        leading: CircleAvatar(
-          radius: 25,
-          backgroundColor: isDark
-              ? const Color(0xFF4A90E2)
-              : AppThemeColor.lightBlueColor,
-          child: user.profilePictureUrl != null
-              ? ClipOval(
-                  child: SafeNetworkImage(
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            width: 48,
+            height: 48,
+            color: isDark
+                ? const Color(0xFF4A90E2)
+                : AppThemeColor.lightBlueColor,
+            child: user.profilePictureUrl != null
+                ? SafeNetworkImage(
                     imageUrl: user.profilePictureUrl!,
                     fit: BoxFit.cover,
                     placeholder: Icon(
@@ -798,14 +807,14 @@ class _NewMessageScreenState extends State<NewMessageScreen>
                           ? const Color(0xFF2C5A96)
                           : const Color(0xFF667EEA),
                     ),
+                  )
+                : Icon(
+                    Icons.person,
+                    color: isDark
+                        ? const Color(0xFF2C5A96)
+                        : const Color(0xFF667EEA),
                   ),
-                )
-              : Icon(
-                  Icons.person,
-                  color: isDark
-                      ? const Color(0xFF2C5A96)
-                      : const Color(0xFF667EEA),
-                ),
+          ),
         ),
         title: Text(
           user.name,
@@ -843,7 +852,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
         ),
         trailing: _groupMode
             ? Checkbox(
-                value: _selectedUserIds.contains(user.uid),
+                value: isSelected,
                 onChanged: (checked) {
                   setState(() {
                     if (checked == true) {
@@ -854,14 +863,18 @@ class _NewMessageScreenState extends State<NewMessageScreen>
                   });
                 },
               )
-            : IconButton(
-                icon: Icon(
-                  Icons.message_outlined,
+            : Container(
+                decoration: BoxDecoration(
                   color: isDark
                       ? const Color(0xFF2C5A96)
-                      : AppThemeColor.darkBlueColor,
+                      : const Color(0xFF667EEA),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                onPressed: () => _startConversation(user),
+                child: IconButton(
+                  icon: const Icon(Icons.message_outlined, color: Colors.white),
+                  onPressed: () => _startConversation(user),
+                  tooltip: 'Message',
+                ),
               ),
         onTap: _groupMode
             ? () {
