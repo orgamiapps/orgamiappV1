@@ -8,6 +8,7 @@ import 'package:orgami/models/attendance_model.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/models/event_question_model.dart';
 import 'package:orgami/Screens/Events/event_analytics_screen.dart';
+import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
 import 'package:orgami/StorageHelper/file_storage.dart';
 import 'package:orgami/Utils/app_buttons.dart';
 import 'package:orgami/Utils/colors.dart';
@@ -409,8 +410,14 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
       ),
       child: Row(
         children: [
-          _modernTabView(label: 'Sign In', index: 1),
-          _modernTabView(label: "RSVP's", index: 2),
+          _modernTabView(
+            label: 'Attendees (${attendanceList.length})',
+            index: 1,
+          ),
+          _modernTabView(
+            label: "RSVP's (${registerAttendanceList.length})",
+            index: 2,
+          ),
         ],
       ),
     );
@@ -586,59 +593,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
   Widget _modernRegisterDetailsView() {
     return Column(
       children: [
-        // Header with stats
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppThemeColor.lightBlueColor.withValues(alpha: 0.1),
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(16),
-              topRight: Radius.circular(16),
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.how_to_reg,
-                  color: AppThemeColor.darkBlueColor,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "RSVP's",
-                      style: const TextStyle(
-                        color: AppThemeColor.pureBlackColor,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                    Text(
-                      "${registerAttendanceList.length} RSVP's",
-                      style: const TextStyle(
-                        color: AppThemeColor.dullFontColor,
-                        fontSize: 14,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+        // Header removed per spec (tab already names the section)
 
         // Attendees List
         Expanded(
@@ -679,107 +634,133 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                   itemCount: registerAttendanceList.length,
                   itemBuilder: (context, index) {
                     final attendee = registerAttendanceList[index];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: AppThemeColor.borderColor,
-                          width: 1,
+                    return GestureDetector(
+                      onTap: () async {
+                        // Only event creator can navigate, and skip manual/anonymous entries
+                        if (eventModel.customerUid ==
+                                FirebaseAuth.instance.currentUser?.uid &&
+                            attendee.customerUid != 'manual' &&
+                            !attendee.isAnonymous) {
+                          final user = await FirebaseFirestoreHelper()
+                              .getSingleCustomer(
+                                customerId: attendee.customerUid,
+                              );
+                          if (user != null && context.mounted) {
+                            final isOwn =
+                                user.uid ==
+                                FirebaseAuth.instance.currentUser?.uid;
+                            RouterClass.nextScreenNormal(
+                              context,
+                              UserProfileScreen(
+                                user: user,
+                                isOwnProfile: isOwn,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppThemeColor.borderColor,
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.02),
+                              spreadRadius: 0,
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.02),
-                            spreadRadius: 0,
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          // Sequential number (more subtle)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppThemeColor.lightBlueColor.withValues(
-                                alpha: 0.3,
+                        child: Row(
+                          children: [
+                            // Sequential number (more subtle)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
                               ),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
+                              decoration: BoxDecoration(
+                                color: AppThemeColor.lightBlueColor.withValues(
+                                  alpha: 0.3,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: AppThemeColor.darkBlueColor.withValues(
+                                    alpha: 0.2,
+                                  ),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Text(
+                                '${index + 1}',
+                                style: const TextStyle(
+                                  color: AppThemeColor.darkBlueColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'Roboto',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+
+                            // Details
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    attendee.userName,
+                                    style: const TextStyle(
+                                      color: AppThemeColor.pureBlackColor,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      fontFamily: 'Roboto',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "RSVP'd on ${DateFormat('MMM dd, yyyy').format(attendee.attendanceDateTime)} at ${DateFormat('h:mm a').format(attendee.attendanceDateTime)}",
+                                    style: const TextStyle(
+                                      color: AppThemeColor.dullFontColor,
+                                      fontSize: 14,
+                                      fontFamily: 'Roboto',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Status badge
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
                                 color: AppThemeColor.darkBlueColor.withValues(
-                                  alpha: 0.2,
+                                  alpha: 0.1,
                                 ),
-                                width: 1,
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                            ),
-                            child: Text(
-                              '${index + 1}',
-                              style: const TextStyle(
-                                color: AppThemeColor.darkBlueColor,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                fontFamily: 'Roboto',
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-
-                          // Details
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  attendee.userName,
-                                  style: const TextStyle(
-                                    color: AppThemeColor.pureBlackColor,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    fontFamily: 'Roboto',
-                                  ),
+                              child: const Text(
+                                "RSVP'd",
+                                style: TextStyle(
+                                  color: AppThemeColor.darkBlueColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'Roboto',
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Registered on ${DateFormat('MMM dd, yyyy').format(attendee.attendanceDateTime)} at ${DateFormat('h:mm a').format(attendee.attendanceDateTime)}',
-                                  style: const TextStyle(
-                                    color: AppThemeColor.dullFontColor,
-                                    fontSize: 14,
-                                    fontFamily: 'Roboto',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Status badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppThemeColor.darkBlueColor.withValues(
-                                alpha: 0.1,
-                              ),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Text(
-                              'Registered',
-                              style: TextStyle(
-                                color: AppThemeColor.darkBlueColor,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                fontFamily: 'Roboto',
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     );
                   },
@@ -792,7 +773,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
   Widget _modernSignInDetailsView() {
     return Column(
       children: [
-        // Header with stats and add button
+        // Header with only Add Name button
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -804,81 +785,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
           ),
           child: Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.check_circle_outline,
-                  color: AppThemeColor.darkBlueColor,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Sign-In Attendees',
-                      style: const TextStyle(
-                        color: AppThemeColor.pureBlackColor,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                    Text(
-                      '${attendanceList.length} people signed in',
-                      style: const TextStyle(
-                        color: AppThemeColor.dullFontColor,
-                        fontSize: 14,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                    // Dwell time summary
-                    if (_hasDwellTimeData()) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        _getDwellTimeSummary(),
-                        style: const TextStyle(
-                          color: Color(0xFF667EEA),
-                          fontSize: 12,
-                          fontFamily: 'Roboto',
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _buildLegendChip(
-                            color: const Color(0xFF10B981),
-                            label: 'Active',
-                            count: _countTrackingState('active'),
-                          ),
-                          _buildLegendChip(
-                            color: const Color(0xFFEF4444),
-                            label: 'Completed',
-                            count: _countTrackingState('completed'),
-                          ),
-                          _buildLegendChip(
-                            color: const Color(0xFF9CA3AF),
-                            label: 'Pending',
-                            count: _countTrackingState('pending'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-
-              // Add Name Button
+              const Spacer(),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppThemeColor.darkBlueColor,
@@ -951,47 +858,387 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                   itemCount: attendanceList.length,
                   itemBuilder: (context, index) {
                     final attendee = attendanceList[index];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: AppThemeColor.borderColor,
-                          width: 1,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            spreadRadius: 0,
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
+                    return GestureDetector(
+                      onTap: () async {
+                        // Only event creator can navigate, and skip manual/anonymous entries
+                        if (eventModel.customerUid ==
+                                FirebaseAuth.instance.currentUser?.uid &&
+                            attendee.customerUid != 'manual' &&
+                            !attendee.isAnonymous) {
+                          final user = await FirebaseFirestoreHelper()
+                              .getSingleCustomer(
+                                customerId: attendee.customerUid,
+                              );
+                          if (user != null && context.mounted) {
+                            final isOwn =
+                                user.uid ==
+                                FirebaseAuth.instance.currentUser?.uid;
+                            RouterClass.nextScreenNormal(
+                              context,
+                              UserProfileScreen(
+                                user: user,
+                                isOwnProfile: isOwn,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: AppThemeColor.borderColor,
+                            width: 1,
                           ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          // Main content area
-                          Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Header row with number, name, and status
-                                Row(
-                                  children: [
-                                    // Attendee number
-                                    Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: BoxDecoration(
-                                        color: AppThemeColor.lightBlueColor
-                                            .withValues(alpha: 0.2),
-                                        borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              spreadRadius: 0,
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            // Main content area
+                            Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Header row with number, name, and status
+                                  Row(
+                                    children: [
+                                      // Attendee number
+                                      Container(
+                                        width: 32,
+                                        height: 32,
+                                        decoration: BoxDecoration(
+                                          color: AppThemeColor.lightBlueColor
+                                              .withValues(alpha: 0.2),
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            '${index + 1}',
+                                            style: const TextStyle(
+                                              color:
+                                                  AppThemeColor.darkBlueColor,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              fontFamily: 'Roboto',
+                                            ),
+                                          ),
+                                        ),
                                       ),
-                                      child: Center(
-                                        child: Text(
-                                          '${index + 1}',
+                                      const SizedBox(width: 16),
+
+                                      // Name and status indicator
+                                      Expanded(
+                                        child: Row(
+                                          children: [
+                                            // Status indicator
+                                            if (attendee.trackingState !=
+                                                'none') ...[
+                                              Container(
+                                                width: 10,
+                                                height: 10,
+                                                decoration: BoxDecoration(
+                                                  color:
+                                                      attendee.trackingState ==
+                                                          'active'
+                                                      ? const Color(0xFF10B981)
+                                                      : attendee.trackingState ==
+                                                            'completed'
+                                                      ? const Color(0xFFEF4444)
+                                                      : const Color(0xFF9CA3AF),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                            ],
+                                            // Name
+                                            Expanded(
+                                              child: Text(
+                                                (attendee.isAnonymous &&
+                                                        eventModel
+                                                                .customerUid ==
+                                                            FirebaseAuth
+                                                                .instance
+                                                                .currentUser
+                                                                ?.uid &&
+                                                        attendee.realName !=
+                                                            null)
+                                                    ? attendee.realName!
+                                                    : attendee.userName,
+                                                style: const TextStyle(
+                                                  color: AppThemeColor
+                                                      .pureBlackColor,
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.w600,
+                                                  fontFamily: 'Roboto',
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+
+                                      // Signed In badge
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppThemeColor.darkBlueColor
+                                              .withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Signed In',
+                                          style: TextStyle(
+                                            color: AppThemeColor.darkBlueColor,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            fontFamily: 'Roboto',
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                  const SizedBox(height: 16),
+
+                                  // Sign-in time
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.access_time,
+                                        size: 16,
+                                        color: AppThemeColor.dullFontColor,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        '${DateFormat('MMM dd, yyyy').format(attendee.attendanceDateTime)} at ${DateFormat('h:mm a').format(attendee.attendanceDateTime)}',
+                                        style: const TextStyle(
+                                          color: AppThemeColor.dullFontColor,
+                                          fontSize: 14,
+                                          fontFamily: 'Roboto',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                  const SizedBox(height: 12),
+
+                                  // Time attended section
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: attendee.trackingState == 'active'
+                                          ? const Color(
+                                              0xFF10B981,
+                                            ).withValues(alpha: 0.08)
+                                          : attendee.trackingState ==
+                                                'completed'
+                                          ? const Color(
+                                              0xFF667EEA,
+                                            ).withValues(alpha: 0.08)
+                                          : attendee.trackingState == 'pending'
+                                          ? const Color(
+                                              0xFF9CA3AF,
+                                            ).withValues(alpha: 0.08)
+                                          : const Color(0xFFF3F4F6),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color:
+                                            attendee.trackingState == 'active'
+                                            ? const Color(
+                                                0xFF10B981,
+                                              ).withValues(alpha: 0.2)
+                                            : attendee.trackingState ==
+                                                  'completed'
+                                            ? const Color(
+                                                0xFF667EEA,
+                                              ).withValues(alpha: 0.2)
+                                            : attendee.trackingState ==
+                                                  'pending'
+                                            ? const Color(
+                                                0xFF9CA3AF,
+                                              ).withValues(alpha: 0.2)
+                                            : const Color(0xFFE5E7EB),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          attendee.trackingState == 'active'
+                                              ? Icons.location_on
+                                              : Icons.timer,
+                                          color:
+                                              attendee.trackingState == 'active'
+                                              ? const Color(0xFF10B981)
+                                              : attendee.trackingState ==
+                                                    'completed'
+                                              ? const Color(0xFF667EEA)
+                                              : attendee.trackingState ==
+                                                    'pending'
+                                              ? const Color(0xFF9CA3AF)
+                                              : const Color(0xFF9CA3AF),
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                attendee.trackingState ==
+                                                        'active'
+                                                    ? 'Currently Tracking'
+                                                    : attendee.trackingState ==
+                                                          'completed'
+                                                    ? 'Time Attended'
+                                                    : attendee.trackingState ==
+                                                          'pending'
+                                                    ? 'Left Event (Grace Period)'
+                                                    : 'Time Tracking',
+                                                style: TextStyle(
+                                                  color:
+                                                      attendee.trackingState ==
+                                                          'active'
+                                                      ? const Color(0xFF10B981)
+                                                      : attendee.trackingState ==
+                                                            'completed'
+                                                      ? const Color(0xFF667EEA)
+                                                      : attendee.trackingState ==
+                                                            'pending'
+                                                      ? const Color(0xFF9CA3AF)
+                                                      : const Color(0xFF6B7280),
+                                                  fontSize: 14,
+                                                  fontFamily: 'Roboto',
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                attendee.trackingState ==
+                                                        'active'
+                                                    ? 'Attendee is currently at the event'
+                                                    : attendee.trackingState ==
+                                                          'completed'
+                                                    ? attendee
+                                                              .formattedDwellTime
+                                                              .isNotEmpty
+                                                          ? attendee
+                                                                .formattedDwellTime
+                                                          : 'No duration recorded'
+                                                    : attendee.trackingState ==
+                                                          'pending'
+                                                    ? 'Left but grace period not expired'
+                                                    : 'No tracking data available',
+                                                style: TextStyle(
+                                                  color:
+                                                      attendee.trackingState ==
+                                                          'active'
+                                                      ? const Color(0xFF10B981)
+                                                      : attendee.trackingState ==
+                                                            'completed'
+                                                      ? const Color(0xFF667EEA)
+                                                      : attendee.trackingState ==
+                                                            'pending'
+                                                      ? const Color(0xFF9CA3AF)
+                                                      : const Color(0xFF9CA3AF),
+                                                  fontSize: 13,
+                                                  fontFamily: 'Roboto',
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                              if (attendee.dwellNotes != null &&
+                                                  attendee
+                                                      .dwellNotes!
+                                                      .isNotEmpty) ...[
+                                                const SizedBox(height: 4),
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 4,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(
+                                                      0xFF9CA3AF,
+                                                    ).withValues(alpha: 0.2),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          6,
+                                                        ),
+                                                  ),
+                                                  child: Text(
+                                                    attendee.dwellNotes!,
+                                                    style: const TextStyle(
+                                                      color: Color(0xFF6B7280),
+                                                      fontSize: 11,
+                                                      fontFamily: 'Roboto',
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Question answers section
+                            if (attendee.answers.isNotEmpty) ...[
+                              Container(
+                                margin: const EdgeInsets.only(top: 1),
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: AppThemeColor.lightBlueColor
+                                      .withValues(alpha: 0.05),
+                                  borderRadius: const BorderRadius.only(
+                                    bottomLeft: Radius.circular(16),
+                                    bottomRight: Radius.circular(16),
+                                  ),
+                                  border: Border.all(
+                                    color: AppThemeColor.borderColor.withValues(
+                                      alpha: 0.3,
+                                    ),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.question_answer,
+                                          size: 16,
+                                          color: AppThemeColor.darkBlueColor,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Question Responses (${attendee.answers.length})',
                                           style: const TextStyle(
                                             color: AppThemeColor.darkBlueColor,
                                             fontSize: 14,
@@ -999,367 +1246,69 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                                             fontFamily: 'Roboto',
                                           ),
                                         ),
-                                      ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 16),
-
-                                    // Name and status indicator
-                                    Expanded(
-                                      child: Row(
-                                        children: [
-                                          // Status indicator
-                                          if (attendee.trackingState !=
-                                              'none') ...[
-                                            Container(
-                                              width: 10,
-                                              height: 10,
-                                              decoration: BoxDecoration(
-                                                color:
-                                                    attendee.trackingState ==
-                                                        'active'
-                                                    ? const Color(0xFF10B981)
-                                                    : attendee.trackingState ==
-                                                          'completed'
-                                                    ? const Color(0xFFEF4444)
-                                                    : const Color(0xFF9CA3AF),
-                                                shape: BoxShape.circle,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                          ],
-                                          // Name
-                                          Expanded(
-                                            child: Text(
-                                              (attendee.isAnonymous &&
-                                                      eventModel.customerUid ==
-                                                          FirebaseAuth
-                                                              .instance
-                                                              .currentUser
-                                                              ?.uid &&
-                                                      attendee.realName != null)
-                                                  ? attendee.realName!
-                                                  : attendee.userName,
-                                              style: const TextStyle(
-                                                color: AppThemeColor
-                                                    .pureBlackColor,
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.w600,
-                                                fontFamily: 'Roboto',
-                                              ),
-                                            ),
+                                    const SizedBox(height: 12),
+                                    ...attendee.answers.map((answer) {
+                                      final parts = answer.split('--ans--');
+                                      if (parts.length == 2) {
+                                        final question = parts[0];
+                                        final response = parts[1];
+                                        return Container(
+                                          margin: const EdgeInsets.only(
+                                            bottom: 8,
                                           ),
-                                        ],
-                                      ),
-                                    ),
-
-                                    // Signed In badge
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: AppThemeColor.darkBlueColor
-                                            .withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: const Text(
-                                        'Signed In',
-                                        style: TextStyle(
-                                          color: AppThemeColor.darkBlueColor,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          fontFamily: 'Roboto',
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 16),
-
-                                // Sign-in time
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.access_time,
-                                      size: 16,
-                                      color: AppThemeColor.dullFontColor,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      '${DateFormat('MMM dd, yyyy').format(attendee.attendanceDateTime)} at ${DateFormat('h:mm a').format(attendee.attendanceDateTime)}',
-                                      style: const TextStyle(
-                                        color: AppThemeColor.dullFontColor,
-                                        fontSize: 14,
-                                        fontFamily: 'Roboto',
-                                      ),
-                                    ),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 12),
-
-                                // Time attended section
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: attendee.trackingState == 'active'
-                                        ? const Color(
-                                            0xFF10B981,
-                                          ).withValues(alpha: 0.08)
-                                        : attendee.trackingState == 'completed'
-                                        ? const Color(
-                                            0xFF667EEA,
-                                          ).withValues(alpha: 0.08)
-                                        : attendee.trackingState == 'pending'
-                                        ? const Color(
-                                            0xFF9CA3AF,
-                                          ).withValues(alpha: 0.08)
-                                        : const Color(0xFFF3F4F6),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: attendee.trackingState == 'active'
-                                          ? const Color(
-                                              0xFF10B981,
-                                            ).withValues(alpha: 0.2)
-                                          : attendee.trackingState ==
-                                                'completed'
-                                          ? const Color(
-                                              0xFF667EEA,
-                                            ).withValues(alpha: 0.2)
-                                          : attendee.trackingState == 'pending'
-                                          ? const Color(
-                                              0xFF9CA3AF,
-                                            ).withValues(alpha: 0.2)
-                                          : const Color(0xFFE5E7EB),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        attendee.trackingState == 'active'
-                                            ? Icons.location_on
-                                            : Icons.timer,
-                                        color:
-                                            attendee.trackingState == 'active'
-                                            ? const Color(0xFF10B981)
-                                            : attendee.trackingState ==
-                                                  'completed'
-                                            ? const Color(0xFF667EEA)
-                                            : attendee.trackingState ==
-                                                  'pending'
-                                            ? const Color(0xFF9CA3AF)
-                                            : const Color(0xFF9CA3AF),
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              attendee.trackingState == 'active'
-                                                  ? 'Currently Tracking'
-                                                  : attendee.trackingState ==
-                                                        'completed'
-                                                  ? 'Time Attended'
-                                                  : attendee.trackingState ==
-                                                        'pending'
-                                                  ? 'Left Event (Grace Period)'
-                                                  : 'Time Tracking',
-                                              style: TextStyle(
-                                                color:
-                                                    attendee.trackingState ==
-                                                        'active'
-                                                    ? const Color(0xFF10B981)
-                                                    : attendee.trackingState ==
-                                                          'completed'
-                                                    ? const Color(0xFF667EEA)
-                                                    : attendee.trackingState ==
-                                                          'pending'
-                                                    ? const Color(0xFF9CA3AF)
-                                                    : const Color(0xFF6B7280),
-                                                fontSize: 14,
-                                                fontFamily: 'Roboto',
-                                                fontWeight: FontWeight.w600,
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                question,
+                                                style: const TextStyle(
+                                                  color: AppThemeColor
+                                                      .pureBlackColor,
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w500,
+                                                  fontFamily: 'Roboto',
+                                                ),
                                               ),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              attendee.trackingState == 'active'
-                                                  ? 'Attendee is currently at the event'
-                                                  : attendee.trackingState ==
-                                                        'completed'
-                                                  ? attendee
-                                                            .formattedDwellTime
-                                                            .isNotEmpty
-                                                        ? attendee
-                                                              .formattedDwellTime
-                                                        : 'No duration recorded'
-                                                  : attendee.trackingState ==
-                                                        'pending'
-                                                  ? 'Left but grace period not expired'
-                                                  : 'No tracking data available',
-                                              style: TextStyle(
-                                                color:
-                                                    attendee.trackingState ==
-                                                        'active'
-                                                    ? const Color(0xFF10B981)
-                                                    : attendee.trackingState ==
-                                                          'completed'
-                                                    ? const Color(0xFF667EEA)
-                                                    : attendee.trackingState ==
-                                                          'pending'
-                                                    ? const Color(0xFF9CA3AF)
-                                                    : const Color(0xFF9CA3AF),
-                                                fontSize: 13,
-                                                fontFamily: 'Roboto',
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            ),
-                                            if (attendee.dwellNotes != null &&
-                                                attendee
-                                                    .dwellNotes!
-                                                    .isNotEmpty) ...[
                                               const SizedBox(height: 4),
                                               Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 4,
-                                                    ),
+                                                padding: const EdgeInsets.all(
+                                                  8,
+                                                ),
                                                 decoration: BoxDecoration(
-                                                  color: const Color(
-                                                    0xFF9CA3AF,
-                                                  ).withValues(alpha: 0.2),
+                                                  color: Colors.white,
                                                   borderRadius:
                                                       BorderRadius.circular(6),
+                                                  border: Border.all(
+                                                    color: AppThemeColor
+                                                        .borderColor,
+                                                    width: 1,
+                                                  ),
                                                 ),
                                                 child: Text(
-                                                  attendee.dwellNotes!,
+                                                  response,
                                                   style: const TextStyle(
-                                                    color: Color(0xFF6B7280),
-                                                    fontSize: 11,
+                                                    color: AppThemeColor
+                                                        .dullFontColor,
+                                                    fontSize: 13,
                                                     fontFamily: 'Roboto',
-                                                    fontWeight: FontWeight.w500,
                                                   ),
                                                 ),
                                               ),
                                             ],
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Question answers section
-                          if (attendee.answers.isNotEmpty) ...[
-                            Container(
-                              margin: const EdgeInsets.only(top: 1),
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: AppThemeColor.lightBlueColor.withValues(
-                                  alpha: 0.05,
-                                ),
-                                borderRadius: const BorderRadius.only(
-                                  bottomLeft: Radius.circular(16),
-                                  bottomRight: Radius.circular(16),
-                                ),
-                                border: Border.all(
-                                  color: AppThemeColor.borderColor.withValues(
-                                    alpha: 0.3,
-                                  ),
-                                  width: 1,
+                                          ),
+                                        );
+                                      }
+                                      return const SizedBox.shrink();
+                                    }),
+                                  ],
                                 ),
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.question_answer,
-                                        size: 16,
-                                        color: AppThemeColor.darkBlueColor,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Question Responses (${attendee.answers.length})',
-                                        style: const TextStyle(
-                                          color: AppThemeColor.darkBlueColor,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                          fontFamily: 'Roboto',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  ...attendee.answers.map((answer) {
-                                    final parts = answer.split('--ans--');
-                                    if (parts.length == 2) {
-                                      final question = parts[0];
-                                      final response = parts[1];
-                                      return Container(
-                                        margin: const EdgeInsets.only(
-                                          bottom: 8,
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              question,
-                                              style: const TextStyle(
-                                                color: AppThemeColor
-                                                    .pureBlackColor,
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w500,
-                                                fontFamily: 'Roboto',
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Container(
-                                              padding: const EdgeInsets.all(8),
-                                              decoration: BoxDecoration(
-                                                color: Colors.white,
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                                border: Border.all(
-                                                  color:
-                                                      AppThemeColor.borderColor,
-                                                  width: 1,
-                                                ),
-                                              ),
-                                              child: Text(
-                                                response,
-                                                style: const TextStyle(
-                                                  color: AppThemeColor
-                                                      .dullFontColor,
-                                                  fontSize: 13,
-                                                  fontFamily: 'Roboto',
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    }
-                                    return const SizedBox.shrink();
-                                  }),
-                                ],
-                              ),
-                            ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     );
                   },
@@ -1548,68 +1497,4 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
   }
 
   // Removed deprecated excel export example that depended on the 'excel' package.
-
-  /// Checks if any attendees have dwell time data
-  bool _hasDwellTimeData() {
-    return attendanceList.any(
-      (attendee) => attendee.dwellTime != null || attendee.isDwellActive,
-    );
-  }
-
-  /// Gets a summary of dwell time statistics
-  String _getDwellTimeSummary() {
-    final activeTracking = attendanceList.where((a) => a.isDwellActive).length;
-    final completedTracking = attendanceList
-        .where((a) => a.isDwellCompleted)
-        .length;
-
-    if (activeTracking > 0 && completedTracking > 0) {
-      return '$activeTracking active, $completedTracking completed';
-    } else if (activeTracking > 0) {
-      return '$activeTracking active tracking';
-    } else if (completedTracking > 0) {
-      return '$completedTracking completed tracking';
-    } else {
-      return '';
-    }
-  }
-
-  int _countTrackingState(String state) {
-    return attendanceList.where((a) => a.trackingState == state).length;
-  }
-
-  Widget _buildLegendChip({
-    required Color color,
-    required String label,
-    required int count,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            '$label (${count.toString()})',
-            style: const TextStyle(
-              color: Color(0xFF4B5563),
-              fontSize: 11,
-              fontFamily: 'Roboto',
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
