@@ -1436,6 +1436,28 @@ class FirebaseFirestoreHelper {
     }
   }
 
+  Future<TicketModel?> getActiveTicketForUserAndEvent({
+    required String customerUid,
+    required String eventId,
+  }) async {
+    try {
+      final query = await _firestore
+          .collection(TicketModel.firebaseKey)
+          .where('customerUid', isEqualTo: customerUid)
+          .where('eventId', isEqualTo: eventId)
+          .where('isUsed', isEqualTo: false)
+          .limit(1)
+          .get();
+      if (query.docs.isNotEmpty) {
+        return TicketModel.fromJson(query.docs.first);
+      }
+      return null;
+    } catch (e) {
+      Logger.debug('Error getting active ticket for user/event: $e');
+      return null;
+    }
+  }
+
   // Debug method to clear all tickets for a user (for testing)
   Future<void> clearUserTickets({
     required String customerUid,

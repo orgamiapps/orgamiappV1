@@ -983,8 +983,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   void _showEditProfileModal() {
     final nameController = TextEditingController(text: widget.user.name);
-    final usernameController =
-        TextEditingController(text: widget.user.username ?? '');
+    final usernameController = TextEditingController(
+      text: widget.user.username ?? '',
+    );
     final bioController = TextEditingController(text: widget.user.bio ?? '');
 
     showModalBottomSheet(
@@ -1096,8 +1097,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                           setState(() {
                             widget.user.name = nameController.text.trim();
                             widget.user.bio = bioController.text.trim();
-                            widget.user.username =
-                                newUsername.isEmpty ? null : newUsername;
+                            widget.user.username = newUsername.isEmpty
+                                ? null
+                                : newUsername;
                           });
 
                           if (mounted) Navigator.pop(context);
@@ -1109,8 +1111,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                           backgroundColor: AppThemeColor.darkBlueColor,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(Dimensions.radiusLarge),
+                            borderRadius: BorderRadius.circular(
+                              Dimensions.radiusLarge,
+                            ),
                           ),
                         ),
                         child: const Text('Save Changes'),

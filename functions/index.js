@@ -38,6 +38,126 @@ setGlobalOptions({maxInstances: 10});
 // });
 
 /**
+ * Callable: generateUserBadgePass
+ * Input: { uid: string, platform: 'apple'|'google' }
+ * Output: { url: string }
+ *
+ * This function returns a URL that initiates adding a pass to the user's wallet.
+ * It expects you to configure the respective issuers:
+ * - Apple Wallet: host a pre-signed .pkpass or generate on the fly.
+ * - Google Wallet: build a JWT Save URL using your issuer ID and class/object IDs.
+ *
+ * For scaffolding purposes, we return placeholder URLs that you should replace
+ * with your own issuer endpoints.
+ */
+exports.generateUserBadgePass = onCall({ region: "us-central1" }, async (req) => {
+  try {
+    const { uid, platform } = req.data || {};
+    if (!uid || !platform) {
+      throw new Error("INVALID_ARGUMENT: { uid, platform } required");
+    }
+
+    let url;
+    if (platform === 'apple') {
+      url = await generateApplePassUrl(uid);
+    } else if (platform === 'google') {
+      url = await generateGoogleSaveUrl(uid);
+    } else {
+      throw new Error("INVALID_ARGUMENT: platform must be 'apple' or 'google'");
+    }
+
+    logger.info("Generated wallet link", { uid, platform });
+    return { url };
+  } catch (err) {
+    logger.error("generateUserBadgePass failed", err);
+    throw new Error("INTERNAL: Failed to generate wallet pass link");
+  }
+});
+
+// ---- Apple Wallet (PKPass) scaffold ----
+// This scaffold assumes you host a pre-generated (signed) pkpass per user.
+// For production, integrate with a signing service that uses your Apple Pass
+// certificate (.p12), private key, and WWDR certificate to generate a pkpass
+// dynamically, then return a short-lived signed URL to that file.
+async function generateApplePassUrl(uid) {
+  const bucket = process.env.APPLE_PASS_BUCKET_URL; // e.g., https://storage.googleapis.com/<bucket>
+  if (!bucket) {
+    // Fallback placeholder to avoid failures during setup
+    return `https://example.com/passes/badge/${uid}.pkpass`;
+  }
+  return `${bucket}/badge/${uid}.pkpass`;
+}
+
+// ---- Google Wallet (Save to Google Pay) scaffold ----
+// Builds a signed JWT Save URL using service account credentials.
+// Set env vars:
+//   GOOGLE_WALLET_ISSUER_ID
+//   GOOGLE_WALLET_CLASS_ID (generic class)
+//   GOOGLE_WALLET_AUDIENCE (default: https://pay.google.com/gp/v/save/)
+// Service account must have Wallet Objects issuer permissions.
+const jwt = require('jsonwebtoken');
+
+async function generateGoogleSaveUrl(uid) {
+  const issuerId = process.env.GOOGLE_WALLET_ISSUER_ID;
+  const classId = process.env.GOOGLE_WALLET_CLASS_ID; // e.g., issuerId.genericClass
+  const audience = process.env.GOOGLE_WALLET_AUDIENCE || 'google';
+
+  if (!issuerId || !classId) {
+    // Return placeholder if not configured
+    return `https://pay.google.com/gp/v/save/REPLACE_WITH_YOUR_JWT_FOR_${uid}`;
+  }
+
+  // Compose objectId using issuerId and uid
+  const objectId = `${issuerId}.${uid}`.replace(/[^a-zA-Z0-9.]/g, '');
+
+  const iat = Math.floor(Date.now() / 1000);
+  const exp = iat + 300; // 5 minutes
+
+  // JWT payload per Google Wallet specs (generic pass)
+  const payload = {
+    iss: process.env.GOOGLE_CLIENT_EMAIL, // service account email
+    aud: audience,
+    typ: 'savetowallet',
+    iat,
+    exp,
+    origins: ['https://orgami.app'],
+    payload: {
+      genericObjects: [
+        {
+          id: objectId,
+          classId: classId,
+          logo: { sourceUri: { uri: 'https://orgami.app/logo.png' } },
+          cardTitle: { defaultValue: { language: 'en-US', value: 'Orgami Badge' } },
+          header: { defaultValue: { language: 'en-US', value: 'Member Badge' } },
+          hexBackgroundColor: '#4A90E2',
+          textModulesData: [
+            { header: 'User', body: uid },
+          ],
+          barcode: {
+            type: 'QR_CODE',
+            value: `orgami_user_${uid}`,
+          },
+        },
+      ],
+    },
+  };
+
+  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
+  if (!privateKey || !clientEmail) {
+    return `https://pay.google.com/gp/v/save/REPLACE_WITH_YOUR_JWT_FOR_${uid}`;
+  }
+
+  const token = jwt.sign(payload, privateKey, {
+    algorithm: 'RS256',
+    issuer: clientEmail,
+    header: { kid: undefined, typ: 'JWT' },
+  });
+
+  return `https://pay.google.com/gp/v/save/${token}`;
+}
+
+/**
  * Aggregate attendance data when a new attendance record is created
  * Updates event_analytics collection with aggregated data
  */

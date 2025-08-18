@@ -141,6 +141,18 @@ class UserBadgeModel {
     };
   }
 
+  // QR payload for scanning user's badge to resolve tickets at an event
+  String get badgeQrData => 'orgami_user_$uid';
+
+  // Parse a user badge QR and return the user id if valid
+  static String? parseBadgeQr(String data) {
+    const prefix = 'orgami_user_';
+    if (data.startsWith(prefix)) {
+      return data.substring(prefix.length);
+    }
+    return null;
+  }
+
   // Create badge from customer data and calculated stats
   static UserBadgeModel createFromUserData({
     required String uid,

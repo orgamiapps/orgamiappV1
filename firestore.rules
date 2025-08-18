@@ -96,12 +96,19 @@ service cloud.firestore {
         );
       }
 
+      // Read allowed if:
+      // - event is public
+      // - requesting user is owner or co-host
+      // - user is in event's access list
+      // - user is a member of the hosting organization (when applicable)
+      // - user has an attendance record for this event (so profile can show past events)
       allow read: if request.auth != null && (
         resource.data.private == false ||
         request.auth.uid == resource.data.customerUid ||
         request.auth.uid in resource.data.coHosts ||
         (resource.data.accessList != null && request.auth.uid in resource.data.accessList) ||
-        (resource.data.organizationId != null && isOrgMember(resource.data.organizationId))
+        (resource.data.organizationId != null && isOrgMember(resource.data.organizationId)) ||
+        exists(/databases/$(database)/documents/Attendance/$(eventId + '-' + request.auth.uid))
       );
 
       allow write: if canWriteEvent();

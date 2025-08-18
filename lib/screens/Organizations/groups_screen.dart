@@ -100,10 +100,11 @@ class _GroupsScreenState extends State<GroupsScreen> {
         systemOverlayStyle: SystemUiOverlayStyle.dark,
         title: const Text('Groups'),
         actions: [
-          IconButton(
-            tooltip: 'Create Group',
-            icon: const Icon(Icons.add_business),
+          TextButton.icon(
             onPressed: _goToCreate,
+            icon: const Icon(Icons.add, size: 20),
+            label: const Text('Create'),
+            style: TextButton.styleFrom(foregroundColor: Colors.black87),
           ),
         ],
         bottom: const PreferredSize(

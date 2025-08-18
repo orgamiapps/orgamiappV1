@@ -6,6 +6,7 @@ import 'package:orgami/models/attendance_model.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:orgami/models/badge_model.dart';
 
 class TicketScannerScreen extends StatefulWidget {
   final String eventId;
@@ -90,6 +91,42 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
           isLoading = false;
         });
         ShowToast().showNormalToast(msg: 'Error scanning ticket: $e');
+      }
+    }
+  }
+
+  Future<void> _processUserBadge(String userId) async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final ticket = await FirebaseFirestoreHelper()
+          .getActiveTicketForUserAndEvent(
+            customerUid: userId,
+            eventId: widget.eventId,
+          );
+
+      if (mounted) {
+        setState(() {
+          scannedTicket = ticket;
+          isLoading = false;
+        });
+
+        if (ticket == null) {
+          ShowToast().showNormalToast(
+            msg: 'No active ticket for this event for this user',
+          );
+        } else {
+          _showTicketValidationDialog(ticket);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+        ShowToast().showNormalToast(msg: 'Error scanning badge: $e');
       }
     }
   }
@@ -415,19 +452,25 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                     final List<Barcode> barcodes = capture.barcodes;
                     for (final barcode in barcodes) {
                       if (barcode.rawValue != null) {
-                        final qrData = TicketModel.parseQRCodeData(
-                          barcode.rawValue!,
-                        );
+                        final raw = barcode.rawValue!;
+                        // Try ticket QR first
+                        final qrData = TicketModel.parseQRCodeData(raw);
                         if (qrData != null) {
                           final ticketCode = qrData['ticketCode'];
                           if (ticketCode != null) {
                             _processTicketCode(ticketCode);
+                            return;
                           }
-                        } else {
-                          ShowToast().showNormalToast(
-                            msg: 'Invalid QR code format',
-                          );
                         }
+                        // Then try user badge QR
+                        final userId = UserBadgeModel.parseBadgeQr(raw);
+                        if (userId != null) {
+                          _processUserBadge(userId);
+                          return;
+                        }
+                        ShowToast().showNormalToast(
+                          msg: 'Invalid QR code format',
+                        );
                       }
                     }
                   },

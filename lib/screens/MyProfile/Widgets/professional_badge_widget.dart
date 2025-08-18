@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:flutter/rendering.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../models/badge_model.dart';
 import '../../../Utils/colors.dart';
 
@@ -11,6 +19,7 @@ class ProfessionalBadgeWidget extends StatefulWidget {
   final bool showActions;
   final VoidCallback? onShare;
   final VoidCallback? onDownload;
+  final bool enableFullScreenOnTap;
 
   const ProfessionalBadgeWidget({
     super.key,
@@ -20,6 +29,7 @@ class ProfessionalBadgeWidget extends StatefulWidget {
     this.showActions = true,
     this.onShare,
     this.onDownload,
+    this.enableFullScreenOnTap = true,
   });
 
   @override
@@ -34,6 +44,14 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
   late AnimationController _entranceController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
+
+  // Compute a UI scale factor that adapts to large text and small layouts
+  double _uiScale(BuildContext context) {
+    final textScale = MediaQuery.of(context).textScaleFactor;
+    // When the user increases text size, gently scale down our UI to maintain fit
+    final inverseTextScale = 1.0 / textScale;
+    return inverseTextScale.clamp(0.85, 1.0);
+  }
 
   @override
   void initState() {
@@ -92,10 +110,25 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
                     child: FittedBox(
                       fit: BoxFit.contain,
                       alignment: Alignment.center,
-                      child: SizedBox(
-                        width: 340,
-                        height: 220,
-                        child: _buildBadgeCard(),
+                      child: Builder(
+                        builder: (context) {
+                          final scale = _uiScale(context);
+                          final card = SizedBox(
+                            width: 340,
+                            height: 220,
+                            child: _buildBadgeCard(),
+                          );
+                          final scaled = Transform.scale(
+                            scale: scale,
+                            alignment: Alignment.topLeft,
+                            child: card,
+                          );
+                          if (!widget.enableFullScreenOnTap) return scaled;
+                          return GestureDetector(
+                            onTap: () => _openFullScreenBadge(context),
+                            child: scaled,
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -135,10 +168,35 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
             _buildGradientBackground(),
             _buildShimmerEffect(),
             _buildContrastOverlay(),
+            _buildCenterQr(),
             _buildBadgeContent(),
             _buildHolographicEffect(),
           ],
         ),
+      ),
+    );
+  }
+
+  void _openFullScreenBadge(BuildContext context) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black.withValues(alpha: 0.85),
+        pageBuilder: (_, __, ___) {
+          final scale = _uiScale(context);
+          return Scaffold(
+            backgroundColor: Colors.black.withValues(alpha: 0.85),
+            body: _FullScreenBadgeView(
+              badgeUid: widget.badge.uid,
+              baseScale: scale,
+              buildCard: _buildBadgeCard,
+              onClose: () => Navigator.of(context).pop(),
+            ),
+          );
+        },
+        transitionsBuilder: (_, animation, __, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
       ),
     );
   }
@@ -257,7 +315,8 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
 
   Widget _buildHeader() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -283,98 +342,145 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
             ),
           ],
         ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+          ),
+          child: Text(
+            'ID: ${widget.badge.uid.substring(0, 8)}',
+            style: TextStyle(
+              fontSize: 8,
+              color: Colors.white.withValues(alpha: 0.9),
+              fontFamily: 'Courier',
+              letterSpacing: 0.5,
+              shadows: _textShadows(small: true),
+            ),
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildProfileSection() {
-    return Column(
-      children: [
-        Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: ClipOval(
-            child: widget.badge.profileImageUrl != null
-                ? CachedNetworkImage(
-                    imageUrl: widget.badge.profileImageUrl!,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
+    final scale = _uiScale(context);
+    final avatarSize = 50.0 * scale;
+    final spacing = 6.0 * scale;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 80, maxWidth: 120),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: avatarSize,
+            height: avatarSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: widget.badge.profileImageUrl != null
+                  ? CachedNetworkImage(
+                      imageUrl: widget.badge.profileImageUrl!,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.person, color: Colors.grey),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.person, color: Colors.grey),
+                      ),
+                    )
+                  : Container(
                       color: Colors.grey[300],
                       child: const Icon(Icons.person, color: Colors.grey),
                     ),
-                    errorWidget: (context, url, error) => Container(
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.person, color: Colors.grey),
-                    ),
-                  )
-                : Container(
-                    color: Colors.grey[300],
-                    child: const Icon(Icons.person, color: Colors.grey),
-                  ),
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          widget.badge.userName,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+          SizedBox(height: spacing),
+          Text(
+            widget.badge.userName,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildStatsSection() {
+    // Align labels closer to their numeric chips on the right side
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _buildStatItem('Events Created', widget.badge.eventsCreated.toString()),
-        _buildStatItem(
+        _buildRightAlignedStat(
+          'Events Created',
+          widget.badge.eventsCreated.toString(),
+        ),
+        _buildRightAlignedStat(
           'Events Attended',
           widget.badge.eventsAttended.toString(),
         ),
-        _buildStatItem('Member Since', widget.badge.membershipDuration),
+        _buildRightAlignedStat('Member Since', widget.badge.membershipDuration),
       ],
     );
   }
 
-  Widget _buildStatItem(String label, String value) {
+  Widget _buildRightAlignedStat(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 9,
-              color: Colors.white.withValues(alpha: 0.95),
-              shadows: _textShadows(small: true),
+          // Label pill first (left), followed by the numeric chip on the right
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+            ),
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 9,
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.right,
             ),
           ),
+          const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.35),
+              color: Colors.black.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.25),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
             child: Text(
               value,
@@ -390,19 +496,54 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
     );
   }
 
-  Widget _buildFooter() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          'ID: ${widget.badge.uid.substring(0, 8)}',
-          style: TextStyle(
-            fontSize: 7,
-            color: Colors.white.withValues(alpha: 0.85),
-            fontFamily: 'Courier',
-            shadows: _textShadows(small: true),
+  // Center QR positioned in the open middle area of the card
+  Widget _buildCenterQr() {
+    final scale = _uiScale(context);
+    final size = 100.0 * scale;
+    return Positioned.fill(
+      child: Align(
+        alignment: Alignment.center,
+        child: Transform.translate(
+          offset: Offset(-24.0 * scale, 0),
+          child: Container(
+            width: size,
+            height: size,
+            padding: EdgeInsets.all(4 * scale),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.95),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: QrImageView(
+              data: widget.badge.badgeQrData,
+              version: QrVersions.auto,
+              gapless: true,
+              foregroundColor: Colors.black,
+              eyeStyle: const QrEyeStyle(
+                eyeShape: QrEyeShape.square,
+                color: Colors.black,
+              ),
+              dataModuleStyle: const QrDataModuleStyle(
+                dataModuleShape: QrDataModuleShape.square,
+                color: Colors.black,
+              ),
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildFooter() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
         Text(
           'Valid: ${DateTime.now().year}',
           style: TextStyle(
@@ -550,5 +691,228 @@ class CompactBadgeWidget extends StatelessWidget {
       default:
         return const Color(0xFF9B59B6);
     }
+  }
+}
+
+class _FullScreenBadgeView extends StatefulWidget {
+  final String badgeUid;
+  final double baseScale;
+  final Widget Function() buildCard;
+  final VoidCallback? onClose;
+  const _FullScreenBadgeView({
+    required this.badgeUid,
+    required this.baseScale,
+    required this.buildCard,
+    this.onClose,
+  });
+
+  @override
+  State<_FullScreenBadgeView> createState() => _FullScreenBadgeViewState();
+}
+
+class _FullScreenBadgeViewState extends State<_FullScreenBadgeView> {
+  final TransformationController _tc = TransformationController();
+
+  @override
+  void dispose() {
+    _tc.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width - 32;
+    final height = width * (220 / 340);
+    return SafeArea(
+      child: Stack(
+        children: [
+          Center(
+            child: Hero(
+              tag: 'badge_fullscreen_${widget.badgeUid}',
+              child: InteractiveViewer(
+                transformationController: _tc,
+                minScale: 0.8,
+                maxScale: 3.0,
+                boundaryMargin: const EdgeInsets.all(48),
+                child: Material(
+                  color: Colors.transparent,
+                  child: Transform.scale(
+                    scale: widget.baseScale,
+                    child: SizedBox(
+                      width: width,
+                      height: height,
+                      child: widget.buildCard(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Top-right close
+          Positioned(
+            top: 8,
+            right: 8,
+            child: IconButton(
+              icon: const Icon(Icons.close, color: Colors.white),
+              onPressed: widget.onClose,
+              tooltip: 'Close',
+            ),
+          ),
+
+          // Bottom actions
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 16,
+            child: _ActionBar(
+              onShare: () async {
+                final file = await _exportBadgePngStatic(
+                  context,
+                  widget.buildCard,
+                  width,
+                  height,
+                );
+                await Share.shareXFiles([
+                  XFile(file.path),
+                ], text: 'My Orgami badge');
+              },
+              onSave: () async {
+                final file = await _exportBadgePngStatic(
+                  context,
+                  widget.buildCard,
+                  width,
+                  height,
+                );
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Saved to: ${file.path}')),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<File> _exportBadgePngStatic(
+    BuildContext context,
+    Widget Function() builder,
+    double width,
+    double height,
+  ) async {
+    final repaintKey = GlobalKey();
+    final repaint = RepaintBoundary(
+      key: repaintKey,
+      child: SizedBox(width: width, height: height, child: builder()),
+    );
+
+    final overlay = Overlay.of(context);
+    final entry = OverlayEntry(
+      builder: (_) => Center(child: Opacity(opacity: 0.0, child: repaint)),
+    );
+    overlay.insert(entry);
+    await Future.delayed(const Duration(milliseconds: 16));
+    final boundary =
+        repaintKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    final image = await boundary.toImage(pixelRatio: 3.0);
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    final dir = await getTemporaryDirectory();
+    final file = File(
+      '${dir.path}/badge_${DateTime.now().millisecondsSinceEpoch}.png',
+    );
+    await file.writeAsBytes(data!.buffer.asUint8List());
+    entry.remove();
+    return file;
+  }
+}
+
+class _ActionBar extends StatelessWidget {
+  final VoidCallback onShare;
+  final VoidCallback onSave;
+  const _ActionBar({required this.onShare, required this.onSave});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _pillButton(icon: Icons.share, label: 'Share', onTap: onShare),
+          _pillButton(
+            icon: Icons.download_rounded,
+            label: 'Save',
+            onTap: onSave,
+          ),
+          _pillButton(
+            icon: Icons.account_balance_wallet_outlined,
+            label: 'Save to Wallet',
+            onTap: () async {
+              try {
+                // Determine platform hint
+                final platform = Theme.of(context).platform;
+                final isApple =
+                    platform == TargetPlatform.iOS ||
+                    platform == TargetPlatform.macOS;
+                final callable = FirebaseFunctions.instance.httpsCallable(
+                  'generateUserBadgePass',
+                );
+                final result = await callable.call({
+                  'uid':
+                      (ModalRoute.of(context)?.settings.arguments
+                          as Map?)?['uid'] ??
+                      '',
+                  'platform': isApple ? 'apple' : 'google',
+                });
+                final url = Uri.parse(result.data['url'] as String);
+                if (await canLaunchUrl(url)) {
+                  await launchUrl(url, mode: LaunchMode.externalApplication);
+                }
+              } catch (_) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Unable to add to wallet at this time.'),
+                  ),
+                );
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _pillButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
