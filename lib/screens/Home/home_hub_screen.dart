@@ -19,7 +19,7 @@ class HomeHubScreen extends StatefulWidget {
 }
 
 class _HomeHubScreenState extends State<HomeHubScreen> {
-  int _tabIndex = 0; // 0: Public, 1: Org Events
+  int _tabIndex = 0; // 0: Public, 1: Private
   final TextEditingController _searchCtlr = TextEditingController();
   bool _searching = false;
   List<Map<String, String>> _myOrgs = [];
@@ -254,7 +254,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
       child: Row(
         children: [
           _segButton('Public', 0, primary, Icons.public),
-          _segButton('Org Events', 1, primary, Icons.diversity_3),
+          _segButton('Private', 1, primary, Icons.diversity_3),
         ],
       ),
     );

@@ -242,7 +242,7 @@ class _SearchScreenState extends State<SearchScreen>
           ),
           tabs: const [
             Tab(text: 'Public'),
-            Tab(text: 'Org Events'),
+            Tab(text: 'Private'),
             Tab(text: 'Users'),
           ],
         ),

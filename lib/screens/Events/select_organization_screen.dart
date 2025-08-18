@@ -122,10 +122,10 @@ class _SelectOrganizationScreenState extends State<SelectOrganizationScreen> {
         children: const [
           Icon(Icons.apartment, size: 56, color: Color(0xFF9CA3AF)),
           SizedBox(height: 12),
-          Text('You are not a member of any organizations yet.'),
+          Text('You are not a member of any groups yet.'),
           SizedBox(height: 4),
           Text(
-            'Create a public event or join an organization to continue.',
+            'Create a public event or join a group to continue.',
             style: TextStyle(color: Color(0xFF6B7280)),
           ),
         ],

@@ -3,7 +3,7 @@ import 'package:orgami/Screens/Home/home_hub_screen.dart';
 import 'package:orgami/screens/MyProfile/my_profile_screen.dart';
 import 'package:orgami/Screens/Home/notifications_screen.dart';
 import 'package:orgami/Screens/Messaging/messaging_screen.dart';
-import 'package:orgami/screens/Organizations/organizations_screen.dart';
+import 'package:orgami/screens/Organizations/groups_screen.dart';
 import 'package:orgami/Screens/Home/account_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -22,7 +22,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   final List<Widget> _dashBoardScreens = const [
     HomeHubScreen(),
-    OrganizationsScreen(),
+    GroupsScreen(),
     MessagingScreen(),
     MyProfileScreen(showBackButton: false),
     NotificationsScreen(),

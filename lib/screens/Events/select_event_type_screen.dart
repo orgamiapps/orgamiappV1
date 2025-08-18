@@ -57,7 +57,7 @@ class _SelectEventTypeScreenState extends State<SelectEventTypeScreen> {
       if (mounted) {
         setState(() {
           _loadingOrgs = false;
-          _errorText = 'Failed to load organizations';
+          _errorText = 'Failed to load groups';
         });
       }
     }
@@ -82,7 +82,7 @@ class _SelectEventTypeScreenState extends State<SelectEventTypeScreen> {
         if (!mounted) return;
         setState(() {
           _loadingOrgs = false;
-          _errorText = 'Error receiving organization updates';
+          _errorText = 'Error receiving group updates';
         });
       },
       cancelOnError: false,
@@ -374,7 +374,7 @@ class _SelectEventTypeScreenState extends State<SelectEventTypeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'You are not a member of any organizations yet.',
+                          'You are not a member of any groups yet.',
                           style: TextStyle(color: Color(0xFF6B7280)),
                         ),
                         const SizedBox(height: 8),
@@ -385,7 +385,7 @@ class _SelectEventTypeScreenState extends State<SelectEventTypeScreen> {
                               const SelectOrganizationScreen(),
                             );
                           },
-                          child: const Text('Browse or create organizations'),
+                          child: const Text('Browse or create groups'),
                         ),
                       ],
                     )
