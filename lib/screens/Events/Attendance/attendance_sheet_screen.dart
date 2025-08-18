@@ -162,7 +162,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
     final List<int> bytes = workbook.saveAsStream();
     FileStorage.writeCounter(
       Uint8List.fromList(bytes),
-      "${eventModel.title} ${selectedTab == 1 ? '' : 'Pre Registered'} Attendance Sheet.xlsx",
+      "${eventModel.title} ${selectedTab == 1 ? '' : "RSVP's"} Attendance Sheet.xlsx",
     ).then((value) {
       ShowToast().showNormalToast(
         msg: '${eventModel.title} Attendance Sheet.xlsx Saved!',
@@ -346,7 +346,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
 
       // Get the file path
       final fileName =
-          "${eventModel.title} ${selectedTab == 1 ? '' : 'Pre Registered'} Attendance Sheet.xlsx";
+          "${eventModel.title} ${selectedTab == 1 ? '' : "RSVP's"} Attendance Sheet.xlsx";
       final directory = await getApplicationDocumentsDirectory();
       final filePath = '${directory.path}/$fileName';
 
@@ -410,7 +410,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
       child: Row(
         children: [
           _modernTabView(label: 'Sign In', index: 1),
-          _modernTabView(label: 'Pre Registered', index: 2),
+          _modernTabView(label: "RSVP's", index: 2),
         ],
       ),
     );
@@ -617,7 +617,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Pre-Registered Attendees',
+                      "RSVP's",
                       style: const TextStyle(
                         color: AppThemeColor.pureBlackColor,
                         fontSize: 18,
@@ -626,7 +626,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                       ),
                     ),
                     Text(
-                      '${registerAttendanceList.length} people registered',
+                      "${registerAttendanceList.length} RSVP's",
                       style: const TextStyle(
                         color: AppThemeColor.dullFontColor,
                         fontSize: 14,
@@ -664,7 +664,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'No pre-registered attendees yet',
+                        "No RSVP's yet",
                         style: TextStyle(
                           color: AppThemeColor.dullFontColor,
                           fontSize: 16,

@@ -38,6 +38,54 @@ setGlobalOptions({maxInstances: 10});
 // });
 
 /**
+ * Deliver pending push notifications created by the app.
+ * The client enqueues docs in `pendingPushNotifications` with fields:
+ * - receiverId, senderId, title, body, type, conversationId, fcmToken
+ * This trigger sends via FCM and deletes the doc upon success.
+ */
+exports.dispatchPendingPush = onDocumentCreated("pendingPushNotifications/{docId}", async (event) => {
+  const snap = event.data;
+  if (!snap) return;
+  const data = snap.data();
+  try {
+    const token = data.fcmToken;
+    const title = data.title || "Orgami";
+    const body = data.body || "New notification";
+    if (!token || typeof token !== 'string' || token.length < 10) {
+      logger.warn("No valid fcmToken, removing pending push", { id: snap.id });
+      await snap.ref.delete();
+      return;
+    }
+
+    const message = {
+      token,
+      notification: { title, body },
+      data: {
+        type: String(data.type || 'message'),
+        conversationId: String(data.conversationId || ''),
+        senderId: String(data.senderId || ''),
+        receiverId: String(data.receiverId || ''),
+      },
+      android: {
+        priority: 'high',
+        notification: { channelId: 'orgami_channel' },
+      },
+      apns: {
+        payload: { aps: { sound: 'default' } },
+      },
+    };
+
+    const id = await admin.messaging().send(message);
+    logger.info("Push sent", { fcmMessageId: id, to: data.receiverId });
+
+    await snap.ref.delete();
+  } catch (err) {
+    logger.error("Failed to dispatch push", { id: snap.id, error: err });
+    await snap.ref.set({ status: 'error', error: String(err && err.message || err), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+  }
+});
+
+/**
  * Callable: generateUserBadgePass
  * Input: { uid: string, platform: 'apple'|'google' }
  * Output: { url: string }

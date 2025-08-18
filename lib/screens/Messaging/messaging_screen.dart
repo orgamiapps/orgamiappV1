@@ -321,6 +321,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'fab_new_message',
         onPressed: () {
           Navigator.push(
             context,
@@ -328,10 +329,9 @@ class _MessagingScreenState extends State<MessagingScreen> {
           );
         },
         backgroundColor: Theme.of(context).colorScheme.primary,
-        child: Icon(
-          Icons.message,
-          color: Theme.of(context).colorScheme.onPrimary,
-        ),
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        elevation: 6,
+        child: const Icon(Icons.add_comment_rounded),
       ),
     );
   }

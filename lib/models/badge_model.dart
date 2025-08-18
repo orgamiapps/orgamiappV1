@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class UserBadgeModel {
   static String firebaseKey = 'UserBadges';
-  
+
   final String uid;
   final String userName;
   final String email;
@@ -16,7 +16,7 @@ class UserBadgeModel {
   final String badgeLevel;
   final List<String> achievements;
   final DateTime lastUpdated;
-  
+
   UserBadgeModel({
     required this.uid,
     required this.userName,
@@ -36,7 +36,7 @@ class UserBadgeModel {
   // Calculate badge level based on activities
   static String calculateBadgeLevel(int eventsCreated, int eventsAttended) {
     final totalActivity = eventsCreated + eventsAttended;
-    
+
     if (totalActivity >= 100) return 'Master Organizer';
     if (totalActivity >= 50) return 'Senior Event Host';
     if (totalActivity >= 25) return 'Event Specialist';
@@ -64,24 +64,36 @@ class UserBadgeModel {
   }
 
   // Get achievements based on user stats
-  static List<String> generateAchievements(int eventsCreated, int eventsAttended, double dwellHours) {
+  static List<String> generateAchievements(
+    int eventsCreated,
+    int eventsAttended,
+    double dwellHours,
+  ) {
     List<String> achievements = [];
-    
-    if (eventsCreated >= 50) achievements.add('Master Creator');
-    else if (eventsCreated >= 25) achievements.add('Event Creator');
-    else if (eventsCreated >= 10) achievements.add('Active Creator');
-    
-    if (eventsAttended >= 50) achievements.add('Super Attendee');
-    else if (eventsAttended >= 25) achievements.add('Regular Attendee');
-    else if (eventsAttended >= 10) achievements.add('Event Explorer');
-    
-    if (dwellHours >= 100) achievements.add('Time Master');
-    else if (dwellHours >= 50) achievements.add('Engagement Expert');
-    
+
+    if (eventsCreated >= 50)
+      achievements.add('Master Creator');
+    else if (eventsCreated >= 25)
+      achievements.add('Event Creator');
+    else if (eventsCreated >= 10)
+      achievements.add('Active Creator');
+
+    if (eventsAttended >= 50)
+      achievements.add('Super Attendee');
+    else if (eventsAttended >= 25)
+      achievements.add('Regular Attendee');
+    else if (eventsAttended >= 10)
+      achievements.add('Event Explorer');
+
+    if (dwellHours >= 100)
+      achievements.add('Time Master');
+    else if (dwellHours >= 50)
+      achievements.add('Engagement Expert');
+
     if (eventsCreated >= 10 && eventsAttended >= 10) {
       achievements.add('Community Leader');
     }
-    
+
     return achievements;
   }
 
@@ -89,22 +101,25 @@ class UserBadgeModel {
   String get membershipDuration {
     final now = DateTime.now();
     final difference = now.difference(memberSince);
-    
+
     if (difference.inDays >= 365) {
       final years = (difference.inDays / 365).floor();
-      return '$years ${years == 1 ? 'year' : 'years'}';
+      if (years <= 1) {
+        return '> 1 year';
+      }
+      return '> $years years';
     } else if (difference.inDays >= 30) {
-      final months = (difference.inDays / 30).floor();
-      return '$months ${months == 1 ? 'month' : 'months'}';
+      // Anything under a year should read "< 1 year"
+      return '< 1 year';
     } else {
-      return '${difference.inDays} ${difference.inDays == 1 ? 'day' : 'days'}';
+      return '< 1 year';
     }
   }
 
   // Create from Firestore document
   factory UserBadgeModel.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    
+
     return UserBadgeModel(
       uid: data['uid'] ?? '',
       userName: data['userName'] ?? '',
@@ -112,13 +127,15 @@ class UserBadgeModel {
       profileImageUrl: data['profileImageUrl'],
       occupation: data['occupation'],
       location: data['location'],
-      memberSince: (data['memberSince'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      memberSince:
+          (data['memberSince'] as Timestamp?)?.toDate() ?? DateTime.now(),
       eventsCreated: data['eventsCreated'] ?? 0,
       eventsAttended: data['eventsAttended'] ?? 0,
       totalDwellHours: (data['totalDwellHours'] ?? 0).toDouble(),
       badgeLevel: data['badgeLevel'] ?? 'Event Explorer',
       achievements: List<String>.from(data['achievements'] ?? []),
-      lastUpdated: (data['lastUpdated'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      lastUpdated:
+          (data['lastUpdated'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 
@@ -167,8 +184,12 @@ class UserBadgeModel {
     required double totalDwellHours,
   }) {
     final badgeLevel = calculateBadgeLevel(eventsCreated, eventsAttended);
-    final achievements = generateAchievements(eventsCreated, eventsAttended, totalDwellHours);
-    
+    final achievements = generateAchievements(
+      eventsCreated,
+      eventsAttended,
+      totalDwellHours,
+    );
+
     return UserBadgeModel(
       uid: uid,
       userName: userName,

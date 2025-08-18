@@ -430,7 +430,12 @@ class FirebaseMessagingHelper {
       if (receiverId != null) {
         await _sendPushNotification(receiverId, content, user.uid);
       } else {
-        // TODO: Broadcast to group members (Cloud Function recommended)
+        // Broadcast to all group members except sender
+        await _broadcastGroupPushNotifications(
+          resolvedConversationId,
+          content,
+          user.uid,
+        );
       }
 
       return messageRef.id;
@@ -499,26 +504,89 @@ class FirebaseMessagingHelper {
       final senderData = senderDoc.data() as Map<String, dynamic>;
       final senderName = senderData['name'] as String? ?? 'Someone';
 
-      // Send notification via Cloud Functions (you'll need to implement this)
-      // For now, we'll just log it
+      // Enqueue for server-side push delivery (Cloud Function processes this)
+      await _firestore.collection('pendingPushNotifications').add({
+        'receiverId': receiverId,
+        'senderId': senderId,
+        'title': senderName,
+        'body': content,
+        'type': 'message',
+        'conversationId': _getConversationId(senderId, receiverId),
+        'fcmToken': fcmToken,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
       if (kDebugMode) {
         Logger.error(
-          '📱 Sending push notification to $receiverId: $content from $senderName',
+          '📱 Enqueued push to $receiverId (token present): "$content" from $senderName',
         );
       }
-
-      // TODO: Implement Cloud Function call to send push notification
-      // await _firestore.collection('notifications').add({
-      //   'receiverId': receiverId,
-      //   'senderId': senderId,
-      //   'content': content,
-      //   'senderName': senderName,
-      //   'fcmToken': fcmToken,
-      //   'timestamp': FieldValue.serverTimestamp(),
-      // });
     } catch (e) {
       if (kDebugMode) {
         Logger.error('❌ Error sending push notification: $e');
+      }
+    }
+  }
+
+  Future<void> _broadcastGroupPushNotifications(
+    String conversationId,
+    String content,
+    String senderId,
+  ) async {
+    try {
+      final convDoc = await _firestore
+          .collection('Conversations')
+          .doc(conversationId)
+          .get();
+      if (!convDoc.exists) return;
+
+      final data = convDoc.data() ?? const <String, dynamic>{};
+      final List<dynamic> participantIdsDyn =
+          (data['participantIds'] as List<dynamic>?) ?? const [];
+      final List<String> participantIds = participantIdsDyn
+          .map((e) => e.toString())
+          .toList();
+      final String groupName = (data['groupName'] as String?) ?? 'Group';
+
+      // Resolve sender name once
+      final senderDoc = await _firestore
+          .collection('Customers')
+          .doc(senderId)
+          .get();
+      final senderData = senderDoc.data() ?? const <String, dynamic>{};
+      final senderName = (senderData['name'] as String?) ?? 'Someone';
+
+      for (final uid in participantIds) {
+        if (uid == senderId) continue;
+
+        // Get fcm token for this user
+        final userDoc = await _firestore.collection('users').doc(uid).get();
+        if (!userDoc.exists) continue;
+        final userData = userDoc.data() as Map<String, dynamic>;
+        final fcmToken = userData['fcmToken'] as String?;
+        if (fcmToken == null || fcmToken.isEmpty) continue;
+
+        // Enqueue push for processing by backend
+        await _firestore.collection('pendingPushNotifications').add({
+          'receiverId': uid,
+          'senderId': senderId,
+          'title': '$groupName • $senderName',
+          'body': content,
+          'type': 'group_message',
+          'conversationId': conversationId,
+          'fcmToken': fcmToken,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      if (kDebugMode) {
+        Logger.error(
+          '📣 Broadcast enqueued to group ($conversationId) by $senderName',
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        Logger.error('❌ Error broadcasting group push: $e');
       }
     }
   }

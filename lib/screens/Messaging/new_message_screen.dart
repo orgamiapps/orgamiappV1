@@ -11,6 +11,7 @@ import 'package:orgami/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:orgami/Utils/logger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:orgami/firebase/organization_helper.dart';
 
 class NewMessageScreen extends StatefulWidget {
   const NewMessageScreen({super.key});
@@ -19,7 +20,8 @@ class NewMessageScreen extends StatefulWidget {
   State<NewMessageScreen> createState() => _NewMessageScreenState();
 }
 
-class _NewMessageScreenState extends State<NewMessageScreen> {
+class _NewMessageScreenState extends State<NewMessageScreen>
+    with TickerProviderStateMixin {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseMessagingHelper _messagingHelper = FirebaseMessagingHelper();
   final TextEditingController _searchController = TextEditingController();
@@ -32,19 +34,56 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
   bool _groupMode = false;
   final Set<String> _selectedUserIds = {};
   Set<String> _blockedUserIds = <String>{};
+  List<Map<String, String>> _myOrgs = [];
+  bool _isLoadingOrgs = false;
+  TabController? _groupTabController;
+  int _groupTabIndex = 0;
+  String? _selectedOrgId;
+  String? _selectedOrgName;
 
   @override
   void initState() {
     super.initState();
     _loadAllUsers();
     _searchController.addListener(_onSearchChanged);
+    _loadMyOrganizations();
+    _groupTabController = TabController(length: 2, vsync: this);
+    _groupTabController!.addListener(() {
+      if (!mounted) return;
+      setState(() {
+        _groupTabIndex = _groupTabController!.index;
+      });
+    });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     _groupNameController.dispose();
+    _groupTabController?.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadMyOrganizations() async {
+    try {
+      setState(() {
+        _isLoadingOrgs = true;
+      });
+      final helper = OrganizationHelper();
+      final orgs = await helper.getUserOrganizationsLite();
+      if (!mounted) return;
+      setState(() {
+        _myOrgs = orgs;
+        _isLoadingOrgs = false;
+      });
+    } catch (e) {
+      Logger.error('Error loading organizations: $e');
+      if (!mounted) return;
+      setState(() {
+        _isLoadingOrgs = false;
+        _myOrgs = [];
+      });
+    }
   }
 
   Future<void> _loadAllUsers() async {
@@ -239,6 +278,61 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
     }
   }
 
+  Future<void> _createGroupFromOrganization(
+    String organizationId,
+    String organizationName,
+  ) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) return;
+
+      final membersSnap = await FirebaseFirestore.instance
+          .collection('Organizations')
+          .doc(organizationId)
+          .collection('Members')
+          .where('status', isEqualTo: 'approved')
+          .limit(500)
+          .get();
+
+      final Set<String> participantIds = <String>{};
+      for (final d in membersSnap.docs) {
+        final data = d.data();
+        final String? fromField = (data['userId'] as String?);
+        final String fallback = d.id; // legacy docs
+        final String resolved = (fromField != null && fromField.isNotEmpty)
+            ? fromField
+            : fallback;
+        if (resolved.isNotEmpty) participantIds.add(resolved);
+      }
+
+      if (participantIds.length < 3) {
+        ShowToast().showSnackBar('Group must have at least 3 members', context);
+        return;
+      }
+
+      final conv = await _messagingHelper.createGroupConversation(
+        groupName: organizationName.isEmpty ? null : organizationName,
+        participantIds: participantIds.toList()..sort(),
+      );
+      if (conv == null) {
+        ShowToast().showSnackBar('Failed to create group', context);
+        return;
+      }
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatScreen(conversationId: conv.id),
+        ),
+      );
+    } catch (e) {
+      Logger.error('Error creating org group: $e');
+      if (!mounted) return;
+      ShowToast().showSnackBar('Error creating group', context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -248,6 +342,14 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.black87,
+          ),
+          onPressed: () => Navigator.pop(context),
+          tooltip: 'Back',
+        ),
         titleTextStyle: const TextStyle(
           color: Colors.black87,
           fontSize: 22,
@@ -256,7 +358,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
-        title: Text(_groupMode ? 'New Group' : 'New Message'),
+        title: Text(_groupMode ? 'New Group Message' : 'New Message'),
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),
           child: Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
@@ -265,19 +367,24 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
       body: Column(
         children: [
           _buildModeToggle(),
-          if (_groupMode) _buildGroupHeader(),
-          _buildSearchBar(),
-          Expanded(
-            child: _isLoading
-                ? Center(
-                    child: CircularProgressIndicator(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  )
-                : _searchResults.isEmpty
-                ? _buildEmptyState()
-                : _buildUsersList(),
-          ),
+          if (_groupMode) ...[
+            _buildGroupHeader(),
+            _buildGroupTabs(),
+            Expanded(child: _buildGroupTabContent()),
+          ] else ...[
+            _buildSearchBar(),
+            Expanded(
+              child: _isLoading
+                  ? Center(
+                      child: CircularProgressIndicator(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    )
+                  : _searchResults.isEmpty
+                  ? _buildEmptyState()
+                  : _buildUsersList(),
+            ),
+          ],
         ],
       ),
     );
@@ -305,15 +412,224 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
           const Spacer(),
           if (_groupMode)
             FilledButton(
-              onPressed: _selectedUserIds.length >= 2
-                  ? _createGroupAndOpenChat
-                  : null,
+              onPressed: () {
+                final onUsersTab = _groupTabIndex == 0;
+                if (onUsersTab) {
+                  if (_selectedUserIds.length >= 2) {
+                    _createGroupAndOpenChat();
+                  }
+                } else {
+                  if (_selectedOrgId != null && _selectedOrgId!.isNotEmpty) {
+                    _createGroupFromOrganization(
+                      _selectedOrgId!,
+                      _selectedOrgName ?? 'Group',
+                    );
+                  }
+                }
+              },
               child: const Text('Create'),
             ),
         ],
       ),
     );
   }
+
+  Widget _buildGroupTabs() {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+    final theme = Theme.of(context);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TabBar(
+        controller: _groupTabController,
+        indicatorColor: Theme.of(context).colorScheme.primary,
+        labelColor: Theme.of(context).colorScheme.primary,
+        unselectedLabelColor: theme.textTheme.bodyMedium?.color,
+        tabs: const [
+          Tab(text: 'Users'),
+          Tab(text: 'Your Groups'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGroupTabContent() {
+    if (_groupTabIndex == 1) {
+      return _buildGroupsTab();
+    }
+    // Users tab content
+    return Column(
+      children: [
+        _buildSearchBar(),
+        Expanded(
+          child: _isLoading
+              ? Center(
+                  child: CircularProgressIndicator(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                )
+              : _searchResults.isEmpty
+              ? _buildEmptyState()
+              : _buildUsersList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGroupsTab() {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+    final theme = Theme.of(context);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.groups_outlined,
+                color: isDark
+                    ? const Color(0xFF2C5A96)
+                    : AppThemeColor.darkBlueColor,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Your Groups',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: theme.textTheme.titleMedium?.color,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                color: theme.textTheme.bodyMedium?.color,
+                onPressed: _loadMyOrganizations,
+                tooltip: 'Refresh',
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_isLoadingOrgs)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: SizedBox(
+                  height: 24,
+                  width: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          else if (_myOrgs.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'You have no groups yet.',
+                style: TextStyle(color: theme.textTheme.bodyMedium?.color),
+              ),
+            )
+          else
+            Column(
+              children: _myOrgs.map((org) {
+                final orgId = org['id'] ?? '';
+                final orgName = org['name'] ?? 'Group';
+                final selected = _selectedOrgId == orgId;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: theme.scaffoldBackgroundColor,
+                    borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+                    border: Border.all(
+                      color: selected
+                          ? (isDark
+                                ? const Color(0xFF2C5A96)
+                                : AppThemeColor.darkBlueColor)
+                          : (isDark
+                                ? const Color(0xFF2C5A96)
+                                : AppThemeColor.lightBlueColor),
+                      width: selected ? 1.0 : 0.5,
+                    ),
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    leading: CircleAvatar(
+                      backgroundColor: isDark
+                          ? const Color(0xFF4A90E2)
+                          : AppThemeColor.lightBlueColor,
+                      child: const Icon(Icons.group, color: Colors.white),
+                    ),
+                    title: Text(
+                      orgName,
+                      style: TextStyle(
+                        color: theme.textTheme.titleMedium?.color,
+                      ),
+                    ),
+                    trailing: Radio<String>(
+                      value: orgId,
+                      groupValue: _selectedOrgId,
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedOrgId = val;
+                          _selectedOrgName = orgName;
+                        });
+                      },
+                    ),
+                    onTap: () {
+                      setState(() {
+                        if (_selectedOrgId == orgId) {
+                          _selectedOrgId = null;
+                          _selectedOrgName = null;
+                        } else {
+                          _selectedOrgId = orgId;
+                          _selectedOrgName = orgName;
+                        }
+                      });
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // (Removed) _buildOrganizationsSection replaced by tabbed UI
 
   Widget _buildGroupHeader() {
     final theme = Theme.of(context);

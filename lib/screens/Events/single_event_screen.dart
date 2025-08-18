@@ -50,6 +50,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:orgami/Screens/Events/Widget/access_list_management_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:orgami/Screens/MyProfile/badge_screen.dart';
+import 'package:orgami/Screens/Events/Widget/pre_registered_horizontal_list.dart';
 
 class SingleEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -74,6 +75,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   bool _justSignedIn =
       false; // Flag to prevent showing sign-in dialog immediately after sign-in
   int _selectedTabIndex = 0;
+
+  // RSVP state
+  bool _isRsvped = false;
+  bool _isRsvpLoading = false;
 
   // _isLoading removed - no longer needed after removing manual code input
 
@@ -184,6 +189,76 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     setState(() {
       isLoadingSummary = false;
     });
+  }
+
+  Future<void> _checkRsvpStatus() async {
+    try {
+      final isRegistered = await FirebaseFirestoreHelper()
+          .checkIfUserIsRegistered(eventModel.id);
+      if (mounted) {
+        setState(() {
+          _isRsvped = isRegistered;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _rsvpForEvent() async {
+    if (_isRsvpLoading || _isRsvped) return;
+    final currentUser = CustomerController.logeInCustomer;
+    if (currentUser == null) {
+      ShowToast().showSnackBar('Please sign in to RSVP', context);
+      return;
+    }
+    setState(() {
+      _isRsvpLoading = true;
+    });
+    try {
+      // Avoid duplicate RSVP
+      final already = await FirebaseFirestoreHelper().checkIfUserIsRegistered(
+        eventModel.id,
+      );
+      if (!already) {
+        final registrationId = FirebaseFirestore.instance
+            .collection(AttendanceModel.registerFirebaseKey)
+            .doc()
+            .id;
+        final registration = AttendanceModel(
+          id: registrationId,
+          eventId: eventModel.id,
+          userName: currentUser.name,
+          customerUid: currentUser.uid,
+          attendanceDateTime: DateTime.now(),
+          answers: [],
+          isAnonymous: false,
+          realName: currentUser.name,
+        );
+        await FirebaseFirestore.instance
+            .collection(AttendanceModel.registerFirebaseKey)
+            .doc(registrationId)
+            .set(registration.toJson());
+      }
+
+      if (mounted) {
+        setState(() {
+          _isRsvped = true;
+          preRegisteredCount = preRegisteredCount + 1;
+        });
+      }
+      if (mounted) {
+        ShowToast().showSnackBar("You've RSVP'd", context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ShowToast().showSnackBar('Failed to RSVP. Please try again.', context);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRsvpLoading = false;
+        });
+      }
+    }
   }
 
   bool isInInRadius(LatLng center, double radiusInFeet, LatLng point) {
@@ -1188,6 +1263,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     getPreRegisterCount();
     loadEventSummary();
     _loadCreatorName();
+    _checkRsvpStatus();
 
     // Check if event is favorited
     _checkFavoriteStatus();
@@ -2540,6 +2616,10 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             _buildEventImage(),
             const SizedBox(height: 24),
 
+            // RSVP Button
+            _buildRsvpButton(),
+            const SizedBox(height: 24),
+
             // Featured Badge
             if (eventModel.isFeatured) _buildFeaturedBadge(),
             if (eventModel.isFeatured) const SizedBox(height: 24),
@@ -2557,6 +2637,10 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               FirebaseAuth.instance.currentUser!.uid,
             ))
               _buildTabbedContentSection(),
+
+            // RSVPs horizontal list (above attendees)
+            PreRegisteredHorizontalList(eventModel: eventModel),
+            const SizedBox(height: 12),
 
             // Attendees List (for everyone) - Now as dropdown
             _buildAttendeesDropdown(),
@@ -4184,6 +4268,48 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                 : const SizedBox.shrink(),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRsvpButton() {
+    // Hide for event managers
+    final String uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final bool isManager = eventModel.hasManagementPermissions(uid);
+    if (isManager) return const SizedBox.shrink();
+
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: ElevatedButton(
+        onPressed: _isRsvped || _isRsvpLoading ? null : _rsvpForEvent,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _isRsvped
+              ? const Color(0xFF10B981)
+              : const Color(0xFF667EEA),
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 0,
+        ),
+        child: _isRsvpLoading
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : Text(
+                _isRsvped ? "RSVP'd" : 'RSVP',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  fontFamily: 'Roboto',
+                ),
+              ),
       ),
     );
   }
