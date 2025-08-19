@@ -496,7 +496,7 @@ class _OrgEventsListState extends State<OrgEventsList>
             Icon(Icons.event_busy, size: 60, color: Color(0xFF667EEA)),
             SizedBox(height: 24),
             Text(
-              'No Org Events Available',
+              'No Group Events Available',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
@@ -506,7 +506,7 @@ class _OrgEventsListState extends State<OrgEventsList>
             ),
             SizedBox(height: 12),
             Text(
-              'Create or join an organization to see its events here',
+              'Create or join a group to see its events here',
               style: TextStyle(
                 fontSize: 15,
                 color: Color(0xFF64748B),

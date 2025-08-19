@@ -4,6 +4,7 @@ import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/Screens/Events/Widget/single_event_list_view_item.dart';
+import 'package:orgami/Utils/cached_image.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shimmer/shimmer.dart';
@@ -619,13 +620,13 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                           ],
                         ),
                         child: ClipOval(
-                          child: user?.profilePictureUrl != null
-                              ? Image.network(
-                                  user!.profilePictureUrl!,
+                          child:
+                              (user?.profilePictureUrl != null &&
+                                  (user!.profilePictureUrl!.isNotEmpty))
+                              ? SafeNetworkImage(
+                                  imageUrl: user.profilePictureUrl!,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return _buildDefaultProfilePicture();
-                                  },
+                                  errorWidget: _buildDefaultProfilePicture(),
                                 )
                               : _buildDefaultProfilePicture(),
                         ),

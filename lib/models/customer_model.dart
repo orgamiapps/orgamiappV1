@@ -6,6 +6,7 @@ class CustomerModel {
   String uid, name, email;
   String? username; // New username field
   String? profilePictureUrl;
+  String? bannerUrl;
   String? bio;
   String? phoneNumber;
   int? age;
@@ -25,6 +26,7 @@ class CustomerModel {
     required this.email,
     this.username,
     this.profilePictureUrl,
+    this.bannerUrl,
     this.bio,
     this.phoneNumber,
     this.age,
@@ -62,6 +64,7 @@ class CustomerModel {
       email: d['email'],
       username: d['username'], // New field
       profilePictureUrl: d['profilePictureUrl'],
+      bannerUrl: d['bannerUrl'],
       bio: d['bio'],
       phoneNumber: d['phoneNumber'],
       age: d['age'],
@@ -86,6 +89,7 @@ class CustomerModel {
       'name': d.name,
       'username': d.username, // New field
       'profilePictureUrl': d.profilePictureUrl,
+      'bannerUrl': d.bannerUrl,
       'bio': d.bio,
       'phoneNumber': d.phoneNumber,
       'age': d.age,

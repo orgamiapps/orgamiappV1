@@ -514,6 +514,7 @@ class FirebaseFirestoreHelper {
     required String customerId,
     String? name,
     String? profilePictureUrl,
+    String? bannerUrl,
     String? bio,
   }) async {
     try {
@@ -523,6 +524,9 @@ class FirebaseFirestoreHelper {
       }
       if (profilePictureUrl != null) {
         updateData['profilePictureUrl'] = profilePictureUrl;
+      }
+      if (bannerUrl != null) {
+        updateData['bannerUrl'] = bannerUrl;
       }
       if (bio != null) {
         updateData['bio'] = bio;

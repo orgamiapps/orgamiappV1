@@ -121,4 +121,44 @@ class FirebaseStorageHelper {
       return null;
     }
   }
+
+  // Upload user banner
+  static Future<String?> uploadUserBanner({
+    required String userId,
+    required File imageFile,
+  }) async {
+    try {
+      // Decode and compress for banner aspect
+      final bytes = await imageFile.readAsBytes();
+      img.Image? decoded = img.decodeImage(bytes);
+      if (decoded == null) return null;
+      final int targetW = 1600;
+      final int targetH = 600;
+      decoded = img.copyResize(
+        decoded,
+        width: targetW,
+        height: targetH,
+        interpolation: img.Interpolation.cubic,
+      );
+
+      final List<int> outBytes = img.encodeJpg(decoded, quality: 80);
+
+      final dir = await getTemporaryDirectory();
+      final String tmpPath = '${dir.path}/user_banner_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final File tmpFile = File(tmpPath)..writeAsBytesSync(outBytes);
+
+      final Reference ref = _storage.ref().child(
+        'user_banners/$userId/banner_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
+      final UploadTask uploadTask = ref.putFile(tmpFile);
+      final TaskSnapshot snapshot = await uploadTask;
+      final String downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      if (kDebugMode) {
+        Logger.error('Error uploading user banner: $e', e);
+      }
+      return null;
+    }
+  }
 }

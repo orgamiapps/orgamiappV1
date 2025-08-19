@@ -33,17 +33,6 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
-    // App Check: use debug provider on emulator/dev, play integrity/safety-net in prod
-    try {
-      await FirebaseAppCheck.instance.activate(
-        androidProvider: AndroidProvider.debug,
-        appleProvider: AppleProvider.debug,
-      );
-    } catch (e, st) {
-      Logger.warning('App Check activation failed, continuing without it: $e');
-      Logger.debug(st.toString());
-    }
-
     // Enable Firestore offline persistence to keep app usable without network
     try {
       FirebaseFirestore.instance.settings = const Settings(
@@ -59,16 +48,44 @@ void main() async {
     final connectivityResult = await Connectivity().checkConnectivity();
     bool isOffline = connectivityResult == ConnectivityResult.none;
 
-    // Extra DNS check to detect captive portals/DNS failures on emulator
-    bool dnsOk = false;
-    try {
-      final lookup = await InternetAddress.lookup('firestore.googleapis.com');
-      dnsOk = lookup.isNotEmpty && lookup.first.rawAddress.isNotEmpty;
-    } catch (_) {
-      dnsOk = false;
+    // Extra DNS checks to detect captive portals/DNS failures on emulator
+    Future<bool> _dnsOkFor(String host) async {
+      try {
+        final lookup = await InternetAddress.lookup(host);
+        return lookup.isNotEmpty && lookup.first.rawAddress.isNotEmpty;
+      } catch (_) {
+        return false;
+      }
     }
 
+    final bool dnsOk =
+        await _dnsOkFor('firestore.googleapis.com') &&
+        await _dnsOkFor('firebaseappcheck.googleapis.com') &&
+        await _dnsOkFor('firebasestorage.googleapis.com');
+
     final bool isReachable = !isOffline && dnsOk;
+
+    // App Check: only activate when network is reachable to avoid noisy DNS/AppCheck warnings
+    if (isReachable) {
+      try {
+        await FirebaseAppCheck.instance.activate(
+          androidProvider: AndroidProvider.debug,
+          appleProvider: AppleProvider.debug,
+        );
+      } catch (e, st) {
+        Logger.warning(
+          'App Check activation failed, continuing without it: $e',
+        );
+        Logger.debug(st.toString());
+      }
+    } else {
+      Logger.warning(
+        'Skipping App Check activation while offline/DNS unavailable.',
+      );
+      try {
+        await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(false);
+      } catch (_) {}
+    }
 
     if (!isReachable) {
       // Prevent Firestore from repeatedly attempting network calls when offline

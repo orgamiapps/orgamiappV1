@@ -507,10 +507,19 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
+        iconTheme: const IconThemeData(color: Colors.black87),
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.black87,
+          ),
+          onPressed: () => Navigator.pop(context),
+          tooltip: 'Back',
+        ),
         titleTextStyle: const TextStyle(
           color: Colors.black87,
           fontSize: 18,

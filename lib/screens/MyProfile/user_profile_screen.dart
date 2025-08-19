@@ -6,6 +6,7 @@ import 'package:orgami/models/event_model.dart';
 import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:orgami/Utils/cached_image.dart';
+import 'package:orgami/firebase/firebase_storage_helper.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/Utils/toast.dart';
@@ -34,7 +35,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   List<EventModel> _createdEvents = [];
   List<EventModel> _attendedEvents = [];
   bool _isLoading = true;
-  bool _isFollowing = false;
+  // Follow state removed from header; we won't track it here to avoid unused field.
   int _followersCount = 0;
   int _followingCount = 0;
 
@@ -131,7 +132,6 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           _attendedEvents = attendedEvents;
           _followersCount = followersCount;
           _followingCount = followingCount;
-          _isFollowing = isFollowing;
           _isLoading = false;
         });
         debugPrint('User data loaded successfully');
@@ -145,7 +145,6 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           _attendedEvents = [];
           _followersCount = 0;
           _followingCount = 0;
-          _isFollowing = false;
         });
       }
     }
@@ -184,17 +183,15 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     }
 
     return Scaffold(
-      backgroundColor: AppThemeColor.backGroundColor,
+      backgroundColor: const Color(0xFFFAFBFC),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadUserData,
           color: AppThemeColor.darkBlueColor,
           child: CustomScrollView(
             slivers: [
-              // App Bar
-              SliverToBoxAdapter(child: _buildAppBar()),
-              // Profile Header
-              SliverToBoxAdapter(child: _buildProfileHeader()),
+              // Profile Header (styled like MyProfileScreen)
+              SliverToBoxAdapter(child: _buildProfileHeaderUser()),
               // Stats Section
               SliverToBoxAdapter(child: _buildStatsSection()),
               // Tab Bar
@@ -208,263 +205,234 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     );
   }
 
-  Widget _buildAppBar() {
+  Widget _buildProfileHeaderUser() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      width: double.infinity,
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppThemeColor.darkBlueColor,
-            AppThemeColor.dullBlueColor,
-            Color(0xFF4A90E2),
-          ],
-        ),
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1)),
       ),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Stack(
         children: [
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(12),
+          Column(
+            children: [
+              Row(
+                children: [
+                  // Back button
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).maybePop(),
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3F4F6),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: const Icon(
+                        Icons.arrow_back,
+                        color: Colors.black87,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  if (widget.isOwnProfile)
+                    GestureDetector(
+                      onTap: _showEditProfileModal,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: const Icon(
+                          Icons.edit,
+                          color: Colors.black87,
+                          size: 18,
+                        ),
+                      ),
+                    )
+                  else ...[
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3F4F6),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(CupertinoIcons.share, size: 18),
+                        color: Colors.black87,
+                        onPressed: _shareProfile,
+                        padding: EdgeInsets.zero,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3F4F6),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.more_vert, size: 18),
+                        color: Colors.black87,
+                        onPressed: () => _showProfileOptions(context),
+                        padding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              child: const Icon(
-                Icons.arrow_back_ios_new,
-                color: AppThemeColor.pureWhiteColor,
-                size: 20,
+              const SizedBox(height: 8),
+              // Compact profile row
+              Row(
+                children: [
+                  // Avatar
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFFE5E7EB),
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child:
+                          (widget.user.profilePictureUrl != null &&
+                              widget.user.profilePictureUrl!.isNotEmpty)
+                          ? SafeNetworkImage(
+                              imageUrl: widget.user.profilePictureUrl!,
+                              fit: BoxFit.cover,
+                              errorWidget: const Icon(
+                                Icons.person,
+                                color: Color(0xFF64748B),
+                              ),
+                            )
+                          : const Icon(Icons.person, color: Color(0xFF64748B)),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  // Name + username + tagline
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.user.name,
+                          style: const TextStyle(
+                            color: Color(0xFF1A1A1A),
+                            fontSize: 22,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                        if (widget.user.username != null &&
+                            widget.user.username!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF3F4F6),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFFE5E7EB),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              '@${widget.user.username}',
+                              style: const TextStyle(
+                                color: Color(0xFF1F2937),
+                                fontWeight: FontWeight.w500,
+                                fontSize: 16,
+                                fontFamily: 'Roboto',
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (widget.user.bio != null &&
+                            widget.user.bio!.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.user.bio!,
+                            style: const TextStyle(
+                              color: Color(0xFF6B7280),
+                              fontWeight: FontWeight.w400,
+                              fontSize: 14,
+                              fontFamily: 'Roboto',
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ),
-            onPressed: () => Navigator.pop(context),
+            ],
           ),
-          const Spacer(),
-          if (widget.isOwnProfile)
-            TextButton(
-              onPressed: () => _showEditProfileModal(),
-              child: const Text(
-                'Edit Profile',
-                style: TextStyle(
-                  color: AppThemeColor.pureWhiteColor,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          if (!widget.isOwnProfile &&
-              CustomerController.logeInCustomer?.uid != widget.user.uid) ...[
-            IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  CupertinoIcons.share,
-                  color: AppThemeColor.pureWhiteColor,
-                  size: 20,
-                ),
-              ),
-              onPressed: () => _shareProfile(),
-            ),
-            IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.more_vert,
-                  color: AppThemeColor.pureWhiteColor,
-                  size: 20,
-                ),
-              ),
-              onPressed: () => _showProfileOptions(context),
-            ),
-          ],
         ],
       ),
     );
   }
 
-  Widget _buildProfileHeader() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppThemeColor.darkBlueColor,
-            AppThemeColor.dullBlueColor,
-            Color(0xFF4A90E2),
-          ],
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              // Profile Image
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(40),
-                  border: Border.all(
-                    color: AppThemeColor.pureWhiteColor,
-                    width: 3,
-                  ),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(37),
-                  child: widget.user.profilePictureUrl != null
-                      ? SafeNetworkImage(
-                          imageUrl: widget.user.profilePictureUrl!,
-                          fit: BoxFit.cover,
-                          placeholder: Container(
-                            color: AppThemeColor.lightBlueColor,
-                            child: const Icon(
-                              Icons.person,
-                              size: 40,
-                              color: AppThemeColor.darkBlueColor,
-                            ),
-                          ),
-                          errorWidget: Container(
-                            color: AppThemeColor.lightBlueColor,
-                            child: const Icon(
-                              Icons.person,
-                              size: 40,
-                              color: AppThemeColor.darkBlueColor,
-                            ),
-                          ),
-                        )
-                      : Container(
-                          color: AppThemeColor.lightBlueColor,
-                          child: const Icon(
-                            Icons.person,
-                            size: 40,
-                            color: AppThemeColor.darkBlueColor,
-                          ),
-                        ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              // User Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.user.name,
-                      style: const TextStyle(
-                        color: AppThemeColor.pureWhiteColor,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                    if (widget.user.username != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        '@${widget.user.username}',
-                        style: TextStyle(
-                          color: AppThemeColor.pureWhiteColor.withValues(
-                            alpha: 0.8,
-                          ),
-                          fontSize: 16,
-                          fontFamily: 'Roboto',
-                        ),
-                      ),
-                    ],
-                    if (widget.user.bio != null &&
-                        widget.user.bio!.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        widget.user.bio!,
-                        style: TextStyle(
-                          color: AppThemeColor.pureWhiteColor.withValues(
-                            alpha: 0.9,
-                          ),
-                          fontSize: 14,
-                          fontFamily: 'Roboto',
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-          // Follow button for non-own profiles
-          if (!widget.isOwnProfile) ...[
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    height: 48,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          AppThemeColor.darkBlueColor,
-                          AppThemeColor.dullBlueColor,
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(
-                        Dimensions.radiusLarge,
-                      ),
-                    ),
-                    child: ElevatedButton(
-                      onPressed: () => _toggleFollow(),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        shadowColor: Colors.transparent,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            Dimensions.radiusLarge,
-                          ),
-                        ),
-                      ),
-                      child: Text(
-                        _isFollowing ? 'Following' : 'Follow',
-                        style: const TextStyle(
-                          color: AppThemeColor.pureWhiteColor,
-                          fontSize: Dimensions.fontSizeDefault,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'Roboto',
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  height: 48,
-                  width: 48,
-                  decoration: BoxDecoration(
-                    color: AppThemeColor.pureWhiteColor,
-                    borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-                    border: Border.all(color: AppThemeColor.borderColor),
-                  ),
-                  child: IconButton(
-                    onPressed: () => _showMessageDialog(),
-                    icon: const Icon(
-                      Icons.message_outlined,
-                      color: AppThemeColor.darkBlueColor,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
+  // Banner upload
+  Future<void> _pickAndUploadBanner() async {
+    try {
+      final file = await FirebaseStorageHelper.pickImageFromGallery();
+      if (file == null) return;
+      final url = await FirebaseStorageHelper.uploadUserBanner(
+        userId: widget.user.uid,
+        imageFile: file,
+      );
+      if (url == null) return;
+      await FirebaseFirestoreHelper().updateCustomerProfile(
+        customerId: widget.user.uid,
+        bannerUrl: url,
+      );
+      setState(() {
+        widget.user.bannerUrl = url;
+      });
+      ShowToast().showNormalToast(msg: 'Banner updated');
+    } catch (_) {}
+  }
+
+  // Avatar upload
+  Future<void> _pickAndUploadAvatar() async {
+    try {
+      final file = await FirebaseStorageHelper.pickImageFromGallery();
+      if (file == null) return;
+      final url = await FirebaseStorageHelper.uploadProfilePicture(
+        widget.user.uid,
+        file,
+      );
+      if (url == null) return;
+      await FirebaseFirestoreHelper().updateCustomerProfile(
+        customerId: widget.user.uid,
+        profilePictureUrl: url,
+      );
+      setState(() {
+        widget.user.profilePictureUrl = url;
+      });
+      ShowToast().showNormalToast(msg: 'Profile photo updated');
+    } catch (_) {}
   }
 
   Widget _buildStatsSection() {
@@ -749,82 +717,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     );
   }
 
-  void _toggleFollow() async {
-    if (CustomerController.logeInCustomer == null) {
-      ShowToast().showNormalToast(msg: 'Please log in to follow users');
-      return;
-    }
+  // Follow action UI moved out; function removed
 
-    if (widget.isOwnProfile) {
-      ShowToast().showNormalToast(msg: 'You cannot follow yourself');
-      return;
-    }
-
-    // Extra safety: prevent following yourself if screen was opened with wrong flag
-    if (CustomerController.logeInCustomer!.uid == widget.user.uid) {
-      ShowToast().showNormalToast(msg: 'You cannot follow yourself');
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      if (_isFollowing) {
-        await FirebaseFirestoreHelper().unfollowUser(
-          followerId: CustomerController.logeInCustomer!.uid,
-          followingId: widget.user.uid,
-        );
-        setState(() {
-          _isFollowing = false;
-          _followersCount--;
-        });
-        ShowToast().showNormalToast(msg: 'Unfollowed ${widget.user.name}');
-      } else {
-        await FirebaseFirestoreHelper().followUser(
-          followerId: CustomerController.logeInCustomer!.uid,
-          followingId: widget.user.uid,
-        );
-        setState(() {
-          _isFollowing = true;
-          _followersCount++;
-        });
-        ShowToast().showNormalToast(msg: 'Following ${widget.user.name}');
-      }
-    } catch (e) {
-      debugPrint('Error toggling follow status: $e');
-      if (e.toString().contains('permission-denied')) {
-        ShowToast().showNormalToast(
-          msg: 'Follow feature is not available yet. Coming soon!',
-        );
-      } else {
-        ShowToast().showNormalToast(
-          msg: 'Error updating follow status. Please try again.',
-        );
-      }
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  void _showMessageDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Send Message'),
-        content: const Text('This feature will be available soon!'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
+  // Removed unused _showMessageDialog
 
   void _startMessage() {
     Navigator.push(
@@ -1038,6 +933,14 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                       ),
                     ),
                     const SizedBox(height: 16),
+                    // Modern media section with live previews
+                    _EditMediaSection(
+                      bannerUrl: widget.user.bannerUrl,
+                      avatarUrl: widget.user.profilePictureUrl,
+                      onChangeBanner: _pickAndUploadBanner,
+                      onChangeAvatar: _pickAndUploadAvatar,
+                    ),
+                    const SizedBox(height: 16),
                     TextField(
                       controller: nameController,
                       decoration: const InputDecoration(
@@ -1126,6 +1029,123 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           },
         );
       },
+    );
+  }
+}
+
+class _EditMediaSection extends StatelessWidget {
+  final String? bannerUrl;
+  final String? avatarUrl;
+  final VoidCallback onChangeBanner;
+  final VoidCallback onChangeAvatar;
+
+  const _EditMediaSection({
+    required this.bannerUrl,
+    required this.avatarUrl,
+    required this.onChangeBanner,
+    required this.onChangeAvatar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Banner preview
+        Stack(
+          children: [
+            Container(
+              height: 120,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12),
+                image: (bannerUrl != null && bannerUrl!.isNotEmpty)
+                    ? DecorationImage(
+                        image: NetworkImage(bannerUrl!),
+                        fit: BoxFit.cover,
+                        colorFilter: ColorFilter.mode(
+                          Colors.black.withOpacity(0.15),
+                          BlendMode.darken,
+                        ),
+                      )
+                    : null,
+              ),
+              child: (bannerUrl == null || bannerUrl!.isEmpty)
+                  ? const Center(
+                      child: Icon(Icons.wallpaper, color: Color(0xFF94A3B8)),
+                    )
+                  : null,
+            ),
+            Positioned(
+              right: 8,
+              bottom: 8,
+              child: FilledButton.icon(
+                onPressed: onChangeBanner,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF667EEA),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                ),
+                icon: const Icon(Icons.edit, size: 16),
+                label: const Text('Change banner'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            // Avatar preview
+            Stack(
+              children: [
+                CircleAvatar(
+                  radius: 32,
+                  backgroundColor: const Color(0xFFE5E7EB),
+                  backgroundImage: (avatarUrl != null && avatarUrl!.isNotEmpty)
+                      ? NetworkImage(avatarUrl!)
+                      : null,
+                  child: (avatarUrl == null || avatarUrl!.isEmpty)
+                      ? const Icon(Icons.person, color: Color(0xFF64748B))
+                      : null,
+                ),
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: InkWell(
+                    onTap: onChangeAvatar,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF667EEA),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(6),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 12),
+            TextButton(
+              onPressed: onChangeAvatar,
+              child: const Text('Change profile photo'),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

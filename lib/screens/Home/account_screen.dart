@@ -14,8 +14,9 @@ import 'package:orgami/Utils/router.dart';
 import 'package:orgami/Utils/theme_provider.dart';
 
 import 'package:orgami/Utils/web_view_page.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
+// import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/screens/Home/delete_account_screen.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
@@ -37,49 +38,6 @@ class _AccountScreenState extends State<AccountScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(child: _bodyView()),
     );
-  }
-
-  Future<void> _confirmDeleteAccount() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Account'),
-        content: const Text(
-          'This will permanently delete your account and data. This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-
-      // Call Cloud Function to fully delete account and data
-      await FirebaseFirestoreHelper().deleteAccountViaCloudFunction(user.uid);
-
-      await FirebaseAuth.instance.signOut();
-      if (mounted) {
-        setState(() {
-          CustomerController.logeInCustomer = null;
-        });
-        RouterClass().appRest(context: context);
-      }
-    } catch (e) {
-      ShowToast().showNormalToast(
-        msg: 'Failed to delete account. Please try again.',
-      );
-    }
   }
 
   Widget _bodyView() {
@@ -238,8 +196,10 @@ class _AccountScreenState extends State<AccountScreen> {
             icon: Icons.delete_forever,
             title: 'Delete Account',
             subtitle: 'Permanently delete your account',
-            onTap: _confirmDeleteAccount,
-            isDestructive: true,
+            onTap: () => RouterClass.nextScreenNormal(
+              context,
+              const DeleteAccountScreen(),
+            ),
           ),
           _buildDivider(),
           _buildSettingsItem(
