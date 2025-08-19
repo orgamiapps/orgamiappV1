@@ -40,6 +40,10 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
   Set<Marker> markers = {};
   Set<Circle> circles = {};
 
+  // Location state management
+  bool _isLocationLoading = false;
+  bool _locationRequestInProgress = false;
+
   // Animation controllers
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
@@ -47,43 +51,125 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
   late Animation<Offset> _slideAnimation;
 
   Future<void> _getCurrentLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return Future.error('Location services are disabled.');
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        return Future.error('Location permissions are denied');
+    // Prevent concurrent location requests
+    if (_locationRequestInProgress) {
+      if (kDebugMode) {
+        debugPrint('🔍 DEBUG: Location request already in progress');
       }
+      return;
     }
 
-    if (permission == LocationPermission.deniedForever) {
-      // Permissions are denied forever, handle appropriately.
-      return Future.error(
-        'Location permissions are permanently denied, we cannot request permissions.',
+    setState(() {
+      _locationRequestInProgress = true;
+      _isLocationLoading = true;
+    });
+
+    try {
+      if (kDebugMode) {
+        debugPrint('🔍 DEBUG: Getting current location...');
+      }
+
+      // Check if location services are enabled
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _showLocationError('Location services are disabled. Please enable them in settings.');
+        return;
+      }
+
+      // Check and request permissions
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          _showLocationError('Location permissions are required to use this feature.');
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        _showLocationError('Location permissions are permanently denied. Please enable them in app settings.');
+        return;
+      }
+
+      // Get current position with timeout and high accuracy
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
       );
-    }
 
-    await Geolocator.getCurrentPosition().then((value) {
-      LatLng newLatLng = LatLng(value.latitude, value.longitude);
-      mapController.animateCamera(
+      LatLng newLatLng = LatLng(position.latitude, position.longitude);
+      
+      // Animate camera to new position
+      await mapController.animateCamera(
         CameraUpdate.newCameraPosition(
           CameraPosition(target: newLatLng, zoom: 15),
         ),
       );
+      
+      // Add marker at current location
       _addMarker(newLatLng);
+      
       if (kDebugMode) {
-        debugPrint(
-          'Current Location is ${value.latitude} and ${value.longitude} and ${value.floor}',
+        debugPrint('✅ SUCCESS: Location retrieved successfully: ${position.latitude}, ${position.longitude}');
+      }
+      
+      // Show success feedback
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Centered on your location'),
+            backgroundColor: const Color(0xFF667EEA),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
         );
       }
-    });
+      
+      if (kDebugMode) {
+        debugPrint('Centered on user location: ${position.latitude}, ${position.longitude}');
+      }
+
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ ERROR: Failed to get location: $e');
+      }
+      
+      String errorMessage = 'Failed to get your location';
+      if (e.toString().contains('timeout')) {
+        errorMessage = 'Location request timed out. Please try again.';
+      } else if (e.toString().contains('network')) {
+        errorMessage = 'Network error. Please check your connection.';
+      }
+      
+      _showLocationError(errorMessage);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _locationRequestInProgress = false;
+          _isLocationLoading = false;
+        });
+      }
+    }
+  }
+
+  void _showLocationError(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          action: SnackBarAction(
+            label: 'Retry',
+            textColor: Colors.white,
+            onPressed: _getCurrentLocation,
+          ),
+        ),
+      );
+    }
   }
 
   void _addMarker(LatLng latLng) {
@@ -160,7 +246,17 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
     _fadeController.forward();
     _slideController.forward();
 
-    _getCurrentLocation();
+    // Delay the initial location request to avoid blocking the UI
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Only get location automatically if user hasn't selected one yet
+      if (selectedLocation == null) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            _getCurrentLocation();
+          }
+        });
+      }
+    });
   }
 
   @override
@@ -301,12 +397,21 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
                   color: Colors.transparent,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(12),
-                    onTap: _getCurrentLocation,
-                    child: const Icon(
-                      Icons.my_location,
-                      color: Color(0xFF667EEA),
-                      size: 24,
-                    ),
+                    onTap: _isLocationLoading ? null : _getCurrentLocation,
+                    child: _isLocationLoading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
+                            ),
+                          )
+                        : const Icon(
+                            Icons.my_location,
+                            color: Color(0xFF667EEA),
+                            size: 24,
+                          ),
                   ),
                 ),
               ),
