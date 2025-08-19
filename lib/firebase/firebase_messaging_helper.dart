@@ -12,6 +12,7 @@ import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/models/notification_model.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/Utils/logger.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class NotificationPage {
   final List<NotificationModel> items;
@@ -36,6 +37,17 @@ class FirebaseMessagingHelper {
   // Initialize messaging
   Future<void> initialize() async {
     try {
+      // Skip initialization if there is no connectivity
+      try {
+        final connectivity = await Connectivity().checkConnectivity();
+        if (connectivity == ConnectivityResult.none) {
+          if (kDebugMode) {
+            Logger.warning('Skipping Messaging init: offline');
+          }
+          return;
+        }
+      } catch (_) {}
+
       // Request permission
       fcm.NotificationSettings settings = await _messaging.requestPermission(
         alert: true,
@@ -134,6 +146,17 @@ class FirebaseMessagingHelper {
 
   Future<void> _saveTokenToFirestore(String token) async {
     try {
+      // Avoid writes when offline
+      try {
+        final connectivity = await Connectivity().checkConnectivity();
+        if (connectivity == ConnectivityResult.none) {
+          if (kDebugMode) {
+            Logger.warning('Skipping FCM token save: offline');
+          }
+          return;
+        }
+      } catch (_) {}
+
       final user = _auth.currentUser;
       if (user != null) {
         await _firestore.collection('users').doc(user.uid).set({

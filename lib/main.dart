@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/firebase_options.dart';
 import 'package:orgami/Screens/Splash/splash_screen.dart';
 import 'package:orgami/Utils/logger.dart';
@@ -13,6 +14,7 @@ import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:orgami/Services/notification_service.dart';
 import 'package:orgami/firebase/firebase_messaging_helper.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -28,6 +30,19 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+
+    // Detect connectivity and configure Firestore accordingly
+    final connectivityResult = await Connectivity().checkConnectivity();
+    final bool isOffline = connectivityResult == ConnectivityResult.none;
+
+    if (isOffline) {
+      // Prevent Firestore from repeatedly attempting network calls when offline
+      await FirebaseFirestore.instance.disableNetwork();
+      Logger.warning('No internet connection detected. Running in offline mode.');
+    } else {
+      // Ensure network is enabled when connectivity is available
+      await FirebaseFirestore.instance.enableNetwork();
+    }
 
     // iOS/web foreground presentation options
     if (kIsWeb || defaultTargetPlatform == TargetPlatform.iOS) {
@@ -51,7 +66,13 @@ void main() async {
 
     // Initialize local notifications and messaging helper
     await NotificationService.initialize();
-    await FirebaseMessagingHelper().initialize();
+
+    // Only initialize Firebase Messaging (which talks to Firestore) when online
+    if (!isOffline) {
+      await FirebaseMessagingHelper().initialize();
+    } else {
+      Logger.warning('Skipping Firebase Messaging initialization while offline.');
+    }
 
     Logger.success('Firebase initialized successfully');
   } catch (e, st) {
