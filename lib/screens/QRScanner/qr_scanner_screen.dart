@@ -28,10 +28,14 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
   @override
   void reassemble() {
     super.reassemble();
-    if (Platform.isAndroid) {
-      controller!.pauseCamera();
+    try {
+      if (Platform.isAndroid) {
+        controller?.pauseCamera();
+      }
+      controller?.resumeCamera();
+    } catch (_) {
+      // Ignore camera errors during hot reload / emulator without camera
     }
-    controller!.resumeCamera();
   }
 
   @override

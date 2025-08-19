@@ -84,6 +84,7 @@ dependencies:
   provider: ^6.1.1
   mobile_scanner: ^7.0.1
   calendar_view: ^1.4.0
+  connectivity_plus: ^6.0.5
 
 dev_dependencies:
   flutter_test:
