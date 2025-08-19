@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:io' show InternetAddress;
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/firebase_options.dart';
 import 'package:orgami/Screens/Splash/splash_screen.dart';
 import 'package:orgami/Utils/logger.dart';
@@ -8,11 +10,13 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:orgami/Utils/error_handler.dart';
 import 'package:firebase_messaging/firebase_messaging.dart' as fcm;
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:orgami/Services/notification_service.dart';
 import 'package:orgami/firebase/firebase_messaging_helper.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -28,6 +32,54 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+
+    // App Check: use debug provider on emulator/dev, play integrity/safety-net in prod
+    try {
+      await FirebaseAppCheck.instance.activate(
+        androidProvider: AndroidProvider.debug,
+        appleProvider: AppleProvider.debug,
+      );
+    } catch (e, st) {
+      Logger.warning('App Check activation failed, continuing without it: $e');
+      Logger.debug(st.toString());
+    }
+
+    // Enable Firestore offline persistence to keep app usable without network
+    try {
+      FirebaseFirestore.instance.settings = const Settings(
+        persistenceEnabled: true,
+        cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+      );
+    } catch (e, st) {
+      Logger.warning('Configuring Firestore settings failed: $e');
+      Logger.debug(st.toString());
+    }
+
+    // Detect connectivity and configure Firestore accordingly
+    final connectivityResult = await Connectivity().checkConnectivity();
+    bool isOffline = connectivityResult == ConnectivityResult.none;
+
+    // Extra DNS check to detect captive portals/DNS failures on emulator
+    bool dnsOk = false;
+    try {
+      final lookup = await InternetAddress.lookup('firestore.googleapis.com');
+      dnsOk = lookup.isNotEmpty && lookup.first.rawAddress.isNotEmpty;
+    } catch (_) {
+      dnsOk = false;
+    }
+
+    final bool isReachable = !isOffline && dnsOk;
+
+    if (!isReachable) {
+      // Prevent Firestore from repeatedly attempting network calls when offline
+      await FirebaseFirestore.instance.disableNetwork();
+      Logger.warning(
+        'No internet connection detected. Running in offline mode.',
+      );
+    } else {
+      // Ensure network is enabled when connectivity is available
+      await FirebaseFirestore.instance.enableNetwork();
+    }
 
     // iOS/web foreground presentation options
     if (kIsWeb || defaultTargetPlatform == TargetPlatform.iOS) {
@@ -51,7 +103,15 @@ void main() async {
 
     // Initialize local notifications and messaging helper
     await NotificationService.initialize();
-    await FirebaseMessagingHelper().initialize();
+
+    // Only initialize Firebase Messaging (which talks to Firestore) when online
+    if (isReachable) {
+      await FirebaseMessagingHelper().initialize();
+    } else {
+      Logger.warning(
+        'Skipping Firebase Messaging initialization while offline.',
+      );
+    }
 
     Logger.success('Firebase initialized successfully');
   } catch (e, st) {

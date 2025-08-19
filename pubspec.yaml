@@ -33,6 +33,7 @@ dependencies:
   firebase_core: ^4.0.0
   firebase_auth: ^6.0.0
   firebase_messaging: ^16.0.0
+  firebase_app_check: ^0.4.0
   flutter_local_notifications: ^19.4.0
   timezone: ^0.10.1
   google_sign_in: ^7.1.1
@@ -84,6 +85,7 @@ dependencies:
   provider: ^6.1.1
   mobile_scanner: ^7.0.1
   calendar_view: ^1.4.0
+  connectivity_plus: ^6.0.5
 
 dev_dependencies:
   flutter_test:
