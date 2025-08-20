@@ -17,6 +17,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
   List<Map<String, String>> _myOrgs = [];
   List<Map<String, dynamic>> _discoverOrgs = [];
   String? _selectedCategoryLower;
+  bool _isLoadingMyOrgs = true;
   final List<Map<String, String>> _categoryOptions = const [
     {'label': 'All', 'value': ''},
     {'label': 'Business', 'value': 'business'},
@@ -36,13 +37,22 @@ class _GroupsScreenState extends State<GroupsScreen> {
 
   Future<void> _initStreams() async {
     final helper = OrganizationHelper();
+    if (mounted) setState(() => _isLoadingMyOrgs = true);
     final my = await helper.getUserOrganizationsLite();
-    if (mounted) setState(() => _myOrgs = my);
+    if (mounted) {
+      setState(() {
+        _myOrgs = my;
+        _isLoadingMyOrgs = false;
+      });
+    }
 
     _myOrgsStream ??= helper.streamUserOrganizationsLite();
     _myOrgsStream!.listen((list) {
       if (!mounted) return;
-      setState(() => _myOrgs = list);
+      setState(() {
+        _myOrgs = list;
+        _isLoadingMyOrgs = false;
+      });
     });
 
     _discover();
@@ -141,39 +151,53 @@ class _GroupsScreenState extends State<GroupsScreen> {
                       style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 8),
-                    _myOrgs.isEmpty
-                        ? _EmptyStateCard(onCreate: _goToCreate)
-                        : SizedBox(
+                    _isLoadingMyOrgs
+                        ? SizedBox(
                             height: 110,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: _myOrgs.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 12),
-                              itemBuilder: (context, i) {
-                                final org = _myOrgs[i];
-                                return GestureDetector(
-                                  onTap: () {
-                                    final orgId = org['id'];
-                                    if (orgId == null || orgId.isEmpty) return;
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            OrganizationProfileScreen(
-                                              organizationId: orgId,
-                                            ),
-                                      ),
-                                    );
-                                  },
-                                  child: _pill(
-                                    org['name'] ?? '',
-                                    icon: Icons.apartment,
-                                  ),
-                                );
-                              },
+                            child: Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
                             ),
-                          ),
+                          )
+                        : (_myOrgs.isEmpty
+                              ? _EmptyStateCard(onCreate: _goToCreate)
+                              : SizedBox(
+                                  height: 110,
+                                  child: ListView.separated(
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: _myOrgs.length,
+                                    separatorBuilder: (_, __) =>
+                                        const SizedBox(width: 12),
+                                    itemBuilder: (context, i) {
+                                      final org = _myOrgs[i];
+                                      return GestureDetector(
+                                        onTap: () {
+                                          final orgId = org['id'];
+                                          if (orgId == null || orgId.isEmpty)
+                                            return;
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  OrganizationProfileScreen(
+                                                    organizationId: orgId,
+                                                  ),
+                                            ),
+                                          );
+                                        },
+                                        child: _pill(
+                                          org['name'] ?? '',
+                                          icon: Icons.apartment,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                )),
                     const SizedBox(height: 16),
                     const Text(
                       'Discover',
