@@ -59,7 +59,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   bool successMessage = false;
   final _btnCtlr = RoundedLoadingButtonController();
 
-  bool privateEvent = false;
+  bool privateEvent = false; // Public by default (no group), private when group is selected
   final List<String> _allCategories = ['Educational', 'Professional', 'Other'];
   final List<String> _selectedCategories = [];
 
@@ -329,10 +329,12 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
     // Preselect organization if provided
     _selectedOrganizationId = widget.preselectedOrganizationId;
-    // If this is explicitly an organization event flow, default to private until the
-    // creator checks the box to make it public.
-    if (widget.forceOrganizationEvent) {
-      privateEvent = true; // not public by default for org events
+    // Set initial privacy based on group selection
+    if (widget.forceOrganizationEvent || 
+        (_selectedOrganizationId != null && _selectedOrganizationId!.isNotEmpty)) {
+      privateEvent = true; // Group events are private by default
+    } else {
+      privateEvent = false; // No group events are public by default
     }
 
     // Prefill organizer with current user's name and make it immutable
@@ -991,10 +993,13 @@ class _CreateEventScreenState extends State<CreateEventScreen>
               onChanged: (value) {
                 setState(() {
                   _selectedOrganizationId = value;
-                  // If selecting an organization, default to private until user opts-in to public
+                  // If selecting a group, default to private
+                  // If selecting "None", default to public
                   if (_selectedOrganizationId != null &&
                       _selectedOrganizationId!.isNotEmpty) {
-                    privateEvent = true;
+                    privateEvent = true; // Group events are private by default
+                  } else {
+                    privateEvent = false; // No group events are public by default
                   }
                 });
               },
@@ -1004,7 +1009,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'This event will by default be private to only users in your group.',
+                'This event will be private to only users in your group.',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey[600],
