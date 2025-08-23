@@ -723,7 +723,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       (_selectedOrganizationId != null && _selectedOrganizationId!.isNotEmpty);
 
   Widget _buildVisibilityToggle() {
-    // For public events (no group), show "Make this event private"
+    // For non-group events (public by default), show "Make event private"
     if (!_isOrganizationContext) {
       return Container(
         width: double.infinity,
@@ -754,7 +754,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             const SizedBox(width: 16),
             const Expanded(
               child: Text(
-                'Make this event private',
+                'Make event private',
                 style: TextStyle(
                   color: Color(0xFF1A1A1A),
                   fontWeight: FontWeight.w600,
@@ -778,7 +778,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       );
     }
 
-    // For group events, show "Make this event public" with a checkbox
+    // For group events (private by default), show "Make event public"
     final bool isPublic = !privateEvent;
     return Container(
       width: double.infinity,
@@ -809,7 +809,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           const SizedBox(width: 16),
           const Expanded(
             child: Text(
-              'Make this event public',
+              'Make event public',
               style: TextStyle(
                 color: Color(0xFF1A1A1A),
                 fontWeight: FontWeight.w600,
@@ -1009,7 +1009,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'This event will be private to only users in your group.',
+                'This event will be private by default, but you can make it public using the toggle below.',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey[600],
