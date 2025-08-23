@@ -30,7 +30,7 @@ import 'package:orgami/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:orgami/utils/location_helper.dart';
 import 'package:orgami/Utils/logger.dart';
-import 'package:orgami/screens/Events/select_event_type_screen.dart';
+import 'package:orgami/screens/Events/chose_sign_in_methods_screen.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -396,7 +396,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _onFabPressed() {
-    RouterClass.nextScreenNormal(context, const SelectEventTypeScreen());
+    RouterClass.nextScreenNormal(context, const ChoseSignInMethodsScreen());
   }
 
   Future<void> getCurrentLocation() async {
