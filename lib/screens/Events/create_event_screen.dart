@@ -193,7 +193,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Please select an organization for this event.'),
+            content: Text('Please select a group for this event.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -505,7 +505,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Organization selector
+              // Group selector
               _buildOrganizationSelector(),
               const SizedBox(height: 24),
               // Private/Public Toggle (depends on org context)
@@ -721,7 +721,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       (_selectedOrganizationId != null && _selectedOrganizationId!.isNotEmpty);
 
   Widget _buildVisibilityToggle() {
-    // For public events (no organization), show "Make this event private"
+    // For public events (no group), show "Make this event private"
     if (!_isOrganizationContext) {
       return Container(
         width: double.infinity,
@@ -776,7 +776,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       );
     }
 
-    // For organization events, show "Make this event public" with a checkbox
+    // For group events, show "Make this event public" with a checkbox
     final bool isPublic = !privateEvent;
     return Container(
       width: double.infinity,
@@ -950,8 +950,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
               const SizedBox(width: 8),
               Text(
                 widget.forceOrganizationEvent
-                    ? 'Organization (required)'
-                    : 'Organization (optional)',
+                    ? 'Group (required)'
+                    : 'Group (optional)',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -963,7 +963,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           const SizedBox(height: 12),
           if (_userOrganizations.isEmpty)
             const Text(
-              'You are not in any organization yet',
+              'You are not in any group yet',
               style: TextStyle(color: Color(0xFF6B7280)),
             )
           else
@@ -974,14 +974,20 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                 filled: true,
                 fillColor: Color(0xFFF9FAFB),
               ),
-              items: _userOrganizations
-                  .map(
-                    (org) => DropdownMenuItem<String>(
-                      value: org['id'],
-                      child: Text(org['name'] ?? ''),
-                    ),
-                  )
-                  .toList(),
+              items: [
+                const DropdownMenuItem<String>(
+                  value: null,
+                  child: Text('None'),
+                ),
+                ..._userOrganizations
+                    .map(
+                      (org) => DropdownMenuItem<String>(
+                        value: org['id'],
+                        child: Text(org['name'] ?? ''),
+                      ),
+                    )
+                    .toList(),
+              ],
               onChanged: (value) {
                 setState(() {
                   _selectedOrganizationId = value;
@@ -992,6 +998,19 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                   }
                 });
               },
+            ),
+          // Add informational text when a group is selected
+          if (_selectedOrganizationId != null && _selectedOrganizationId!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'This event will by default be private to only users in your group.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
             ),
         ],
       ),
