@@ -17,6 +17,7 @@ import 'package:flutter/foundation.dart'
 import 'package:orgami/Services/notification_service.dart';
 import 'package:orgami/firebase/firebase_messaging_helper.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -166,6 +167,13 @@ class MyApp extends StatelessWidget {
           darkTheme: themeProvider.darkTheme,
           themeMode: themeProvider.themeMode,
           navigatorKey: appNavigatorKey,
+          // Localization scaffolding removed until ARB/gen is configured
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [Locale('en')],
           home: homeOverride ?? const SplashScreen(),
         );
       },

@@ -59,7 +59,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   bool successMessage = false;
   final _btnCtlr = RoundedLoadingButtonController();
 
-  bool privateEvent = false;
+  bool privateEvent =
+      false; // Public by default (no group), private when group is selected
   final List<String> _allCategories = ['Educational', 'Professional', 'Other'];
   final List<String> _selectedCategories = [];
 
@@ -193,7 +194,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Please select an organization for this event.'),
+            content: Text('Please select a group for this event.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -329,10 +330,13 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
     // Preselect organization if provided
     _selectedOrganizationId = widget.preselectedOrganizationId;
-    // If this is explicitly an organization event flow, default to private until the
-    // creator checks the box to make it public.
-    if (widget.forceOrganizationEvent) {
-      privateEvent = true; // not public by default for org events
+    // Set initial privacy based on group selection
+    if (widget.forceOrganizationEvent ||
+        (_selectedOrganizationId != null &&
+            _selectedOrganizationId!.isNotEmpty)) {
+      privateEvent = true; // Group events are private by default
+    } else {
+      privateEvent = false; // No group events are public by default
     }
 
     // Prefill organizer with current user's name and make it immutable
@@ -505,7 +509,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Organization selector
+              // Group selector
               _buildOrganizationSelector(),
               const SizedBox(height: 24),
               // Private/Public Toggle (depends on org context)
@@ -721,7 +725,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       (_selectedOrganizationId != null && _selectedOrganizationId!.isNotEmpty);
 
   Widget _buildVisibilityToggle() {
-    // For public events (no organization), show "Make this event private"
+    // For non-group events (public by default), show "Make event private"
     if (!_isOrganizationContext) {
       return Container(
         width: double.infinity,
@@ -752,7 +756,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             const SizedBox(width: 16),
             const Expanded(
               child: Text(
-                'Make this event private',
+                'Make event private',
                 style: TextStyle(
                   color: Color(0xFF1A1A1A),
                   fontWeight: FontWeight.w600,
@@ -776,7 +780,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       );
     }
 
-    // For organization events, show "Make this event public" with a checkbox
+    // For group events (private by default), show "Make event public"
     final bool isPublic = !privateEvent;
     return Container(
       width: double.infinity,
@@ -807,7 +811,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           const SizedBox(width: 16),
           const Expanded(
             child: Text(
-              'Make this event public',
+              'Make event public',
               style: TextStyle(
                 color: Color(0xFF1A1A1A),
                 fontWeight: FontWeight.w600,
@@ -950,8 +954,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
               const SizedBox(width: 8),
               Text(
                 widget.forceOrganizationEvent
-                    ? 'Organization (required)'
-                    : 'Organization (optional)',
+                    ? 'Group (required)'
+                    : 'Group (optional)',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -963,7 +967,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           const SizedBox(height: 12),
           if (_userOrganizations.isEmpty)
             const Text(
-              'You are not in any organization yet',
+              'You are not in any group yet',
               style: TextStyle(color: Color(0xFF6B7280)),
             )
           else
@@ -974,24 +978,48 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                 filled: true,
                 fillColor: Color(0xFFF9FAFB),
               ),
-              items: _userOrganizations
-                  .map(
-                    (org) => DropdownMenuItem<String>(
-                      value: org['id'],
-                      child: Text(org['name'] ?? ''),
-                    ),
-                  )
-                  .toList(),
+              items: [
+                const DropdownMenuItem<String>(
+                  value: null,
+                  child: Text('None'),
+                ),
+                ..._userOrganizations
+                    .map(
+                      (org) => DropdownMenuItem<String>(
+                        value: org['id'],
+                        child: Text(org['name'] ?? ''),
+                      ),
+                    )
+                    .toList(),
+              ],
               onChanged: (value) {
                 setState(() {
                   _selectedOrganizationId = value;
-                  // If selecting an organization, default to private until user opts-in to public
+                  // If selecting a group, default to private
+                  // If selecting "None", default to public
                   if (_selectedOrganizationId != null &&
                       _selectedOrganizationId!.isNotEmpty) {
-                    privateEvent = true;
+                    privateEvent = true; // Group events are private by default
+                  } else {
+                    privateEvent =
+                        false; // No group events are public by default
                   }
                 });
               },
+            ),
+          // Add informational text when a group is selected
+          if (_selectedOrganizationId != null &&
+              _selectedOrganizationId!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'This event will be private by default, but you can make it public using the toggle below.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
             ),
         ],
       ),

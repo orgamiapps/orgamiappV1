@@ -3,11 +3,11 @@ import 'package:orgami/controller/customer_controller.dart';
 import 'package:orgami/Utils/app_app_bar_view.dart';
 import 'package:orgami/utils/app_constants.dart';
 import 'package:orgami/utils/colors.dart';
-import 'package:orgami/utils/images.dart';
 import 'package:orgami/utils/text_fields.dart';
 import 'package:orgami/Utils/dimensions.dart';
+import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class FeedbackScreen extends StatefulWidget {
   const FeedbackScreen({super.key});
@@ -18,253 +18,204 @@ class FeedbackScreen extends StatefulWidget {
 
 class FeedbackScreenState extends State<FeedbackScreen> {
   final _btnCtlr = RoundedLoadingButtonController();
-
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _contactController = TextEditingController();
   final _emailController = TextEditingController();
   final _commentsController = TextEditingController();
-  double _sliderValue = 1.0;
-  String _experience = "Worst";
-
-  Future<void> _handleSubmit() async {
-    if (_formKey.currentState!.validate()) {
-      final name = _nameController.text;
-      final contact = _contactController.text;
-      final email = _emailController.text;
-      final experience = _experience;
-      final comments = _commentsController.text;
-
-      final subject = Uri.encodeComponent('New Feedback Submission');
-      final body = Uri.encodeComponent(
-        'Name: $name\n'
-        'Contact: $contact\n'
-        'Email: $email\n'
-        'Experience: $experience\n'
-        'Comments: $comments',
-      );
-
-      final url =
-          'mailto:${AppConstants.companyEmail}?subject=$subject&body=$body';
-
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-        if (!mounted) return;
-        Navigator.pop(context);
-      } else {
-        throw 'Could not launch $url';
-      }
-    }
-  }
+  int _selectedRating = 0;
+  bool _isAnonymous = false;
+  final FirebaseFirestoreHelper _firestoreHelper = FirebaseFirestoreHelper();
 
   @override
   void initState() {
-    _nameController.text = CustomerController.logeInCustomer!.name;
-    _emailController.text = CustomerController.logeInCustomer!.email;
+    final customer = CustomerController.logeInCustomer;
+    if (customer != null) {
+      _nameController.text = customer.name;
+      _emailController.text = customer.email;
+    }
     super.initState();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _contactController.dispose();
+    _emailController.dispose();
+    _commentsController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleSubmit() async {
+    if (_formKey.currentState!.validate()) {
+      if (_selectedRating == 0) {
+        ShowToast().showSnackBar('Please select a rating', context);
+        _btnCtlr.reset();
+        return;
+      }
+
+      _btnCtlr.start();
+
+      try {
+        final customer = CustomerController.logeInCustomer;
+        String userId = customer?.uid ?? '';
+        String name = _nameController.text.trim();
+        String email = _emailController.text.trim();
+        String contact = _contactController.text.trim();
+        String comment = _commentsController.text.trim();
+
+        if (_isAnonymous) {
+          userId = '';
+          name = '';
+          email = '';
+          contact = '';
+        }
+
+        await _firestoreHelper.submitAppFeedback(
+          userId: userId.isEmpty ? null : userId,
+          rating: _selectedRating,
+          comment: comment.isEmpty ? null : comment,
+          isAnonymous: _isAnonymous,
+          name: name.isEmpty ? null : name,
+          email: email.isEmpty ? null : email,
+          contactNumber: contact.isEmpty ? null : contact,
+        );
+
+        _btnCtlr.success();
+        ShowToast().showSnackBar('Thank you for your feedback!', context);
+        await Future.delayed(const Duration(seconds: 1));
+        if (!mounted) return;
+        Navigator.pop(context);
+      } catch (e) {
+        _btnCtlr.error();
+        ShowToast().showSnackBar('Error submitting feedback: $e', context);
+      } finally {
+        await Future.delayed(const Duration(seconds: 1));
+        _btnCtlr.reset();
+      }
+    } else {
+      _btnCtlr.reset();
+    }
+  }
+
+  Widget _buildRatingStars() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Rate your experience with ${AppConstants.appName}',
+          style: TextStyle(
+            fontSize: Dimensions.fontSizeExtraLarge,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[800],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(5, (index) {
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedRating = index + 1;
+                });
+              },
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                child: Icon(
+                  index < _selectedRating ? Icons.star : Icons.star_border,
+                  size: 48,
+                  color: index < _selectedRating
+                      ? AppColors.primaryColor
+                      : Colors.grey[400],
+                ),
+              ),
+            );
+          }),
+        ),
+        // Remove the SizedBox and Center Text for rating label
+        const SizedBox(height: 32),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.only(left: 20, right: 20, bottom: 20),
-        child: RoundedLoadingButton(
-          animateOnTap: false,
-          borderRadius: 5,
-          width: MediaQuery.of(context).size.width,
-          controller: _btnCtlr,
-          onPressed: () => _handleSubmit(),
-          color: AppThemeColor.darkGreenColor,
-          elevation: 0,
-          child: const Wrap(
-            children: [
-              Text(
-                'Submit Feedback',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-            ],
+      appBar: AppBar(
+        leading: AppAppBarView.appBarWithOnlyBackButton(
+          context: context,
+          backButtonColor: AppColors.primaryColor,
+        ),
+        title: Text(
+          'Feedback',
+          style: TextStyle(
+            color: AppColors.primaryColor,
+            fontSize: Dimensions.fontSizeLarge,
+            fontWeight: FontWeight.w500,
           ),
         ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(18.0),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20.0),
           child: Form(
             key: _formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  AppAppBarView.appBarView(context: context, title: 'Feedback'),
-                  const SizedBox(height: 20),
-                  AppTextFields.textField2(
-                    hintText: 'Type here...',
-                    titleText: 'Name',
-                    width: MediaQuery.of(context).size.width,
-                    controller: _nameController,
-                    validator: (value) {
-                      if (value!.isEmpty) {
-                        return 'Please enter your name';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  AppTextFields.textField2(
-                    hintText: '+92 00000 00000',
-                    titleText: 'Contact Number',
-                    width: MediaQuery.of(context).size.width,
-                    controller: _contactController,
-                    validator: (value) {
-                      if (value!.isEmpty) {
-                        return 'Please enter your contact number';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  AppTextFields.textField2(
-                    hintText: 'xyz123@gmail.com',
-                    titleText: 'Email Address',
-                    enabled: false,
-                    width: MediaQuery.of(context).size.width,
-                    controller: _emailController,
-                    validator: (value) {
-                      if (value!.isEmpty) {
-                        return 'Please enter your email address';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Share your experience with ${AppConstants.appName}',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 20),
+                _buildRatingStars(),
+                // Remove name, contact, email fields
+                AppTextFields.textField2(
+                  controller: _commentsController,
+                  hintText: 'Tell us about your experience...',
+                  titleText: 'Comments',
+                  width: MediaQuery.of(context).size.width,
+                  maxLines: 5,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter your feedback';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+                CheckboxListTile(
+                  title: const Text('Submit anonymously'),
+                  value: _isAnonymous,
+                  onChanged: (value) {
+                    setState(() {
+                      _isAnonymous = value ?? false;
+                    });
+                  },
+                  activeColor: AppColors.primaryColor,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                const SizedBox(height: 24),
+                RoundedLoadingButton(
+                  animateOnTap: false,
+                  borderRadius: 12,
+                  width: MediaQuery.of(context).size.width,
+                  controller: _btnCtlr,
+                  onPressed: _handleSubmit,
+                  color: AppColors.primaryColor,
+                  elevation: 0,
+                  child: const Text(
+                    'Submit Feedback',
                     style: TextStyle(
-                      fontSize: Dimensions.fontSizeLarge,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
                     ),
                   ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      _singleIconView(
-                        label: 'Worst',
-                        activeImage: Images.worstActive,
-                        nonActiveImage: Images.worstNonActive,
-                        numberValue: 1.0,
-                      ),
-                      _singleIconView(
-                        label: 'Not Good',
-                        activeImage: Images.fineActive,
-                        nonActiveImage: Images.fineNonActive,
-                        numberValue: 2.0,
-                      ),
-                      _singleIconView(
-                        label: 'Fine',
-                        activeImage: Images.neutralActive,
-                        nonActiveImage: Images.neutralNonActive,
-                        numberValue: 3.0,
-                      ),
-                      _singleIconView(
-                        label: 'Look Good',
-                        activeImage: Images.goodActive,
-                        nonActiveImage: Images.goodNonActive,
-                        numberValue: 4.0,
-                      ),
-                      _singleIconView(
-                        label: 'Very Good',
-                        activeImage: Images.loveActive,
-                        nonActiveImage: Images.loveNonActive,
-                        numberValue: 5.0,
-                      ),
-                    ],
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(0.0),
-                    child: Slider(
-                      value: _sliderValue,
-                      min: 1,
-                      max: 5,
-                      divisions: 4,
-                      onChanged: (value) {
-                        setState(() {
-                          _sliderValue = value;
-                          switch (value.toInt()) {
-                            case 1:
-                              _experience = "Worst";
-                              break;
-                            case 2:
-                              _experience = "Not Good";
-                              break;
-                            case 3:
-                              _experience = "Fine";
-                              break;
-                            case 4:
-                              _experience = "Look Good";
-                              break;
-                            case 5:
-                              _experience = "Very Good";
-                              break;
-                          }
-                        });
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  AppTextFields.textField2(
-                    controller: _commentsController,
-                    hintText: 'Add your comments...',
-                    titleText: 'Your Comments',
-                    width: MediaQuery.of(context).size.width,
-                    maxLines: 4,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your comments';
-                      }
-                      return null;
-                    },
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _singleIconView({
-    required String activeImage,
-    required String nonActiveImage,
-    required String label,
-    required double numberValue,
-  }) {
-    String imageToShow = _experience == label ? activeImage : nonActiveImage;
-    return SizedBox(
-      width: 50,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Image.asset(imageToShow, width: 40),
-          Text(
-            label,
-            maxLines: 2,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: _sliderValue == numberValue
-                  ? AppThemeColor.pureBlackColor
-                  : AppThemeColor.dullFontColor,
-            ),
-          ),
-        ],
       ),
     );
   }

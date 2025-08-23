@@ -9,6 +9,7 @@ import 'package:orgami/models/event_model.dart';
 import 'package:orgami/models/event_question_model.dart';
 import 'package:orgami/models/ticket_model.dart';
 import 'package:orgami/models/event_feedback_model.dart';
+import 'package:orgami/models/app_feedback_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:orgami/Utils/logger.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -2641,4 +2642,36 @@ class FirebaseFirestoreHelper {
   }
 
   // ====== End Private Event Access Request Workflow ======
+
+  Future<void> submitAppFeedback({
+    String? userId,
+    required int rating,
+    String? comment,
+    required bool isAnonymous,
+    String? name,
+    String? email,
+    String? contactNumber,
+  }) async {
+    try {
+      final feedbackData = {
+        'userId': isAnonymous ? null : userId,
+        'rating': rating,
+        'comment': comment,
+        'timestamp': Timestamp.now(),
+        'isAnonymous': isAnonymous,
+        'name': name,
+        'email': email,
+        'contactNumber': contactNumber,
+      };
+
+      await _firestore
+          .collection(AppFeedbackModel.firebaseKey)
+          .add(feedbackData);
+
+      Logger.debug('App feedback submitted successfully');
+    } catch (e) {
+      Logger.debug('Error submitting app feedback: $e');
+      rethrow;
+    }
+  }
 }

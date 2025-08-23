@@ -1,4 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/firebase/firebase_messaging_helper.dart';
@@ -12,6 +16,12 @@ import 'package:provider/provider.dart';
 import 'package:orgami/Utils/logger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/firebase/organization_helper.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shimmer/shimmer.dart';
+// intl not used here; keep code lean
+import 'package:share_plus/share_plus.dart';
+import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
+import 'package:orgami/screens/Organizations/groups_screen.dart';
 
 class NewMessageScreen extends StatefulWidget {
   const NewMessageScreen({super.key});
@@ -21,7 +31,7 @@ class NewMessageScreen extends StatefulWidget {
 }
 
 class _NewMessageScreenState extends State<NewMessageScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseMessagingHelper _messagingHelper = FirebaseMessagingHelper();
   final TextEditingController _searchController = TextEditingController();
@@ -31,6 +41,8 @@ class _NewMessageScreenState extends State<NewMessageScreen>
   List<CustomerModel> _allUsers = [];
   bool _isLoading = false;
   bool _isSearching = false;
+  bool _isSearchInFlight = false;
+  bool _searchFailed = false;
   bool _groupMode = false;
   final Set<String> _selectedUserIds = {};
   Set<String> _blockedUserIds = <String>{};
@@ -40,10 +52,21 @@ class _NewMessageScreenState extends State<NewMessageScreen>
   int _groupTabIndex = 0;
   String? _selectedOrgId;
   String? _selectedOrgName;
+  final ScrollController _listController = ScrollController();
+  int _listLimit = 30;
+  bool _isNavigating = false;
+  Timer? _searchDebounce;
+  List<String> _recentSearches = [];
+  String _lastSearchQuery = '';
+  double _testTextScale = 1.0; // debug-only a11y testing
+
+  static const String _prefsKeyMode = 'new_message_last_mode';
+  static const String _prefsKeyRecent = 'new_message_recent_searches';
 
   @override
   void initState() {
     super.initState();
+    _restorePrefs();
     _loadAllUsers();
     _searchController.addListener(_onSearchChanged);
     _loadMyOrganizations();
@@ -54,6 +77,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
         _groupTabIndex = _groupTabController!.index;
       });
     });
+    _listController.addListener(_onListScroll);
   }
 
   @override
@@ -61,7 +85,46 @@ class _NewMessageScreenState extends State<NewMessageScreen>
     _searchController.dispose();
     _groupNameController.dispose();
     _groupTabController?.dispose();
+    _listController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
+  }
+
+  @override
+  bool get wantKeepAlive => true;
+
+  Future<void> _restorePrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastMode = prefs.getBool(_prefsKeyMode);
+      final recent = prefs.getStringList(_prefsKeyRecent) ?? <String>[];
+      if (!mounted) return;
+      setState(() {
+        _groupMode = lastMode ?? false;
+        _recentSearches = recent;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _persistMode(bool group) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_prefsKeyMode, group);
+    } catch (_) {}
+  }
+
+  Future<void> _addRecentSearch(String term) async {
+    if (term.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList(_prefsKeyRecent) ?? <String>[];
+      list.remove(term);
+      list.insert(0, term);
+      final trimmed = list.take(10).toList();
+      await prefs.setStringList(_prefsKeyRecent, trimmed);
+      if (!mounted) return;
+      setState(() => _recentSearches = trimmed);
+    } catch (_) {}
   }
 
   Future<void> _loadMyOrganizations() async {
@@ -129,13 +192,21 @@ class _NewMessageScreenState extends State<NewMessageScreen>
       _isSearching = query.isNotEmpty;
     });
 
+    _searchDebounce?.cancel();
     if (query.isEmpty) {
       setState(() {
         _searchResults = _allUsers;
+        _isSearchInFlight = false;
       });
-    } else {
-      _performSearch(query);
+      return;
     }
+    setState(() {
+      _isSearchInFlight = true;
+      _searchFailed = false;
+    });
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      _performSearch(query);
+    });
   }
 
   Future<void> _performSearch(String query) async {
@@ -147,20 +218,41 @@ class _NewMessageScreenState extends State<NewMessageScreen>
         query,
         currentUser.uid,
       );
+      // Support @username prefix filter locally
+      final q = query.startsWith('@') ? query.substring(1) : query;
       final filtered = results
           .where((u) => !_blockedUserIds.contains(u.uid))
+          .where((u) {
+            if (query.startsWith('@')) {
+              final uname = (u.username ?? '').toLowerCase();
+              return uname.contains(q.toLowerCase());
+            }
+            return true;
+          })
           .toList();
       if (!mounted) return;
       setState(() {
         _searchResults = filtered;
+        _isSearchInFlight = false;
+        _searchFailed = false;
       });
+      _lastSearchQuery = query;
+      _addRecentSearch(query);
     } catch (e) {
       Logger.error('Error searching users: $e');
+      if (!mounted) return;
+      setState(() {
+        _isSearchInFlight = false;
+        _searchFailed = true;
+      });
+      ShowToast().showSnackBar(_t('searchFailedToast'), context);
     }
   }
 
   Future<void> _startConversation(CustomerModel user) async {
+    if (_isNavigating) return;
     try {
+      setState(() => _isNavigating = true);
       final currentUser = _auth.currentUser;
       if (currentUser == null) return;
 
@@ -177,7 +269,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
       if (existingConversationId != null) {
         // Navigate to existing conversation
         if (!mounted) return;
-        Navigator.pushReplacement(
+        await Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => ChatScreen(
@@ -207,7 +299,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
       } else {
         // Create new conversation and navigate
         if (!mounted) return;
-        Navigator.pushReplacement(
+        await Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => ChatScreen(
@@ -239,6 +331,8 @@ class _NewMessageScreenState extends State<NewMessageScreen>
       Logger.error('Error starting conversation: $e');
       if (!mounted) return;
       ShowToast().showSnackBar('Error starting conversation', context);
+    } finally {
+      if (mounted) setState(() => _isNavigating = false);
     }
   }
 
@@ -254,7 +348,10 @@ class _NewMessageScreenState extends State<NewMessageScreen>
         );
         return;
       }
-      final groupName = _groupNameController.text.trim();
+
+      // Ask for a name just-in-time in a bottom sheet
+      final name = await _promptForGroupName(context);
+      final groupName = name?.trim() ?? '';
 
       final conv = await _messagingHelper.createGroupConversation(
         groupName: groupName.isEmpty ? null : groupName,
@@ -264,6 +361,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
         ShowToast().showSnackBar('Failed to create group', context);
         return;
       }
+      HapticFeedback.mediumImpact();
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
@@ -276,6 +374,77 @@ class _NewMessageScreenState extends State<NewMessageScreen>
       if (!mounted) return;
       ShowToast().showSnackBar('Error creating group', context);
     }
+  }
+
+  Future<String?> _promptForGroupName(BuildContext context) async {
+    final controller = TextEditingController();
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Name your group',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: controller,
+                  textInputAction: TextInputAction.done,
+                  decoration: const InputDecoration(
+                    hintText: 'Add a name (optional) 🛸✨',
+                    border: OutlineInputBorder(),
+                  ),
+                  onSubmitted: (v) => Navigator.pop(context, controller.text),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, ''),
+                      child: const Text('Skip'),
+                    ),
+                    const Spacer(),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(context, controller.text),
+                      child: const Text('Create'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _createGroupFromOrganization(
@@ -335,9 +504,10 @@ class _NewMessageScreenState extends State<NewMessageScreen>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final theme = Theme.of(context);
 
-    return Scaffold(
+    final scaffold = Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -358,28 +528,24 @@ class _NewMessageScreenState extends State<NewMessageScreen>
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
-        title: Text(_groupMode ? 'New Group Message' : 'New Message'),
+        title: Text(_groupMode ? _t('newGroupMessage') : _t('newMessage')),
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),
           child: Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
         ),
       ),
+      bottomNavigationBar: _buildCreateGroupBar(),
       body: Column(
         children: [
           _buildModeToggle(),
           if (_groupMode) ...[
-            _buildGroupHeader(),
             _buildGroupTabs(),
             Expanded(child: _buildGroupTabContent()),
           ] else ...[
             _buildSearchBar(),
             Expanded(
               child: _isLoading
-                  ? Center(
-                      child: CircularProgressIndicator(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    )
+                  ? _buildShimmerList()
                   : _searchResults.isEmpty
                   ? _buildEmptyState()
                   : _buildUsersList(),
@@ -388,48 +554,77 @@ class _NewMessageScreenState extends State<NewMessageScreen>
         ],
       ),
     );
+
+    if (kDebugMode) {
+      final mq = MediaQuery.of(context);
+      return MediaQuery(
+        data: mq.copyWith(textScaleFactor: _testTextScale),
+        child: scaffold,
+      );
+    }
+    return scaffold;
   }
 
   Widget _buildModeToggle() {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Row(
-        children: [
-          ChoiceChip(
-            label: const Text('Direct'),
-            selected: !_groupMode,
-            onSelected: (v) => setState(() => _groupMode = false),
-            selectedColor: theme.colorScheme.primary.withValues(alpha: 0.15),
-          ),
-          const SizedBox(width: 8),
-          ChoiceChip(
-            label: const Text('Group'),
-            selected: _groupMode,
-            onSelected: (v) => setState(() => _groupMode = true),
-            selectedColor: theme.colorScheme.primary.withValues(alpha: 0.15),
-          ),
-          const Spacer(),
-          if (_groupMode)
-            FilledButton(
-              onPressed: () {
-                final onUsersTab = _groupTabIndex == 0;
-                if (onUsersTab) {
-                  if (_selectedUserIds.length >= 2) {
-                    _createGroupAndOpenChat();
-                  }
-                } else {
-                  if (_selectedOrgId != null && _selectedOrgId!.isNotEmpty) {
-                    _createGroupFromOrganization(
-                      _selectedOrgId!,
-                      _selectedOrgName ?? 'Group',
-                    );
-                  }
-                }
-              },
-              child: const Text('Create'),
+      child: CupertinoSegmentedControl<bool>(
+        children: {
+          false: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            child: Text(
+              'Direct',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: _groupMode == false
+                    ? theme.colorScheme.primary
+                    : theme.textTheme.bodyMedium?.color?.withValues(
+                        alpha: 0.85,
+                      ),
+                shadows: const [
+                  Shadow(
+                    color: Colors.black26,
+                    blurRadius: 2,
+                    offset: Offset(0, 1),
+                  ),
+                ],
+              ),
             ),
-        ],
+          ),
+          true: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            child: Text(
+              'Group',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: _groupMode == true
+                    ? theme.colorScheme.primary
+                    : theme.textTheme.bodyMedium?.color?.withValues(
+                        alpha: 0.85,
+                      ),
+                shadows: const [
+                  Shadow(
+                    color: Colors.black26,
+                    blurRadius: 2,
+                    offset: Offset(0, 1),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        },
+        groupValue: _groupMode,
+        borderColor: theme.colorScheme.primary.withValues(alpha: 0.4),
+        pressedColor: theme.colorScheme.primary.withValues(alpha: 0.08),
+        selectedColor: Colors.white,
+        unselectedColor: theme.cardColor,
+        onValueChanged: (val) {
+          setState(() => _groupMode = val);
+          _persistMode(val);
+        },
       ),
     );
   }
@@ -475,13 +670,11 @@ class _NewMessageScreenState extends State<NewMessageScreen>
     return Column(
       children: [
         _buildSearchBar(),
+        if (_selectedUserIds.isNotEmpty) _buildSelectedChips(),
+        if (_searchFailed) _buildRetryBar(),
         Expanded(
           child: _isLoading
-              ? Center(
-                  child: CircularProgressIndicator(
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                )
+              ? _buildShimmerList()
               : _searchResults.isEmpty
               ? _buildEmptyState()
               : _buildUsersList(),
@@ -524,7 +717,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
               ),
               const SizedBox(width: 8),
               Text(
-                'Your Groups',
+                _t('yourGroups'),
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -533,10 +726,16 @@ class _NewMessageScreenState extends State<NewMessageScreen>
               ),
               const Spacer(),
               IconButton(
+                icon: const Icon(Icons.info_outline),
+                color: theme.textTheme.bodyMedium?.color,
+                onPressed: () => _showOrgInfo(context),
+                tooltip: _t('info'),
+              ),
+              IconButton(
                 icon: const Icon(Icons.refresh),
                 color: theme.textTheme.bodyMedium?.color,
                 onPressed: _loadMyOrganizations,
-                tooltip: 'Refresh',
+                tooltip: _t('refresh'),
               ),
             ],
           ),
@@ -561,144 +760,281 @@ class _NewMessageScreenState extends State<NewMessageScreen>
               ),
             )
           else
-            Column(
-              children: _myOrgs.map((org) {
-                final orgId = org['id'] ?? '';
-                final orgName = org['name'] ?? 'Group';
-                final selected = _selectedOrgId == orgId;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    color: theme.scaffoldBackgroundColor,
-                    borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-                    border: Border.all(
-                      color: selected
-                          ? (isDark
-                                ? const Color(0xFF2C5A96)
-                                : AppThemeColor.darkBlueColor)
-                          : (isDark
-                                ? const Color(0xFF2C5A96)
-                                : AppThemeColor.lightBlueColor),
-                      width: selected ? 1.0 : 0.5,
-                    ),
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    leading: CircleAvatar(
-                      backgroundColor: isDark
-                          ? const Color(0xFF4A90E2)
-                          : AppThemeColor.lightBlueColor,
-                      child: const Icon(Icons.group, color: Colors.white),
-                    ),
-                    title: Text(
-                      orgName,
-                      style: TextStyle(
-                        color: theme.textTheme.titleMedium?.color,
+            Expanded(
+              child: ListView.separated(
+                padding: EdgeInsets.zero,
+                itemCount: _myOrgs.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final org = _myOrgs[index];
+                  final orgId = org['id'] ?? '';
+                  final orgName = org['name'] ?? 'Group';
+                  final selected = _selectedOrgId == orgId;
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: theme.scaffoldBackgroundColor,
+                      borderRadius: BorderRadius.circular(
+                        Dimensions.radiusLarge,
+                      ),
+                      border: Border.all(
+                        color: selected
+                            ? (isDark
+                                  ? const Color(0xFF2C5A96)
+                                  : AppThemeColor.darkBlueColor)
+                            : (isDark
+                                  ? const Color(0xFF2C5A96)
+                                  : AppThemeColor.lightBlueColor),
+                        width: selected ? 1.0 : 0.5,
                       ),
                     ),
-                    trailing: Radio<String>(
-                      value: orgId,
-                      groupValue: _selectedOrgId,
-                      onChanged: (val) {
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      leading: CircleAvatar(
+                        backgroundColor: isDark
+                            ? const Color(0xFF4A90E2)
+                            : AppThemeColor.lightBlueColor,
+                        child: const Icon(Icons.group, color: Colors.white),
+                      ),
+                      title: Text(
+                        orgName,
+                        style: TextStyle(
+                          color: theme.textTheme.titleMedium?.color,
+                        ),
+                      ),
+                      subtitle:
+                          FutureBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                            future: FirebaseFirestore.instance
+                                .collection('Organizations')
+                                .doc(orgId)
+                                .collection('Members')
+                                .where('status', isEqualTo: 'approved')
+                                .get(),
+                            builder: (context, snap) {
+                              final count = snap.data?.docs.length ?? 0;
+                              return Text(
+                                count == 0
+                                    ? _t('noMembers')
+                                    : _t('members', {'count': '$count'}),
+                                style: TextStyle(
+                                  color: theme.textTheme.bodyMedium?.color,
+                                ),
+                              );
+                            },
+                          ),
+                      trailing: Radio<String>(
+                        value: orgId,
+                        groupValue: _selectedOrgId,
+                        onChanged: (val) {
+                          setState(() {
+                            _selectedOrgId = val;
+                            _selectedOrgName = orgName;
+                          });
+                        },
+                      ),
+                      onTap: () {
                         setState(() {
-                          _selectedOrgId = val;
-                          _selectedOrgName = orgName;
+                          if (_selectedOrgId == orgId) {
+                            _selectedOrgId = null;
+                            _selectedOrgName = null;
+                          } else {
+                            _selectedOrgId = orgId;
+                            _selectedOrgName = orgName;
+                          }
                         });
                       },
                     ),
-                    onTap: () {
-                      setState(() {
-                        if (_selectedOrgId == orgId) {
-                          _selectedOrgId = null;
-                          _selectedOrgName = null;
-                        } else {
-                          _selectedOrgId = orgId;
-                          _selectedOrgName = orgName;
-                        }
-                      });
-                    },
-                  ),
-                );
-              }).toList(),
+                  );
+                },
+              ),
             ),
         ],
+      ),
+    );
+  }
+
+  void _showOrgInfo(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(16),
+            topRight: Radius.circular(16),
+          ),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 8),
+            Text(
+              _t('aboutGroups'),
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            Text(_t('orgGroupExplainer')),
+            const SizedBox(height: 12),
+          ],
+        ),
       ),
     );
   }
 
   // (Removed) _buildOrganizationsSection replaced by tabbed UI
 
-  Widget _buildGroupHeader() {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _groupNameController,
-              decoration: const InputDecoration(
-                hintText: 'Group name',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            '${_selectedUserIds.length} selected',
-            style: TextStyle(color: theme.textTheme.bodyMedium?.color),
-          ),
-        ],
-      ),
-    );
-  }
+  // Legacy inline group header removed in favor of bottom sticky bar
 
   Widget _buildSearchBar() {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDarkMode;
     final theme = Theme.of(context);
 
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          margin: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.3)
+                    : Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: TextField(
-        controller: _searchController,
-        style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-        decoration: InputDecoration(
-          hintText: 'Search users...',
-          hintStyle: TextStyle(
-            color: theme.textTheme.bodyMedium?.color,
-            fontSize: 16,
-          ),
-          border: InputBorder.none,
-          icon: Icon(Icons.search, color: theme.textTheme.bodyMedium?.color),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: Icon(
-                    Icons.clear,
-                    color: theme.textTheme.bodyMedium?.color,
+          child: Column(
+            children: [
+              Semantics(
+                textField: true,
+                label: _t('searchUsers'),
+                hint: _t('searchUsersHint'),
+                child: TextField(
+                  controller: _searchController,
+                  style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+                  decoration: InputDecoration(
+                    hintText: _t('searchUsers'),
+                    hintStyle: TextStyle(
+                      color: theme.textTheme.bodyMedium?.color,
+                      fontSize: 16,
+                    ),
+                    border: InputBorder.none,
+                    icon: Icon(
+                      Icons.search,
+                      color: theme.textTheme.bodyMedium?.color,
+                    ),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? Semantics(
+                            button: true,
+                            label: _t('clearSearch'),
+                            child: IconButton(
+                              icon: Icon(
+                                Icons.clear,
+                                color: theme.textTheme.bodyMedium?.color,
+                              ),
+                              onPressed: () {
+                                _searchController.clear();
+                              },
+                            ),
+                          )
+                        : null,
                   ),
+                ),
+              ),
+              if (_isSearchInFlight)
+                const SizedBox(
+                  height: 2,
+                  child: LinearProgressIndicator(minHeight: 2),
+                ),
+            ],
+          ),
+        ),
+        if (_recentSearches.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: _recentSearches
+                  .map(
+                    (s) => Semantics(
+                      label: _t('recentSearch', {'term': s}),
+                      button: true,
+                      child: InputChip(
+                        label: Text(s),
+                        onPressed: () {
+                          _searchController.text = s;
+                          _onSearchChanged();
+                        },
+                        onDeleted: () async {
+                          final prefs = await SharedPreferences.getInstance();
+                          final list =
+                              prefs.getStringList(_prefsKeyRecent) ??
+                              <String>[];
+                          list.remove(s);
+                          await prefs.setStringList(_prefsKeyRecent, list);
+                          if (!mounted) return;
+                          setState(() => _recentSearches = list);
+                        },
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildRetryBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Semantics(
+        container: true,
+        label: _t('searchFailedMsg'),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.red.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.red.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _t('searchFailedMsg'),
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
+              Semantics(
+                button: true,
+                label: _t('retry'),
+                child: TextButton(
                   onPressed: () {
-                    _searchController.clear();
+                    if (_lastSearchQuery.isNotEmpty) {
+                      setState(() => _isSearchInFlight = true);
+                      _performSearch(_lastSearchQuery);
+                    }
                   },
-                )
-              : null,
+                  child: Text(_t('retry')),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -720,7 +1056,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
           ),
           const SizedBox(height: 16),
           Text(
-            _isSearching ? 'No users found' : 'No users available',
+            _isSearching ? _t('noUsersFound') : _t('noUsersAvailable'),
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
@@ -729,14 +1065,26 @@ class _NewMessageScreenState extends State<NewMessageScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            _isSearching
-                ? 'Try a different search term'
-                : 'There are no other users to message',
+            _isSearching ? _t('tryDifferentSearch') : _t('noUsersToMessage'),
             style: TextStyle(
               fontSize: 16,
               color: theme.textTheme.bodyMedium?.color,
             ),
             textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            children: [
+              OutlinedButton(
+                onPressed: _inviteFriends,
+                child: Text(_t('inviteFriends')),
+              ),
+              OutlinedButton(
+                onPressed: _discoverPeople,
+                child: Text(_t('discoverPeople')),
+              ),
+            ],
           ),
         ],
       ),
@@ -746,8 +1094,26 @@ class _NewMessageScreenState extends State<NewMessageScreen>
   Widget _buildUsersList() {
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: _searchResults.length,
+      controller: _listController,
+      itemCount:
+          (_searchResults.length > _listLimit
+              ? _listLimit
+              : _searchResults.length) +
+          1,
       itemBuilder: (context, index) {
+        if (index >=
+            (_searchResults.length > _listLimit
+                ? _listLimit
+                : _searchResults.length)) {
+          return (_searchResults.length > _listLimit)
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Center(
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : const SizedBox.shrink();
+        }
         final user = _searchResults[index];
         return _buildUserTile(user);
       },
@@ -760,134 +1126,412 @@ class _NewMessageScreenState extends State<NewMessageScreen>
     final theme = Theme.of(context);
     final bool isSelected = _selectedUserIds.contains(user.uid);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-        border: Border.all(
-          color: _groupMode && isSelected
-              ? (isDark ? const Color(0xFF2C5A96) : const Color(0xFF667EEA))
-              : Colors.transparent,
-          width: _groupMode && isSelected ? 1.2 : 0.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+    return Semantics(
+      label: _groupMode
+          ? 'Select ${user.name}'
+          : 'Start conversation with ${user.name}',
+      button: true,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+          border: Border.all(
+            color: _groupMode && isSelected
+                ? (isDark ? const Color(0xFF2C5A96) : const Color(0xFF667EEA))
+                : Colors.transparent,
+            width: _groupMode && isSelected ? 1.2 : 0.0,
           ),
-        ],
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            width: 48,
-            height: 48,
-            color: isDark
-                ? const Color(0xFF4A90E2)
-                : AppThemeColor.lightBlueColor,
-            child: user.profilePictureUrl != null
-                ? SafeNetworkImage(
-                    imageUrl: user.profilePictureUrl!,
-                    fit: BoxFit.cover,
-                    placeholder: Icon(
-                      Icons.person,
-                      color: isDark
-                          ? const Color(0xFF2C5A96)
-                          : const Color(0xFF667EEA),
-                    ),
-                    errorWidget: Icon(
-                      Icons.person,
-                      color: isDark
-                          ? const Color(0xFF2C5A96)
-                          : const Color(0xFF667EEA),
-                    ),
-                  )
-                : Icon(
-                    Icons.person,
-                    color: isDark
-                        ? const Color(0xFF2C5A96)
-                        : const Color(0xFF667EEA),
-                  ),
-          ),
-        ),
-        title: Text(
-          user.name,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: theme.textTheme.titleMedium?.color,
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (user.username != null && user.username!.isNotEmpty) ...[
-              Text(
-                '@${user.username}',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: theme.textTheme.bodyMedium?.color,
-                ),
-              ),
-              const SizedBox(height: 4),
-            ],
-            if (user.bio != null && user.bio!.isNotEmpty) ...[
-              Text(
-                user.bio!,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: theme.textTheme.bodyMedium?.color,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.3)
+                  : Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
           ],
         ),
-        trailing: _groupMode
-            ? Checkbox(
-                value: isSelected,
-                onChanged: (checked) {
+        child: ListTile(
+          contentPadding: const EdgeInsets.all(16),
+          leading: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              width: 56,
+              height: 56,
+              color: isDark
+                  ? const Color(0xFF4A90E2)
+                  : AppThemeColor.lightBlueColor,
+              child:
+                  (user.profilePictureUrl != null &&
+                      user.profilePictureUrl!.isNotEmpty)
+                  ? SafeNetworkImage(
+                      imageUrl: user.profilePictureUrl!,
+                      fit: BoxFit.cover,
+                      placeholder: Icon(
+                        Icons.person,
+                        color: isDark
+                            ? const Color(0xFF2C5A96)
+                            : const Color(0xFF667EEA),
+                      ),
+                      errorWidget: _buildAvatarFallback(user, isDark),
+                    )
+                  : _buildAvatarFallback(user, isDark),
+            ),
+          ),
+          title: Text(
+            user.name,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: theme.textTheme.titleMedium?.color,
+            ),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (user.username != null && user.username!.isNotEmpty) ...[
+                Text(
+                  '@${user.username}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: theme.textTheme.bodyMedium?.color,
+                  ),
+                ),
+                const SizedBox(height: 4),
+              ],
+              if (user.bio != null && user.bio!.isNotEmpty) ...[
+                Text(
+                  user.bio!,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: theme.textTheme.bodyMedium?.color,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ],
+          ),
+          trailing: _groupMode
+              ? Checkbox(
+                  value: isSelected,
+                  onChanged: (checked) {
+                    setState(() {
+                      if (checked == true) {
+                        _selectedUserIds.add(user.uid);
+                      } else {
+                        _selectedUserIds.remove(user.uid);
+                      }
+                    });
+                    HapticFeedback.selectionClick();
+                  },
+                )
+              : Icon(
+                  Icons.chevron_right,
+                  color: theme.textTheme.bodyMedium?.color,
+                ),
+          onTap: _groupMode
+              ? () {
                   setState(() {
-                    if (checked == true) {
-                      _selectedUserIds.add(user.uid);
-                    } else {
+                    if (_selectedUserIds.contains(user.uid)) {
                       _selectedUserIds.remove(user.uid);
+                    } else {
+                      _selectedUserIds.add(user.uid);
                     }
                   });
-                },
-              )
-            : Container(
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF2C5A96)
-                      : const Color(0xFF667EEA),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.message_outlined, color: Colors.white),
-                  onPressed: () => _startConversation(user),
-                  tooltip: 'Message',
-                ),
-              ),
-        onTap: _groupMode
-            ? () {
-                setState(() {
-                  if (_selectedUserIds.contains(user.uid)) {
-                    _selectedUserIds.remove(user.uid);
-                  } else {
-                    _selectedUserIds.add(user.uid);
-                  }
-                });
-              }
-            : () => _startConversation(user),
+                  HapticFeedback.selectionClick();
+                }
+              : () => _startConversation(user),
+          onLongPress: () => _showUserActions(user),
+        ),
       ),
     );
+  }
+
+  Widget _buildAvatarFallback(CustomerModel user, bool isDark) {
+    final initial = (user.name.isNotEmpty ? user.name[0] : '?').toUpperCase();
+    final bg = _colorFromString(user.uid);
+    return Container(
+      color: bg,
+      alignment: Alignment.center,
+      child: Text(
+        initial,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Color _colorFromString(String input) {
+    final hash = input.codeUnits.fold<int>(0, (prev, el) => prev + el);
+    final r = (hash & 0xFF0000) >> 16;
+    final g = (hash & 0x00FF00) >> 8;
+    final b = (hash & 0x0000FF);
+    return Color.fromARGB(
+      255,
+      (r + 60) % 256,
+      (g + 120) % 256,
+      (b + 180) % 256,
+    );
+  }
+
+  void _onListScroll() {
+    if (!_listController.hasClients) return;
+    final position = _listController.position;
+    if (position.pixels > position.maxScrollExtent - 200) {
+      if (_listLimit < _searchResults.length) {
+        setState(
+          () => _listLimit = (_listLimit + 30).clamp(0, _searchResults.length),
+        );
+      }
+    }
+  }
+
+  Widget _buildSelectedChips() {
+    final selected = _allUsers
+        .where((u) => _selectedUserIds.contains(u.uid))
+        .toList();
+    if (selected.isEmpty) return const SizedBox.shrink();
+    return SizedBox(
+      height: 48,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        scrollDirection: Axis.horizontal,
+        itemCount: selected.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final u = selected[index];
+          return Semantics(
+            label: _t('selectedUserChip', {'name': u.name}),
+            hint: _t('removeSelectedHint'),
+            button: true,
+            child: InputChip(
+              label: Text(u.name, overflow: TextOverflow.ellipsis),
+              onDeleted: () {
+                setState(() => _selectedUserIds.remove(u.uid));
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget? _buildCreateGroupBar() {
+    if (!_groupMode) return null;
+    final onUsersTab = _groupTabIndex == 0;
+    final canCreateFromUsers = onUsersTab && _selectedUserIds.length >= 2;
+    final canCreateFromOrg =
+        !onUsersTab && _selectedOrgId != null && _selectedOrgId!.isNotEmpty;
+    if (!canCreateFromUsers && !canCreateFromOrg) return null;
+    return SafeArea(
+      child: Semantics(
+        label: onUsersTab ? _t('createWithSelected') : _t('createFromOrg'),
+        button: true,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 8,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              if (onUsersTab) ...[
+                CircleAvatar(
+                  radius: 14,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.15),
+                  child: Text(
+                    '${_selectedUserIds.length}',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: Text(_t('createWithSelected'))),
+                FilledButton(
+                  onPressed: _createGroupAndOpenChat,
+                  child: Text(_t('createGroup')),
+                ),
+              ] else ...[
+                const Icon(Icons.group_outlined),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _selectedOrgName == null || _selectedOrgName!.isEmpty
+                        ? _t('createFromOrg')
+                        : 'Create group from "${_selectedOrgName!}"',
+                  ),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    if (_selectedOrgId != null && _selectedOrgId!.isNotEmpty) {
+                      _createGroupFromOrganization(
+                        _selectedOrgId!,
+                        _selectedOrgName ?? 'Group',
+                      );
+                    }
+                  },
+                  child: Text(_t('createGroup')),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShimmerList() {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: 6,
+      itemBuilder: (_, __) => Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: Shimmer.fromColors(
+          baseColor: Colors.grey.shade300,
+          highlightColor: Colors.grey.shade100,
+          child: Container(
+            height: 80,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showUserActions(CustomerModel user) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(16),
+            topRight: Radius.circular(16),
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.person_outline),
+                title: Text(_t('viewProfile')),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          UserProfileScreen(user: user, isOwnProfile: false),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.message_outlined),
+                title: Text(_t('message')),
+                onTap: () {
+                  Navigator.pop(context);
+                  _startConversation(user);
+                },
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.report_outlined,
+                  color: Colors.orange,
+                ),
+                title: Text(_t('reportOrBlock')),
+                onTap: () {
+                  Navigator.pop(context);
+                  ShowToast().showNormalToast(msg: 'Reported');
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Simple localization shim; replace with your app's localization later
+  String _t(String key, [Map<String, String>? vars]) {
+    final m = <String, String>{
+      'newMessage': 'New Message',
+      'newGroupMessage': 'New Group Message',
+      'yourGroups': 'Your Groups',
+      'info': 'Info',
+      'refresh': 'Refresh',
+      'noMembers': 'No members',
+      'members': '${vars?['count'] ?? '{count}'} members',
+      'noUsersFound': 'No users found',
+      'noUsersAvailable': 'No users available',
+      'tryDifferentSearch': 'Try a different search term',
+      'noUsersToMessage': 'There are no other users to message',
+      'inviteFriends': 'Invite friends',
+      'discoverPeople': 'Discover people',
+      'aboutGroups': 'About groups',
+      'orgGroupExplainer':
+          'Selecting a group here will create a group conversation with all approved members of that organization.',
+      'viewProfile': 'View profile',
+      'message': 'Message',
+      'reportOrBlock': 'Report / Block',
+      'createWithSelected': 'Create group with selected users',
+      'createGroup': 'Create group',
+      'createFromOrg': 'Create group from selected organization',
+      'searchFailedToast': 'Search failed. Try again.',
+      'searchFailedMsg': 'Search failed. Please try again.',
+      'retry': 'Retry',
+      'messageType': 'Message type',
+      'searchUsers': 'Search users...',
+      'searchUsersHint': 'Type a name or @username',
+      'clearSearch': 'Clear search',
+      'recentSearch': 'Recent search: {term}',
+      'selectedUserChip': 'Selected: {name}',
+      'removeSelectedHint': 'Double tap to remove',
+      'a11yScaleFabTooltip': 'Toggle text scale for accessibility testing',
+      'a11yScaleFabLabel': 'Change text scale to {scale}',
+    };
+    String value = m[key] ?? key;
+    if (vars != null) {
+      vars.forEach((k, v) => value = value.replaceAll('{$k}', v));
+    }
+    return value;
+  }
+
+  void _inviteFriends() {
+    SharePlus.instance.share(
+      ShareParams(text: 'Join me on Orgami to chat and collaborate!'),
+    );
+  }
+
+  void _discoverPeople() {
+    try {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const GroupsScreen()),
+      );
+    } catch (_) {
+      ShowToast().showNormalToast(msg: 'Discover coming soon');
+    }
   }
 }

@@ -8,7 +8,7 @@ import 'package:orgami/Utils/Router.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/screens/Events/single_event_screen.dart';
 import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
-import 'package:orgami/screens/Events/select_event_type_screen.dart';
+import 'package:orgami/screens/Events/chose_sign_in_methods_screen.dart';
 import 'package:orgami/screens/Home/calendar_screen.dart';
 
 class HomeHubScreen extends StatefulWidget {
@@ -127,7 +127,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
           onTap: () {
             RouterClass.nextScreenNormal(
               context,
-              const SelectEventTypeScreen(),
+              const ChoseSignInMethodsScreen(),
             );
           },
           child: const Icon(Icons.add, color: Colors.white, size: 28),
@@ -306,7 +306,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 8, bottom: 4),
               child: Text(
-                'Organizations: ${_discoverOrgs.length}',
+                'Groups: ${_discoverOrgs.length}',
                 style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
               ),
             ),
