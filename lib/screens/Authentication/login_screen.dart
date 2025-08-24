@@ -4,9 +4,9 @@ import 'package:orgami/controller/customer_controller.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/Screens/Authentication/forgot_password_screen.dart';
 import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/images.dart';
+import 'package:orgami/Utils/Images.dart';
 import 'package:orgami/Utils/router.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Utils/logger.dart';
 import 'package:orgami/Utils/app_constants.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
@@ -169,10 +169,10 @@ class _LoginScreenState extends State<LoginScreen>
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                color: AppThemeColor.darkBlueColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: AppThemeColor.darkBlueColor.withValues(alpha: 0.2),
+                  color: AppThemeColor.darkBlueColor.withOpacity(0.2),
                   width: 1,
                 ),
               ),
@@ -234,7 +234,7 @@ class _LoginScreenState extends State<LoginScreen>
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Theme.of(context).shadowColor.withValues(alpha: 0.08),
+                color: Theme.of(context).shadowColor.withOpacity(0.08),
                 blurRadius: 30,
                 offset: const Offset(0, 12),
                 spreadRadius: 0,
@@ -286,7 +286,7 @@ class _LoginScreenState extends State<LoginScreen>
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: AppThemeColor.darkBlueColor.withValues(alpha: 0.06),
+            color: AppThemeColor.darkBlueColor.withOpacity(0.06),
             blurRadius: 40,
             offset: const Offset(0, 8),
             spreadRadius: 0,
@@ -351,8 +351,8 @@ class _LoginScreenState extends State<LoginScreen>
               ),
               filled: true,
               fillColor: _isEmailFocused
-                  ? AppThemeColor.lightBlueColor.withValues(alpha: 0.15)
-                  : Colors.grey.withValues(alpha: 0.04),
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.15)
+                  : Colors.grey.withOpacity(0.04),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
@@ -367,7 +367,7 @@ class _LoginScreenState extends State<LoginScreen>
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
-                  color: Colors.grey.withValues(alpha: 0.1),
+                  color: Colors.grey.withOpacity(0.1),
                   width: 1,
                 ),
               ),
@@ -431,8 +431,8 @@ class _LoginScreenState extends State<LoginScreen>
               ),
               filled: true,
               fillColor: _isPasswordFocused
-                  ? AppThemeColor.lightBlueColor.withValues(alpha: 0.15)
-                  : Colors.grey.withValues(alpha: 0.04),
+                  ? AppThemeColor.lightBlueColor.withOpacity(0.15)
+                  : Colors.grey.withOpacity(0.04),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
@@ -447,7 +447,7 @@ class _LoginScreenState extends State<LoginScreen>
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
-                  color: Colors.grey.withValues(alpha: 0.1),
+                  color: Colors.grey.withOpacity(0.1),
                   width: 1,
                 ),
               ),
@@ -548,7 +548,7 @@ class _LoginScreenState extends State<LoginScreen>
       child: OutlinedButton.icon(
         style: OutlinedButton.styleFrom(
           side: BorderSide(
-            color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
+            color: AppThemeColor.darkBlueColor.withOpacity(0.3),
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),

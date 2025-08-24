@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:orgami/controller/customer_controller.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 
-import 'package:orgami/Utils/images.dart';
+import 'package:orgami/Utils/Images.dart';
 import 'package:orgami/Utils/router.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -390,7 +390,7 @@ class _SplashScreenState extends State<SplashScreen>
                             height: 40,
                             child: CircularProgressIndicator(
                               valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white.withValues(alpha: 0.8),
+                                Colors.white.withOpacity(0.8),
                               ),
                               strokeWidth: 3,
                             ),

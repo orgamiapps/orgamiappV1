@@ -104,7 +104,7 @@ class _StepProfessionalInfoState extends State<StepProfessionalInfo> {
           decoration: InputDecoration(
             hintText: 'Enter $label (optional)',
             filled: true,
-            fillColor: Colors.grey.withValues(alpha: 0.04),
+            fillColor: Colors.grey.withOpacity(0.04),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
@@ -143,7 +143,7 @@ class _StepProfessionalInfoState extends State<StepProfessionalInfo> {
           decoration: InputDecoration(
             hintText: 'Add a short bio about yourself (optional)',
             filled: true,
-            fillColor: Colors.grey.withValues(alpha: 0.04),
+            fillColor: Colors.grey.withOpacity(0.04),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,

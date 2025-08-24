@@ -112,7 +112,7 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Icon(
@@ -181,7 +181,7 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
+            color: Colors.black.withOpacity(0.06),
             spreadRadius: 0,
             blurRadius: 24,
             offset: const Offset(0, 8),
@@ -197,7 +197,7 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Icon(
@@ -322,7 +322,7 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
             color: Colors.grey[50],
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: color.withValues(alpha: 0.15),
+              color: color.withOpacity(0.15),
               width: 1.5,
             ),
           ),
@@ -332,7 +332,7 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
+                  color: color.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(icon, color: color, size: 24),
@@ -368,7 +368,7 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
+                  color: color.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(Icons.arrow_forward_ios, color: color, size: 16),
@@ -385,10 +385,10 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF667EEA).withValues(alpha: 0.04),
+        color: const Color(0xFF667EEA).withOpacity(0.04),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(0xFF667EEA).withValues(alpha: 0.15),
+          color: const Color(0xFF667EEA).withOpacity(0.15),
           width: 1,
         ),
       ),
@@ -401,7 +401,7 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(

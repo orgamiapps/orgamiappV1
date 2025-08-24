@@ -4,7 +4,7 @@ import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:orgami/Utils/cached_image.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/controller/customer_controller.dart';
 
 class FollowersFollowingScreen extends StatefulWidget {
@@ -209,7 +209,7 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
             icon: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.3),
+                color: Colors.black.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
@@ -237,7 +237,7 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
                 Text(
                   'Followers & Following',
                   style: TextStyle(
-                    color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.8),
+                    color: AppThemeColor.pureWhiteColor.withOpacity(0.8),
                     fontSize: 14,
                     fontFamily: 'Roboto',
                   ),
@@ -258,7 +258,7 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
         borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -300,7 +300,7 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
         borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -422,7 +422,7 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
           borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withOpacity(0.05),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),

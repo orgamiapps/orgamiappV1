@@ -94,7 +94,7 @@ class _SelectOrganizationScreenState extends State<SelectOrganizationScreen> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Icon(Icons.arrow_back_ios_new, color: Colors.white),

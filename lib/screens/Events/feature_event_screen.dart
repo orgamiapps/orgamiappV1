@@ -118,7 +118,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Icon(
@@ -181,7 +181,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -197,7 +197,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF9800).withValues(alpha: 0.1),
+                  color: const Color(0xFFFF9800).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -247,7 +247,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
           width: 32,
           height: 32,
           decoration: BoxDecoration(
-            color: const Color(0xFFFF9800).withValues(alpha: 0.1),
+            color: const Color(0xFFFF9800).withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, color: const Color(0xFFFF9800), size: 16),
@@ -291,7 +291,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -423,7 +423,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
                             BoxShadow(
                               color: const Color(
                                 0xFFFF9800,
-                              ).withValues(alpha: 0.3),
+                              ).withOpacity(0.3),
                               spreadRadius: 0,
                               blurRadius: 8,
                               offset: const Offset(0, 2),
@@ -431,7 +431,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
                           ]
                         : [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
+                              color: Colors.black.withOpacity(0.05),
                               spreadRadius: 0,
                               blurRadius: 4,
                               offset: const Offset(0, 2),
@@ -494,7 +494,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
           boxShadow: _untilEvent
               ? [
                   BoxShadow(
-                    color: const Color(0xFFFF9800).withValues(alpha: 0.3),
+                    color: const Color(0xFFFF9800).withOpacity(0.3),
                     spreadRadius: 0,
                     blurRadius: 8,
                     offset: const Offset(0, 2),
@@ -502,7 +502,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
                 ]
               : [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    color: Colors.black.withOpacity(0.05),
                     spreadRadius: 0,
                     blurRadius: 4,
                     offset: const Offset(0, 2),
@@ -526,7 +526,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
                   text: '(${timeLeftLabel})',
                   style: TextStyle(
                     color: _untilEvent
-                        ? Colors.white.withValues(alpha: 0.9)
+                        ? Colors.white.withOpacity(0.9)
                         : const Color(0xFF6B7280),
                     fontWeight: FontWeight.w500,
                     fontSize: 14,
@@ -565,7 +565,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: Colors.black.withOpacity(0.1),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, -4),
@@ -591,7 +591,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
           boxShadow: (_selectedDays != null || _untilEvent)
               ? [
                   BoxShadow(
-                    color: const Color(0xFFFF9800).withValues(alpha: 0.3),
+                    color: const Color(0xFFFF9800).withOpacity(0.3),
                     spreadRadius: 0,
                     blurRadius: 12,
                     offset: const Offset(0, 4),
@@ -599,7 +599,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
                 ]
               : [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    color: Colors.black.withOpacity(0.05),
                     spreadRadius: 0,
                     blurRadius: 8,
                     offset: const Offset(0, 2),

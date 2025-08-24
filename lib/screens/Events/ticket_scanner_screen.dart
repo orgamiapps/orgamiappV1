@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/models/ticket_model.dart';
 import 'package:orgami/models/attendance_model.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:orgami/models/badge_model.dart';

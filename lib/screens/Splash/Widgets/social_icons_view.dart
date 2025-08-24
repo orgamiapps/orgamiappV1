@@ -8,7 +8,7 @@ import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/Utils/app_constants.dart';
 import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/router.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 
 class SocialLoginView extends StatefulWidget {
   const SocialLoginView({super.key});
@@ -83,7 +83,7 @@ class _SocialLoginViewState extends State<SocialLoginView> {
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-              color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
+              color: AppThemeColor.darkBlueColor.withOpacity(0.3),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),

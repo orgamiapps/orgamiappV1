@@ -193,7 +193,7 @@ class _PreRegisteredHorizontalListState
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
+                          color: Colors.black.withOpacity(0.05),
                           spreadRadius: 0,
                           blurRadius: 10,
                           offset: const Offset(0, 2),
@@ -215,7 +215,7 @@ class _PreRegisteredHorizontalListState
                             decoration: BoxDecoration(
                               color: const Color(
                                 0xFF667EEA,
-                              ).withValues(alpha: 0.1),
+                              ).withOpacity(0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: const Icon(
@@ -308,7 +308,7 @@ class _PreRegisteredHorizontalListState
                                               decoration: BoxDecoration(
                                                 color: const Color(
                                                   0xFF667EEA,
-                                                ).withValues(alpha: 0.1),
+                                                ).withOpacity(0.1),
                                                 borderRadius:
                                                     BorderRadius.circular(12),
                                                 border: Border.all(
@@ -594,7 +594,7 @@ class _PreRegisteredHorizontalListState
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                        color: const Color(0xFF667EEA).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
@@ -659,7 +659,7 @@ class _PreRegisteredHorizontalListState
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: Colors.grey.withValues(alpha: 0.1),
+                            color: Colors.grey.withOpacity(0.1),
                             width: 1,
                           ),
                         ),
@@ -702,14 +702,14 @@ class _PreRegisteredHorizontalListState
                                     color: isAnon
                                         ? const Color(
                                             0xFF6B7280,
-                                          ).withValues(alpha: 0.3)
+                                          ).withOpacity(0.3)
                                         : (attendee.id.startsWith('ticket_')
                                               ? const Color(
                                                   0xFFFF9800,
-                                                ).withValues(alpha: 0.3)
+                                                ).withOpacity(0.3)
                                               : const Color(
                                                   0xFF667EEA,
-                                                ).withValues(alpha: 0.3)),
+                                                ).withOpacity(0.3)),
                                     spreadRadius: 0,
                                     blurRadius: 8,
                                     offset: const Offset(0, 4),
@@ -787,10 +787,10 @@ class _PreRegisteredHorizontalListState
                                 color: attendee.id.startsWith('ticket_')
                                     ? const Color(
                                         0xFFFF9800,
-                                      ).withValues(alpha: 0.1)
+                                      ).withOpacity(0.1)
                                     : const Color(
                                         0xFF667EEA,
-                                      ).withValues(alpha: 0.1),
+                                      ).withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(

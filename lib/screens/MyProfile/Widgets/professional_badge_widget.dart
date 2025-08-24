@@ -148,13 +148,13 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
+            color: Colors.black.withOpacity(0.3),
             blurRadius: 20,
             spreadRadius: 2,
             offset: const Offset(0, 8),
           ),
           BoxShadow(
-            color: const Color(0xFFC0C0C0).withValues(alpha: 0.2),
+            color: const Color(0xFFC0C0C0).withOpacity(0.2),
             blurRadius: 30,
             spreadRadius: 5,
             offset: const Offset(0, 4),
@@ -181,11 +181,11 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
     Navigator.of(context).push(
       PageRouteBuilder(
         opaque: false,
-        barrierColor: Colors.black.withValues(alpha: 0.85),
+        barrierColor: Colors.black.withOpacity(0.85),
         pageBuilder: (_, __, ___) {
           final scale = _uiScale(context);
           return Scaffold(
-            backgroundColor: Colors.black.withValues(alpha: 0.85),
+            backgroundColor: Colors.black.withOpacity(0.85),
             body: _FullScreenBadgeView(
               badgeUid: widget.badge.uid,
               baseScale: scale,
@@ -229,9 +229,9 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
               end: Alignment.bottomRight,
               colors: [
                 Colors.transparent,
-                Colors.white.withValues(alpha: 0.05),
-                Colors.white.withValues(alpha: 0.12),
-                Colors.white.withValues(alpha: 0.05),
+                Colors.white.withOpacity(0.05),
+                Colors.white.withOpacity(0.12),
+                Colors.white.withOpacity(0.05),
                 Colors.transparent,
               ],
               stops: [
@@ -257,9 +257,9 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Colors.black.withValues(alpha: 0.28),
-              Colors.black.withValues(alpha: 0.16),
-              Colors.black.withValues(alpha: 0.10),
+              Colors.black.withOpacity(0.28),
+              Colors.black.withOpacity(0.16),
+              Colors.black.withOpacity(0.10),
             ],
             stops: const [0.0, 0.55, 1.0],
           ),
@@ -276,11 +276,11 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Colors.white.withValues(alpha: 0.06),
+              Colors.white.withOpacity(0.06),
               Colors.transparent,
-              const Color(0xFF00FFFF).withValues(alpha: 0.06),
+              const Color(0xFF00FFFF).withOpacity(0.06),
               Colors.transparent,
-              const Color(0xFFFF00FF).withValues(alpha: 0.06),
+              const Color(0xFFFF00FF).withOpacity(0.06),
               Colors.transparent,
             ],
           ),
@@ -326,7 +326,7 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: Colors.white.withValues(alpha: 0.98),
+                color: Colors.white.withOpacity(0.98),
                 letterSpacing: 2,
                 shadows: _textShadows(),
               ),
@@ -335,7 +335,7 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
               'EVENT BADGE',
               style: TextStyle(
                 fontSize: 9,
-                color: Colors.white.withValues(alpha: 0.9),
+                color: Colors.white.withOpacity(0.9),
                 letterSpacing: 1.5,
                 shadows: _textShadows(small: true),
               ),
@@ -345,15 +345,15 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.35),
+            color: Colors.black.withOpacity(0.35),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+            border: Border.all(color: Colors.white.withOpacity(0.2)),
           ),
           child: Text(
             'ID: ${widget.badge.uid.substring(0, 8)}',
             style: TextStyle(
               fontSize: 8,
-              color: Colors.white.withValues(alpha: 0.9),
+              color: Colors.white.withOpacity(0.9),
               fontFamily: 'Courier',
               letterSpacing: 0.5,
               shadows: _textShadows(small: true),
@@ -381,7 +381,7 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
               border: Border.all(color: Colors.white, width: 2),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.3),
+                  color: Colors.black.withOpacity(0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
@@ -453,9 +453,9 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.35),
+              color: Colors.black.withOpacity(0.35),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+              border: Border.all(color: Colors.white.withOpacity(0.18)),
             ),
             child: Text(
               label,
@@ -471,12 +471,12 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.5),
+              color: Colors.black.withOpacity(0.5),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+              border: Border.all(color: Colors.white.withOpacity(0.2)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.25),
+                  color: Colors.black.withOpacity(0.25),
                   blurRadius: 8,
                   offset: const Offset(0, 3),
                 ),
@@ -510,11 +510,11 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
             height: size,
             padding: EdgeInsets.all(4 * scale),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.95),
+              color: Colors.white.withOpacity(0.95),
               borderRadius: BorderRadius.circular(10),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
+                  color: Colors.black.withOpacity(0.2),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -548,7 +548,7 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
           'Valid: ${DateTime.now().year}',
           style: TextStyle(
             fontSize: 7,
-            color: Colors.white.withValues(alpha: 0.85),
+            color: Colors.white.withOpacity(0.85),
             shadows: _textShadows(small: true),
           ),
         ),
@@ -559,7 +559,7 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
   List<Shadow> _textShadows({bool small = false}) {
     return [
       Shadow(
-        color: Colors.black.withValues(alpha: 0.45),
+        color: Colors.black.withOpacity(0.45),
         blurRadius: small ? 2 : 4,
         offset: const Offset(0, 1),
       ),
@@ -599,10 +599,10 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: AppColors.primaryColor.withValues(alpha: 0.1),
+          color: AppColors.primaryColor.withOpacity(0.1),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: AppColors.primaryColor.withValues(alpha: 0.3),
+            color: AppColors.primaryColor.withOpacity(0.3),
           ),
         ),
         child: Row(
@@ -648,11 +648,11 @@ class CompactBadgeWidget extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: LinearGradient(
-            colors: [_getBadgeColor(), _getBadgeColor().withValues(alpha: 0.7)],
+            colors: [_getBadgeColor(), _getBadgeColor().withOpacity(0.7)],
           ),
           boxShadow: [
             BoxShadow(
-              color: _getBadgeColor().withValues(alpha: 0.3),
+              color: _getBadgeColor().withOpacity(0.3),
               blurRadius: 8,
               spreadRadius: 2,
             ),
@@ -838,9 +838,9 @@ class _ActionBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.35),
+        color: Colors.black.withOpacity(0.35),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+        border: Border.all(color: Colors.white.withOpacity(0.2)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,

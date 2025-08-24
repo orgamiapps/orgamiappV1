@@ -9,7 +9,7 @@ import 'package:orgami/Permissions/permissions_helper.dart';
 import 'package:orgami/Screens/QRScanner/ans_questions_to_sign_in_event_screen.dart';
 import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/router.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -314,7 +314,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
                   height: 200,
                   decoration: BoxDecoration(
                     border: Border.all(
-                      color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
+                      color: AppThemeColor.darkBlueColor.withOpacity(0.3),
                       width: 2,
                     ),
                     borderRadius: BorderRadius.circular(20),
@@ -323,7 +323,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
                     child: Icon(
                       Icons.qr_code_scanner,
                       size: 60,
-                      color: AppThemeColor.darkBlueColor.withValues(alpha: 0.5),
+                      color: AppThemeColor.darkBlueColor.withOpacity(0.5),
                     ),
                   ),
                 ),
@@ -343,7 +343,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
           Text(
             'Or enter code manually below',
             style: TextStyle(
-              color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.7),
+              color: AppThemeColor.pureWhiteColor.withOpacity(0.7),
               fontSize: Dimensions.fontSizeSmall,
             ),
           ),
@@ -358,10 +358,10 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
       height: _isManualEntry ? 200 : 60,
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
-        color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.1),
+        color: AppThemeColor.pureWhiteColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(15),
         border: Border.all(
-          color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.2),
+          color: AppThemeColor.pureWhiteColor.withOpacity(0.2),
           width: 1,
         ),
       ),
@@ -402,7 +402,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
                   const Spacer(),
                   Icon(
                     Icons.edit,
-                    color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.7),
+                    color: AppThemeColor.pureWhiteColor.withOpacity(0.7),
                     size: 18,
                   ),
                 ],
@@ -452,7 +452,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: AppThemeColor.pureBlackColor.withValues(alpha: 0.1),
+            color: AppThemeColor.pureBlackColor.withOpacity(0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -490,7 +490,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.1),
+        color: AppThemeColor.pureWhiteColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -506,7 +506,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
               },
               activeColor: AppThemeColor.darkGreenColor,
               side: BorderSide(
-                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.5),
+                color: AppThemeColor.pureWhiteColor.withOpacity(0.5),
                 width: 2,
               ),
             ),
@@ -562,12 +562,12 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
         decoration: BoxDecoration(
           color: isActive
               ? AppThemeColor.darkBlueColor
-              : AppThemeColor.pureWhiteColor.withValues(alpha: 0.1),
+              : AppThemeColor.pureWhiteColor.withOpacity(0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isActive
                 ? AppThemeColor.darkBlueColor
-                : AppThemeColor.pureWhiteColor.withValues(alpha: 0.3),
+                : AppThemeColor.pureWhiteColor.withOpacity(0.3),
             width: 1,
           ),
         ),
@@ -577,7 +577,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
               icon,
               color: isActive
                   ? AppThemeColor.pureWhiteColor
-                  : AppThemeColor.pureWhiteColor.withValues(alpha: 0.8),
+                  : AppThemeColor.pureWhiteColor.withOpacity(0.8),
               size: 20,
             ),
             const SizedBox(height: 4),
@@ -586,7 +586,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
               style: TextStyle(
                 color: isActive
                     ? AppThemeColor.pureWhiteColor
-                    : AppThemeColor.pureWhiteColor.withValues(alpha: 0.8),
+                    : AppThemeColor.pureWhiteColor.withOpacity(0.8),
                 fontSize: Dimensions.fontSizeSmall,
                 fontWeight: FontWeight.w500,
               ),
@@ -607,7 +607,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
+              color: AppThemeColor.darkBlueColor.withOpacity(0.3),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -655,8 +655,8 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              AppThemeColor.pureBlackColor.withValues(alpha: 0.8),
-              AppThemeColor.pureBlackColor.withValues(alpha: 0.0),
+              AppThemeColor.pureBlackColor.withOpacity(0.8),
+              AppThemeColor.pureBlackColor.withOpacity(0.0),
             ],
           ),
         ),
@@ -670,7 +670,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.2),
+                  color: AppThemeColor.pureWhiteColor.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(

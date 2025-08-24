@@ -48,7 +48,7 @@ class ThemeProvider extends ChangeNotifier {
     cardTheme: CardThemeData(
       color: const Color(0xFFFFFFFF),
       surfaceTintColor: const Color(0xFF667EEA),
-      shadowColor: Colors.black.withValues(alpha: 0.1),
+      shadowColor: Colors.black.withOpacity(0.1),
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),
@@ -70,7 +70,7 @@ class ThemeProvider extends ChangeNotifier {
         backgroundColor: const Color(0xFF667EEA),
         foregroundColor: const Color(0xFFFFFFFF),
         elevation: 1,
-        shadowColor: Colors.black.withValues(alpha: 0.1),
+        shadowColor: Colors.black.withOpacity(0.1),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       ),
@@ -113,7 +113,7 @@ class ThemeProvider extends ChangeNotifier {
       ),
       labelStyle: const TextStyle(color: Color(0xFF49454F)),
       hintStyle: TextStyle(
-        color: const Color(0xFF49454F).withValues(alpha: 0.6),
+        color: const Color(0xFF49454F).withOpacity(0.6),
       ),
     ),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
@@ -261,7 +261,7 @@ class ThemeProvider extends ChangeNotifier {
     cardTheme: CardThemeData(
       color: const Color(0xFF1A1A1A),
       surfaceTintColor: const Color(0xFF7B8EF0),
-      shadowColor: Colors.black.withValues(alpha: 0.4),
+      shadowColor: Colors.black.withOpacity(0.4),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),
@@ -283,7 +283,7 @@ class ThemeProvider extends ChangeNotifier {
         backgroundColor: const Color(0xFF7B8EF0),
         foregroundColor: const Color(0xFF001D34),
         elevation: 2,
-        shadowColor: Colors.black.withValues(alpha: 0.4),
+        shadowColor: Colors.black.withOpacity(0.4),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       ),
@@ -326,7 +326,7 @@ class ThemeProvider extends ChangeNotifier {
       ),
       labelStyle: const TextStyle(color: Color(0xFFCAC4D0)),
       hintStyle: TextStyle(
-        color: const Color(0xFFCAC4D0).withValues(alpha: 0.6),
+        color: const Color(0xFFCAC4D0).withOpacity(0.6),
       ),
     ),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(

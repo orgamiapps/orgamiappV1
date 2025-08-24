@@ -5,7 +5,7 @@ import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/Screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:orgami/Utils/cached_image.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:orgami/Screens/MyProfile/my_tickets_screen.dart';
@@ -613,7 +613,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
+                              color: Colors.black.withOpacity(0.06),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
@@ -642,7 +642,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.06),
+                                color: Colors.black.withOpacity(0.06),
                                 blurRadius: 6,
                                 offset: const Offset(0, 1),
                               ),
@@ -789,7 +789,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withOpacity(0.05),
               spreadRadius: 0,
               blurRadius: 20,
               offset: const Offset(0, 4),
@@ -816,7 +816,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -870,7 +870,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                    color: const Color(0xFF667EEA).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
@@ -944,7 +944,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -1010,7 +1010,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                 activeColor: const Color(0xFF667EEA),
                 activeTrackColor: const Color(
                   0xFF667EEA,
-                ).withValues(alpha: 0.3),
+                ).withOpacity(0.3),
                 inactiveThumbColor: const Color(0xFF9CA3AF),
                 inactiveTrackColor: const Color(0xFFE1E5E9),
               ),
@@ -1053,7 +1053,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -1068,10 +1068,10 @@ class _MyProfileScreenState extends State<MyProfileScreen>
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFFFF9800).withValues(alpha: 0.1),
+              color: const Color(0xFFFF9800).withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: const Color(0xFFFF9800).withValues(alpha: 0.3),
+                color: const Color(0xFFFF9800).withOpacity(0.3),
               ),
             ),
             child: Material(
@@ -1092,7 +1092,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFF9800).withValues(alpha: 0.2),
+                        color: const Color(0xFFFF9800).withOpacity(0.2),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Icon(
@@ -1187,7 +1187,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: Colors.black.withOpacity(0.05),
                   spreadRadius: 0,
                   blurRadius: 20,
                   offset: const Offset(0, 4),
@@ -1221,7 +1221,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         decoration: BoxDecoration(
           color: isActive
-              ? const Color(0xFF667EEA).withValues(alpha: 0.1)
+              ? const Color(0xFF667EEA).withOpacity(0.1)
               : Colors.white,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
@@ -1230,7 +1230,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withOpacity(0.05),
               spreadRadius: 0,
               blurRadius: 8,
               offset: const Offset(0, 2),
@@ -1358,7 +1358,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
+                          color: Colors.black.withOpacity(0.05),
                           spreadRadius: 0,
                           blurRadius: 10,
                           offset: const Offset(0, 2),
@@ -1447,7 +1447,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -1537,7 +1537,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                 : null,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
+                color: Colors.black.withOpacity(0.05),
                 spreadRadius: 0,
                 blurRadius: 10,
                 offset: const Offset(0, 2),
@@ -1562,7 +1562,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                     decoration: BoxDecoration(
                       color: isSelected
                           ? const Color(0xFF667EEA)
-                          : Colors.white.withValues(alpha: 0.9),
+                          : Colors.white.withOpacity(0.9),
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: isSelected
@@ -1840,10 +1840,10 @@ class _FilterSortModalState extends State<_FilterSortModal> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+        color: const Color(0xFF667EEA).withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+          color: const Color(0xFF667EEA).withOpacity(0.3),
           width: 1,
         ),
       ),

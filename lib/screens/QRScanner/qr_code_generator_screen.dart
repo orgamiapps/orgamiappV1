@@ -76,7 +76,7 @@ class _QRCodeGeneratorScreenState extends State<QRCodeGeneratorScreen>
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.2),
+                color: AppThemeColor.pureWhiteColor.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -213,7 +213,7 @@ class _QRCodeGeneratorScreenState extends State<QRCodeGeneratorScreen>
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                      color: AppThemeColor.darkBlueColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(15),
                       border: Border.all(
                         color: AppThemeColor.darkBlueColor.withValues(
@@ -277,7 +277,7 @@ class _QRCodeGeneratorScreenState extends State<QRCodeGeneratorScreen>
       children: [
         Icon(
           icon,
-          color: AppThemeColor.darkBlueColor.withValues(alpha: 0.7),
+          color: AppThemeColor.darkBlueColor.withOpacity(0.7),
           size: 16,
         ),
         const SizedBox(width: 10),
@@ -285,7 +285,7 @@ class _QRCodeGeneratorScreenState extends State<QRCodeGeneratorScreen>
           child: Text(
             text,
             style: TextStyle(
-              color: AppThemeColor.darkBlueColor.withValues(alpha: 0.8),
+              color: AppThemeColor.darkBlueColor.withOpacity(0.8),
               fontSize: Dimensions.fontSizeSmall,
             ),
           ),
@@ -310,7 +310,7 @@ class _QRCodeGeneratorScreenState extends State<QRCodeGeneratorScreen>
                 borderRadius: BorderRadius.circular(15),
                 boxShadow: [
                   BoxShadow(
-                    color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
+                    color: AppThemeColor.darkBlueColor.withOpacity(0.3),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -346,10 +346,10 @@ class _QRCodeGeneratorScreenState extends State<QRCodeGeneratorScreen>
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(
-                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.1),
+                color: AppThemeColor.pureWhiteColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(15),
                 border: Border.all(
-                  color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.3),
+                  color: AppThemeColor.pureWhiteColor.withOpacity(0.3),
                 ),
               ),
               child: Row(

@@ -458,7 +458,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Icon(
@@ -548,7 +548,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+        border: Border.all(color: Colors.grey.withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -735,7 +735,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
+              color: Colors.black.withOpacity(0.08),
               spreadRadius: 0,
               blurRadius: 20,
               offset: const Offset(0, 4),
@@ -748,7 +748,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                color: const Color(0xFF667EEA).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(Icons.lock, color: Color(0xFF667EEA), size: 20),
@@ -773,7 +773,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                 });
               },
               activeColor: const Color(0xFF667EEA),
-              activeTrackColor: const Color(0xFF667EEA).withValues(alpha: 0.3),
+              activeTrackColor: const Color(0xFF667EEA).withOpacity(0.3),
             ),
           ],
         ),
@@ -790,7 +790,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -803,7 +803,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: const Color(0xFF10B981).withValues(alpha: 0.1),
+              color: const Color(0xFF10B981).withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(Icons.public, color: Color(0xFF10B981), size: 20),
@@ -828,7 +828,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
               });
             },
             activeColor: const Color(0xFF10B981),
-            activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
+            activeTrackColor: const Color(0xFF10B981).withOpacity(0.3),
           ),
         ],
       ),
@@ -844,7 +844,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -860,7 +860,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -916,12 +916,12 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           }
         });
       },
-      backgroundColor: Colors.grey.withValues(alpha: 0.1),
+      backgroundColor: Colors.grey.withOpacity(0.1),
       selectedColor: const Color(0xFF667EEA),
       side: BorderSide(
         color: isSelected
             ? const Color(0xFF667EEA)
-            : Colors.grey.withValues(alpha: 0.3),
+            : Colors.grey.withOpacity(0.3),
         width: 1,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -938,7 +938,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -1035,7 +1035,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -1051,7 +1051,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -1206,7 +1206,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: TextStyle(
-              color: Colors.grey.withValues(alpha: 0.6),
+              color: Colors.grey.withOpacity(0.6),
               fontSize: 14,
               fontFamily: 'Roboto',
             ),
@@ -1257,7 +1257,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             border: Border.all(
               color: _selectedImagePath != null
                   ? const Color(0xFF667EEA)
-                  : Colors.grey.withValues(alpha: 0.3),
+                  : Colors.grey.withOpacity(0.3),
               width: 2,
             ),
           ),
@@ -1276,7 +1276,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                    color: const Color(0xFF667EEA).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -1316,7 +1316,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.1),
+                    color: Colors.red.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -1363,7 +1363,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                 width: double.infinity,
                 height: double.infinity,
                 decoration: BoxDecoration(
-                  color: Colors.grey.withValues(alpha: 0.2),
+                  color: Colors.grey.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Icon(
@@ -1384,7 +1384,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.7),
+                color: Colors.black.withOpacity(0.7),
                 borderRadius: BorderRadius.circular(18),
               ),
               child: const Icon(Icons.edit, color: Colors.white, size: 18),
@@ -1412,7 +1412,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                color: const Color(0xFF667EEA).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(32),
               ),
               child: const Icon(
@@ -1435,7 +1435,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             Text(
               'Tap to select an image from your gallery',
               style: TextStyle(
-                color: Colors.grey.withValues(alpha: 0.7),
+                color: Colors.grey.withOpacity(0.7),
                 fontSize: 14,
                 fontFamily: 'Roboto',
               ),
@@ -1466,7 +1466,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
+                      color: Colors.black.withOpacity(0.1),
                       spreadRadius: 0,
                       blurRadius: 20,
                       offset: const Offset(0, -4),

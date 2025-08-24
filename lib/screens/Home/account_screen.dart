@@ -15,7 +15,7 @@ import 'package:orgami/Utils/theme_provider.dart';
 
 import 'package:orgami/Utils/web_view_page.dart';
 // import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/screens/Home/delete_account_screen.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
@@ -86,7 +86,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 border: Border.all(color: Color(0xFFE5E7EB), width: 1),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
+                    color: Colors.black.withOpacity(0.06),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
@@ -125,7 +125,7 @@ class _AccountScreenState extends State<AccountScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -271,8 +271,8 @@ class _AccountScreenState extends State<AccountScreen> {
         height: 40,
         decoration: BoxDecoration(
           color: isDestructive
-              ? const Color(0xFFEF4444).withValues(alpha: 0.1)
-              : const Color(0xFF667EEA).withValues(alpha: 0.1),
+              ? const Color(0xFFEF4444).withOpacity(0.1)
+              : const Color(0xFF667EEA).withOpacity(0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
@@ -330,7 +330,7 @@ class _AccountScreenState extends State<AccountScreen> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+              color: const Color(0xFF667EEA).withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
@@ -355,7 +355,7 @@ class _AccountScreenState extends State<AccountScreen> {
             style: TextStyle(
               color: Theme.of(
                 context,
-              ).colorScheme.onSurface.withValues(alpha: 0.6),
+              ).colorScheme.onSurface.withOpacity(0.6),
               fontSize: 14,
               fontFamily: 'Roboto',
             ),
@@ -364,7 +364,7 @@ class _AccountScreenState extends State<AccountScreen> {
             Icons.arrow_forward_ios,
             color: Theme.of(
               context,
-            ).colorScheme.onSurface.withValues(alpha: 0.6),
+            ).colorScheme.onSurface.withOpacity(0.6),
             size: 16,
           ),
           onTap: () => _showThemeSelector(context, themeProvider),
@@ -407,7 +407,7 @@ class _AccountScreenState extends State<AccountScreen> {
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: Colors.black.withOpacity(0.1),
               blurRadius: 10,
               offset: const Offset(0, -2),
             ),
@@ -423,7 +423,7 @@ class _AccountScreenState extends State<AccountScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(
                   context,
-                ).colorScheme.onSurface.withValues(alpha: 0.3),
+                ).colorScheme.onSurface.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -478,7 +478,7 @@ class _AccountScreenState extends State<AccountScreen> {
         decoration: BoxDecoration(
           color: isSelected
               ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+              : Theme.of(context).colorScheme.primary.withOpacity(0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(

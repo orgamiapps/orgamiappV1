@@ -202,7 +202,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
           circleId: const CircleId('radius-circle'),
           center: latLng,
           radius: radius * 0.3048, // Convert feet to meters
-          fillColor: const Color(0xFF667EEA).withValues(alpha: 0.2),
+          fillColor: const Color(0xFF667EEA).withOpacity(0.2),
           strokeColor: const Color(0xFF667EEA),
           strokeWidth: 2,
         ),
@@ -222,7 +222,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
             circleId: const CircleId('radius-circle'),
             center: selectedLocation!,
             radius: radius * 0.3048, // Convert feet to meters
-            fillColor: const Color(0xFF667EEA).withValues(alpha: 0.2),
+            fillColor: const Color(0xFF667EEA).withOpacity(0.2),
             strokeColor: const Color(0xFF667EEA),
             strokeWidth: 2,
           ),
@@ -323,7 +323,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Icon(
@@ -397,7 +397,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
+                      color: Colors.black.withOpacity(0.1),
                       spreadRadius: 0,
                       blurRadius: 8,
                       offset: const Offset(0, 2),
@@ -436,7 +436,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
+                      color: Colors.black.withOpacity(0.1),
                       spreadRadius: 0,
                       blurRadius: 8,
                       offset: const Offset(0, 2),
@@ -469,7 +469,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
                     Container(
                       width: 32,
                       height: 1,
-                      color: Colors.grey.withValues(alpha: 0.2),
+                      color: Colors.grey.withOpacity(0.2),
                     ),
                     Material(
                       color: Colors.transparent,
@@ -561,7 +561,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                    color: const Color(0xFF667EEA).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -581,9 +581,9 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
             SliderTheme(
               data: SliderTheme.of(context).copyWith(
                 activeTrackColor: const Color(0xFF667EEA),
-                inactiveTrackColor: Colors.grey.withValues(alpha: 0.3),
+                inactiveTrackColor: Colors.grey.withOpacity(0.3),
                 thumbColor: const Color(0xFF667EEA),
-                overlayColor: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                overlayColor: const Color(0xFF667EEA).withOpacity(0.1),
                 thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
                 overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
                 trackHeight: 4,
@@ -610,7 +610,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+                    color: const Color(0xFF667EEA).withOpacity(0.3),
                     spreadRadius: 0,
                     blurRadius: 12,
                     offset: const Offset(0, 4),

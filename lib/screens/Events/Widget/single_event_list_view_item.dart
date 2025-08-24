@@ -7,7 +7,7 @@ import 'package:orgami/Utils/router.dart';
 import 'package:orgami/Utils/cached_image.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/controller/customer_controller.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 
 class SingleEventListViewItem extends StatefulWidget {
   final EventModel eventModel;
@@ -141,7 +141,7 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
     super.build(context); // Required for AutomaticKeepAliveClientMixin
     return Card(
       elevation: 5,
-      shadowColor: Colors.black.withValues(alpha: 0.1),
+      shadowColor: Colors.black.withOpacity(0.1),
       margin: const EdgeInsets.only(bottom: 20),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: InkWell(
@@ -205,11 +205,11 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.9),
+                color: Colors.white.withOpacity(0.9),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15),
+                    color: Colors.black.withOpacity(0.15),
                     blurRadius: 8,
                   ),
                 ],
@@ -317,10 +317,10 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF667EEA).withValues(alpha: 0.08),
+        color: const Color(0xFF667EEA).withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFF667EEA).withValues(alpha: 0.15),
+          color: const Color(0xFF667EEA).withOpacity(0.15),
           width: 1,
         ),
       ),

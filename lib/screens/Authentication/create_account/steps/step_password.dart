@@ -106,7 +106,7 @@ class _StepPasswordState extends State<StepPassword> {
           decoration: InputDecoration(
             hintText: label,
             filled: true,
-            fillColor: Colors.grey.withValues(alpha: 0.04),
+            fillColor: Colors.grey.withOpacity(0.04),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,

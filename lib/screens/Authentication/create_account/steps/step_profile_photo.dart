@@ -110,13 +110,13 @@ class _StepProfilePhotoState extends State<StepProfilePhoto> {
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
                     colors: [
-                      AppThemeColor.lightBlueColor.withValues(alpha: 0.2),
+                      AppThemeColor.lightBlueColor.withOpacity(0.2),
                       Colors.white,
                     ],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
+                      color: Colors.black.withOpacity(0.05),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
@@ -125,7 +125,7 @@ class _StepProfilePhotoState extends State<StepProfilePhoto> {
                 child: CircleAvatar(
                   radius: 72,
                   backgroundColor:
-                      AppThemeColor.lightBlueColor.withValues(alpha: 0.15),
+                      AppThemeColor.lightBlueColor.withOpacity(0.15),
                   backgroundImage: _image != null ? FileImage(_image!) : null,
                   child: _image == null
                       ? Icon(Icons.person, size: 72, color: AppThemeColor.darkBlueColor)
@@ -190,7 +190,7 @@ class _StepProfilePhotoState extends State<StepProfilePhoto> {
         ),
         if (_isUploading)
           Container(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             child: const Center(child: CircularProgressIndicator()),
           ),
       ],

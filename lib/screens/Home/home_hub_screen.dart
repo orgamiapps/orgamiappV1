@@ -328,7 +328,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                color: const Color(0xFF667EEA).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(40),
               ),
               child: const Icon(

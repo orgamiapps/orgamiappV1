@@ -6,7 +6,7 @@ import 'package:orgami/Screens/QRScanner/ans_questions_to_sign_in_event_screen.d
 import 'package:orgami/Screens/QRScanner/modern_qr_scanner_screen.dart';
 import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/router.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/Screens/Events/single_event_screen.dart';
@@ -91,7 +91,7 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.2),
+                color: AppThemeColor.pureWhiteColor.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -131,7 +131,7 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
               borderRadius: BorderRadius.circular(60),
               boxShadow: [
                 BoxShadow(
-                  color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
+                  color: AppThemeColor.darkBlueColor.withOpacity(0.3),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -157,7 +157,7 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
           Text(
             'Choose how you\'d like to sign in to your event',
             style: TextStyle(
-              color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.8),
+              color: AppThemeColor.pureWhiteColor.withOpacity(0.8),
               fontSize: Dimensions.fontSizeDefault,
             ),
             textAlign: TextAlign.center,
@@ -167,10 +167,10 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
             Container(
               padding: const EdgeInsets.all(15),
               decoration: BoxDecoration(
-                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.1),
+                color: AppThemeColor.pureWhiteColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(15),
                 border: Border.all(
-                  color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.2),
+                  color: AppThemeColor.pureWhiteColor.withOpacity(0.2),
                 ),
               ),
               child: Row(
@@ -245,7 +245,7 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
                 Text(
                   'Select how you would like to sign in to your event',
                   style: TextStyle(
-                    color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.8),
+                    color: AppThemeColor.pureWhiteColor.withOpacity(0.8),
                     fontSize: Dimensions.fontSizeDefault,
                   ),
                   textAlign: TextAlign.center,
@@ -313,10 +313,10 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
             margin: const EdgeInsets.only(top: 20),
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+              color: AppThemeColor.darkBlueColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(15),
               border: Border.all(
-                color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
+                color: AppThemeColor.darkBlueColor.withOpacity(0.3),
               ),
             ),
             child: Column(
@@ -375,10 +375,10 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.1),
+          color: AppThemeColor.pureWhiteColor.withOpacity(0.1),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.2),
+            color: AppThemeColor.pureWhiteColor.withOpacity(0.2),
             width: 1,
           ),
         ),
@@ -433,7 +433,7 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
             ),
             Icon(
               Icons.arrow_forward_ios,
-              color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.5),
+              color: AppThemeColor.pureWhiteColor.withOpacity(0.5),
               size: 20,
             ),
           ],
@@ -490,7 +490,7 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-            color: AppThemeColor.pureBlackColor.withValues(alpha: 0.1),
+            color: AppThemeColor.pureBlackColor.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -528,10 +528,10 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.1),
+        color: AppThemeColor.pureWhiteColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(15),
         border: Border.all(
-          color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.2),
+          color: AppThemeColor.pureWhiteColor.withOpacity(0.2),
         ),
       ),
       child: Row(
@@ -547,7 +547,7 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
               },
               activeColor: AppThemeColor.darkGreenColor,
               side: BorderSide(
-                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.5),
+                color: AppThemeColor.pureWhiteColor.withOpacity(0.5),
                 width: 2,
               ),
             ),
@@ -568,7 +568,7 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
                 Text(
                   'Your name will be hidden from public view',
                   style: TextStyle(
-                    color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.7),
+                    color: AppThemeColor.pureWhiteColor.withOpacity(0.7),
                     fontSize: Dimensions.fontSizeSmall,
                   ),
                 ),
@@ -591,7 +591,7 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
           borderRadius: BorderRadius.circular(15),
           boxShadow: [
             BoxShadow(
-              color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
+              color: AppThemeColor.darkBlueColor.withOpacity(0.3),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -654,7 +654,7 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
                   shape: BoxShape.circle,
                   color: index <= _currentStep
                       ? AppThemeColor.darkBlueColor
-                      : AppThemeColor.pureWhiteColor.withValues(alpha: 0.3),
+                      : AppThemeColor.pureWhiteColor.withOpacity(0.3),
                   border: index == _currentStep
                       ? Border.all(
                           color: AppThemeColor.pureWhiteColor,
@@ -682,8 +682,8 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
             color: isActive
                 ? AppThemeColor.darkBlueColor
                 : isCompleted
-                ? AppThemeColor.pureWhiteColor.withValues(alpha: 0.8)
-                : AppThemeColor.pureWhiteColor.withValues(alpha: 0.4),
+                ? AppThemeColor.pureWhiteColor.withOpacity(0.8)
+                : AppThemeColor.pureWhiteColor.withOpacity(0.4),
             fontSize: Dimensions.fontSizeSmall,
             fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
           ),
@@ -698,7 +698,7 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
       children: [
         Icon(
           icon,
-          color: AppThemeColor.darkBlueColor.withValues(alpha: 0.7),
+          color: AppThemeColor.darkBlueColor.withOpacity(0.7),
           size: 16,
         ),
         const SizedBox(width: 10),
@@ -706,7 +706,7 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
           child: Text(
             text,
             style: TextStyle(
-              color: AppThemeColor.darkBlueColor.withValues(alpha: 0.8),
+              color: AppThemeColor.darkBlueColor.withOpacity(0.8),
               fontSize: Dimensions.fontSizeSmall,
             ),
           ),

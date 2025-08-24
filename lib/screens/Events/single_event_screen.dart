@@ -34,10 +34,10 @@ import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
 
 // import 'package:orgami/Screens/QRScanner/QrScannerScreenForLogedIn.dart';
 import 'package:orgami/Screens/QRScanner/qr_scanner_flow_screen.dart';
-import 'package:orgami/utils/colors.dart';
-import 'package:orgami/utils/router.dart';
-import 'package:orgami/utils/toast.dart';
-import 'package:orgami/utils/logger.dart';
+import 'package:orgami/Utils/colors.dart';
+import 'package:orgami/Utils/router.dart';
+import 'package:orgami/Utils/Toast.dart';
+import 'package:orgami/Utils/logger.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
@@ -879,7 +879,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppThemeColor.dullBlueColor.withValues(alpha: 0.3),
+                color: AppThemeColor.dullBlueColor.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -893,7 +893,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                      color: AppThemeColor.darkBlueColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -961,7 +961,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.02),
+                            color: Colors.black.withOpacity(0.02),
                             spreadRadius: 0,
                             blurRadius: 4,
                             offset: const Offset(0, 2),
@@ -1066,7 +1066,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                               ),
                               filled: true,
                               fillColor: AppThemeColor.lightBlueColor
-                                  .withValues(alpha: 0.1),
+                                  .withOpacity(0.1),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
@@ -1124,7 +1124,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    color: Colors.black.withOpacity(0.05),
                     spreadRadius: 0,
                     blurRadius: 10,
                     offset: const Offset(0, -2),
@@ -2357,7 +2357,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: const Icon(
@@ -2388,13 +2388,13 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             borderRadius: BorderRadius.circular(28),
             boxShadow: [
               BoxShadow(
-                color: _primaryBlue.withValues(alpha: 0.4),
+                color: _primaryBlue.withOpacity(0.4),
                 spreadRadius: 0,
                 blurRadius: 15,
                 offset: const Offset(0, 6),
               ),
               BoxShadow(
-                color: _primaryPurple.withValues(alpha: 0.3),
+                color: _primaryPurple.withOpacity(0.3),
                 spreadRadius: 0,
                 blurRadius: 25,
                 offset: const Offset(0, 12),
@@ -2437,13 +2437,13 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             ),
             boxShadow: [
               BoxShadow(
-                color: _primaryBlue.withValues(alpha: 0.3),
+                color: _primaryBlue.withOpacity(0.3),
                 spreadRadius: 0,
                 blurRadius: 20 * _glowAnimation.value,
                 offset: const Offset(0, 10),
               ),
               BoxShadow(
-                color: _primaryPurple.withValues(alpha: 0.2),
+                color: _primaryPurple.withOpacity(0.2),
                 spreadRadius: 0,
                 blurRadius: 30 * _glowAnimation.value,
                 offset: const Offset(0, 20),
@@ -2457,7 +2457,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                 end: Alignment.bottomCenter,
                 colors: [
                   Colors.transparent,
-                  Colors.black.withValues(alpha: 0.05),
+                  Colors.black.withOpacity(0.05),
                 ],
               ),
             ),
@@ -2558,25 +2558,25 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               height: 48,
               decoration: BoxDecoration(
                 color: isActive
-                    ? Colors.white.withValues(alpha: 0.25)
-                    : Colors.white.withValues(alpha: 0.15),
+                    ? Colors.white.withOpacity(0.25)
+                    : Colors.white.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
                   color: isActive
-                      ? Colors.white.withValues(alpha: 0.4)
-                      : Colors.white.withValues(alpha: 0.2),
+                      ? Colors.white.withOpacity(0.4)
+                      : Colors.white.withOpacity(0.2),
                   width: 1.5,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
+                    color: Colors.black.withOpacity(0.1),
                     spreadRadius: 0,
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
                   if (isActive)
                     BoxShadow(
-                      color: Colors.white.withValues(alpha: 0.3),
+                      color: Colors.white.withOpacity(0.3),
                       spreadRadius: 0,
                       blurRadius: 12,
                       offset: const Offset(0, 0),
@@ -2715,13 +2715,13 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.15),
+                color: Colors.black.withOpacity(0.15),
                 spreadRadius: 0,
                 blurRadius: 25,
                 offset: const Offset(0, 8),
               ),
               BoxShadow(
-                color: _primaryBlue.withValues(alpha: 0.1),
+                color: _primaryBlue.withOpacity(0.1),
                 spreadRadius: 0,
                 blurRadius: 40,
                 offset: const Offset(0, 16),
@@ -2783,7 +2783,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                             width: 64,
                             height: 64,
                             decoration: BoxDecoration(
-                              color: _primaryBlue.withValues(alpha: 0.1),
+                              color: _primaryBlue.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(32),
                             ),
                             child: Icon(
@@ -2826,7 +2826,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      Colors.black.withValues(alpha: 0.02),
+                      Colors.black.withOpacity(0.02),
                     ],
                   ),
                 ),
@@ -2836,7 +2836,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.1),
+                    color: Colors.white.withOpacity(0.1),
                     width: 1,
                   ),
                 ),
@@ -2870,20 +2870,20 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: _orange.withValues(alpha: 0.4),
+                  color: _orange.withOpacity(0.4),
                   spreadRadius: 0,
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
                 BoxShadow(
-                  color: _orange.withValues(alpha: 0.2),
+                  color: _orange.withOpacity(0.2),
                   spreadRadius: 0,
                   blurRadius: 20,
                   offset: const Offset(0, 8),
                 ),
               ],
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: Colors.white.withOpacity(0.2),
                 width: 1,
               ),
             ),
@@ -2894,7 +2894,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                   width: 24,
                   height: 24,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
@@ -2934,20 +2934,20 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.12),
+                color: Colors.black.withOpacity(0.12),
                 spreadRadius: 0,
                 blurRadius: 30,
                 offset: const Offset(0, 8),
               ),
               BoxShadow(
-                color: _primaryBlue.withValues(alpha: 0.08),
+                color: _primaryBlue.withOpacity(0.08),
                 spreadRadius: 0,
                 blurRadius: 40,
                 offset: const Offset(0, 16),
               ),
             ],
             border: Border.all(
-              color: _borderColor.withValues(alpha: 0.5),
+              color: _borderColor.withOpacity(0.5),
               width: 1,
             ),
           ),
@@ -3037,7 +3037,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                          color: const Color(0xFF667EEA).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: const Color(0xFF667EEA),
@@ -3120,7 +3120,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           width: 32,
                           height: 32,
                           decoration: BoxDecoration(
-                            color: _primaryBlue.withValues(alpha: 0.1),
+                            color: _primaryBlue.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Icon(
@@ -3182,7 +3182,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         border: Border.all(color: _borderColor, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withOpacity(0.04),
             spreadRadius: 0,
             blurRadius: 8,
             offset: const Offset(0, 2),
@@ -3199,13 +3199,13 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  _primaryBlue.withValues(alpha: 0.15),
-                  _primaryBlue.withValues(alpha: 0.08),
+                  _primaryBlue.withOpacity(0.15),
+                  _primaryBlue.withOpacity(0.08),
                 ],
               ),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: _primaryBlue.withValues(alpha: 0.2),
+                color: _primaryBlue.withOpacity(0.2),
                 width: 1,
               ),
             ),
@@ -3254,7 +3254,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         border: Border.all(color: _borderColor, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withOpacity(0.04),
             spreadRadius: 0,
             blurRadius: 8,
             offset: const Offset(0, 2),
@@ -3272,13 +3272,13 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  _primaryBlue.withValues(alpha: 0.15),
-                  _primaryBlue.withValues(alpha: 0.08),
+                  _primaryBlue.withOpacity(0.15),
+                  _primaryBlue.withOpacity(0.08),
                 ],
               ),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: _primaryBlue.withValues(alpha: 0.2),
+                color: _primaryBlue.withOpacity(0.2),
                 width: 1,
               ),
             ),
@@ -4811,21 +4811,21 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               boxShadow: [
                 // Outer elevated shadow for clickable appearance
                 BoxShadow(
-                  color: const Color(0xFF2563EB).withValues(alpha: 0.3),
+                  color: const Color(0xFF2563EB).withOpacity(0.3),
                   spreadRadius: 1,
                   blurRadius: 16,
                   offset: const Offset(0, 6),
                 ),
                 // Inner depth shadow
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.4),
+                  color: Colors.black.withOpacity(0.4),
                   spreadRadius: -3,
                   blurRadius: 12,
                   offset: const Offset(3, 3),
                 ),
                 // Subtle outer glow for interactivity
                 BoxShadow(
-                  color: const Color(0xFF60A5FA).withValues(alpha: 0.6),
+                  color: const Color(0xFF60A5FA).withOpacity(0.6),
                   spreadRadius: 0,
                   blurRadius: 8,
                   offset: const Offset(0, 0),
@@ -4833,7 +4833,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               ],
               // Subtle border for clickability
               border: Border.all(
-                color: const Color(0xFF93C5FD).withValues(alpha: 0.4),
+                color: const Color(0xFF93C5FD).withOpacity(0.4),
                 width: 0.5,
               ),
             ),
@@ -4841,8 +4841,8 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               color: Colors.transparent,
               child: InkWell(
                 borderRadius: BorderRadius.circular(24),
-                splashColor: const Color(0xFF60A5FA).withValues(alpha: 0.3),
-                highlightColor: const Color(0xFF93C5FD).withValues(alpha: 0.2),
+                splashColor: const Color(0xFF60A5FA).withOpacity(0.3),
+                highlightColor: const Color(0xFF93C5FD).withOpacity(0.2),
                 onTap: () {
                   // Enhanced haptic feedback
                   HapticFeedback.mediumImpact();
@@ -4866,8 +4866,8 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           center: const Alignment(0.2, -0.3),
                           radius: 0.9,
                           colors: [
-                            const Color(0xFF228B22).withValues(alpha: 0.3),
-                            const Color(0xFF32CD32).withValues(alpha: 0.2),
+                            const Color(0xFF228B22).withOpacity(0.3),
+                            const Color(0xFF32CD32).withOpacity(0.2),
                             Colors.transparent,
                           ],
                         ),
@@ -4922,7 +4922,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           gradient: SweepGradient(
                             colors: [
                               Colors.transparent,
-                              Colors.white.withValues(alpha: 0.3),
+                              Colors.white.withOpacity(0.3),
                               Colors.transparent,
                               Colors.transparent,
                             ],
@@ -4956,7 +4956,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           border: Border.all(
                             color: const Color(
                               0xFFFFFFFF,
-                            ).withValues(alpha: 0.2),
+                            ).withOpacity(0.2),
                             width: 0.5,
                           ),
                         ),
@@ -5059,11 +5059,11 @@ class EnhancedContinentPainter extends CustomPainter {
             colors: [
               const Color(
                 0xFF32CD32,
-              ).withValues(alpha: 0.9), // Bright green highlight
-              const Color(0xFF228B22).withValues(alpha: 0.8), // Medium green
+              ).withOpacity(0.9), // Bright green highlight
+              const Color(0xFF228B22).withOpacity(0.8), // Medium green
               const Color(
                 0xFF006400,
-              ).withValues(alpha: 0.7), // Dark green shadow
+              ).withOpacity(0.7), // Dark green shadow
             ],
           ).createShader(
             Rect.fromCenter(
@@ -5217,7 +5217,7 @@ class RealisticGridPainter extends CustomPainter {
       ..strokeWidth = 0.8;
 
     final faintGridPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.15)
+      ..color = Colors.white.withOpacity(0.15)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.4;
 
@@ -5290,7 +5290,7 @@ class RealisticGridPainter extends CustomPainter {
     primeMeridianPath.lineTo(center.dx, center.dy + radius * 0.9);
 
     final primeMeridianPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.4)
+      ..color = Colors.white.withOpacity(0.4)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
 

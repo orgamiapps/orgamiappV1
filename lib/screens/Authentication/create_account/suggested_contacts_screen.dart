@@ -105,7 +105,7 @@ class _SuggestedContactsScreenState extends State<SuggestedContactsScreen> {
                 hintText: 'Search by name or @username',
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
-                fillColor: Colors.grey.withValues(alpha: 0.05),
+                fillColor: Colors.grey.withOpacity(0.05),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,

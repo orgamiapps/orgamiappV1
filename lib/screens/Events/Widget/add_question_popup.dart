@@ -146,7 +146,7 @@ class _AddQuestionPopupState extends State<AddQuestionPopup>
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
+                  color: Colors.black.withOpacity(0.1),
                   spreadRadius: 0,
                   blurRadius: 20,
                   offset: const Offset(0, 10),
@@ -319,10 +319,10 @@ class _AddQuestionPopupState extends State<AddQuestionPopup>
                                 color: _isRequired
                                     ? const Color(
                                         0xFFEF4444,
-                                      ).withValues(alpha: 0.1)
+                                      ).withOpacity(0.1)
                                     : const Color(
                                         0xFF10B981,
-                                      ).withValues(alpha: 0.1),
+                                      ).withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Icon(
@@ -375,11 +375,11 @@ class _AddQuestionPopupState extends State<AddQuestionPopup>
                               activeColor: const Color(0xFFEF4444),
                               activeTrackColor: const Color(
                                 0xFFEF4444,
-                              ).withValues(alpha: 0.3),
+                              ).withOpacity(0.3),
                               inactiveThumbColor: const Color(0xFF10B981),
                               inactiveTrackColor: const Color(
                                 0xFF10B981,
-                              ).withValues(alpha: 0.3),
+                              ).withOpacity(0.3),
                             ),
                           ],
                         ),
@@ -433,7 +433,7 @@ class _AddQuestionPopupState extends State<AddQuestionPopup>
                                   BoxShadow(
                                     color: const Color(
                                       0xFF667EEA,
-                                    ).withValues(alpha: 0.3),
+                                    ).withOpacity(0.3),
                                     spreadRadius: 0,
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
