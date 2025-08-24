@@ -8,7 +8,7 @@ import 'package:orgami/Screens/Events/single_event_screen.dart';
 import 'package:orgami/Utils/app_app_bar_view.dart';
 import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/router.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
 class AnsQuestionsToSignInEventScreen extends StatefulWidget {
@@ -154,7 +154,7 @@ class _AnsQuestionsToSignInEventScreenState
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withOpacity(0.05),
               spreadRadius: 0,
               blurRadius: 10,
               offset: const Offset(0, -2),
@@ -195,7 +195,7 @@ class _AnsQuestionsToSignInEventScreenState
             color: Colors.white,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
+                color: Colors.black.withOpacity(0.05),
                 spreadRadius: 0,
                 blurRadius: 10,
                 offset: const Offset(0, 2),
@@ -233,7 +233,7 @@ class _AnsQuestionsToSignInEventScreenState
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: AppThemeColor.lightGrayColor.withValues(alpha: 0.1),
+              color: AppThemeColor.lightGrayColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(40),
             ),
             child: const Icon(
@@ -273,7 +273,7 @@ class _AnsQuestionsToSignInEventScreenState
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             spreadRadius: 0,
             blurRadius: 10,
             offset: const Offset(0, 2),
@@ -289,7 +289,7 @@ class _AnsQuestionsToSignInEventScreenState
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: AppThemeColor.lightBlueColor.withValues(alpha: 0.1),
+                color: AppThemeColor.lightBlueColor.withOpacity(0.1),
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(16),
                   topRight: Radius.circular(16),
@@ -301,7 +301,7 @@ class _AnsQuestionsToSignInEventScreenState
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                      color: AppThemeColor.darkBlueColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -368,7 +368,7 @@ class _AnsQuestionsToSignInEventScreenState
         border: Border.all(color: AppThemeColor.borderColor, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withOpacity(0.02),
             spreadRadius: 0,
             blurRadius: 4,
             offset: const Offset(0, 2),
@@ -419,7 +419,7 @@ class _AnsQuestionsToSignInEventScreenState
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: AppThemeColor.orangeColor.withValues(alpha: 0.1),
+                    color: AppThemeColor.orangeColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text(
@@ -439,7 +439,7 @@ class _AnsQuestionsToSignInEventScreenState
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: AppThemeColor.dullFontColor.withValues(alpha: 0.1),
+                    color: AppThemeColor.dullFontColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text(
@@ -463,11 +463,11 @@ class _AnsQuestionsToSignInEventScreenState
             decoration: InputDecoration(
               hintText: 'Type your answer here...',
               hintStyle: TextStyle(
-                color: AppThemeColor.dullFontColor.withValues(alpha: 0.6),
+                color: AppThemeColor.dullFontColor.withOpacity(0.6),
                 fontFamily: 'Roboto',
               ),
               filled: true,
-              fillColor: AppThemeColor.lightBlueColor.withValues(alpha: 0.1),
+              fillColor: AppThemeColor.lightBlueColor.withOpacity(0.1),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(

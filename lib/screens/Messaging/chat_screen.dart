@@ -7,7 +7,7 @@ import 'dart:async';
 import 'package:orgami/models/message_model.dart';
 import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/firebase/firebase_messaging_helper.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -445,7 +445,7 @@ class _ChatScreenState extends State<ChatScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.3),
+            color: Colors.grey.withOpacity(0.3),
             blurRadius: 5,
             offset: const Offset(0, -2),
           ),

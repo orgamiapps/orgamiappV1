@@ -10,7 +10,7 @@ import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:flutter/foundation.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
@@ -294,7 +294,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                       Dimensions.paddingSizeDefault,
                     ),
                     decoration: BoxDecoration(
-                      color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                      color: AppThemeColor.darkBlueColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(
                         Dimensions.radiusDefault,
                       ),
@@ -373,7 +373,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                 color: AppThemeColor.pureWhiteColor,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
+                    color: Colors.black.withOpacity(0.08),
                     blurRadius: 15,
                     offset: const Offset(0, 3),
                   ),
@@ -485,7 +485,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                 borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
+                    color: Colors.black.withOpacity(0.08),
                     blurRadius: 10,
                     offset: const Offset(0, 3),
                   ),
@@ -723,7 +723,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
         borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: 0.3),
+            color: color.withOpacity(0.3),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -737,7 +737,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
             Container(
               padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
               decoration: BoxDecoration(
-                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.2),
+                color: AppThemeColor.pureWhiteColor.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
               ),
               child: Icon(icon, color: AppThemeColor.pureWhiteColor, size: 20),
@@ -788,7 +788,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
         borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -872,7 +872,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     return Container(
       padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
       ),
       child: Column(
@@ -914,7 +914,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
         borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -1075,7 +1075,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                    color: AppThemeColor.darkBlueColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -1194,7 +1194,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
+            color: Colors.grey.withOpacity(0.1),
             spreadRadius: 1,
             blurRadius: 4,
             offset: const Offset(0, 2),
@@ -1288,7 +1288,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withValues(alpha: 0.1),
+                  color: Colors.grey.withOpacity(0.1),
                   spreadRadius: 1,
                   blurRadius: 4,
                   offset: const Offset(0, 2),
@@ -1446,7 +1446,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withValues(alpha: 0.1),
+                  color: Colors.grey.withOpacity(0.1),
                   spreadRadius: 1,
                   blurRadius: 4,
                   offset: const Offset(0, 2),

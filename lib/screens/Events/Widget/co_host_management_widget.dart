@@ -3,7 +3,7 @@ import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 
 class CoHostManagementWidget extends StatefulWidget {
   final EventModel eventModel;
@@ -89,7 +89,7 @@ class _CoHostManagementWidgetState extends State<CoHostManagementWidget> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: AppThemeColor.orangeColor.withValues(alpha: 0.1),
+                  color: AppThemeColor.orangeColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -186,7 +186,7 @@ class _CoHostManagementWidgetState extends State<CoHostManagementWidget> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -203,7 +203,7 @@ class _CoHostManagementWidgetState extends State<CoHostManagementWidget> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                  color: AppThemeColor.darkBlueColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -232,7 +232,7 @@ class _CoHostManagementWidgetState extends State<CoHostManagementWidget> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                    color: AppThemeColor.darkBlueColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: AppThemeColor.darkBlueColor,
@@ -289,10 +289,10 @@ class _CoHostManagementWidgetState extends State<CoHostManagementWidget> {
               width: double.infinity,
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: AppThemeColor.lightBlueColor.withValues(alpha: 0.1),
+                color: AppThemeColor.lightBlueColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: AppThemeColor.lightBlueColor.withValues(alpha: 0.3),
+                  color: AppThemeColor.lightBlueColor.withOpacity(0.3),
                   width: 1,
                 ),
               ),
@@ -317,7 +317,7 @@ class _CoHostManagementWidgetState extends State<CoHostManagementWidget> {
                   Text(
                     'Add co-hosts to share event management',
                     style: TextStyle(
-                      color: AppThemeColor.dullFontColor.withValues(alpha: 0.7),
+                      color: AppThemeColor.dullFontColor.withOpacity(0.7),
                       fontSize: 14,
                       fontFamily: 'Roboto',
                     ),
@@ -333,7 +333,7 @@ class _CoHostManagementWidgetState extends State<CoHostManagementWidget> {
                   margin: const EdgeInsets.only(bottom: 12),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppThemeColor.lightBlueColor.withValues(alpha: 0.05),
+                    color: AppThemeColor.lightBlueColor.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: AppThemeColor.lightBlueColor.withValues(
@@ -543,7 +543,7 @@ class _AddCoHostDialogState extends State<_AddCoHostDialog> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                    color: AppThemeColor.darkBlueColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
@@ -580,7 +580,7 @@ class _AddCoHostDialogState extends State<_AddCoHostDialog> {
               decoration: InputDecoration(
                 hintText: 'Search users by name or username...',
                 hintStyle: TextStyle(
-                  color: AppThemeColor.dullFontColor.withValues(alpha: 0.6),
+                  color: AppThemeColor.dullFontColor.withOpacity(0.6),
                   fontFamily: 'Roboto',
                 ),
                 prefixIcon: const Icon(
@@ -588,7 +588,7 @@ class _AddCoHostDialogState extends State<_AddCoHostDialog> {
                   color: AppThemeColor.dullFontColor,
                 ),
                 filled: true,
-                fillColor: AppThemeColor.lightBlueColor.withValues(alpha: 0.1),
+                fillColor: AppThemeColor.lightBlueColor.withOpacity(0.1),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(

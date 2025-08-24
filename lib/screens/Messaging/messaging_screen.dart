@@ -370,7 +370,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
             Icon(
               Icons.error_outline,
               size: 80,
-              color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
+              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
             ),
             const SizedBox(height: 16),
             Text(
@@ -441,7 +441,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
           Icon(
             isSearching ? Icons.search_off : Icons.message_outlined,
             size: 80,
-            color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
+            color: theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
           ),
           const SizedBox(height: 16),
           Text(
@@ -512,8 +512,8 @@ class _MessagingScreenState extends State<MessagingScreen> {
         boxShadow: [
           BoxShadow(
             color: isDark
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.05),
+                ? Colors.black.withOpacity(0.3)
+                : Colors.black.withOpacity(0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -618,8 +618,8 @@ class _MessagingScreenState extends State<MessagingScreen> {
         boxShadow: [
           BoxShadow(
             color: isDark
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.05),
+                ? Colors.black.withOpacity(0.3)
+                : Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),

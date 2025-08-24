@@ -3,7 +3,7 @@ import 'dart:io' show InternetAddress;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/firebase_options.dart';
-import 'package:orgami/Screens/Splash/splash_screen.dart';
+import 'package:orgami/screens/Splash/splash_screen.dart';
 import 'package:orgami/Utils/logger.dart';
 import 'package:orgami/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';

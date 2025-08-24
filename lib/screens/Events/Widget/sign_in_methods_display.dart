@@ -28,7 +28,7 @@ class SignInMethodsDisplay extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             spreadRadius: 0,
             blurRadius: 10,
             offset: const Offset(0, 2),
@@ -44,7 +44,7 @@ class SignInMethodsDisplay extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
@@ -71,7 +71,7 @@ class SignInMethodsDisplay extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                    color: const Color(0xFF667EEA).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Text(
@@ -107,10 +107,10 @@ class SignInMethodsDisplay extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: methodInfo['color'].withValues(alpha: 0.1),
+        color: methodInfo['color'].withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: methodInfo['color'].withValues(alpha: 0.3),
+          color: methodInfo['color'].withOpacity(0.3),
           width: 1,
         ),
       ),
@@ -138,10 +138,10 @@ class SignInMethodsDisplay extends StatelessWidget {
       margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF764BA2).withValues(alpha: 0.05),
+        color: const Color(0xFF764BA2).withOpacity(0.05),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: const Color(0xFF764BA2).withValues(alpha: 0.2),
+          color: const Color(0xFF764BA2).withOpacity(0.2),
           width: 1,
         ),
       ),

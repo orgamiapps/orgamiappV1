@@ -116,7 +116,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           decoration: BoxDecoration(
             color: active
                 ? AppThemeColor.darkBlueColor
-                : AppThemeColor.lightBlueColor.withValues(alpha: 0.5),
+                : AppThemeColor.lightBlueColor.withOpacity(0.5),
             borderRadius: BorderRadius.circular(99),
           ),
         );

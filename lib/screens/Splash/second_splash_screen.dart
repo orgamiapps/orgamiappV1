@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/Screens/Authentication/login_screen.dart';
+import 'package:orgami/screens/Authentication/login_screen.dart';
 import 'package:orgami/screens/Authentication/create_account/create_account_screen.dart';
-import 'package:orgami/Screens/Splash/Widgets/social_icons_view.dart';
-import 'package:orgami/utils/colors.dart';
-import 'package:orgami/utils/images.dart';
-import 'package:orgami/utils/router.dart';
-import 'package:orgami/Screens/QRScanner/qr_scanner_flow_screen.dart';
+import 'package:orgami/screens/Splash/Widgets/social_icons_view.dart';
+import 'package:orgami/Utils/colors.dart';
+import 'package:orgami/Utils/Images.dart';
+import 'package:orgami/Utils/router.dart';
+import 'package:orgami/screens/QRScanner/qr_scanner_flow_screen.dart';
 
 class SecondSplashScreen extends StatefulWidget {
   const SecondSplashScreen({super.key});

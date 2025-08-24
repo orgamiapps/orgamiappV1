@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/models/ticket_model.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:orgami/Screens/Events/ticket_scanner_screen.dart';
@@ -231,7 +231,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -316,7 +316,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -332,7 +332,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -462,7 +462,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -478,7 +478,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -557,9 +557,9 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Column(
         children: [
@@ -598,7 +598,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -614,7 +614,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -687,11 +687,11 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
           border: Border.all(
             color: ticket.isUsed
                 ? const Color(0xFFE5E7EB)
-                : const Color(0xFF667EEA).withValues(alpha: 0.3),
+                : const Color(0xFF667EEA).withOpacity(0.3),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withOpacity(0.05),
               spreadRadius: 0,
               blurRadius: 10,
               offset: const Offset(0, 2),
@@ -708,7 +708,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                   decoration: BoxDecoration(
                     color: ticket.isUsed
                         ? const Color(0xFF9CA3AF)
-                        : const Color(0xFF667EEA).withValues(alpha: 0.1),
+                        : const Color(0xFF667EEA).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Icon(
@@ -776,8 +776,8 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: ticket.isUsed
-                        ? const Color(0xFFEF4444).withValues(alpha: 0.1)
-                        : const Color(0xFF10B981).withValues(alpha: 0.1),
+                        ? const Color(0xFFEF4444).withOpacity(0.1)
+                        : const Color(0xFF10B981).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -800,10 +800,10 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.05),
+                  color: const Color(0xFF667EEA).withOpacity(0.05),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: const Color(0xFF667EEA).withValues(alpha: 0.2),
+                    color: const Color(0xFF667EEA).withOpacity(0.2),
                   ),
                 ),
                 child: Row(
@@ -815,7 +815,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+                          color: const Color(0xFF667EEA).withOpacity(0.3),
                         ),
                       ),
                       child: QrImageView(
@@ -893,7 +893,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.2),
+              color: Colors.black.withOpacity(0.2),
               spreadRadius: 0,
               blurRadius: 20,
               offset: const Offset(0, 10),
@@ -1046,12 +1046,12 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                         decoration: BoxDecoration(
                           color: const Color(
                             0xFF667EEA,
-                          ).withValues(alpha: 0.05),
+                          ).withOpacity(0.05),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: const Color(
                               0xFF667EEA,
-                            ).withValues(alpha: 0.2),
+                            ).withOpacity(0.2),
                           ),
                         ),
                         child: Column(
@@ -1074,7 +1074,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                                 border: Border.all(
                                   color: const Color(
                                     0xFF667EEA,
-                                  ).withValues(alpha: 0.3),
+                                  ).withOpacity(0.3),
                                 ),
                               ),
                               child: QrImageView(
@@ -1107,8 +1107,8 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                       ),
                       decoration: BoxDecoration(
                         color: ticket.isUsed
-                            ? const Color(0xFFEF4444).withValues(alpha: 0.1)
-                            : const Color(0xFF10B981).withValues(alpha: 0.1),
+                            ? const Color(0xFFEF4444).withOpacity(0.1)
+                            : const Color(0xFF10B981).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color: ticket.isUsed
@@ -1167,7 +1167,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: (color ?? const Color(0xFF667EEA)).withValues(alpha: 0.1),
+              color: (color ?? const Color(0xFF667EEA)).withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(

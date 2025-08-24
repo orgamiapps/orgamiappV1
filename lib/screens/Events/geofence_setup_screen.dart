@@ -93,7 +93,7 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
           circleId: const CircleId('radius-circle'),
           center: latLng,
           radius: radius * 0.3048, // Convert feet to meters
-          fillColor: const Color(0xFF667EEA).withValues(alpha: 0.2),
+          fillColor: const Color(0xFF667EEA).withOpacity(0.2),
           strokeColor: const Color(0xFF667EEA),
           strokeWidth: 2,
         ),
@@ -203,7 +203,7 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Icon(
@@ -232,7 +232,7 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Icon(
@@ -260,7 +260,7 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
           // Search bar
           Container(
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
+              color: Colors.white.withOpacity(0.15),
               borderRadius: BorderRadius.circular(12),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -341,7 +341,7 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -357,7 +357,7 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -407,7 +407,7 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -470,7 +470,7 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
+                      color: Colors.black.withOpacity(0.06),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -498,7 +498,7 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -524,7 +524,7 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -540,7 +540,7 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -629,7 +629,7 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+            color: const Color(0xFF667EEA).withOpacity(0.3),
             spreadRadius: 0,
             blurRadius: 12,
             offset: const Offset(0, 4),

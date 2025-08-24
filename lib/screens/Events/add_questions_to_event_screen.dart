@@ -559,7 +559,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Icon(
@@ -629,7 +629,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -646,7 +646,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -699,7 +699,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
                   ),
                   decoration: BoxDecoration(
                     color: _showTemplates
-                        ? const Color(0xFF667EEA).withValues(alpha: 0.1)
+                        ? const Color(0xFF667EEA).withOpacity(0.1)
                         : const Color(0xFFF3F4F6),
                     borderRadius: BorderRadius.circular(20),
                   ),
@@ -862,7 +862,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                      color: const Color(0xFF10B981).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -927,7 +927,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: const Color(0xFF6B7280).withValues(alpha: 0.1),
+              color: const Color(0xFF6B7280).withOpacity(0.1),
               borderRadius: BorderRadius.circular(30),
             ),
             child: const Icon(
@@ -993,15 +993,15 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
             color: isAlreadyAdded
                 ? const Color(0xFFF3F4F6)
                 : (isSelected
-                      ? template['color'].withValues(alpha: 0.18)
-                      : template['color'].withValues(alpha: 0.08)),
+                      ? template['color'].withOpacity(0.18)
+                      : template['color'].withOpacity(0.08)),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isAlreadyAdded
                   ? const Color(0xFFE5E7EB)
                   : (isSelected
                         ? template['color']
-                        : template['color'].withValues(alpha: 0.2)),
+                        : template['color'].withOpacity(0.2)),
               width: 1.5,
             ),
           ),
@@ -1038,7 +1038,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
                       decoration: BoxDecoration(
                         color: isAlreadyAdded
                             ? const Color(0xFFF3F4F6)
-                            : template['color'].withValues(alpha: 0.15),
+                            : template['color'].withOpacity(0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -1104,8 +1104,8 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
                   color: isAlreadyAdded
                       ? const Color(0xFFF3F4F6)
                       : (isSelected
-                            ? template['color'].withValues(alpha: 0.18)
-                            : template['color'].withValues(alpha: 0.1)),
+                            ? template['color'].withOpacity(0.18)
+                            : template['color'].withOpacity(0.1)),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -1151,9 +1151,9 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.08),
+        color: accent.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accent.withValues(alpha: 0.2)),
+        border: Border.all(color: accent.withOpacity(0.2)),
       ),
       child: Row(
         children: [
@@ -1214,7 +1214,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -1230,7 +1230,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -1285,7 +1285,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+              color: const Color(0xFF667EEA).withOpacity(0.1),
               borderRadius: BorderRadius.circular(40),
             ),
             child: const Icon(
@@ -1382,8 +1382,8 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
                   ),
                   decoration: BoxDecoration(
                     color: question.required
-                        ? const Color(0xFFEF4444).withValues(alpha: 0.1)
-                        : const Color(0xFF10B981).withValues(alpha: 0.1),
+                        ? const Color(0xFFEF4444).withOpacity(0.1)
+                        : const Color(0xFF10B981).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -1511,7 +1511,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
                 decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.06),
+                  color: accent.withOpacity(0.06),
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(24),
                   ),
@@ -1621,7 +1621,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: Colors.black.withOpacity(0.1),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, -4),
@@ -1698,7 +1698,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+                    color: const Color(0xFF667EEA).withOpacity(0.3),
                     spreadRadius: 0,
                     blurRadius: 12,
                     offset: const Offset(0, 4),

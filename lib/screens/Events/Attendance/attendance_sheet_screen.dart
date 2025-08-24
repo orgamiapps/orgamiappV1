@@ -13,7 +13,7 @@ import 'package:orgami/StorageHelper/file_storage.dart';
 import 'package:orgami/Utils/app_buttons.dart';
 import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/router.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xcel;
@@ -194,7 +194,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppThemeColor.dullFontColor.withValues(alpha: 0.3),
+                color: AppThemeColor.dullFontColor.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -208,7 +208,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                      color: AppThemeColor.darkBlueColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -401,7 +401,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             spreadRadius: 0,
             blurRadius: 10,
             offset: const Offset(0, 2),
@@ -501,7 +501,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
+                      color: AppThemeColor.darkBlueColor.withOpacity(0.3),
                       spreadRadius: 0,
                       blurRadius: 8,
                       offset: const Offset(0, 2),
@@ -533,7 +533,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: Colors.black.withOpacity(0.05),
                   spreadRadius: 0,
                   blurRadius: 10,
                   offset: const Offset(0, 2),
@@ -671,7 +671,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.02),
+                              color: Colors.black.withOpacity(0.02),
                               spreadRadius: 0,
                               blurRadius: 4,
                               offset: const Offset(0, 2),
@@ -777,7 +777,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppThemeColor.lightBlueColor.withValues(alpha: 0.1),
+            color: AppThemeColor.lightBlueColor.withOpacity(0.1),
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(16),
               topRight: Radius.circular(16),
@@ -894,7 +894,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.04),
+                              color: Colors.black.withOpacity(0.04),
                               spreadRadius: 0,
                               blurRadius: 8,
                               offset: const Offset(0, 2),
@@ -918,7 +918,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                                         height: 32,
                                         decoration: BoxDecoration(
                                           color: AppThemeColor.lightBlueColor
-                                              .withValues(alpha: 0.2),
+                                              .withOpacity(0.2),
                                           borderRadius: BorderRadius.circular(
                                             16,
                                           ),
@@ -997,7 +997,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: AppThemeColor.darkBlueColor
-                                              .withValues(alpha: 0.1),
+                                              .withOpacity(0.1),
                                           borderRadius: BorderRadius.circular(
                                             20,
                                           ),
@@ -1047,16 +1047,16 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                                       color: attendee.trackingState == 'active'
                                           ? const Color(
                                               0xFF10B981,
-                                            ).withValues(alpha: 0.08)
+                                            ).withOpacity(0.08)
                                           : attendee.trackingState ==
                                                 'completed'
                                           ? const Color(
                                               0xFF667EEA,
-                                            ).withValues(alpha: 0.08)
+                                            ).withOpacity(0.08)
                                           : attendee.trackingState == 'pending'
                                           ? const Color(
                                               0xFF9CA3AF,
-                                            ).withValues(alpha: 0.08)
+                                            ).withOpacity(0.08)
                                           : const Color(0xFFF3F4F6),
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
@@ -1064,17 +1064,17 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                                             attendee.trackingState == 'active'
                                             ? const Color(
                                                 0xFF10B981,
-                                              ).withValues(alpha: 0.2)
+                                              ).withOpacity(0.2)
                                             : attendee.trackingState ==
                                                   'completed'
                                             ? const Color(
                                                 0xFF667EEA,
-                                              ).withValues(alpha: 0.2)
+                                              ).withOpacity(0.2)
                                             : attendee.trackingState ==
                                                   'pending'
                                             ? const Color(
                                                 0xFF9CA3AF,
-                                              ).withValues(alpha: 0.2)
+                                              ).withOpacity(0.2)
                                             : const Color(0xFFE5E7EB),
                                         width: 1,
                                       ),
@@ -1179,7 +1179,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                                                   decoration: BoxDecoration(
                                                     color: const Color(
                                                       0xFF9CA3AF,
-                                                    ).withValues(alpha: 0.2),
+                                                    ).withOpacity(0.2),
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                           6,
@@ -1214,7 +1214,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                                 padding: const EdgeInsets.all(20),
                                 decoration: BoxDecoration(
                                   color: AppThemeColor.lightBlueColor
-                                      .withValues(alpha: 0.05),
+                                      .withOpacity(0.05),
                                   borderRadius: const BorderRadius.only(
                                     bottomLeft: Radius.circular(16),
                                     bottomRight: Radius.circular(16),
@@ -1334,7 +1334,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                  color: AppThemeColor.darkBlueColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -1376,7 +1376,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                 decoration: InputDecoration(
                   hintText: 'Enter name',
                   hintStyle: TextStyle(
-                    color: AppThemeColor.dullFontColor.withValues(alpha: 0.6),
+                    color: AppThemeColor.dullFontColor.withOpacity(0.6),
                     fontFamily: 'Roboto',
                   ),
                   filled: true,

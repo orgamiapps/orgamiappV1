@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Utils/logger.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -72,7 +72,7 @@ class _ShareQRDialogState extends State<ShareQRDialog>
     _screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      backgroundColor: Colors.black.withValues(alpha: 0.5),
+      backgroundColor: Colors.black.withOpacity(0.5),
       body: SafeArea(child: _bodyView(context: context)),
     );
   }
@@ -97,7 +97,7 @@ class _ShareQRDialogState extends State<ShareQRDialog>
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
+                      color: Colors.black.withOpacity(0.1),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -165,7 +165,7 @@ class _ShareQRDialogState extends State<ShareQRDialog>
             onPressed: () => Navigator.pop(context),
             icon: const Icon(Icons.close, color: Colors.white, size: 22),
             style: IconButton.styleFrom(
-              backgroundColor: Colors.white.withValues(alpha: 0.2),
+              backgroundColor: Colors.white.withOpacity(0.2),
               shape: const CircleBorder(),
             ),
           ),
@@ -309,7 +309,7 @@ class _ShareQRDialogState extends State<ShareQRDialog>
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppThemeColor.lightBlueColor.withValues(alpha: 0.3),
+              color: AppThemeColor.lightBlueColor.withOpacity(0.3),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -325,7 +325,7 @@ class _ShareQRDialogState extends State<ShareQRDialog>
                     'Scan this QR code or use the Event ID to join the event',
                     style: TextStyle(
                       fontSize: 13,
-                      color: AppThemeColor.darkBlueColor.withValues(alpha: 0.8),
+                      color: AppThemeColor.darkBlueColor.withOpacity(0.8),
                     ),
                   ),
                 ),

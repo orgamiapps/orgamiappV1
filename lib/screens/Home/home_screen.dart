@@ -23,12 +23,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:orgami/Screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/controller/customer_controller.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Screens/QRScanner/qr_scanner_flow_screen.dart';
 
 import 'package:orgami/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:orgami/utils/location_helper.dart';
+import 'package:orgami/Utils/location_helper.dart';
 import 'package:orgami/Utils/logger.dart';
 import 'package:orgami/screens/Events/chose_sign_in_methods_screen.dart';
 
@@ -540,7 +540,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       borderRadius: BorderRadius.circular(28),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+                          color: const Color(0xFF667EEA).withOpacity(0.3),
                           spreadRadius: 2,
                           blurRadius: 8,
                           offset: const Offset(0, 4),
@@ -666,7 +666,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
+                              color: Colors.white.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Material(
@@ -699,7 +699,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
+                              color: Colors.white.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Material(
@@ -736,8 +736,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         boxShadow: [
           BoxShadow(
             color: themeProvider.isDarkMode
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.05),
+                ? Colors.black.withOpacity(0.3)
+                : Colors.black.withOpacity(0.05),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -777,7 +777,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                      color: const Color(0xFF667EEA).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -802,7 +802,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                    color: const Color(0xFF667EEA).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: Stack(
@@ -840,7 +840,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               activeTrackColor: const Color(0xFF667EEA),
               inactiveTrackColor: const Color(0xFFE1E5E9),
               thumbColor: const Color(0xFF667EEA),
-              overlayColor: const Color(0xFF667EEA).withValues(alpha: 0.2),
+              overlayColor: const Color(0xFF667EEA).withOpacity(0.2),
               trackHeight: 4,
               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
               overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
@@ -1207,7 +1207,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                color: const Color(0xFF667EEA).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(40),
               ),
               child: Icon(
@@ -1254,7 +1254,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                color: const Color(0xFF667EEA).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(40),
               ),
               child: Icon(
@@ -1390,7 +1390,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             spreadRadius: 0,
             blurRadius: 10,
             offset: const Offset(0, 2),
@@ -1405,7 +1405,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             height: 50,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+              color: const Color(0xFF667EEA).withOpacity(0.1),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(25),
@@ -1757,7 +1757,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withValues(alpha: 0.1),
+                  color: Colors.grey.withOpacity(0.1),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -1883,7 +1883,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
+                            color: Colors.white.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: const Icon(
@@ -1911,10 +1911,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   // Search Type Toggle
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
+                      color: Colors.white.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.2),
+                        color: Colors.white.withOpacity(0.2),
                         width: 1,
                       ),
                     ),
@@ -1935,7 +1935,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               decoration: BoxDecoration(
                                 color: _currentSearchType == SearchType.events
-                                    ? Colors.white.withValues(alpha: 0.3)
+                                    ? Colors.white.withOpacity(0.3)
                                     : Colors.transparent,
                                 borderRadius: const BorderRadius.only(
                                   topLeft: Radius.circular(12),
@@ -1985,7 +1985,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               decoration: BoxDecoration(
                                 color: _currentSearchType == SearchType.users
-                                    ? Colors.white.withValues(alpha: 0.3)
+                                    ? Colors.white.withOpacity(0.3)
                                     : Colors.transparent,
                                 borderRadius: const BorderRadius.only(
                                   topRight: Radius.circular(12),
@@ -2123,9 +2123,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
+                color: Colors.red.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                border: Border.all(color: Colors.red.withOpacity(0.3)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2290,7 +2290,7 @@ class _FeaturedEventCardState extends State<_FeaturedEventCard>
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFFFF9800).withValues(alpha: 0.3),
+                color: const Color(0xFFFF9800).withOpacity(0.3),
                 spreadRadius: 0,
                 blurRadius: 20,
                 offset: const Offset(0, 8),
@@ -2356,9 +2356,9 @@ class _FeaturedEventCardState extends State<_FeaturedEventCard>
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Colors.black.withValues(alpha: 0.1),
+                        Colors.black.withOpacity(0.1),
                         Colors.transparent,
-                        Colors.black.withValues(alpha: 0.8),
+                        Colors.black.withOpacity(0.8),
                       ],
                     ),
                   ),
@@ -2374,11 +2374,11 @@ class _FeaturedEventCardState extends State<_FeaturedEventCard>
                         scale: _favoriteScaleAnimation.value,
                         child: Container(
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.3),
+                            color: Colors.black.withOpacity(0.3),
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.2),
+                                color: Colors.black.withOpacity(0.2),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),
@@ -2399,7 +2399,7 @@ class _FeaturedEventCardState extends State<_FeaturedEventCard>
                                 decoration: BoxDecoration(
                                   color: _isFavorited
                                       ? const Color(0xFFE53E3E)
-                                      : Colors.white.withValues(alpha: 0.9),
+                                      : Colors.white.withOpacity(0.9),
                                   shape: BoxShape.circle,
                                 ),
                                 child: _isLoadingFavorite
@@ -2488,7 +2488,7 @@ class _FeaturedEventCardState extends State<_FeaturedEventCard>
                           Text(
                             widget.event.groupName,
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
+                              color: Colors.white.withOpacity(0.9),
                               fontSize: 16,
                               fontFamily: 'Roboto',
                             ),
@@ -2503,7 +2503,7 @@ class _FeaturedEventCardState extends State<_FeaturedEventCard>
                                     vertical: 8,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.2),
+                                    color: Colors.white.withOpacity(0.2),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
                                       color: Colors.white.withValues(
@@ -2739,10 +2739,10 @@ class _FilterSortModalState extends State<_FilterSortModal> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+        color: const Color(0xFF667EEA).withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+          color: const Color(0xFF667EEA).withOpacity(0.3),
           width: 1,
         ),
       ),

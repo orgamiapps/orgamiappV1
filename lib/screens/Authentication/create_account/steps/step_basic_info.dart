@@ -295,12 +295,12 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
+                color: Colors.black.withOpacity(0.08),
                 blurRadius: 20,
                 offset: const Offset(0, 6),
               ),
             ],
-            border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
+            border: Border.all(color: Colors.grey.withOpacity(0.1)),
           ),
           constraints: const BoxConstraints(maxHeight: 220),
           child: ListView.builder(
@@ -381,7 +381,7 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
-            fillColor: Colors.grey.withValues(alpha: 0.04),
+            fillColor: Colors.grey.withOpacity(0.04),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,

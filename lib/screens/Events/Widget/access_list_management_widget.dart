@@ -4,7 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/models/event_model.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:orgami/Utils/app_constants.dart';
 

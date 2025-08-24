@@ -66,10 +66,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                color: AppThemeColor.darkBlueColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: AppThemeColor.darkBlueColor.withValues(alpha: 0.2),
+                  color: AppThemeColor.darkBlueColor.withOpacity(0.2),
                   width: 1,
                 ),
               ),
@@ -102,7 +102,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
           end: Alignment.bottomCenter,
           colors: [
             Colors.white,
-            AppThemeColor.lightBlueColor.withValues(alpha: 0.4),
+            AppThemeColor.lightBlueColor.withOpacity(0.4),
           ],
         ),
       ),
@@ -137,7 +137,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: AppThemeColor.darkBlueColor.withValues(alpha: 0.08),
+            color: AppThemeColor.darkBlueColor.withOpacity(0.08),
             blurRadius: 30,
             offset: const Offset(0, 12),
             spreadRadius: 0,
@@ -184,7 +184,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: AppThemeColor.darkBlueColor.withValues(alpha: 0.06),
+            color: AppThemeColor.darkBlueColor.withOpacity(0.06),
             blurRadius: 40,
             offset: const Offset(0, 8),
             spreadRadius: 0,
@@ -235,7 +235,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
               fontSize: 16,
             ),
             filled: true,
-            fillColor: Colors.grey.withValues(alpha: 0.04),
+            fillColor: Colors.grey.withOpacity(0.04),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
@@ -250,7 +250,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                color: Colors.grey.withValues(alpha: 0.1),
+                color: Colors.grey.withOpacity(0.1),
                 width: 1,
               ),
             ),

@@ -91,7 +91,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
             circleId: const CircleId('location-circle'),
             center: eventLocation,
             radius: 100, // 100 meters radius
-            fillColor: const Color(0xFF667EEA).withValues(alpha: 0.1),
+            fillColor: const Color(0xFF667EEA).withOpacity(0.1),
             strokeColor: const Color(0xFF667EEA),
             strokeWidth: 2,
           ),
@@ -139,7 +139,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             spreadRadius: 0,
             blurRadius: 10,
             offset: const Offset(0, 2),
@@ -155,7 +155,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -196,7 +196,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: Colors.grey.withValues(alpha: 0.1),
+                  color: Colors.grey.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Material(
@@ -252,7 +252,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
+                      color: Colors.black.withOpacity(0.1),
                       spreadRadius: 0,
                       blurRadius: 8,
                       offset: const Offset(0, 2),
@@ -294,7 +294,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
+                      color: Colors.black.withOpacity(0.1),
                       spreadRadius: 0,
                       blurRadius: 8,
                       offset: const Offset(0, 2),
@@ -326,7 +326,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
+                      color: Colors.black.withOpacity(0.1),
                       spreadRadius: 0,
                       blurRadius: 8,
                       offset: const Offset(0, 2),
@@ -363,7 +363,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
+                  color: Colors.black.withOpacity(0.1),
                   spreadRadius: 0,
                   blurRadius: 8,
                   offset: const Offset(0, 2),
@@ -437,7 +437,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: Colors.black.withOpacity(0.1),
               spreadRadius: 0,
               blurRadius: 20,
               offset: const Offset(0, -4),
@@ -452,7 +452,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.withValues(alpha: 0.3),
+                color: Colors.grey.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -478,7 +478,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                color: const Color(0xFF667EEA).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
@@ -548,7 +548,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                color: const Color(0xFF10B981).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
@@ -598,10 +598,10 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
           child: Container(
             height: 56,
             decoration: BoxDecoration(
-              color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+              color: const Color(0xFF667EEA).withOpacity(0.1),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: const Color(0xFF667EEA).withValues(alpha: 0.2),
+                color: const Color(0xFF667EEA).withOpacity(0.2),
                 width: 1,
               ),
             ),

@@ -103,7 +103,7 @@ class _CommentsSectionState extends State<CommentsSection> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
+                color: Colors.black.withOpacity(0.05),
                 spreadRadius: 0,
                 blurRadius: 10,
                 offset: const Offset(0, 2),
@@ -137,7 +137,7 @@ class _CommentsSectionState extends State<CommentsSection> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                      color: const Color(0xFF667EEA).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -287,7 +287,7 @@ class _CommentsModalState extends State<CommentsModal> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+              color: const Color(0xFF667EEA).withOpacity(0.3),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -298,7 +298,7 @@ class _CommentsModalState extends State<CommentsModal> {
             decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(
-                  color: Colors.grey.withValues(alpha: 0.2),
+                  color: Colors.grey.withOpacity(0.2),
                   width: 1,
                 ),
               ),
@@ -339,7 +339,7 @@ class _CommentsModalState extends State<CommentsModal> {
             decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(
-                  color: Colors.grey.withValues(alpha: 0.2),
+                  color: Colors.grey.withOpacity(0.2),
                   width: 1,
                 ),
               ),

@@ -101,7 +101,7 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Icon(
@@ -180,10 +180,10 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF667EEA).withValues(alpha: 0.05),
+        color: const Color(0xFF667EEA).withOpacity(0.05),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(0xFF667EEA).withValues(alpha: 0.2),
+          color: const Color(0xFF667EEA).withOpacity(0.2),
           width: 1,
         ),
       ),
@@ -239,7 +239,7 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+            color: const Color(0xFF667EEA).withOpacity(0.3),
             spreadRadius: 0,
             blurRadius: 12,
             offset: const Offset(0, 4),
@@ -316,7 +316,7 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
+                      color: Colors.black.withOpacity(0.1),
                       spreadRadius: 0,
                       blurRadius: 20,
                       offset: const Offset(0, -4),

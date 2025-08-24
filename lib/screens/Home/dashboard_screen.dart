@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/Screens/Home/home_hub_screen.dart';
+import 'package:orgami/screens/Home/home_hub_screen.dart';
 import 'package:orgami/screens/MyProfile/my_profile_screen.dart';
-import 'package:orgami/Screens/Home/notifications_screen.dart';
-import 'package:orgami/Screens/Messaging/messaging_screen.dart';
+import 'package:orgami/screens/Home/notifications_screen.dart';
+import 'package:orgami/screens/Messaging/messaging_screen.dart';
 import 'package:orgami/screens/Organizations/groups_screen.dart';
-import 'package:orgami/Screens/Home/account_screen.dart';
+import 'package:orgami/screens/Home/account_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});

@@ -12,7 +12,7 @@ import 'package:orgami/Screens/Events/Widget/delete_event_dialogue.dart';
 
 import 'package:orgami/Utils/router.dart';
 import 'package:orgami/Utils/text_fields.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 import 'package:orgami/Screens/Events/Widget/sign_in_methods_selector.dart';
@@ -293,7 +293,7 @@ class _EditEventScreenState extends State<EditEventScreen>
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Icon(
@@ -378,7 +378,7 @@ class _EditEventScreenState extends State<EditEventScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -394,7 +394,7 @@ class _EditEventScreenState extends State<EditEventScreen>
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
@@ -425,7 +425,7 @@ class _EditEventScreenState extends State<EditEventScreen>
               border: Border.all(
                 color: (_selectedImagePath != null || _currentImageUrl != null)
                     ? const Color(0xFF667EEA)
-                    : Colors.grey.withValues(alpha: 0.3),
+                    : Colors.grey.withOpacity(0.3),
                 width: 2,
               ),
             ),
@@ -444,7 +444,7 @@ class _EditEventScreenState extends State<EditEventScreen>
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                      color: const Color(0xFF667EEA).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -487,7 +487,7 @@ class _EditEventScreenState extends State<EditEventScreen>
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.1),
+                      color: Colors.red.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -529,7 +529,7 @@ class _EditEventScreenState extends State<EditEventScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -545,7 +545,7 @@ class _EditEventScreenState extends State<EditEventScreen>
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
@@ -641,7 +641,7 @@ class _EditEventScreenState extends State<EditEventScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -657,7 +657,7 @@ class _EditEventScreenState extends State<EditEventScreen>
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
@@ -702,7 +702,7 @@ class _EditEventScreenState extends State<EditEventScreen>
                   decoration: BoxDecoration(
                     color: isSelected
                         ? const Color(0xFF667EEA)
-                        : const Color(0xFF667EEA).withValues(alpha: 0.1),
+                        : const Color(0xFF667EEA).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: const Color(0xFF667EEA),
@@ -768,7 +768,7 @@ class _EditEventScreenState extends State<EditEventScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -784,7 +784,7 @@ class _EditEventScreenState extends State<EditEventScreen>
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
@@ -849,7 +849,7 @@ class _EditEventScreenState extends State<EditEventScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+            color: const Color(0xFF667EEA).withOpacity(0.3),
             spreadRadius: 0,
             blurRadius: 12,
             offset: const Offset(0, 4),
@@ -891,7 +891,7 @@ class _EditEventScreenState extends State<EditEventScreen>
         border: Border.all(color: const Color(0xFFFF5722), width: 2),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFFF5722).withValues(alpha: 0.1),
+            color: const Color(0xFFFF5722).withOpacity(0.1),
             spreadRadius: 0,
             blurRadius: 8,
             offset: const Offset(0, 2),
@@ -946,7 +946,7 @@ class _EditEventScreenState extends State<EditEventScreen>
                       width: double.infinity,
                       height: double.infinity,
                       decoration: BoxDecoration(
-                        color: Colors.grey.withValues(alpha: 0.2),
+                        color: Colors.grey.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: const Icon(
@@ -967,7 +967,7 @@ class _EditEventScreenState extends State<EditEventScreen>
                       width: double.infinity,
                       height: double.infinity,
                       decoration: BoxDecoration(
-                        color: Colors.grey.withValues(alpha: 0.2),
+                        color: Colors.grey.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: const Icon(
@@ -988,7 +988,7 @@ class _EditEventScreenState extends State<EditEventScreen>
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.7),
+                color: Colors.black.withOpacity(0.7),
                 borderRadius: BorderRadius.circular(18),
               ),
               child: const Icon(Icons.edit, color: Colors.white, size: 18),
@@ -1016,7 +1016,7 @@ class _EditEventScreenState extends State<EditEventScreen>
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                color: const Color(0xFF667EEA).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(32),
               ),
               child: const Icon(
@@ -1039,7 +1039,7 @@ class _EditEventScreenState extends State<EditEventScreen>
             Text(
               'Tap to select an image from your gallery',
               style: TextStyle(
-                color: Colors.grey.withValues(alpha: 0.7),
+                color: Colors.grey.withOpacity(0.7),
                 fontSize: 14,
                 fontFamily: 'Roboto',
               ),

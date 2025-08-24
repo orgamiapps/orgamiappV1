@@ -101,7 +101,7 @@ class _SignInMethodsSelectorState extends State<SignInMethodsSelector>
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
+                color: Colors.black.withOpacity(0.08),
                 spreadRadius: 0,
                 blurRadius: 20,
                 offset: const Offset(0, 4),
@@ -128,7 +128,7 @@ class _SignInMethodsSelectorState extends State<SignInMethodsSelector>
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+            color: const Color(0xFF667EEA).withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: const Icon(Icons.login, color: Color(0xFF667EEA), size: 20),
@@ -184,13 +184,13 @@ class _SignInMethodsSelectorState extends State<SignInMethodsSelector>
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: isSelected
-                  ? method['color'].withValues(alpha: 0.1)
+                  ? method['color'].withOpacity(0.1)
                   : Colors.grey[50],
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isSelected
                     ? method['color']
-                    : Colors.grey.withValues(alpha: 0.3),
+                    : Colors.grey.withOpacity(0.3),
                 width: isSelected ? 2 : 1,
               ),
             ),
@@ -202,7 +202,7 @@ class _SignInMethodsSelectorState extends State<SignInMethodsSelector>
                   decoration: BoxDecoration(
                     color: isSelected
                         ? method['color']
-                        : Colors.grey.withValues(alpha: 0.2),
+                        : Colors.grey.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -258,7 +258,7 @@ class _SignInMethodsSelectorState extends State<SignInMethodsSelector>
                     border: Border.all(
                       color: isSelected
                           ? method['color']
-                          : Colors.grey.withValues(alpha: 0.5),
+                          : Colors.grey.withOpacity(0.5),
                       width: 2,
                     ),
                   ),

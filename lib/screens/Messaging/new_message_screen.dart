@@ -10,7 +10,7 @@ import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:orgami/Utils/cached_image.dart';
 import 'package:orgami/screens/Messaging/chat_screen.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:orgami/Utils/logger.dart';
@@ -617,8 +617,8 @@ class _NewMessageScreenState extends State<NewMessageScreen>
           ),
         },
         groupValue: _groupMode,
-        borderColor: theme.colorScheme.primary.withValues(alpha: 0.4),
-        pressedColor: theme.colorScheme.primary.withValues(alpha: 0.08),
+        borderColor: theme.colorScheme.primary.withOpacity(0.4),
+        pressedColor: theme.colorScheme.primary.withOpacity(0.08),
         selectedColor: Colors.white,
         unselectedColor: theme.cardColor,
         onValueChanged: (val) {
@@ -642,8 +642,8 @@ class _NewMessageScreenState extends State<NewMessageScreen>
         boxShadow: [
           BoxShadow(
             color: isDark
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.05),
+                ? Colors.black.withOpacity(0.3)
+                : Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -697,8 +697,8 @@ class _NewMessageScreenState extends State<NewMessageScreen>
         boxShadow: [
           BoxShadow(
             color: isDark
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.05),
+                ? Colors.black.withOpacity(0.3)
+                : Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -907,8 +907,8 @@ class _NewMessageScreenState extends State<NewMessageScreen>
             boxShadow: [
               BoxShadow(
                 color: isDark
-                    ? Colors.black.withValues(alpha: 0.3)
-                    : Colors.black.withValues(alpha: 0.05),
+                    ? Colors.black.withOpacity(0.3)
+                    : Colors.black.withOpacity(0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
@@ -1006,9 +1006,9 @@ class _NewMessageScreenState extends State<NewMessageScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: Colors.red.withValues(alpha: 0.06),
+            color: Colors.red.withOpacity(0.06),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.red.withValues(alpha: 0.25)),
+            border: Border.all(color: Colors.red.withOpacity(0.25)),
           ),
           child: Row(
             children: [
@@ -1052,7 +1052,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
           Icon(
             _isSearching ? Icons.search_off : Icons.people_outline,
             size: 80,
-            color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
+            color: theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
           ),
           const SizedBox(height: 16),
           Text(
@@ -1145,8 +1145,8 @@ class _NewMessageScreenState extends State<NewMessageScreen>
           boxShadow: [
             BoxShadow(
               color: isDark
-                  ? Colors.black.withValues(alpha: 0.3)
-                  : Colors.black.withValues(alpha: 0.05),
+                  ? Colors.black.withOpacity(0.3)
+                  : Colors.black.withOpacity(0.05),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
@@ -1338,7 +1338,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
             color: Theme.of(context).cardColor,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
+                color: Colors.black.withOpacity(0.05),
                 blurRadius: 8,
                 offset: const Offset(0, -2),
               ),
@@ -1351,7 +1351,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
                   radius: 14,
                   backgroundColor: Theme.of(
                     context,
-                  ).colorScheme.primary.withValues(alpha: 0.15),
+                  ).colorScheme.primary.withOpacity(0.15),
                   child: Text(
                     '${_selectedUserIds.length}',
                     style: TextStyle(

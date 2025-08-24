@@ -9,7 +9,7 @@ import 'package:orgami/Utils/cached_image.dart';
 import 'package:orgami/firebase/firebase_storage_helper.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 import 'package:orgami/Screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:orgami/controller/customer_controller.dart';
 import 'package:orgami/Screens/MyProfile/followers_following_screen.dart';
@@ -444,7 +444,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -551,7 +551,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -681,7 +681,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),

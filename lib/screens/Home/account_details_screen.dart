@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:orgami/controller/customer_controller.dart';
 import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/Utils/app_app_bar_view.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/Toast.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'dart:convert';
@@ -370,8 +370,8 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                cs.primary.withValues(alpha: 0.12),
-                cs.secondary.withValues(alpha: 0.12),
+                cs.primary.withOpacity(0.12),
+                cs.secondary.withOpacity(0.12),
               ],
             ),
             borderRadius: BorderRadius.circular(24),
@@ -452,7 +452,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.12),
+                                  color: Colors.black.withOpacity(0.12),
                                   blurRadius: 8,
                                   offset: const Offset(0, 2),
                                 ),
@@ -667,7 +667,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
+        color: cs.surfaceContainerHighest.withOpacity(0.4),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -1066,7 +1066,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
       decoration: BoxDecoration(
         color: Theme.of(
           context,
-        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+        ).colorScheme.surfaceContainerHighest.withOpacity(0.4),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
