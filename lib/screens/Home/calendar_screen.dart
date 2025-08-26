@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -9,6 +8,7 @@ import 'package:orgami/screens/Events/single_event_screen.dart';
 import 'package:orgami/screens/Events/chose_sign_in_methods_screen.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/widgets/month_year_picker.dart';
 import 'dart:async';
 
 class CalendarScreen extends StatefulWidget {
@@ -324,6 +324,31 @@ class _CalendarScreenState extends State<CalendarScreen>
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
+  void _showMonthYearPicker() {
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => MonthYearPickerSheet(
+        initialDate: _currentMonth,
+        onDateSelected: (DateTime selectedDate) {
+          setState(() {
+            _currentMonth = selectedDate;
+            // Calculate the page index for the selected month
+            final now = DateTime.now();
+            final monthDiff =
+                (selectedDate.year - now.year) * 12 +
+                (selectedDate.month - now.month);
+            final pageIndex = 12 + monthDiff;
+            _monthPageController.jumpToPage(pageIndex);
+          });
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -432,14 +457,30 @@ class _CalendarScreenState extends State<CalendarScreen>
                 constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
               ),
               Expanded(
-                child: Text(
-                  _isDayViewExpanded && _selectedDate != null
-                      ? DateFormat('EEEE, MMMM d').format(_selectedDate!)
-                      : DateFormat('MMMM yyyy').format(_currentMonth),
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A1A),
+                child: GestureDetector(
+                  onTap: _isDayViewExpanded ? null : _showMonthYearPicker,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _isDayViewExpanded && _selectedDate != null
+                            ? DateFormat('EEEE, MMMM d').format(_selectedDate!)
+                            : DateFormat('MMMM yyyy').format(_currentMonth),
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A1A1A),
+                        ),
+                      ),
+                      if (!_isDayViewExpanded) ...[
+                        const SizedBox(width: 8),
+                        const Icon(
+                          Icons.keyboard_arrow_down,
+                          size: 28,
+                          color: Color(0xFF667EEA),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ),
@@ -553,7 +594,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 7,
-        childAspectRatio: 0.85, // Adjusted to give more vertical space
+        childAspectRatio: 0.88, // Optimized for event indicators
         crossAxisSpacing: 2,
         mainAxisSpacing: 2,
       ),
@@ -586,31 +627,39 @@ class _CalendarScreenState extends State<CalendarScreen>
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // Day number
-                Text(
-                  '${day.day}',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
-                    color: isSelected
-                        ? Colors.white
-                        : isToday
-                        ? const Color(0xFF667EEA)
-                        : const Color(0xFF374151),
+                Flexible(
+                  child: Container(
+                    alignment: Alignment.center,
+                    child: Text(
+                      '${day.day}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: isToday ? FontWeight.bold : FontWeight.w600,
+                        color: isSelected
+                            ? Colors.white
+                            : isToday
+                            ? const Color(0xFF667EEA)
+                            : const Color(0xFF374151),
+                      ),
+                    ),
                   ),
                 ),
-                // Event indicator dots - cleaner iOS style
-                if (events.isNotEmpty) ...[
-                  const SizedBox(height: 4),
+                // Event indicator section with proper spacing
+                if (events.isNotEmpty) 
                   Container(
-                    height: 6,
+                    height: 16,  // Fixed height for consistency
+                    alignment: Alignment.center,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
+                        // Event dot indicator
                         Container(
-                          width: 6,
-                          height: 6,
+                          width: 5,
+                          height: 5,
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? Colors.white
@@ -620,25 +669,60 @@ class _CalendarScreenState extends State<CalendarScreen>
                                 ? const Color(0xFFEF4444)
                                 : const Color(0xFF667EEA),
                             shape: BoxShape.circle,
+                            boxShadow: !isSelected ? [
+                              BoxShadow(
+                                color: (events.any((e) => e.ticketsEnabled)
+                                    ? const Color(0xFF10B981)
+                                    : events.any((e) => e.private)
+                                    ? const Color(0xFFEF4444)
+                                    : const Color(0xFF667EEA)).withValues(alpha: 0.3),
+                                blurRadius: 2,
+                                spreadRadius: 0,
+                              ),
+                            ] : null,
                           ),
                         ),
+                        // Event count badge for multiple events
                         if (events.length > 1) ...[
                           const SizedBox(width: 2),
-                          Text(
-                            '+${events.length - 1}',
-                            style: TextStyle(
-                              fontSize: 8,
+                          Container(
+                            constraints: const BoxConstraints(minWidth: 18),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 3,
+                              vertical: 0.5,
+                            ),
+                            decoration: BoxDecoration(
                               color: isSelected
-                                  ? Colors.white.withValues(alpha: 0.9)
-                                  : const Color(0xFF6B7280),
-                              fontWeight: FontWeight.w600,
+                                  ? Colors.white.withValues(alpha: 0.25)
+                                  : const Color(0xFF6B7280).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isSelected
+                                    ? Colors.white.withValues(alpha: 0.3)
+                                    : const Color(0xFF6B7280).withValues(alpha: 0.15),
+                                width: 0.5,
+                              ),
+                            ),
+                            child: Text(
+                              '+${events.length - 1}',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: isSelected
+                                    ? Colors.white
+                                    : const Color(0xFF374151),
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: -0.2,
+                                height: 1.2,
+                              ),
                             ),
                           ),
                         ],
                       ],
                     ),
-                  ),
-                ],
+                  )
+                else
+                  const SizedBox(height: 16),  // Maintain consistent spacing
               ],
             ),
           ),
