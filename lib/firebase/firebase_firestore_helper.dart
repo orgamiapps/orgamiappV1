@@ -328,6 +328,35 @@ class FirebaseFirestoreHelper {
     return list.isNotEmpty ? true : false;
   }
 
+  Future<bool> unregisterFromEvent(String eventId) async {
+    try {
+      QuerySnapshot querySnapshot = await _firestore
+          .collection(AttendanceModel.registerFirebaseKey)
+          .where('eventId', isEqualTo: eventId)
+          .where('customerUid', isEqualTo: CustomerController.logeInCustomer!.uid)
+          .get();
+      
+      if (querySnapshot.docs.isNotEmpty) {
+        // Delete all registration records for this user and event
+        for (var doc in querySnapshot.docs) {
+          await doc.reference.delete();
+        }
+        
+        // Clear cache for this event's registration data
+        _cache.remove('register_attendance_$eventId');
+        
+        Logger.debug('Successfully unregistered user from event: $eventId');
+        return true;
+      }
+      
+      Logger.debug('No registration found to remove for event: $eventId');
+      return false;
+    } catch (e) {
+      Logger.error('Error unregistering from event: $eventId', e);
+      rethrow;
+    }
+  }
+
   Future<EventModel?> getSingleEvent(String eventId) async {
     EventModel? eventData;
     try {
