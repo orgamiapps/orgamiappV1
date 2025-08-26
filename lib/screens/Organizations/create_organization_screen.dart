@@ -3,6 +3,7 @@ import 'package:orgami/firebase/organization_helper.dart';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/firebase/firebase_storage_helper.dart';
+import 'package:flutter/services.dart';
 
 class CreateOrganizationScreen extends StatefulWidget {
   const CreateOrganizationScreen({super.key});
@@ -17,7 +18,6 @@ class _CreateOrganizationScreenState extends State<CreateOrganizationScreen> {
   final _nameCtlr = TextEditingController();
   final _descCtlr = TextEditingController();
   String _category = 'Business';
-  String _defaultVisibility = 'public';
   bool _submitting = false;
   File? _logoFile;
   File? _bannerFile;
@@ -27,7 +27,33 @@ class _CreateOrganizationScreenState extends State<CreateOrganizationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Organization')),
+      appBar: AppBar(
+        title: const Text('Create Group'),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        iconTheme: const IconThemeData(color: Colors.black87),
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.black87,
+          ),
+          onPressed: () => Navigator.pop(context),
+          tooltip: 'Back',
+        ),
+        titleTextStyle: const TextStyle(
+          color: Colors.black87,
+          fontSize: 22,
+          fontWeight: FontWeight.w600,
+        ),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+        ),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -35,14 +61,14 @@ class _CreateOrganizationScreenState extends State<CreateOrganizationScreen> {
           child: ListView(
             children: [
               const Text(
-                'Organization Details',
+                'Group Details',
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _nameCtlr,
                 decoration: const InputDecoration(
-                  labelText: 'Organization Name*',
+                  labelText: 'Group Name*',
                   helperText: 'Make it clear and recognizable',
                 ),
                 validator: (v) =>
@@ -53,7 +79,7 @@ class _CreateOrganizationScreenState extends State<CreateOrganizationScreen> {
                 controller: _descCtlr,
                 decoration: const InputDecoration(
                   labelText: 'Description',
-                  helperText: 'What is this organization about? (optional)',
+                  helperText: 'What is this group about? (optional)',
                 ),
                 maxLines: 3,
               ),
@@ -69,25 +95,6 @@ class _CreateOrganizationScreenState extends State<CreateOrganizationScreen> {
                 ],
                 onChanged: (v) => setState(() => _category = v ?? 'Business'),
                 decoration: const InputDecoration(labelText: 'Category'),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: _defaultVisibility,
-                items: const [
-                  DropdownMenuItem(
-                    value: 'public',
-                    child: Text('Default Public'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'private',
-                    child: Text('Default Private'),
-                  ),
-                ],
-                onChanged: (v) =>
-                    setState(() => _defaultVisibility = v ?? 'public'),
-                decoration: const InputDecoration(
-                  labelText: 'Default Event Visibility',
-                ),
               ),
               const SizedBox(height: 24),
               const Text(
@@ -128,7 +135,7 @@ class _CreateOrganizationScreenState extends State<CreateOrganizationScreen> {
                           name: _nameCtlr.text.trim(),
                           description: _descCtlr.text.trim(),
                           category: _category,
-                          defaultEventVisibility: _defaultVisibility,
+                          defaultEventVisibility: 'public',
                         );
 
                         if (id != null) {
@@ -167,7 +174,7 @@ class _CreateOrganizationScreenState extends State<CreateOrganizationScreen> {
                           setState(() => _submitting = false);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Failed to create organization'),
+                              content: Text('Failed to create group'),
                             ),
                           );
                         }
@@ -181,7 +188,7 @@ class _CreateOrganizationScreenState extends State<CreateOrganizationScreen> {
                           color: Colors.white,
                         ),
                       )
-                    : const Text('Create Organization'),
+                    : const Text('Create Group'),
               ),
             ],
           ),
