@@ -66,6 +66,10 @@ class _NewMessageScreenState extends State<NewMessageScreen>
   @override
   void initState() {
     super.initState();
+    // Clear all state to ensure clean start
+    _searchController.clear();
+    _selectedUserIds.clear();
+    _recentSearches.clear();
     _restorePrefs();
     _loadAllUsers();
     _searchController.addListener(_onSearchChanged);
@@ -82,12 +86,21 @@ class _NewMessageScreenState extends State<NewMessageScreen>
 
   @override
   void dispose() {
+    // Clear recent searches from storage when leaving the screen
+    _clearRecentSearches();
     _searchController.dispose();
     _groupNameController.dispose();
     _groupTabController?.dispose();
     _listController.dispose();
     _searchDebounce?.cancel();
     super.dispose();
+  }
+
+  Future<void> _clearRecentSearches() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_prefsKeyRecent);
+    } catch (_) {}
   }
 
   @override
@@ -97,11 +110,12 @@ class _NewMessageScreenState extends State<NewMessageScreen>
     try {
       final prefs = await SharedPreferences.getInstance();
       final lastMode = prefs.getBool(_prefsKeyMode);
-      final recent = prefs.getStringList(_prefsKeyRecent) ?? <String>[];
+      // Don't restore recent searches - start with a clean slate each time
+      // This prevents confusion with old search terms appearing as selections
       if (!mounted) return;
       setState(() {
         _groupMode = lastMode ?? false;
-        _recentSearches = recent;
+        _recentSearches = <String>[]; // Always start with empty recent searches
       });
     } catch (_) {}
   }
@@ -114,19 +128,9 @@ class _NewMessageScreenState extends State<NewMessageScreen>
   }
 
   Future<void> _addRecentSearch(String term) async {
-    // Don't add single character searches or very short searches to recent searches
-    // This prevents confusion with selected users
-    if (term.isEmpty || term.length < 2) return;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final list = prefs.getStringList(_prefsKeyRecent) ?? <String>[];
-      list.remove(term);
-      list.insert(0, term);
-      final trimmed = list.take(10).toList();
-      await prefs.setStringList(_prefsKeyRecent, trimmed);
-      if (!mounted) return;
-      setState(() => _recentSearches = trimmed);
-    } catch (_) {}
+    // Recent searches are disabled to prevent confusion with selected users
+    // We no longer persist or display recent searches
+    return;
   }
 
   Future<void> _loadMyOrganizations() async {
