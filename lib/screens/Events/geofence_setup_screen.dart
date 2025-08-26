@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:orgami/models/event_model.dart';
-import 'package:orgami/Utils/Toast.dart';
+import 'package:orgami/Utils/toast.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geocoding/geocoding.dart';
 

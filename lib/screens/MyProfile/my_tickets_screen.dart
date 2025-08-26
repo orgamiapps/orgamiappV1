@@ -318,10 +318,10 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.1),
+                            color: statusColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: statusColor.withOpacity(0.5),
+                              color: statusColor.withValues(alpha: 0.5),
                             ),
                           ),
                           child: Text(
@@ -438,10 +438,12 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
       final date = DateFormat(
         'EEE, MMM dd, h:mm a',
       ).format(ticket.eventDateTime);
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text:
-            'My Orgami Event Ticket\n${ticket.eventTitle}\n$date\nCode: ${ticket.ticketCode}',
+      await SharePlus.instance.share(
+        ShareParams(
+          text:
+              'My Orgami Event Ticket\n${ticket.eventTitle}\n$date\nCode: ${ticket.ticketCode}',
+          files: [XFile(file.path)],
+        ),
       );
     } catch (e) {
       debugPrint('Error sharing ticket: $e');
@@ -465,7 +467,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withValues(alpha: 0.2),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -498,7 +500,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
+                              color: Colors.black.withValues(alpha: 0.1),
                               blurRadius: 10,
                               offset: const Offset(0, 5),
                             ),

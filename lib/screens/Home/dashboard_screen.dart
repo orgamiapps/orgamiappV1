@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/Screens/Home/home_hub_screen.dart';
+import 'package:orgami/screens/Home/home_hub_screen.dart';
 import 'package:orgami/screens/MyProfile/my_profile_screen.dart';
-import 'package:orgami/Screens/Home/notifications_screen.dart';
-import 'package:orgami/Screens/Messaging/messaging_screen.dart';
+import 'package:orgami/screens/Home/notifications_screen.dart';
+import 'package:orgami/screens/Messaging/messaging_screen.dart';
 import 'package:orgami/screens/Organizations/groups_screen.dart';
-import 'package:orgami/Screens/Home/account_screen.dart';
+import 'package:orgami/screens/Home/account_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -75,7 +75,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             boxShadow: _hasScrolledContent
                 ? [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: Colors.black.withValues(alpha: 0.08),
                       blurRadius: 16,
                       spreadRadius: 0,
                       offset: const Offset(0, 6),
@@ -86,7 +86,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: NavigationBarTheme(
             data: NavigationBarThemeData(
               backgroundColor: barColor,
-              indicatorColor: primary.withOpacity(0.12),
+              indicatorColor: primary.withValues(alpha: 0.12),
               labelTextStyle: WidgetStateProperty.all(
                 const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
               ),

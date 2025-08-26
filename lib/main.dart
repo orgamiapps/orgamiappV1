@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'dart:io' show InternetAddress;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/firebase_options.dart';
-import 'package:orgami/Screens/Splash/splash_screen.dart';
+import 'package:orgami/screens/Splash/splash_screen.dart';
 import 'package:orgami/Utils/logger.dart';
 import 'package:orgami/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
@@ -29,125 +28,132 @@ void main() async {
 
   Logger.info('Starting app initialization...');
 
+  // Quick Firebase initialization
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-
-    // Enable Firestore offline persistence to keep app usable without network
-    try {
-      FirebaseFirestore.instance.settings = const Settings(
-        persistenceEnabled: true,
-        cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-      );
-    } catch (e, st) {
-      Logger.warning('Configuring Firestore settings failed: $e');
-      Logger.debug(st.toString());
-    }
-
-    // Detect connectivity and configure Firestore accordingly
-    final connectivityResult = await Connectivity().checkConnectivity();
-    bool isOffline = connectivityResult == ConnectivityResult.none;
-
-    // Extra DNS checks to detect captive portals/DNS failures on emulator
-    Future<bool> _dnsOkFor(String host) async {
-      try {
-        final lookup = await InternetAddress.lookup(host);
-        return lookup.isNotEmpty && lookup.first.rawAddress.isNotEmpty;
-      } catch (_) {
-        return false;
-      }
-    }
-
-    final bool dnsOk =
-        await _dnsOkFor('firestore.googleapis.com') &&
-        await _dnsOkFor('firebaseappcheck.googleapis.com') &&
-        await _dnsOkFor('firebasestorage.googleapis.com');
-
-    final bool isReachable = !isOffline && dnsOk;
-
-    // App Check: only activate when network is reachable to avoid noisy DNS/AppCheck warnings
-    if (isReachable) {
-      try {
-        await FirebaseAppCheck.instance.activate(
-          androidProvider: AndroidProvider.debug,
-          appleProvider: AppleProvider.debug,
-        );
-      } catch (e, st) {
-        Logger.warning(
-          'App Check activation failed, continuing without it: $e',
-        );
-        Logger.debug(st.toString());
-      }
-    } else {
-      Logger.warning(
-        'Skipping App Check activation while offline/DNS unavailable.',
-      );
-      try {
-        await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(false);
-      } catch (_) {}
-    }
-
-    if (!isReachable) {
-      // Prevent Firestore from repeatedly attempting network calls when offline
-      await FirebaseFirestore.instance.disableNetwork();
-      Logger.warning(
-        'No internet connection detected. Running in offline mode.',
-      );
-    } else {
-      // Ensure network is enabled when connectivity is available
-      await FirebaseFirestore.instance.enableNetwork();
-    }
-
-    // iOS/web foreground presentation options
-    if (kIsWeb || defaultTargetPlatform == TargetPlatform.iOS) {
-      await fcm.FirebaseMessaging.instance
-          .setForegroundNotificationPresentationOptions(
-            alert: true,
-            badge: true,
-            sound: true,
-          );
-    }
-
-    // Android 13+ notifications permission
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      final plugin = FlutterLocalNotificationsPlugin();
-      await plugin
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >()
-          ?.requestNotificationsPermission();
-    }
-
-    // Initialize local notifications and messaging helper
-    await NotificationService.initialize();
-
-    // Only initialize Firebase Messaging (which talks to Firestore) when online
-    if (isReachable) {
-      await FirebaseMessagingHelper().initialize();
-    } else {
-      Logger.warning(
-        'Skipping Firebase Messaging initialization while offline.',
-      );
-    }
-
-    Logger.success('Firebase initialized successfully');
+    Logger.success('Firebase core initialized');
   } catch (e, st) {
     Logger.error('Firebase initialization failed', e, st);
   }
 
-  // Load theme preference
-  final prefs = await SharedPreferences.getInstance();
-  final isDarkMode = prefs.getBool('isDarkMode') ?? false;
+  // Load theme preference in parallel
+  final themeFuture = SharedPreferences.getInstance().then(
+    (prefs) => prefs.getBool('isDarkMode') ?? false,
+  );
+
+  // Get theme result
+  final isDarkMode = await themeFuture;
 
   Logger.success('App initialization complete');
 
+  // Run the app immediately
   runApp(
     ChangeNotifierProvider(
       create: (context) => ThemeProvider()..loadTheme(isDarkMode),
       child: const MyApp(),
     ),
   );
+
+  // Defer heavy initialization to after the app starts
+  _initializeBackgroundServices();
+}
+
+/// Initialize background services after app startup
+Future<void> _initializeBackgroundServices() async {
+  try {
+    // Configure Firestore settings
+    try {
+      FirebaseFirestore.instance.settings = const Settings(
+        persistenceEnabled: true,
+        cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+      );
+    } catch (e) {
+      Logger.warning('Configuring Firestore settings failed: $e');
+    }
+
+    // Quick connectivity check without DNS lookups
+    final dynamic connectivityResult = await Connectivity().checkConnectivity();
+    bool isOffline = false;
+    if (connectivityResult is ConnectivityResult) {
+      isOffline = connectivityResult == ConnectivityResult.none;
+    } else if (connectivityResult is Iterable) {
+      final list = List<ConnectivityResult>.from(
+        connectivityResult.cast<ConnectivityResult>(),
+      );
+      isOffline =
+          list.isEmpty || list.every((c) => c == ConnectivityResult.none);
+    }
+
+    // Skip DNS checks - they're blocking the main thread
+    // Instead, just use connectivity status
+    final bool isReachable = !isOffline;
+
+    // Initialize App Check in background if reachable
+    if (isReachable) {
+      FirebaseAppCheck.instance.activate(
+        androidProvider: AndroidProvider.debug,
+        appleProvider: AppleProvider.debug,
+      ).catchError((e) {
+        Logger.warning('App Check activation failed: $e');
+      });
+    }
+
+    // Configure Firestore network based on connectivity
+    if (!isReachable) {
+      FirebaseFirestore.instance.disableNetwork().catchError((e) {
+        Logger.warning('Failed to disable network: $e');
+      });
+    }
+
+    // iOS/web foreground presentation options
+    if (kIsWeb || defaultTargetPlatform == TargetPlatform.iOS) {
+      fcm.FirebaseMessaging.instance
+          .setForegroundNotificationPresentationOptions(
+            alert: true,
+            badge: true,
+            sound: true,
+          )
+          .catchError((e) {
+            Logger.warning('Failed to set notification options: $e');
+          });
+    }
+
+    // Android notifications permission - non-blocking
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      final plugin = FlutterLocalNotificationsPlugin();
+      plugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.requestNotificationsPermission()
+          .catchError((e) {
+            Logger.warning('Failed to request notification permission: $e');
+            return false;
+          });
+    }
+
+    // Initialize notifications in background
+    NotificationService.initialize().catchError((e) {
+      Logger.warning('Notification service initialization failed: $e');
+      return;
+    });
+
+    // Initialize Firebase Messaging in background if online
+    if (isReachable) {
+      // Delay messaging initialization to avoid blocking
+      Future.delayed(const Duration(seconds: 2), () {
+        FirebaseMessagingHelper().initialize().catchError((e) {
+          Logger.warning('Firebase Messaging initialization failed: $e');
+        });
+      });
+    }
+
+    Logger.success('Background services initialized');
+  } catch (e) {
+    Logger.error('Background services initialization failed: $e');
+  }
 }
 
 class MyApp extends StatelessWidget {

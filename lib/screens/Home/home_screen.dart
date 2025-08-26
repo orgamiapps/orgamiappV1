@@ -28,7 +28,7 @@ import 'package:orgami/Screens/QRScanner/qr_scanner_flow_screen.dart';
 
 import 'package:orgami/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:orgami/utils/location_helper.dart';
+import 'package:orgami/Utils/location_helper.dart';
 import 'package:orgami/Utils/logger.dart';
 import 'package:orgami/screens/Events/chose_sign_in_methods_screen.dart';
 

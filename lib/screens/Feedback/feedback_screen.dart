@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:orgami/controller/customer_controller.dart';
 import 'package:orgami/Utils/app_app_bar_view.dart';
-import 'package:orgami/utils/app_constants.dart';
-import 'package:orgami/utils/colors.dart';
-import 'package:orgami/utils/text_fields.dart';
+import 'package:orgami/Utils/app_constants.dart';
+import 'package:orgami/Utils/colors.dart';
+import 'package:orgami/Utils/text_fields.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';

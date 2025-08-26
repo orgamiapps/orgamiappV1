@@ -121,7 +121,7 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
           : _phoneController.text.trim(),
       email: _emailController.text.trim().isEmpty
           ? null
-          : _emailController.text.trim(),
+          : _emailController.text.trim().toLowerCase(),
       dateOfBirth: _selectedDob,
       location: _locationController.text.trim().isEmpty
           ? null

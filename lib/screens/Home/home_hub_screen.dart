@@ -4,7 +4,7 @@ import 'package:orgami/screens/Home/search_screen.dart';
 import 'package:orgami/screens/QRScanner/qr_scanner_flow_screen.dart';
 import 'package:orgami/firebase/organization_helper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:orgami/Utils/Router.dart';
+import 'package:orgami/Utils/router.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/screens/Events/single_event_screen.dart';
 import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
@@ -113,7 +113,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF667EEA).withOpacity(0.3),
+            color: const Color(0xFF667EEA).withValues(alpha: 0.3),
             spreadRadius: 2,
             blurRadius: 8,
             offset: const Offset(0, 4),
@@ -245,7 +245,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -269,7 +269,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: selected ? primary.withOpacity(0.1) : Colors.transparent,
+            color: selected ? primary.withValues(alpha: 0.1) : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -500,7 +500,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
     borderRadius: BorderRadius.circular(16),
     boxShadow: [
       BoxShadow(
-        color: Colors.black.withOpacity(0.06),
+        color: Colors.black.withValues(alpha: 0.06),
         blurRadius: 16,
         offset: const Offset(0, 8),
       ),

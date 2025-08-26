@@ -166,14 +166,16 @@ class _BadgeScreenState extends State<BadgeScreen>
       await file.writeAsBytes(uint8List);
 
       // Share the image
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text:
-            'Check out my Orgami Event Badge! 🏆\n\n'
-            'Level: ${_badge!.badgeLevel}\n'
-            'Events Created: ${_badge!.eventsCreated}\n'
-            'Events Attended: ${_badge!.eventsAttended}\n'
-            'Member since: ${_badge!.membershipDuration}',
+      await SharePlus.instance.share(
+        ShareParams(
+          text:
+              'Check out my Orgami Event Badge! 🏆\n\n'
+              'Level: ${_badge!.badgeLevel}\n'
+              'Events Created: ${_badge!.eventsCreated}\n'
+              'Events Attended: ${_badge!.eventsAttended}\n'
+              'Member since: ${_badge!.membershipDuration}',
+          files: [XFile(file.path)],
+        ),
       );
     } catch (e) {
       debugPrint('Error sharing badge: $e');

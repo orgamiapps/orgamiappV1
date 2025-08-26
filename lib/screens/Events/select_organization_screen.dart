@@ -146,7 +146,7 @@ class _SelectOrganizationScreenState extends State<SelectOrganizationScreen> {
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: Colors.black.withValues(alpha: 0.06),
                 blurRadius: 16,
                 offset: const Offset(0, 8),
               ),
@@ -158,7 +158,7 @@ class _SelectOrganizationScreenState extends State<SelectOrganizationScreen> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withOpacity(0.12),
+                  color: const Color(0xFF667EEA).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.apartment, color: Color(0xFF667EEA)),

@@ -7,8 +7,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/screens/Events/single_event_screen.dart';
 import 'package:orgami/screens/Events/chose_sign_in_methods_screen.dart';
-import 'package:orgami/Utils/Router.dart';
-import 'package:orgami/Utils/Toast.dart';
+import 'package:orgami/Utils/router.dart';
+import 'package:orgami/Utils/toast.dart';
 import 'dart:async';
 
 class CalendarScreen extends StatefulWidget {
@@ -389,7 +389,7 @@ class _CalendarScreenState extends State<CalendarScreen>
             ),
             if (_isLoading)
               Container(
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withValues(alpha: 0.3),
                 child: const Center(
                   child: CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(
@@ -412,7 +412,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -580,7 +580,7 @@ class _CalendarScreenState extends State<CalendarScreen>
               color: isSelected
                   ? const Color(0xFF667EEA)
                   : isToday
-                  ? const Color(0xFF667EEA).withOpacity(0.1)
+                  ? const Color(0xFF667EEA).withValues(alpha: 0.1)
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
             ),
@@ -629,7 +629,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                             style: TextStyle(
                               fontSize: 8,
                               color: isSelected
-                                  ? Colors.white.withOpacity(0.9)
+                                  ? Colors.white.withValues(alpha: 0.9)
                                   : const Color(0xFF6B7280),
                               fontWeight: FontWeight.w600,
                             ),
@@ -659,7 +659,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -897,12 +897,12 @@ class _CalendarScreenState extends State<CalendarScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: eventColor.withOpacity(0.9),
+            color: eventColor.withValues(alpha: 0.9),
             borderRadius: BorderRadius.circular(6),
             border: Border.all(color: eventColor, width: 0.5),
             boxShadow: [
               BoxShadow(
-                color: eventColor.withOpacity(0.3),
+                color: eventColor.withValues(alpha: 0.3),
                 blurRadius: 3,
                 offset: const Offset(0, 1),
               ),
@@ -931,7 +931,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                       margin: const EdgeInsets.only(left: 4),
                       padding: const EdgeInsets.all(2),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.25),
+                        color: Colors.white.withValues(alpha: 0.25),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: const Icon(

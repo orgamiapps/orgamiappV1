@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:orgami/services/sms_notification_service.dart';
-import 'package:orgami/utils/colors.dart';
-import 'package:orgami/utils/dimensions.dart';
-import 'package:orgami/utils/toast.dart';
+import 'package:orgami/Utils/colors.dart';
+import 'package:orgami/Utils/dimensions.dart';
+import 'package:orgami/Utils/toast.dart';
 import 'package:intl/intl.dart';
 import 'package:orgami/models/customer_model.dart';
 

@@ -34,10 +34,10 @@ import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
 
 // import 'package:orgami/Screens/QRScanner/QrScannerScreenForLogedIn.dart';
 import 'package:orgami/Screens/QRScanner/qr_scanner_flow_screen.dart';
-import 'package:orgami/utils/colors.dart';
-import 'package:orgami/utils/router.dart';
-import 'package:orgami/utils/toast.dart';
-import 'package:orgami/utils/logger.dart';
+import 'package:orgami/Utils/colors.dart';
+import 'package:orgami/Utils/router.dart';
+import 'package:orgami/Utils/toast.dart';
+import 'package:orgami/Utils/logger.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
@@ -2429,39 +2429,18 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         return Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [_primaryBlue, _primaryPurple, _accentBlue],
-              stops: const [0.0, 0.6, 1.0],
-            ),
+            color: Colors.white,
+            border: Border(bottom: BorderSide(color: _borderColor, width: 1)),
             boxShadow: [
               BoxShadow(
-                color: _primaryBlue.withValues(alpha: 0.3),
-                spreadRadius: 0,
-                blurRadius: 20 * _glowAnimation.value,
-                offset: const Offset(0, 10),
-              ),
-              BoxShadow(
-                color: _primaryPurple.withValues(alpha: 0.2),
-                spreadRadius: 0,
-                blurRadius: 30 * _glowAnimation.value,
-                offset: const Offset(0, 20),
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withValues(alpha: 0.05),
-                ],
-              ),
-            ),
-            padding: const EdgeInsets.fromLTRB(28, 24, 28, 32),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
             child: Column(
               children: [
                 // Back button, title, and action buttons
@@ -2529,7 +2508,6 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                       ),
                   ],
                 ),
-                const SizedBox(height: 16),
               ],
             ),
           ),
@@ -2554,49 +2532,46 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             onTap: onTap,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              width: 48,
-              height: 48,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
                 color: isActive
-                    ? Colors.white.withValues(alpha: 0.25)
-                    : Colors.white.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(24),
+                    ? _primaryBlue.withValues(alpha: 0.10)
+                    : const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isActive
-                      ? Colors.white.withValues(alpha: 0.4)
-                      : Colors.white.withValues(alpha: 0.2),
+                      ? _primaryBlue.withValues(alpha: 0.30)
+                      : _borderColor,
                   width: 1.5,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
+                    color: Colors.black.withValues(alpha: 0.04),
                     spreadRadius: 0,
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
                   ),
-                  if (isActive)
-                    BoxShadow(
-                      color: Colors.white.withValues(alpha: 0.3),
-                      spreadRadius: 0,
-                      blurRadius: 12,
-                      offset: const Offset(0, 0),
-                    ),
                 ],
               ),
               child: isLoading
                   ? const Center(
                       child: SizedBox(
-                        width: 20,
-                        height: 20,
+                        width: 18,
+                        height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2.5,
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
+                            _primaryBlue,
                           ),
                         ),
                       ),
                     )
-                  : Icon(icon, color: Colors.white, size: 22),
+                  : Icon(
+                      icon,
+                      color: isActive ? _primaryBlue : _darkText,
+                      size: 20,
+                    ),
             ),
           );
         },

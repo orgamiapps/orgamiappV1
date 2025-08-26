@@ -30,6 +30,7 @@ class RouterClass {
           builder: (splashContext) => const SecondSplashScreen(),
         ),
       );
+
   Future<T?> homeScreenRoute<T>({required BuildContext context}) =>
       Navigator.pushAndRemoveUntil(
         context,

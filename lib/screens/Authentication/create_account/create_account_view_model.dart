@@ -30,7 +30,7 @@ class CreateAccountViewModel extends ChangeNotifier {
     this.lastName = lastName.trim();
     this.username = username.trim().toLowerCase();
     this.phoneNumber = phoneNumber?.trim();
-    this.email = email?.trim();
+    this.email = email?.trim().toLowerCase();
     this.dateOfBirth = dateOfBirth;
     this.location = location?.trim();
     notifyListeners();
@@ -66,7 +66,7 @@ class CreateAccountViewModel extends ChangeNotifier {
 
       final auth = FirebaseAuth.instance;
       final newUserCred = await auth.createUserWithEmailAndPassword(
-        email: email!,
+        email: email!.trim().toLowerCase(),
         password: password,
       );
 
@@ -113,7 +113,7 @@ class CreateAccountViewModel extends ChangeNotifier {
       final newCustomerModel = CustomerModel(
         uid: newUserCred.user!.uid,
         name: fullName,
-        email: email!,
+        email: email!.trim().toLowerCase(),
         username: desired,
         phoneNumber: (phoneNumber != null && phoneNumber!.isNotEmpty)
             ? phoneNumber
@@ -143,6 +143,51 @@ class CreateAccountViewModel extends ChangeNotifier {
       isCreating = false;
       notifyListeners();
       return true;
+    } on FirebaseAuthException catch (e) {
+      isCreating = false;
+      notifyListeners();
+
+      switch (e.code) {
+        case 'email-already-in-use':
+          ShowToast().showNormalToast(
+            msg:
+                'An account with this email already exists. Please try signing in instead.',
+          );
+          break;
+        case 'weak-password':
+          ShowToast().showNormalToast(
+            msg: 'The password is too weak. Please choose a stronger password.',
+          );
+          break;
+        case 'invalid-email':
+          ShowToast().showNormalToast(
+            msg: 'Please enter a valid email address.',
+          );
+          break;
+        case 'network-request-failed':
+          ShowToast().showNormalToast(
+            msg:
+                'Network error. Please check your internet connection and try again.',
+          );
+          break;
+        case 'too-many-requests':
+          ShowToast().showNormalToast(
+            msg: 'Too many requests. Please try again later.',
+          );
+          break;
+        case 'operation-not-allowed':
+          ShowToast().showNormalToast(
+            msg:
+                'Email and password sign-up is not enabled. Please contact support.',
+          );
+          break;
+        default:
+          ShowToast().showNormalToast(
+            msg:
+                'Failed to create account: ${e.message ?? 'An error occurred'}',
+          );
+      }
+      return false;
     } catch (e) {
       isCreating = false;
       notifyListeners();

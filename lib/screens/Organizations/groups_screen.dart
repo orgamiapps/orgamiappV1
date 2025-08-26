@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/firebase/organization_helper.dart';
 import 'package:orgami/screens/Organizations/organization_profile_screen.dart';
 import 'package:orgami/screens/Organizations/create_organization_screen.dart';
+import 'dart:async';
 
 class GroupsScreen extends StatefulWidget {
   const GroupsScreen({super.key});
@@ -18,6 +19,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
   List<Map<String, dynamic>> _discoverOrgs = [];
   String? _selectedCategoryLower;
   bool _isLoadingMyOrgs = true;
+  Timer? _debounce;
   final List<Map<String, String>> _categoryOptions = const [
     {'label': 'All', 'value': ''},
     {'label': 'Business', 'value': 'business'},
@@ -33,6 +35,12 @@ class _GroupsScreenState extends State<GroupsScreen> {
   void initState() {
     super.initState();
     _initStreams();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
   }
 
   Future<void> _initStreams() async {
@@ -143,7 +151,17 @@ class _GroupsScreenState extends State<GroupsScreen> {
                         ),
                         isDense: true,
                       ),
-                      onSubmitted: (_) => _discover(),
+                      onChanged: (value) {
+                        _debounce?.cancel();
+                        _debounce = Timer(
+                          const Duration(milliseconds: 300),
+                          _discover,
+                        );
+                      },
+                      onSubmitted: (_) {
+                        _debounce?.cancel();
+                        _discover();
+                      },
                     ),
                     const SizedBox(height: 16),
                     const Text(
@@ -276,7 +294,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
     borderRadius: BorderRadius.circular(16),
     boxShadow: [
       BoxShadow(
-        color: Colors.black.withOpacity(0.06),
+        color: Colors.black.withValues(alpha: 0.06),
         blurRadius: 16,
         offset: const Offset(0, 8),
       ),
@@ -311,7 +329,7 @@ class _EmptyStateCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),

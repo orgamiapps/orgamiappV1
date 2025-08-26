@@ -37,8 +37,8 @@ class _SplashScreenState extends State<SplashScreen>
     _initializeAnimations();
     _startLoadingSequence();
 
-    // Set a global timeout to prevent getting stuck
-    _timeoutTimer = Timer(const Duration(seconds: 10), () {
+    // Set a shorter global timeout to prevent getting stuck
+    _timeoutTimer = Timer(const Duration(seconds: 5), () {
       if (mounted && !_hasNavigated) {
         debugPrint('⏰ Global timeout - forcing navigation');
         _navigateToSecondSplash();
@@ -135,7 +135,7 @@ class _SplashScreenState extends State<SplashScreen>
         final userData = await FirebaseFirestoreHelper()
             .getSingleCustomer(customerId: firebaseUser.uid)
             .timeout(
-              const Duration(seconds: 5),
+              const Duration(seconds: 3),
               onTimeout: () {
                 debugPrint('⏰ Timeout getting user data');
                 return null;

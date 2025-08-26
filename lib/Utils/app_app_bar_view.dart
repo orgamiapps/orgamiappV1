@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/utils/app_buttons.dart';
-import 'package:orgami/utils/colors.dart';
-import 'package:orgami/utils/dimensions.dart';
+import 'package:orgami/Utils/app_buttons.dart';
+import 'package:orgami/Utils/colors.dart';
+import 'package:orgami/Utils/dimensions.dart';
 
 class AppAppBarView {
   static Widget appBarView({
@@ -31,7 +31,10 @@ class AppAppBarView {
     );
   }
 
-  static Widget appBarWithOnlyBackButton({required BuildContext context, Color? backButtonColor}) {
+  static Widget appBarWithOnlyBackButton({
+    required BuildContext context,
+    Color? backButtonColor,
+  }) {
     return SafeArea(
       child: Row(
         children: [
@@ -42,7 +45,8 @@ class AppAppBarView {
               child: AppButtons.roundedButton(
                 iconData: Icons.arrow_back_ios_rounded,
                 iconColor: AppThemeColor.pureWhiteColor,
-                backgroundColor: backButtonColor ?? AppThemeColor.darkGreenColor,
+                backgroundColor:
+                    backButtonColor ?? AppThemeColor.darkGreenColor,
               ),
             ),
           ),

@@ -773,9 +773,12 @@ class _FullScreenBadgeViewState extends State<_FullScreenBadgeView> {
                   width,
                   height,
                 );
-                await Share.shareXFiles([
-                  XFile(file.path),
-                ], text: 'My Orgami badge');
+                await SharePlus.instance.share(
+                  ShareParams(
+                    text: 'My Orgami badge',
+                    files: [XFile(file.path)],
+                  ),
+                );
               },
               onSave: () async {
                 final file = await _exportBadgePngStatic(

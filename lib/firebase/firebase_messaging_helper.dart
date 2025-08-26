@@ -5,7 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart' as fcm;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
-import 'dart:typed_data' show Int64List;
+// import 'dart:typed_data' show Int64List; // Unused; Int64List available via foundation
 
 import 'package:orgami/models/message_model.dart';
 import 'package:orgami/models/customer_model.dart';
@@ -34,64 +34,99 @@ class FirebaseMessagingHelper {
   UserNotificationSettings? _settings;
   EventModel? _pendingFeedbackEvent;
 
-  // Initialize messaging
+  // Initialize messaging with optimizations
   Future<void> initialize() async {
     try {
-      // Skip initialization if there is no connectivity
+      // Quick connectivity check
+      bool isOnline = true;
       try {
-        final connectivity = await Connectivity().checkConnectivity();
-        if (connectivity == ConnectivityResult.none) {
-          if (kDebugMode) {
-            Logger.warning('Skipping Messaging init: offline');
-          }
-          return;
-        }
-      } catch (_) {}
-
-      // Request permission
-      fcm.NotificationSettings settings = await _messaging.requestPermission(
-        alert: true,
-        announcement: false,
-        badge: true,
-        carPlay: false,
-        criticalAlert: false,
-        provisional: false,
-        sound: true,
-      );
-
-      if (kDebugMode) {
-        if (settings.authorizationStatus ==
-            fcm.AuthorizationStatus.authorized) {
-          Logger.success('✅ Notification permissions granted');
-        } else {
-          Logger.warning('❌ Notification permissions denied');
-        }
-      }
-
-      // Initialize local notifications (mobile platforms)
-      if (!kIsWeb) {
-        await _initializeLocalNotifications();
-      }
-
-      // Enable auto-init and get FCM token
-      await _messaging.setAutoInitEnabled(true);
-      String? fcmToken;
-      if (kIsWeb) {
-        // Web requires a VAPID key and service worker
-        fcmToken = await _messaging.getToken(
-          vapidKey:
-              'BCFlVkRk4wUzL3pNaP7bVYqg8uH3M2vYsmYcB5dOSdpnqjWcW1O9xv5v3kHcQ8bYl1o3tB6Qx4HjG3C2D5E6F7G8',
+        final connectivity = await Connectivity().checkConnectivity().timeout(
+          const Duration(milliseconds: 500),
         );
-      } else {
-        fcmToken = await _messaging.getToken();
+        if (connectivity is ConnectivityResult) {
+          isOnline = connectivity != ConnectivityResult.none;
+        } else if (connectivity is Iterable) {
+          final list = List<ConnectivityResult>.from(
+            connectivity.cast<ConnectivityResult>(),
+          );
+          isOnline =
+              list.isNotEmpty &&
+              !list.every((c) => c == ConnectivityResult.none);
+        }
+      } catch (_) {
+        // Assume online if check fails
+        isOnline = true;
       }
-      if (fcmToken != null) {
-        await _saveTokenToFirestore(fcmToken);
+
+      if (!isOnline) {
+        Logger.warning('Skipping Messaging init: offline');
+        return;
       }
+
+      // Request permission non-blocking
+      _messaging
+          .requestPermission(
+            alert: true,
+            announcement: false,
+            badge: true,
+            carPlay: false,
+            criticalAlert: false,
+            provisional: false,
+            sound: true,
+          )
+          .then((settings) {
+            if (kDebugMode) {
+              if (settings.authorizationStatus ==
+                  fcm.AuthorizationStatus.authorized) {
+                Logger.success('✅ Notification permissions granted');
+              } else {
+                Logger.warning('❌ Notification permissions denied');
+              }
+            }
+          })
+          .catchError((e) {
+            Logger.warning('Permission request failed: $e');
+          });
+
+      // Initialize local notifications async
+      if (!kIsWeb) {
+        _initializeLocalNotifications().catchError((e) {
+          Logger.warning('Local notifications init failed: $e');
+        });
+      }
+
+      // Enable auto-init
+      _messaging.setAutoInitEnabled(true).catchError((e) {
+        Logger.warning('Auto-init failed: $e');
+      });
+
+      // Get FCM token async
+      (() async {
+        try {
+          String? fcmToken;
+          if (kIsWeb) {
+            fcmToken = await _messaging.getToken(
+              vapidKey:
+                  'BCFlVkRk4wUzL3pNaP7bVYqg8uH3M2vYsmYcB5dOSdpnqjWcW1O9xv5v3kHcQ8bYl1o3tB6Qx4HjG3C2D5E6F7G8',
+            );
+          } else {
+            fcmToken = await _messaging.getToken();
+          }
+          if (fcmToken != null) {
+            _saveTokenToFirestore(fcmToken).catchError((e) {
+              Logger.warning('Failed to save FCM token: $e');
+            });
+          }
+        } catch (e) {
+          Logger.warning('Failed to get FCM token: $e');
+        }
+      })();
 
       // Listen for token refresh
       _messaging.onTokenRefresh.listen((token) {
-        _saveTokenToFirestore(token);
+        _saveTokenToFirestore(token).catchError((e) {
+          Logger.warning('Failed to save refreshed token: $e');
+        });
       });
 
       // Handle background messages (mobile only)
@@ -110,8 +145,10 @@ class FirebaseMessagingHelper {
         fcm.FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
       }
 
-      // Load user settings
-      await _loadNotificationSettings();
+      // Load user settings async
+      _loadNotificationSettings().catchError((e) {
+        Logger.warning('Failed to load notification settings: $e');
+      });
     } catch (e) {
       if (kDebugMode) {
         Logger.error('❌ Error initializing Firebase Messaging: $e', e);
@@ -148,8 +185,18 @@ class FirebaseMessagingHelper {
     try {
       // Avoid writes when offline
       try {
-        final connectivity = await Connectivity().checkConnectivity();
-        if (connectivity == ConnectivityResult.none) {
+        final dynamic connectivity = await Connectivity().checkConnectivity();
+        bool offline = false;
+        if (connectivity is ConnectivityResult) {
+          offline = connectivity == ConnectivityResult.none;
+        } else if (connectivity is Iterable) {
+          final list = List<ConnectivityResult>.from(
+            connectivity.cast<ConnectivityResult>(),
+          );
+          offline =
+              list.isEmpty || list.every((c) => c == ConnectivityResult.none);
+        }
+        if (offline) {
           if (kDebugMode) {
             Logger.warning('Skipping FCM token save: offline');
           }
