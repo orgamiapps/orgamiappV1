@@ -36,7 +36,6 @@ class _MessagingScreenState extends State<MessagingScreen> {
   StreamSubscription<List<ConversationModel>>? _conversationsSubscription;
   Timer? _timeoutTimer;
   final TextEditingController _searchController = TextEditingController();
-  bool _isSearching = false;
   final Map<String, Map<String, dynamic>> _userInfoCache = {};
   Set<String> _blockedUserIds = <String>{};
 
@@ -155,15 +154,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
     await _loadConversations();
   }
 
-  void _toggleSearch() {
-    setState(() {
-      _isSearching = !_isSearching;
-      if (!_isSearching) {
-        _searchController.clear();
-        _filteredConversations = _conversations;
-      }
-    });
-  }
+  // Search is always visible now; clearing text resets the filtered list
 
   void _onSearchChanged(String query) {
     if (query.isEmpty) {
@@ -305,8 +296,16 @@ class _MessagingScreenState extends State<MessagingScreen> {
         title: const Text('Messages'),
         actions: [
           IconButton(
-            icon: Icon(_isSearching ? Icons.close : Icons.search),
-            onPressed: _toggleSearch,
+            icon: const Icon(Icons.add_comment_rounded),
+            tooltip: 'New message',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const NewMessageScreen(),
+                ),
+              );
+            },
           ),
         ],
         bottom: const PreferredSize(
@@ -316,22 +315,9 @@ class _MessagingScreenState extends State<MessagingScreen> {
       ),
       body: Column(
         children: [
-          if (_isSearching) _buildSearchBar(),
+          _buildSearchBar(),
           Expanded(child: _buildBody()),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'fab_new_message',
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const NewMessageScreen()),
-          );
-        },
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
-        elevation: 6,
-        child: const Icon(Icons.add_comment_rounded),
       ),
     );
   }
@@ -432,7 +418,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDarkMode;
     final theme = Theme.of(context);
-    final isSearching = _isSearching && _searchController.text.isNotEmpty;
+    final isSearching = _searchController.text.isNotEmpty;
 
     return Center(
       child: Column(

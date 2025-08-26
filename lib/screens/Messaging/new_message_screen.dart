@@ -114,7 +114,9 @@ class _NewMessageScreenState extends State<NewMessageScreen>
   }
 
   Future<void> _addRecentSearch(String term) async {
-    if (term.isEmpty) return;
+    // Don't add single character searches or very short searches to recent searches
+    // This prevents confusion with selected users
+    if (term.isEmpty || term.length < 2) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       final list = prefs.getStringList(_prefsKeyRecent) ?? <String>[];
@@ -528,7 +530,17 @@ class _NewMessageScreenState extends State<NewMessageScreen>
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
-        title: Text(_groupMode ? _t('newGroupMessage') : _t('newMessage')),
+        title: Row(
+          children: [
+            Icon(
+              _groupMode ? Icons.group_rounded : Icons.person_rounded,
+              color: Colors.black87,
+              size: 24,
+            ),
+            const SizedBox(width: 8),
+            Text(_groupMode ? _t('newGroupMessage') : _t('newMessage')),
+          ],
+        ),
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),
           child: Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
@@ -566,65 +578,191 @@ class _NewMessageScreenState extends State<NewMessageScreen>
   }
 
   Widget _buildModeToggle() {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: CupertinoSegmentedControl<bool>(
-        children: {
-          false: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-            child: Text(
-              'Direct',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: _groupMode == false
-                    ? theme.colorScheme.primary
-                    : theme.textTheme.bodyMedium?.color?.withValues(
-                        alpha: 0.85,
-                      ),
-                shadows: const [
-                  Shadow(
-                    color: Colors.black26,
-                    blurRadius: 2,
-                    offset: Offset(0, 1),
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      height: 54,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey[900] : Colors.grey[100],
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // Animated sliding background indicator
+          AnimatedAlign(
+            alignment: _groupMode
+                ? Alignment.centerRight
+                : Alignment.centerLeft,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            child: Container(
+              width: MediaQuery.of(context).size.width / 2 - 24,
+              height: 46,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: isDark
+                      ? [const Color(0xFF2C5A96), const Color(0xFF4A90E2)]
+                      : [const Color(0xFF667EEA), const Color(0xFF764BA2)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(26),
+                boxShadow: [
+                  BoxShadow(
+                    color:
+                        (isDark
+                                ? const Color(0xFF2C5A96)
+                                : const Color(0xFF667EEA))
+                            .withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
             ),
           ),
-          true: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-            child: Text(
-              'Group',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: _groupMode == true
-                    ? theme.colorScheme.primary
-                    : theme.textTheme.bodyMedium?.color?.withValues(
-                        alpha: 0.85,
-                      ),
-                shadows: const [
-                  Shadow(
-                    color: Colors.black26,
-                    blurRadius: 2,
-                    offset: Offset(0, 1),
+          // Tab buttons
+          Row(
+            children: [
+              // Direct Tab
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    if (_groupMode) {
+                      HapticFeedback.lightImpact();
+                      setState(() {
+                        _groupMode = false;
+                        // Clear recent searches when switching modes
+                        _recentSearches.clear();
+                      });
+                      _persistMode(false);
+                    }
+                  },
+                  child: Container(
+                    height: 46,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(26),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.person_rounded,
+                          size: 20,
+                          color: !_groupMode
+                              ? Colors.white
+                              : (isDark ? Colors.grey[400] : Colors.grey[700]),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Direct',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: !_groupMode
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: !_groupMode
+                                ? Colors.white
+                                : (isDark
+                                      ? Colors.grey[400]
+                                      : Colors.grey[700]),
+                            letterSpacing: !_groupMode ? 0.3 : 0,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ],
+                ),
               ),
-            ),
+              // Group Tab
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    if (!_groupMode) {
+                      HapticFeedback.lightImpact();
+                      setState(() {
+                        _groupMode = true;
+                        // Clear recent searches when entering group mode
+                        _recentSearches.clear();
+                      });
+                      _persistMode(true);
+                    }
+                  },
+                  child: Container(
+                    height: 46,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(26),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.group_rounded,
+                          size: 20,
+                          color: _groupMode
+                              ? Colors.white
+                              : (isDark ? Colors.grey[400] : Colors.grey[700]),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Group',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: _groupMode
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: _groupMode
+                                ? Colors.white
+                                : (isDark
+                                      ? Colors.grey[400]
+                                      : Colors.grey[700]),
+                            letterSpacing: _groupMode ? 0.3 : 0,
+                          ),
+                        ),
+                        // Show selected count badge when in group mode
+                        if (_groupMode && _selectedUserIds.isNotEmpty)
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            margin: const EdgeInsets.only(left: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${_selectedUserIds.length}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: isDark
+                                    ? const Color(0xFF2C5A96)
+                                    : const Color(0xFF667EEA),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        },
-        groupValue: _groupMode,
-        borderColor: theme.colorScheme.primary.withValues(alpha: 0.4),
-        pressedColor: theme.colorScheme.primary.withValues(alpha: 0.08),
-        selectedColor: Colors.white,
-        unselectedColor: theme.cardColor,
-        onValueChanged: (val) {
-          setState(() => _groupMode = val);
-          _persistMode(val);
-        },
+        ],
       ),
     );
   }
@@ -899,17 +1037,15 @@ class _NewMessageScreenState extends State<NewMessageScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          margin: const EdgeInsets.all(16),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: theme.cardColor,
-            borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
             boxShadow: [
               BoxShadow(
                 color: isDark
                     ? Colors.black.withValues(alpha: 0.3)
                     : Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
+                blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
             ],
@@ -927,10 +1063,8 @@ class _NewMessageScreenState extends State<NewMessageScreen>
                     hintText: _t('searchUsers'),
                     hintStyle: TextStyle(
                       color: theme.textTheme.bodyMedium?.color,
-                      fontSize: 16,
                     ),
-                    border: InputBorder.none,
-                    icon: Icon(
+                    prefixIcon: Icon(
                       Icons.search,
                       color: theme.textTheme.bodyMedium?.color,
                     ),
@@ -949,18 +1083,55 @@ class _NewMessageScreenState extends State<NewMessageScreen>
                             ),
                           )
                         : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(
+                        Dimensions.radiusLarge,
+                      ),
+                      borderSide: BorderSide(
+                        color: isDark
+                            ? const Color(0xFF4A90E2)
+                            : AppThemeColor.lightBlueColor,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(
+                        Dimensions.radiusLarge,
+                      ),
+                      borderSide: BorderSide(
+                        color: isDark
+                            ? const Color(0xFF2C5A96)
+                            : const Color(0xFF667EEA),
+                        width: 2,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(
+                        Dimensions.radiusLarge,
+                      ),
+                      borderSide: BorderSide(
+                        color: isDark
+                            ? const Color(0xFF4A90E2)
+                            : AppThemeColor.lightBlueColor,
+                      ),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                   ),
                 ),
               ),
               if (_isSearchInFlight)
-                const SizedBox(
-                  height: 2,
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
                   child: LinearProgressIndicator(minHeight: 2),
                 ),
             ],
           ),
         ),
-        if (_recentSearches.isNotEmpty)
+        // Only show recent searches in direct message mode, not in group mode
+        // This prevents confusion between recent searches and selected users
+        if (_recentSearches.isNotEmpty && !_groupMode)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Wrap(
