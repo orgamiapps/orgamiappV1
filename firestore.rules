@@ -236,6 +236,29 @@ service cloud.firestore {
       allow update: if request.auth != null;
     }
 
+    // Ticket payments collection
+    // Users can read their own payment records
+    // Event creators can read payment records for their events
+    match /TicketPayments/{paymentId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.customerUid ||
+        request.auth.uid == resource.data.creatorUid
+      );
+      // Only cloud functions can create/update payment records
+      allow create, update: if false;
+      allow delete: if false;
+    }
+
+    // Feature payments collection (existing)
+    match /FeaturePayments/{paymentId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.customerUid
+      );
+      // Only cloud functions can create/update payment records
+      allow create, update: if false;
+      allow delete: if false;
+    }
+
     // User badges (profile badges with stats)
     // Each user can read/write only their own badge document
     match /UserBadges/{userId} {

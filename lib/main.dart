@@ -17,6 +17,7 @@ import 'package:orgami/Services/notification_service.dart';
 import 'package:orgami/firebase/firebase_messaging_helper.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -45,6 +46,12 @@ void main() async {
 
   // Get theme result
   final isDarkMode = await themeFuture;
+
+  // Initialize Stripe
+  // TODO: Replace with your actual Stripe publishable key
+  // For testing, you can use Stripe's test publishable key
+  Stripe.publishableKey = 'pk_test_YOUR_PUBLISHABLE_KEY';
+  Logger.info('Stripe initialized');
 
   Logger.success('App initialization complete');
 

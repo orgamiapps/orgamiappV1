@@ -17,6 +17,10 @@ class TicketModel {
   bool isUsed;
   DateTime? usedDateTime;
   String? usedBy;
+  double? price; // Ticket price in USD
+  bool isPaid; // Whether the ticket has been paid for
+  String? paymentIntentId; // Stripe payment intent ID
+  DateTime? paidAt; // When the ticket was paid for
 
   TicketModel({
     required this.id,
@@ -32,6 +36,10 @@ class TicketModel {
     this.isUsed = false,
     this.usedDateTime,
     this.usedBy,
+    this.price,
+    this.isPaid = false,
+    this.paymentIntentId,
+    this.paidAt,
   });
 
   factory TicketModel.fromJson(dynamic parsedJson) {
@@ -55,6 +63,12 @@ class TicketModel {
           ? (data['usedDateTime'] as Timestamp).toDate()
           : null,
       usedBy: data['usedBy'],
+      price: data['price']?.toDouble(),
+      isPaid: data['isPaid'] ?? false,
+      paymentIntentId: data['paymentIntentId'],
+      paidAt: data['paidAt'] != null
+          ? (data['paidAt'] as Timestamp).toDate()
+          : null,
     );
   }
 
@@ -73,6 +87,10 @@ class TicketModel {
       'isUsed': isUsed,
       'usedDateTime': usedDateTime,
       'usedBy': usedBy,
+      'price': price,
+      'isPaid': isPaid,
+      'paymentIntentId': paymentIntentId,
+      'paidAt': paidAt,
     };
   }
 

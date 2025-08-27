@@ -1796,3 +1796,322 @@ exports.setAdminByEmail = onCall({ region: "us-central1" }, async (req) => {
   await admin.auth().setCustomUserClaims(user.uid, { admin });
   return { status: "ok" };
 });
+
+// ============================================================================
+// TICKET PAYMENT FUNCTIONS
+// ============================================================================
+
+// Initialize Stripe with your secret key
+// You need to set this in Firebase Functions config:
+// firebase functions:config:set stripe.secret_key="your_stripe_secret_key"
+const Stripe = require('stripe');
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_YOUR_TEST_KEY', {
+  apiVersion: '2023-10-16',
+});
+
+/**
+ * Create a payment intent for ticket purchase
+ */
+exports.createTicketPaymentIntent = onCall({ region: "us-central1" }, async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new Error("UNAUTHENTICATED");
+
+  const {
+    eventId,
+    ticketId,
+    amount,
+    currency = 'usd',
+    customerUid,
+    customerName,
+    customerEmail,
+    creatorUid,
+    eventTitle,
+  } = req.data || {};
+
+  // Validate input
+  if (!eventId || !amount || !customerEmail || !creatorUid || !eventTitle) {
+    throw new Error("INVALID_ARGUMENT: Missing required fields");
+  }
+
+  if (amount <= 0) {
+    throw new Error("INVALID_ARGUMENT: Invalid amount");
+  }
+
+  try {
+    // Create payment intent with Stripe
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount, // Amount should already be in cents
+      currency: currency,
+      metadata: {
+        eventId: eventId,
+        ticketId: ticketId || '',
+        customerUid: customerUid,
+        customerName: customerName,
+        customerEmail: customerEmail,
+        creatorUid: creatorUid,
+        eventTitle: eventTitle,
+      },
+      receipt_email: customerEmail,
+      description: `Ticket for ${eventTitle}`,
+    });
+
+    // Create a payment record in Firestore
+    const db = admin.firestore();
+    const paymentDoc = {
+      id: paymentIntent.id,
+      eventId: eventId,
+      eventTitle: eventTitle,
+      ticketId: ticketId || null,
+      customerUid: customerUid,
+      customerName: customerName,
+      customerEmail: customerEmail,
+      creatorUid: creatorUid,
+      amount: amount / 100, // Store in dollars
+      currency: currency,
+      paymentIntentId: paymentIntent.id,
+      status: 'pending',
+      createdAt: admin.firestore.Timestamp.now(),
+      metadata: {
+        stripeCustomerId: paymentIntent.customer || null,
+      },
+    };
+
+    await db.collection('TicketPayments').doc(paymentIntent.id).set(paymentDoc);
+
+    return {
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+    };
+  } catch (error) {
+    logger.error('Error creating payment intent:', error);
+    throw new Error(`INTERNAL: ${error.message}`);
+  }
+});
+
+/**
+ * Confirm ticket payment and issue the ticket
+ */
+exports.confirmTicketPayment = onCall({ region: "us-central1" }, async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new Error("UNAUTHENTICATED");
+
+  const { paymentIntentId, ticketId, eventId } = req.data || {};
+
+  if (!paymentIntentId || !eventId) {
+    throw new Error("INVALID_ARGUMENT: Missing required fields");
+  }
+
+  try {
+    const db = admin.firestore();
+    
+    // Retrieve the payment intent from Stripe
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    
+    if (paymentIntent.status !== 'succeeded') {
+      throw new Error("Payment not successful");
+    }
+
+    // Update the payment record
+    await db.collection('TicketPayments').doc(paymentIntentId).update({
+      status: 'completed',
+      completedAt: admin.firestore.Timestamp.now(),
+    });
+
+    // If ticketId is provided, update the ticket
+    if (ticketId) {
+      await db.collection('Tickets').doc(ticketId).update({
+        isPaid: true,
+        paymentIntentId: paymentIntentId,
+        paidAt: admin.firestore.Timestamp.now(),
+      });
+    }
+
+    // Update event issued tickets count
+    await db.collection('Events').doc(eventId).update({
+      issuedTickets: admin.firestore.FieldValue.increment(1),
+    });
+
+    return { status: 'success' };
+  } catch (error) {
+    logger.error('Error confirming payment:', error);
+    throw new Error(`INTERNAL: ${error.message}`);
+  }
+});
+
+/**
+ * Webhook handler for Stripe events
+ */
+exports.stripeWebhook = onCall({ region: "us-central1" }, async (req) => {
+  const sig = req.rawRequest.headers['stripe-signature'];
+  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_YOUR_WEBHOOK_SECRET';
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.rawRequest.rawBody, sig, endpointSecret);
+  } catch (err) {
+    logger.error('Webhook signature verification failed:', err);
+    throw new Error(`INVALID_ARGUMENT: ${err.message}`);
+  }
+
+  const db = admin.firestore();
+
+  // Handle the event
+  switch (event.type) {
+    case 'payment_intent.succeeded':
+      const paymentIntent = event.data.object;
+      
+      // Update payment status in Firestore
+      await db.collection('TicketPayments').doc(paymentIntent.id).update({
+        status: 'completed',
+        completedAt: admin.firestore.Timestamp.now(),
+      });
+      
+      // Issue the ticket if not already issued
+      const { eventId, ticketId, customerUid } = paymentIntent.metadata;
+      if (ticketId) {
+        await db.collection('Tickets').doc(ticketId).update({
+          isPaid: true,
+          paymentIntentId: paymentIntent.id,
+          paidAt: admin.firestore.Timestamp.now(),
+        });
+      }
+      
+      logger.info('Payment succeeded:', paymentIntent.id);
+      break;
+
+    case 'payment_intent.payment_failed':
+      const failedPayment = event.data.object;
+      
+      await db.collection('TicketPayments').doc(failedPayment.id).update({
+        status: 'failed',
+        metadata: {
+          failureReason: failedPayment.last_payment_error?.message || 'Unknown error',
+        },
+      });
+      
+      logger.error('Payment failed:', failedPayment.id);
+      break;
+
+    default:
+      logger.info('Unhandled event type:', event.type);
+  }
+
+  return { received: true };
+});
+
+/**
+ * Create a payment intent for featuring an event (existing functionality)
+ */
+exports.createFeaturePaymentIntent = onCall({ region: "us-central1" }, async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new Error("UNAUTHENTICATED");
+
+  const {
+    eventId,
+    durationDays,
+    customerUid,
+    amount,
+    currency = 'usd',
+  } = req.data || {};
+
+  // Validate input
+  if (!eventId || !durationDays || !amount || !customerUid) {
+    throw new Error("INVALID_ARGUMENT: Missing required fields");
+  }
+
+  try {
+    // Create payment intent with Stripe
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount, // Amount should already be in cents
+      currency: currency,
+      metadata: {
+        eventId: eventId,
+        durationDays: durationDays.toString(),
+        customerUid: customerUid,
+        type: 'feature_event',
+      },
+      description: `Feature event for ${durationDays} days`,
+    });
+
+    // Create a payment record in Firestore
+    const db = admin.firestore();
+    const paymentDoc = {
+      id: paymentIntent.id,
+      eventId: eventId,
+      customerUid: customerUid,
+      amount: amount / 100, // Store in dollars
+      currency: currency,
+      durationDays: durationDays,
+      paymentIntentId: paymentIntent.id,
+      status: 'pending',
+      type: 'feature_event',
+      createdAt: admin.firestore.Timestamp.now(),
+    };
+
+    await db.collection('FeaturePayments').doc(paymentIntent.id).set(paymentDoc);
+
+    return {
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+    };
+  } catch (error) {
+    logger.error('Error creating feature payment intent:', error);
+    throw new Error(`INTERNAL: ${error.message}`);
+  }
+});
+
+/**
+ * Confirm feature payment after successful Stripe payment
+ */
+exports.confirmFeaturePayment = onCall({ region: "us-central1" }, async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new Error("UNAUTHENTICATED");
+
+  const { paymentIntentId, eventId, durationDays, untilEvent } = req.data || {};
+
+  if (!paymentIntentId || !eventId || !durationDays) {
+    throw new Error("INVALID_ARGUMENT: Missing required fields");
+  }
+
+  try {
+    const db = admin.firestore();
+    
+    // Retrieve the payment intent from Stripe
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    
+    if (paymentIntent.status !== 'succeeded') {
+      throw new Error("Payment not successful");
+    }
+
+    // Update the payment record
+    await db.collection('FeaturePayments').doc(paymentIntentId).update({
+      status: 'completed',
+      completedAt: admin.firestore.Timestamp.now(),
+    });
+
+    // Calculate feature end date
+    let featureEndDate;
+    if (untilEvent) {
+      // Get event date
+      const eventDoc = await db.collection('Events').doc(eventId).get();
+      const eventData = eventDoc.data();
+      featureEndDate = eventData.selectedDateTime;
+    } else {
+      // Add duration days from now
+      featureEndDate = new Date();
+      featureEndDate.setDate(featureEndDate.getDate() + durationDays);
+    }
+
+    // Update event to be featured
+    await db.collection('Events').doc(eventId).update({
+      isFeatured: true,
+      featureEndDate: admin.firestore.Timestamp.fromDate(featureEndDate),
+    });
+
+    return { status: 'success' };
+  } catch (error) {
+    logger.error('Error confirming feature payment:', error);
+    throw new Error(`INTERNAL: ${error.message}`);
+  }
+});
