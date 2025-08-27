@@ -64,8 +64,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   late EventModel eventModel;
   StreamSubscription<DocumentSnapshot>? _eventSubscription;
-  late final double _screenWidth = MediaQuery.of(context).size.width;
-  late final double _screenHeight = MediaQuery.of(context).size.height;
+  double get _screenWidth => MediaQuery.of(context).size.width;
+  double get _screenHeight => MediaQuery.of(context).size.height;
   bool? signedIn;
   final _btnCtlr = RoundedLoadingButtonController();
   bool _isAnonymousSignIn = false;
@@ -111,6 +111,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   // Favorite functionality
   bool _isFavorited = false;
   bool _isLoadingFavorite = false;
+
+  // Feedback functionality
+  bool? _hasSubmittedFeedback;
+  bool _isLoadingFeedback = false;
 
   // Attendees dropdown state
   bool _isAttendeesExpanded = false;
@@ -337,7 +341,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       if (!signedIn! &&
           !_justSignedIn &&
           eventModel.getLocation &&
-          eventModel.customerUid != CustomerController.logeInCustomer!.uid &&
+          eventModel.customerUid != (CustomerController.logeInCustomer?.uid ?? '') &&
           isInEventInTime()) {
         _getCurrentLocation();
       }
@@ -360,7 +364,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
       final userAttendance = attendanceList.firstWhere(
         (attendance) =>
-            attendance.customerUid == CustomerController.logeInCustomer!.uid,
+            attendance.customerUid == (CustomerController.logeInCustomer?.uid ?? ''),
         orElse: () => AttendanceModel(
           id: '',
           userName: '',
@@ -399,7 +403,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withAlpha((0.1 * 255).round()),
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -605,7 +609,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                   borderRadius: BorderRadius.circular(20.0),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withAlpha((0.1 * 255).round()),
+                      color: Colors.black.withOpacity(0.1),
                       spreadRadius: 0,
                       blurRadius: 20,
                       offset: const Offset(0, 10),
@@ -698,7 +702,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                           child: Container(
                             height: 48,
                             decoration: BoxDecoration(
-                              color: Colors.grey.withAlpha((0.1 * 255).round()),
+                              color: Colors.grey.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Material(
@@ -738,31 +742,35 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                 BoxShadow(
                                   color: const Color(
                                     0xFF667EEA,
-                                  ).withAlpha((0.3 * 255).round()),
+                                  ).withOpacity(0.3),
                                   spreadRadius: 0,
                                   blurRadius: 8,
                                   offset: const Offset(0, 2),
                                 ),
                               ],
                             ),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(12),
-                                onTap: makeSignInToEvent,
-                                child: const Center(
-                                  child: Text(
-                                    'Sign In',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      fontFamily: 'Roboto',
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
+                                        child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: makeSignInToEvent,
+                child: Semantics(
+                  button: true,
+                  label: 'Sign in to ${eventModel.title}',
+                  child: const Center(
+                    child: Text(
+                      'Sign In',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
                           ),
                         ),
                       ],
@@ -788,12 +796,18 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         return;
       }
 
-      String docId =
-          '${eventModel.id}-${CustomerController.logeInCustomer!.uid}';
+      final customerUid = CustomerController.logeInCustomer?.uid;
+      if (customerUid == null) {
+        _btnCtlr.reset();
+        ShowToast().showNormalToast(msg: 'Please log in to sign in to events.');
+        return;
+      }
+
+      String docId = '${eventModel.id}-$customerUid';
 
       Logger.debug('=== SIGN-IN DEBUG ===');
       Logger.debug('Event ID: ${eventModel.id}');
-      Logger.debug('User ID: ${CustomerController.logeInCustomer!.uid}');
+      Logger.debug('User ID: $customerUid');
       Logger.debug('Document ID: $docId');
 
       AttendanceModel newAttendanceModel = AttendanceModel(
@@ -801,13 +815,13 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         eventId: eventModel.id,
         userName: _isAnonymousSignIn
             ? 'Anonymous'
-            : CustomerController.logeInCustomer!.name,
-        customerUid: CustomerController.logeInCustomer!.uid,
+            : CustomerController.logeInCustomer?.name ?? 'Unknown',
+        customerUid: customerUid,
         attendanceDateTime: DateTime.now(),
         answers: [],
         isAnonymous: _isAnonymousSignIn,
         realName: _isAnonymousSignIn
-            ? CustomerController.logeInCustomer!.name
+            ? CustomerController.logeInCustomer?.name
             : null,
         entryTimestamp: eventModel.getLocation ? DateTime.now() : null,
         dwellStatus: eventModel.getLocation ? 'active' : null,
@@ -923,7 +937,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppThemeColor.dullBlueColor.withValues(alpha: 0.3),
+                color: AppThemeColor.dullBlueColor.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -937,7 +951,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                      color: AppThemeColor.darkBlueColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -1005,7 +1019,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.02),
+                            color: Colors.black.withOpacity(0.02),
                             spreadRadius: 0,
                             blurRadius: 4,
                             offset: const Offset(0, 2),
@@ -1079,7 +1093,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                   ),
                                   decoration: BoxDecoration(
                                     color: AppThemeColor.dullFontColor
-                                        .withAlpha((0.1 * 255).round()),
+                                        .withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: const Text(
@@ -1103,14 +1117,12 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                             decoration: InputDecoration(
                               hintText: 'Type your answer here...',
                               hintStyle: TextStyle(
-                                color: AppThemeColor.dullFontColor.withValues(
-                                  alpha: 153,
-                                ),
+                                color: AppThemeColor.dullFontColor.withOpacity(0.6),
                                 fontFamily: 'Roboto',
                               ),
                               filled: true,
                               fillColor: AppThemeColor.lightBlueColor
-                                  .withValues(alpha: 0.1),
+                                  .withOpacity(0.1),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
@@ -1168,7 +1180,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    color: Colors.black.withOpacity(0.05),
                     spreadRadius: 0,
                     blurRadius: 10,
                     offset: const Offset(0, -2),
@@ -1312,6 +1324,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     // Check if event is favorited
     _checkFavoriteStatus();
 
+    // Check feedback status
+    _checkFeedbackStatus();
+
     // Check user ticket status after a short delay to ensure proper initialization
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) {
@@ -1345,8 +1360,11 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     if (CustomerController.logeInCustomer == null) return;
 
     try {
+      final customerUid = CustomerController.logeInCustomer?.uid;
+      if (customerUid == null) return;
+
       final isFavorited = await FirebaseFirestoreHelper().isEventFavorited(
-        userId: CustomerController.logeInCustomer!.uid,
+        userId: customerUid,
         eventId: eventModel.id,
       );
 
@@ -1357,6 +1375,36 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       }
     } catch (e) {
       Logger.error('Error checking favorite status: $e');
+    }
+  }
+
+  Future<void> _checkFeedbackStatus() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    try {
+      setState(() {
+        _isLoadingFeedback = true;
+      });
+
+      final hasSubmitted = await FirebaseFirestoreHelper().hasUserSubmittedFeedback(
+        eventId: eventModel.id,
+        userId: currentUser.uid,
+      );
+
+      if (mounted) {
+        setState(() {
+          _hasSubmittedFeedback = hasSubmitted;
+          _isLoadingFeedback = false;
+        });
+      }
+    } catch (e) {
+      Logger.error('Error checking feedback status: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingFeedback = false;
+        });
+      }
     }
   }
 
@@ -1371,15 +1419,18 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     });
 
     try {
+      final customerUid = CustomerController.logeInCustomer?.uid;
+      if (customerUid == null) return;
+
       bool success;
       if (_isFavorited) {
         success = await FirebaseFirestoreHelper().removeFromFavorites(
-          userId: CustomerController.logeInCustomer!.uid,
+          userId: customerUid,
           eventId: eventModel.id,
         );
       } else {
         success = await FirebaseFirestoreHelper().addToFavorites(
-          userId: CustomerController.logeInCustomer!.uid,
+          userId: customerUid,
           eventId: eventModel.id,
         );
       }
@@ -1461,8 +1512,11 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     }
 
     try {
+      final customerUid = CustomerController.logeInCustomer?.uid;
+      if (customerUid == null) return;
+
       final userTickets = await FirebaseFirestoreHelper().getUserTickets(
-        customerUid: CustomerController.logeInCustomer!.uid,
+        customerUid: customerUid,
       );
 
       // Check if user has an active ticket for this event
@@ -1829,7 +1883,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: color.withAlpha((0.1 * 255).round()),
+                color: color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(icon, color: color, size: 18),
@@ -1866,7 +1920,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha((0.05 * 255).round()),
+            color: Colors.black.withOpacity(0.05),
             spreadRadius: 0,
             blurRadius: 8,
             offset: const Offset(0, 2),
@@ -2049,7 +2103,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha((0.05 * 255).round()),
+            color: Colors.black.withOpacity(0.05),
             spreadRadius: 0,
             blurRadius: 8,
             offset: const Offset(0, 2),
@@ -2244,10 +2298,16 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         await _purchaseTicket();
       } else {
         // Handle free ticket
+        final customerUid = CustomerController.logeInCustomer?.uid;
+        final customerName = CustomerController.logeInCustomer?.name;
+        if (customerUid == null || customerName == null) {
+          throw Exception('User not properly authenticated');
+        }
+
         await FirebaseFirestoreHelper().issueTicket(
-          customerUid: CustomerController.logeInCustomer!.uid,
+          customerUid: customerUid,
           eventId: eventModel.id,
-          customerName: CustomerController.logeInCustomer!.name,
+          customerName: customerName,
           eventModel: eventModel,
         );
 
@@ -2301,14 +2361,19 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
           .doc()
           .id;
 
+      final customer = CustomerController.logeInCustomer;
+      if (customer == null) {
+        throw Exception('User not authenticated');
+      }
+
       // Create payment intent
       final paymentData = await TicketPaymentService.createTicketPaymentIntent(
         eventId: eventModel.id,
         ticketId: ticketId,
         amount: eventModel.ticketPrice!,
-        customerUid: CustomerController.logeInCustomer!.uid,
-        customerName: CustomerController.logeInCustomer!.name,
-        customerEmail: CustomerController.logeInCustomer!.email,
+        customerUid: customer.uid,
+        customerName: customer.name,
+        customerEmail: customer.email,
         creatorUid: eventModel.customerUid,
         eventTitle: eventModel.title,
       );
@@ -2330,8 +2395,8 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         // Issue the paid ticket
         await TicketPaymentService.issuePaidTicket(
           eventId: eventModel.id,
-          customerUid: CustomerController.logeInCustomer!.uid,
-          customerName: CustomerController.logeInCustomer!.name,
+          customerUid: customer.uid,
+          customerName: customer.name,
           eventModel: eventModel,
           paymentIntentId: paymentData['paymentIntentId'],
         );
@@ -2456,9 +2521,13 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       backgroundColor: _backgroundColor,
       floatingActionButton:
           eventModel.hasManagementPermissions(
-            FirebaseAuth.instance.currentUser!.uid,
+            FirebaseAuth.instance.currentUser?.uid ?? '',
           )
-          ? _buildFloatingActionButton()
+          ? Semantics(
+              button: true,
+              label: 'Manage event settings and options',
+              child: _buildFloatingActionButton(),
+            )
           : null,
       body: SafeArea(
         child: FadeTransition(opacity: _fadeAnimation, child: _bodyView()),
@@ -2482,7 +2551,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: const Icon(
@@ -2513,13 +2582,13 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             borderRadius: BorderRadius.circular(28),
             boxShadow: [
               BoxShadow(
-                color: _primaryBlue.withValues(alpha: 0.4),
+                color: _primaryBlue.withOpacity(0.4),
                 spreadRadius: 0,
                 blurRadius: 15,
                 offset: const Offset(0, 6),
               ),
               BoxShadow(
-                color: _primaryPurple.withValues(alpha: 0.3),
+                color: _primaryPurple.withOpacity(0.3),
                 spreadRadius: 0,
                 blurRadius: 25,
                 offset: const Offset(0, 12),
@@ -2558,7 +2627,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             border: Border(bottom: BorderSide(color: _borderColor, width: 1)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
+                color: Colors.black.withOpacity(0.04),
                 blurRadius: 6,
                 offset: const Offset(0, 2),
               ),
@@ -2661,18 +2730,18 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               height: 40,
               decoration: BoxDecoration(
                 color: isActive
-                    ? _primaryBlue.withValues(alpha: 0.10)
+                    ? _primaryBlue.withOpacity(0.10)
                     : const Color(0xFFF3F4F6),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isActive
-                      ? _primaryBlue.withValues(alpha: 0.30)
+                      ? _primaryBlue.withOpacity(0.30)
                       : _borderColor,
                   width: 1.5,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
+                    color: Colors.black.withOpacity(0.04),
                     spreadRadius: 0,
                     blurRadius: 6,
                     offset: const Offset(0, 2),
@@ -2815,13 +2884,13 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.15),
+                color: Colors.black.withOpacity(0.15),
                 spreadRadius: 0,
                 blurRadius: 25,
                 offset: const Offset(0, 8),
               ),
               BoxShadow(
-                color: _primaryBlue.withValues(alpha: 0.1),
+                color: _primaryBlue.withOpacity(0.1),
                 spreadRadius: 0,
                 blurRadius: 40,
                 offset: const Offset(0, 16),
@@ -2883,7 +2952,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                             width: 64,
                             height: 64,
                             decoration: BoxDecoration(
-                              color: _primaryBlue.withValues(alpha: 0.1),
+                              color: _primaryBlue.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(32),
                             ),
                             child: Icon(
@@ -2926,7 +2995,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      Colors.black.withValues(alpha: 0.02),
+                      Colors.black.withOpacity(0.02),
                     ],
                   ),
                 ),
@@ -2936,7 +3005,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.1),
+                    color: Colors.white.withOpacity(0.1),
                     width: 1,
                   ),
                 ),
@@ -2970,20 +3039,20 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: _orange.withValues(alpha: 0.4),
+                  color: _orange.withOpacity(0.4),
                   spreadRadius: 0,
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
                 BoxShadow(
-                  color: _orange.withValues(alpha: 0.2),
+                  color: _orange.withOpacity(0.2),
                   spreadRadius: 0,
                   blurRadius: 20,
                   offset: const Offset(0, 8),
                 ),
               ],
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: Colors.white.withOpacity(0.2),
                 width: 1,
               ),
             ),
@@ -2994,7 +3063,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                   width: 24,
                   height: 24,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
@@ -3034,20 +3103,20 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.12),
+                color: Colors.black.withOpacity(0.12),
                 spreadRadius: 0,
                 blurRadius: 30,
                 offset: const Offset(0, 8),
               ),
               BoxShadow(
-                color: _primaryBlue.withValues(alpha: 0.08),
+                color: _primaryBlue.withOpacity(0.08),
                 spreadRadius: 0,
                 blurRadius: 40,
                 offset: const Offset(0, 16),
               ),
             ],
             border: Border.all(
-              color: _borderColor.withValues(alpha: 0.5),
+              color: _borderColor.withOpacity(0.5),
               width: 1,
             ),
           ),
@@ -3137,7 +3206,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                          color: const Color(0xFF667EEA).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: const Color(0xFF667EEA),
@@ -3220,7 +3289,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           width: 32,
                           height: 32,
                           decoration: BoxDecoration(
-                            color: _primaryBlue.withValues(alpha: 0.1),
+                            color: _primaryBlue.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Icon(
@@ -3282,7 +3351,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         border: Border.all(color: _borderColor, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withOpacity(0.04),
             spreadRadius: 0,
             blurRadius: 8,
             offset: const Offset(0, 2),
@@ -3299,13 +3368,13 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  _primaryBlue.withValues(alpha: 0.15),
-                  _primaryBlue.withValues(alpha: 0.08),
+                  _primaryBlue.withOpacity(0.15),
+                  _primaryBlue.withOpacity(0.08),
                 ],
               ),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: _primaryBlue.withValues(alpha: 0.2),
+                color: _primaryBlue.withOpacity(0.2),
                 width: 1,
               ),
             ),
@@ -3354,7 +3423,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         border: Border.all(color: _borderColor, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withOpacity(0.04),
             spreadRadius: 0,
             blurRadius: 8,
             offset: const Offset(0, 2),
@@ -3372,13 +3441,13 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  _primaryBlue.withValues(alpha: 0.15),
-                  _primaryBlue.withValues(alpha: 0.08),
+                  _primaryBlue.withOpacity(0.15),
+                  _primaryBlue.withOpacity(0.08),
                 ],
               ),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: _primaryBlue.withValues(alpha: 0.2),
+                color: _primaryBlue.withOpacity(0.2),
                 width: 1,
               ),
             ),
@@ -3457,10 +3526,10 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFFF9800).withAlpha((0.05 * 255).round()),
+        color: const Color(0xFFFF9800).withOpacity(0.05),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFFFF9800).withAlpha((0.2 * 255).round()),
+          color: const Color(0xFFFF9800).withOpacity(0.2),
           width: 1,
         ),
       ),
@@ -3470,7 +3539,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: const Color(0xFFFF9800).withAlpha((0.1 * 255).round()),
+              color: const Color(0xFFFF9800).withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
@@ -3535,7 +3604,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           value: percentage / 100,
                           backgroundColor: const Color(
                             0xFFFF9800,
-                          ).withAlpha((0.2 * 255).round()),
+                          ).withOpacity(0.2),
                           valueColor: const AlwaysStoppedAnimation<Color>(
                             Color(0xFFFF9800),
                           ),
@@ -3563,106 +3632,117 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
   }
 
   Widget _buildFeedbackButton() {
-    return FutureBuilder<bool>(
-      future: FirebaseFirestoreHelper().hasUserSubmittedFeedback(
-        eventId: eventModel.id,
-        userId: FirebaseAuth.instance.currentUser?.uid ?? '',
-      ),
-      builder: (context, snapshot) {
-        final hasSubmittedFeedback = snapshot.data ?? false;
+    if (_isLoadingFeedback) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey[300]!, width: 1),
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
 
-        return GestureDetector(
-          onTap: hasSubmittedFeedback
-              ? null
-              : () {
-                  RouterClass.nextScreenNormal(
-                    context,
-                    EventFeedbackScreen(eventModel: eventModel),
-                  );
-                },
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: hasSubmittedFeedback
-                  ? Colors.grey[100]
-                  : const Color(0xFF667EEA).withAlpha((0.1 * 255).round()),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
+    final hasSubmittedFeedback = _hasSubmittedFeedback ?? false;
+
+    return GestureDetector(
+      onTap: hasSubmittedFeedback
+          ? null
+          : () {
+              RouterClass.nextScreenNormal(
+                context,
+                EventFeedbackScreen(eventModel: eventModel),
+              ).then((_) => _checkFeedbackStatus()); // Refresh status after feedback
+            },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: hasSubmittedFeedback
+              ? Colors.grey[100]
+              : const Color(0xFF667EEA).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: hasSubmittedFeedback
+                ? Colors.grey[300]!
+                : const Color(0xFF667EEA),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
                 color: hasSubmittedFeedback
-                    ? Colors.grey[300]!
+                    ? Colors.grey[300]
+                    : const Color(0xFF667EEA).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                hasSubmittedFeedback ? Icons.check_circle : Icons.star,
+                color: hasSubmittedFeedback
+                    ? Colors.grey[600]
                     : const Color(0xFF667EEA),
-                width: 1,
+                size: 20,
               ),
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: hasSubmittedFeedback
-                        ? Colors.grey[300]
-                        : const Color(
-                            0xFF667EEA,
-                          ).withAlpha((0.2 * 255).round()),
-                    borderRadius: BorderRadius.circular(12),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    hasSubmittedFeedback
+                        ? 'Feedback Submitted'
+                        : 'Rate This Event',
+                    style: TextStyle(
+                      color: hasSubmittedFeedback
+                          ? Colors.grey[600]
+                          : const Color(0xFF1A1A1A),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      fontFamily: 'Roboto',
+                    ),
                   ),
-                  child: Icon(
-                    hasSubmittedFeedback ? Icons.check_circle : Icons.star,
-                    color: hasSubmittedFeedback
-                        ? Colors.grey[600]
-                        : const Color(0xFF667EEA),
-                    size: 20,
+                  const SizedBox(height: 2),
+                  Text(
+                    hasSubmittedFeedback
+                        ? 'Thank you for your feedback!'
+                        : 'Share your experience and help improve future events',
+                    style: TextStyle(
+                      color: hasSubmittedFeedback
+                          ? Colors.grey[500]
+                          : const Color(0xFF6B7280),
+                      fontSize: 14,
+                      fontFamily: 'Roboto',
+                    ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        hasSubmittedFeedback
-                            ? 'Feedback Submitted'
-                            : 'Rate This Event',
-                        style: TextStyle(
-                          color: hasSubmittedFeedback
-                              ? Colors.grey[600]
-                              : const Color(0xFF1A1A1A),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                          fontFamily: 'Roboto',
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        hasSubmittedFeedback
-                            ? 'Thank you for your feedback!'
-                            : 'Share your experience and help improve future events',
-                        style: TextStyle(
-                          color: hasSubmittedFeedback
-                              ? Colors.grey[500]
-                              : const Color(0xFF6B7280),
-                          fontSize: 14,
-                          fontFamily: 'Roboto',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (!hasSubmittedFeedback)
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    color: const Color(0xFF6B7280),
-                    size: 16,
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
+            if (!hasSubmittedFeedback)
+              Icon(
+                Icons.arrow_forward_ios,
+                color: const Color(0xFF6B7280),
+                size: 16,
+              ),
+          ],
+        ),
+      ),
     );
   }
+
+
 
   Widget _buildCategoriesCard() {
     return Container(
@@ -3689,7 +3769,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withAlpha((0.1 * 255).round()),
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -3721,12 +3801,12 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withAlpha((0.1 * 255).round()),
+                  color: const Color(0xFF667EEA).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: const Color(
                       0xFF667EEA,
-                    ).withAlpha((0.3 * 255).round()),
+                    ).withOpacity(0.3),
                     width: 1,
                   ),
                 ),
@@ -3832,7 +3912,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: Colors.black.withAlpha((0.1 * 255).round()),
+                    color: Colors.black.withOpacity(0.1),
                     spreadRadius: 0,
                     blurRadius: 8,
                     offset: const Offset(0, 2),
@@ -3978,7 +4058,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF10B981).withAlpha((0.3 * 255).round()),
+                  color: const Color(0xFF10B981).withOpacity(0.3),
                   spreadRadius: 0,
                   blurRadius: 8,
                   offset: const Offset(0, 4),
@@ -4031,7 +4111,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFFF9800).withAlpha((0.3 * 255).round()),
+                  color: const Color(0xFFFF9800).withOpacity(0.3),
                   spreadRadius: 0,
                   blurRadius: 8,
                   offset: const Offset(0, 4),
@@ -4168,7 +4248,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF10B981).withAlpha((0.3 * 255).round()),
+                color: const Color(0xFF10B981).withOpacity(0.3),
                 spreadRadius: 0,
                 blurRadius: 8,
                 offset: const Offset(0, 4),
@@ -4224,7 +4304,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha((0.05 * 255).round()),
+            color: Colors.black.withOpacity(0.05),
             spreadRadius: 0,
             blurRadius: 10,
             offset: const Offset(0, 2),
@@ -4234,14 +4314,19 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       child: Column(
         children: [
           // Dropdown Header Button
-          InkWell(
-            onTap: () {
-              setState(() {
-                _isAttendeesExpanded = !_isAttendeesExpanded;
-              });
-            },
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            child: Container(
+          Semantics(
+            button: true,
+            label: _isAttendeesExpanded 
+                ? 'Collapse attendees list'
+                : 'Expand to view attendees list',
+            child: InkWell(
+              onTap: () {
+                setState(() {
+                  _isAttendeesExpanded = !_isAttendeesExpanded;
+                });
+              },
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Row(
                 children: [
@@ -4251,7 +4336,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                     decoration: BoxDecoration(
                       color: const Color(
                         0xFF10B981,
-                      ).withAlpha((0.1 * 255).round()),
+                      ).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -4301,6 +4386,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                 ],
               ),
             ),
+            ),
           ),
           // Dropdown Content
           AnimatedContainer(
@@ -4326,49 +4412,55 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     final bool isManager = eventModel.hasManagementPermissions(uid);
     if (isManager) return const SizedBox.shrink();
 
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: ElevatedButton(
-        onPressed: _isRsvpLoading ? null : _rsvpForEvent,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _isRsvped
-              ? const Color(0xFF10B981)
-              : const Color(0xFF667EEA),
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+    return Semantics(
+      button: true,
+      label: _isRsvped 
+          ? 'You have RSVP\'d to this event. Tap to remove RSVP'
+          : 'RSVP to this event to show your interest',
+      child: SizedBox(
+        width: double.infinity,
+        height: 48,
+        child: ElevatedButton(
+          onPressed: _isRsvpLoading ? null : _rsvpForEvent,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _isRsvped
+                ? const Color(0xFF10B981)
+                : const Color(0xFF667EEA),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            elevation: 0,
           ),
-          elevation: 0,
-        ),
-        child: _isRsvpLoading
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    _isRsvped ? Icons.check_circle : Icons.event_available,
-                    size: 20,
+          child: _isRsvpLoading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
                     color: Colors.white,
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _isRsvped ? "RSVP'd" : 'RSVP',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      fontFamily: 'Roboto',
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      _isRsvped ? Icons.check_circle : Icons.event_available,
+                      size: 20,
+                      color: Colors.white,
                     ),
-                  ),
-                ],
-              ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _isRsvped ? "RSVP'd" : 'RSVP',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
+                ),
+        ),
       ),
     );
   }
@@ -4377,10 +4469,10 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF6B7280).withAlpha((0.05 * 255).round()),
+        color: const Color(0xFF6B7280).withOpacity(0.05),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFF6B7280).withAlpha((0.2 * 255).round()),
+          color: const Color(0xFF6B7280).withOpacity(0.2),
           width: 1,
         ),
       ),
@@ -4499,7 +4591,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                         decoration: BoxDecoration(
                           color: const Color(
                             0xFF10B981,
-                          ).withAlpha((0.1 * 255).round()),
+                          ).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: const Color(0xFF10B981),
@@ -4603,10 +4695,10 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                                         color: isAnon
                                             ? const Color(
                                                 0xFF6B7280,
-                                              ).withAlpha((0.3 * 255).round())
+                                              ).withOpacity(0.3)
                                             : const Color(
                                                 0xFF10B981,
-                                              ).withAlpha((0.3 * 255).round()),
+                                              ).withOpacity(0.3),
                                         spreadRadius: 0,
                                         blurRadius: 8,
                                         offset: const Offset(0, 2),
@@ -4678,7 +4770,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                       decoration: BoxDecoration(
                         color: const Color(
                           0xFF10B981,
-                        ).withAlpha((0.1 * 255).round()),
+                        ).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
@@ -4734,7 +4826,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: Colors.grey.withAlpha((0.1 * 255).round()),
+                            color: Colors.grey.withOpacity(0.1),
                             width: 1,
                           ),
                         ),
@@ -4768,10 +4860,10 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                                     color: isAnon
                                         ? const Color(
                                             0xFF6B7280,
-                                          ).withAlpha((0.3 * 255).round())
+                                          ).withOpacity(0.3)
                                         : const Color(
                                             0xFF10B981,
-                                          ).withAlpha((0.3 * 255).round()),
+                                          ).withOpacity(0.3),
                                     spreadRadius: 0,
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
@@ -4870,21 +4962,21 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               boxShadow: [
                 // Outer elevated shadow for clickable appearance
                 BoxShadow(
-                  color: const Color(0xFF2563EB).withValues(alpha: 0.3),
+                  color: const Color(0xFF2563EB).withOpacity(0.3),
                   spreadRadius: 1,
                   blurRadius: 16,
                   offset: const Offset(0, 6),
                 ),
                 // Inner depth shadow
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.4),
+                  color: Colors.black.withOpacity(0.4),
                   spreadRadius: -3,
                   blurRadius: 12,
                   offset: const Offset(3, 3),
                 ),
                 // Subtle outer glow for interactivity
                 BoxShadow(
-                  color: const Color(0xFF60A5FA).withValues(alpha: 0.6),
+                  color: const Color(0xFF60A5FA).withOpacity(0.6),
                   spreadRadius: 0,
                   blurRadius: 8,
                   offset: const Offset(0, 0),
@@ -4892,7 +4984,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               ],
               // Subtle border for clickability
               border: Border.all(
-                color: const Color(0xFF93C5FD).withValues(alpha: 0.4),
+                color: const Color(0xFF93C5FD).withOpacity(0.4),
                 width: 0.5,
               ),
             ),
@@ -4900,8 +4992,8 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               color: Colors.transparent,
               child: InkWell(
                 borderRadius: BorderRadius.circular(24),
-                splashColor: const Color(0xFF60A5FA).withValues(alpha: 0.3),
-                highlightColor: const Color(0xFF93C5FD).withValues(alpha: 0.2),
+                splashColor: const Color(0xFF60A5FA).withOpacity(0.3),
+                highlightColor: const Color(0xFF93C5FD).withOpacity(0.2),
                 onTap: () {
                   // Enhanced haptic feedback
                   HapticFeedback.mediumImpact();
@@ -4912,6 +5004,9 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                     ),
                   );
                 },
+                child: Semantics(
+                  button: true,
+                  label: 'View event location on map',
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -4925,8 +5020,8 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           center: const Alignment(0.2, -0.3),
                           radius: 0.9,
                           colors: [
-                            const Color(0xFF228B22).withValues(alpha: 0.3),
-                            const Color(0xFF32CD32).withValues(alpha: 0.2),
+                            const Color(0xFF228B22).withOpacity(0.3),
+                            const Color(0xFF32CD32).withOpacity(0.2),
                             Colors.transparent,
                           ],
                         ),
@@ -4959,12 +5054,8 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           center: const Alignment(-0.3, -0.4),
                           radius: 1.1,
                           colors: [
-                            Colors.white.withValues(
-                              alpha: 0.4 * animationValue,
-                            ),
-                            Colors.white.withValues(
-                              alpha: 0.1 * animationValue,
-                            ),
+                            Colors.white.withOpacity(0.4 * animationValue),
+                            Colors.white.withOpacity(0.1 * animationValue),
                             Colors.transparent,
                           ],
                         ),
@@ -4981,7 +5072,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           gradient: SweepGradient(
                             colors: [
                               Colors.transparent,
-                              Colors.white.withValues(alpha: 0.3),
+                              Colors.white.withOpacity(0.3),
                               Colors.transparent,
                               Colors.transparent,
                             ],
@@ -5002,7 +5093,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                         border: Border.all(
                           color: const Color(
                             0xFF60A5FA,
-                          ).withValues(alpha: 0.4 * (1 - animationValue * 0.3)),
+                          ).withOpacity(0.4 * (1 - animationValue * 0.3)),
                           width: 1.5,
                         ),
                       ),
@@ -5015,13 +5106,14 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           border: Border.all(
                             color: const Color(
                               0xFFFFFFFF,
-                            ).withValues(alpha: 0.2),
+                            ).withOpacity(0.2),
                             width: 0.5,
                           ),
                         ),
                       ),
                     ),
                   ],
+                ),
                 ),
               ),
             ),
@@ -5118,11 +5210,9 @@ class EnhancedContinentPainter extends CustomPainter {
             colors: [
               const Color(
                 0xFF32CD32,
-              ).withValues(alpha: 0.9), // Bright green highlight
-              const Color(0xFF228B22).withValues(alpha: 0.8), // Medium green
-              const Color(
-                0xFF006400,
-              ).withValues(alpha: 0.7), // Dark green shadow
+              ).withOpacity(0.9), // Bright green highlight
+              const Color(0xFF228B22).withOpacity(0.8), // Medium green
+              const Color(0xFF006400).withOpacity(0.7), // Dark green shadow
             ],
           ).createShader(
             Rect.fromCenter(
@@ -5269,14 +5359,14 @@ class RealisticGridPainter extends CustomPainter {
 
     // Enhanced grid paint with better visibility
     final gridPaint = Paint()
-      ..color = Colors.white.withValues(
-        alpha: 0.25 + (0.1 * sin(animationValue * 2 * pi)),
+      ..color = Colors.white.withOpacity(
+        0.25 + (0.1 * sin(animationValue * 2 * pi)),
       )
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.8;
 
     final faintGridPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.15)
+      ..color = Colors.white.withOpacity(0.15)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.4;
 
@@ -5349,7 +5439,7 @@ class RealisticGridPainter extends CustomPainter {
     primeMeridianPath.lineTo(center.dx, center.dy + radius * 0.9);
 
     final primeMeridianPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.4)
+      ..color = Colors.white.withOpacity(0.4)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
 
