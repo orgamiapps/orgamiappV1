@@ -391,13 +391,11 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                           ),
                         ),
                         const Spacer(),
-                        TextButton.icon(
+                        IconButton(
                           onPressed: () => _shareTicket(ticket),
-                          icon: const Icon(Icons.ios_share, size: 16),
-                          label: const Text('Share'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: const Color(0xFF667EEA),
-                          ),
+                          icon: const Icon(Icons.ios_share, size: 20),
+                          color: const Color(0xFF667EEA),
+                          tooltip: 'Share',
                         ),
                       ],
                     ),
@@ -421,27 +419,55 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
 
   Future<void> _shareTicket(TicketModel ticket) async {
     try {
+      // Ensure the event image is cached before rendering
+      await precacheImage(
+        CachedNetworkImageProvider(ticket.eventImageUrl),
+        context,
+      );
+
+      final overlay = Overlay.maybeOf(context);
+      if (overlay == null) throw Exception('Overlay not available');
+
+      late OverlayEntry entry;
+      entry = OverlayEntry(
+        builder: (context) => Material(
+          type: MaterialType.transparency,
+          child: Center(
+            child: RepaintBoundary(
+              key: ticketShareKey,
+              child: _buildShareableTicketCard(ticket),
+            ),
+          ),
+        ),
+      );
+
+      overlay.insert(entry);
+      // Wait for the frame to paint
+      await Future.delayed(const Duration(milliseconds: 200));
+
       final boundary =
           ticketShareKey.currentContext?.findRenderObject()
               as RenderRepaintBoundary?;
-      if (boundary == null) return;
+      if (boundary == null) throw Exception('Share boundary not found');
 
       final image = await boundary.toImage(pixelRatio: 3.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData == null) return;
-
+      if (byteData == null) throw Exception('Failed to encode image');
       final bytes = byteData.buffer.asUint8List();
+
+      // Remove the overlay entry as soon as we have the bytes
+      entry.remove();
+
       final tempDir = await getTemporaryDirectory();
-      final file = File('${tempDir.path}/ticket_${ticket.ticketCode}.png');
+      final file = File(
+        '${tempDir.path}/orgami_ticket_${ticket.ticketCode}.png',
+      );
       await file.writeAsBytes(bytes);
 
-      final date = DateFormat(
-        'EEE, MMM dd, h:mm a',
-      ).format(ticket.eventDateTime);
       await SharePlus.instance.share(
         ShareParams(
           text:
-              'My Orgami Event Ticket\n${ticket.eventTitle}\n$date\nCode: ${ticket.ticketCode}',
+              'My Orgami Ticket • ${ticket.eventTitle} • Code: ${ticket.ticketCode}',
           files: [XFile(file.path)],
         ),
       );
@@ -449,6 +475,183 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
       debugPrint('Error sharing ticket: $e');
       ShowToast().showNormalToast(msg: 'Failed to share ticket');
     }
+  }
+
+  Widget _buildShareableTicketCard(TicketModel ticket) {
+    // Fixed width for consistent image output
+    const double cardWidth = 360; // logical pixels before pixelRatio scaling
+    return Container(
+      width: cardWidth,
+      margin: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header image
+            CachedNetworkImage(
+              imageUrl: ticket.eventImageUrl,
+              height: 160,
+              fit: BoxFit.cover,
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          ticket.eventTitle,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF111827),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              (ticket.isUsed
+                                      ? Colors.red
+                                      : const Color(0xFF10B981))
+                                  .withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          ticket.isUsed ? 'USED' : 'ACTIVE',
+                          style: TextStyle(
+                            color: ticket.isUsed
+                                ? Colors.red
+                                : const Color(0xFF10B981),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today,
+                        size: 16,
+                        color: Color(0xFF6B7280),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        DateFormat(
+                          'EEE, MMM dd • h:mm a',
+                        ).format(ticket.eventDateTime),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF374151),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on,
+                        size: 16,
+                        color: Color(0xFF6B7280),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          ticket.eventLocation,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF374151),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Ticket Code',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF6B7280),
+                              ),
+                            ),
+                            Text(
+                              ticket.ticketCode,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.5,
+                                color: Color(0xFF111827),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.white,
+                        ),
+                        padding: const EdgeInsets.all(6),
+                        child: QrImageView(
+                          data: ticket.qrCodeData,
+                          version: QrVersions.auto,
+                          size: 88,
+                          gapless: false,
+                          backgroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Divider(height: 20),
+                  const Center(
+                    child: Text(
+                      'Powered by Orgami',
+                      style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildTicketDetailDialog(TicketModel ticket) {

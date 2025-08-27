@@ -1593,6 +1593,50 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                           ],
                         ),
                         const SizedBox(height: 24),
+                        // Ticket Management Section
+                        _buildManagementSection(
+                          icon: Icons.confirmation_number,
+                          title: 'Ticket Management',
+                          color: const Color(0xFF667EEA),
+                          children: [
+                            _buildManagementOption(
+                              icon: Icons.confirmation_number,
+                              title: 'Manage Tickets',
+                              subtitle:
+                                  'Configure ticket settings and availability',
+                              onTap: () {
+                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        TicketManagementScreen(
+                                          eventModel: eventModel,
+                                        ),
+                                  ),
+                                ).then((_) => _showEventManagementModal());
+                              },
+                            ),
+                            _buildManagementOption(
+                              icon: Icons.qr_code_scanner,
+                              title: 'Ticket Scanner',
+                              subtitle: 'Scan and validate tickets',
+                              onTap: () {
+                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => TicketScannerScreen(
+                                      eventId: eventModel.id,
+                                      eventTitle: eventModel.title,
+                                    ),
+                                  ),
+                                ).then((_) => _showEventManagementModal());
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
                         // Attendance Management Section
                         _buildManagementSection(
                           icon: Icons.people,
@@ -1704,50 +1748,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                             ),
                           ],
                         ),
-                        const SizedBox(height: 24),
-                        // Ticket Management Section
-                        _buildManagementSection(
-                          icon: Icons.confirmation_number,
-                          title: 'Ticket Management',
-                          color: const Color(0xFF667EEA),
-                          children: [
-                            _buildManagementOption(
-                              icon: Icons.confirmation_number,
-                              title: 'Manage Tickets',
-                              subtitle:
-                                  'Configure ticket settings and availability',
-                              onTap: () {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        TicketManagementScreen(
-                                          eventModel: eventModel,
-                                        ),
-                                  ),
-                                ).then((_) => _showEventManagementModal());
-                              },
-                            ),
-                            _buildManagementOption(
-                              icon: Icons.qr_code_scanner,
-                              title: 'Ticket Scanner',
-                              subtitle: 'Scan and validate tickets',
-                              onTap: () {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => TicketScannerScreen(
-                                      eventId: eventModel.id,
-                                      eventTitle: eventModel.title,
-                                    ),
-                                  ),
-                                ).then((_) => _showEventManagementModal());
-                              },
-                            ),
-                          ],
-                        ),
+
                         const SizedBox(height: 24),
                         if (eventModel.private)
                           _buildManagementSection(
