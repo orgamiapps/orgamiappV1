@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'Colors.dart';
+import 'colors.dart';
 import 'dimensions.dart';
 
 class AppTextFields {

@@ -3,7 +3,7 @@ import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/models/attendance_model.dart';
 import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/models/event_model.dart';
-import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
+import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
 import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:orgami/Utils/logger.dart';

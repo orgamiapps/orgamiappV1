@@ -13,18 +13,18 @@ import 'package:flutter/foundation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/Screens/Events/single_event_screen.dart';
-import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
+import 'package:orgami/screens/Events/single_event_screen.dart';
+import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:orgami/Screens/Events/Widget/single_event_list_view_item.dart';
+import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/controller/customer_controller.dart';
 import 'package:orgami/Utils/toast.dart';
-import 'package:orgami/Screens/QRScanner/qr_scanner_flow_screen.dart';
+import 'package:orgami/screens/QRScanner/qr_scanner_flow_screen.dart';
 
 import 'package:orgami/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
@@ -1351,7 +1351,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         parent: AlwaysScrollableScrollPhysics(),
       ),
       itemCount: _searchEvents.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, index) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final event = _searchEvents[index];
         return _buildEventCard(event);
@@ -1374,7 +1374,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         parent: AlwaysScrollableScrollPhysics(),
       ),
       itemCount: _searchUsers.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, index) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final user = _searchUsers[index];
         return _buildUserCard(user);
@@ -1684,7 +1684,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         parent: AlwaysScrollableScrollPhysics(),
       ),
       itemCount: _defaultEvents.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, index) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final event = _defaultEvents[index];
         return _buildEventCard(event);
@@ -1739,7 +1739,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         parent: AlwaysScrollableScrollPhysics(),
       ),
       itemCount: _defaultUsers.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, index) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final user = _defaultUsers[index];
         return GestureDetector(

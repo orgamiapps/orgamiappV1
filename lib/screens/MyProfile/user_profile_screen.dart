@@ -10,10 +10,10 @@ import 'package:orgami/firebase/firebase_storage_helper.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/Utils/toast.dart';
-import 'package:orgami/Screens/Events/Widget/single_event_list_view_item.dart';
+import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:orgami/controller/customer_controller.dart';
-import 'package:orgami/Screens/MyProfile/followers_following_screen.dart';
-import 'package:orgami/Screens/Messaging/new_message_screen.dart';
+import 'package:orgami/screens/MyProfile/followers_following_screen.dart';
+import 'package:orgami/screens/Messaging/new_message_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final CustomerModel user;
@@ -1005,10 +1005,12 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                                 : newUsername;
                           });
 
-                          if (mounted) Navigator.pop(context);
-                          ShowToast().showNormalToast(
-                            msg: 'Profile updated successfully',
-                          );
+                          if (mounted) {
+                            Navigator.pop(context);
+                            ShowToast().showNormalToast(
+                              msg: 'Profile updated successfully',
+                            );
+                          }
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppThemeColor.darkBlueColor,

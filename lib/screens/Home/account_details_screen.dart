@@ -9,7 +9,7 @@ import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'dart:convert';
 import 'package:orgami/firebase/firebase_storage_helper.dart';
-import 'package:orgami/Screens/Authentication/forgot_password_screen.dart';
+import 'package:orgami/screens/Authentication/forgot_password_screen.dart';
 import 'package:orgami/Utils/full_screen_image_viewer.dart';
 
 class AccountDetailsScreen extends StatefulWidget {
@@ -824,7 +824,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: _selectedGender,
+          initialValue: _selectedGender,
           decoration: InputDecoration(
             hintText: 'Select your gender (optional)',
             prefixIcon: const Icon(Icons.person_outline),
@@ -1109,7 +1109,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: Theme.of(context).colorScheme.primary,
+            activeThumbColor: Theme.of(context).colorScheme.primary,
           ),
         ],
       ),

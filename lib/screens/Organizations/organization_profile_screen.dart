@@ -284,7 +284,7 @@ class _OrgHeader extends StatelessWidget {
                                   child: child,
                                 );
                               },
-                              errorBuilder: (_, __, ___) =>
+                              errorBuilder: (context, error, stackTrace) =>
                                   const SizedBox.shrink(),
                             ),
                           ),
@@ -1008,15 +1008,17 @@ class _MemberCard extends StatelessWidget {
                     favorites: List<String>.from(d['favorites'] ?? const []),
                     createdAt: parsedCreatedAt,
                   );
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => UserProfileScreen(
-                        user: user,
-                        isOwnProfile:
-                            user.uid == CustomerController.logeInCustomer?.uid,
+                  if (context.mounted) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => UserProfileScreen(
+                          user: user,
+                          isOwnProfile:
+                              user.uid == CustomerController.logeInCustomer?.uid,
+                        ),
                       ),
-                    ),
-                  );
+                    );
+                  }
                 } catch (_) {}
               },
         child: Padding(
@@ -1039,7 +1041,7 @@ class _MemberCard extends StatelessWidget {
                           child: Image.network(
                             photoUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Center(
+                            errorBuilder: (context, error, stackTrace) => Center(
                               child: Text(
                                 name.isNotEmpty ? name[0].toUpperCase() : 'U',
                                 style: const TextStyle(
@@ -1350,8 +1352,7 @@ class _OrgAboutTab extends StatelessWidget {
                           label: address,
                           onTap: () => _launchUrl(
                             Uri.parse(
-                              'https://www.google.com/maps/search/?api=1&query=' +
-                                  Uri.encodeComponent(address),
+                              'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(address)}',
                             ),
                           ),
                         ),
@@ -1412,7 +1413,7 @@ class _OrgAboutTab extends StatelessWidget {
                       return ListView.separated(
                         scrollDirection: Axis.horizontal,
                         itemCount: docs.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 12),
+                        separatorBuilder: (_, index) => const SizedBox(width: 12),
                         itemBuilder: (context, i) {
                           final Map<String, dynamic> m =
                               docs[i].data() as Map<String, dynamic>;

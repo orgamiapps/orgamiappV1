@@ -560,7 +560,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
                       ),
                     ),
                     TextSpan(
-                      text: '(${timeLeftLabel})',
+                      text: '($timeLeftLabel)',
                       style: TextStyle(
                         color: _untilEvent
                             ? Colors.white.withValues(alpha: 0.9)

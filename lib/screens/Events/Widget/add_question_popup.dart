@@ -372,7 +372,7 @@ class _AddQuestionPopupState extends State<AddQuestionPopup>
                                   _isRequired = value;
                                 });
                               },
-                              activeColor: const Color(0xFFEF4444),
+                              activeThumbColor: const Color(0xFFEF4444),
                               activeTrackColor: const Color(
                                 0xFFEF4444,
                               ).withValues(alpha: 0.3),

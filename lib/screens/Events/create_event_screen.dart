@@ -10,8 +10,8 @@ import 'package:intl/intl.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/models/event_question_model.dart';
-import 'package:orgami/Screens/Events/single_event_screen.dart';
-import 'package:orgami/Screens/Home/dashboard_screen.dart';
+import 'package:orgami/screens/Events/single_event_screen.dart';
+import 'package:orgami/screens/Home/dashboard_screen.dart';
 
 import 'package:orgami/Utils/router.dart';
 
@@ -772,7 +772,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                   privateEvent = value;
                 });
               },
-              activeColor: const Color(0xFF667EEA),
+              activeThumbColor: const Color(0xFF667EEA),
               activeTrackColor: const Color(0xFF667EEA).withValues(alpha: 0.3),
             ),
           ],
@@ -827,7 +827,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                 privateEvent = !value;
               });
             },
-            activeColor: const Color(0xFF10B981),
+            activeThumbColor: const Color(0xFF10B981),
             activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
           ),
         ],
@@ -972,7 +972,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             )
           else
             DropdownButtonFormField<String>(
-              value: _selectedOrganizationId,
+              initialValue: _selectedOrganizationId,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(borderSide: BorderSide.none),
                 filled: true,
@@ -989,8 +989,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                         value: org['id'],
                         child: Text(org['name'] ?? ''),
                       ),
-                    )
-                    .toList(),
+                    ),
               ],
               onChanged: (value) {
                 setState(() {

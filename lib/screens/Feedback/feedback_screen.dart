@@ -82,13 +82,18 @@ class FeedbackScreenState extends State<FeedbackScreen> {
         );
 
         _btnCtlr.success();
-        ShowToast().showSnackBar('Thank you for your feedback!', context);
+        if (mounted) {
+          ShowToast().showSnackBar('Thank you for your feedback!', context);
+        }
         await Future.delayed(const Duration(seconds: 1));
-        if (!mounted) return;
-        Navigator.pop(context);
+        if (mounted) {
+          Navigator.pop(context);
+        }
       } catch (e) {
         _btnCtlr.error();
-        ShowToast().showSnackBar('Error submitting feedback: $e', context);
+        if (mounted) {
+          ShowToast().showSnackBar('Error submitting feedback: $e', context);
+        }
       } finally {
         await Future.delayed(const Duration(seconds: 1));
         _btnCtlr.reset();

@@ -3,18 +3,18 @@ import 'package:orgami/controller/customer_controller.dart';
 import 'package:orgami/models/customer_model.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/models/event_model.dart';
-import 'package:orgami/Screens/Events/Widget/single_event_list_view_item.dart';
+import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:orgami/Utils/cached_image.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:orgami/Screens/MyProfile/my_tickets_screen.dart';
-import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
-import 'package:orgami/Screens/MyProfile/badge_screen.dart';
-import 'package:orgami/Screens/MyProfile/Widgets/professional_badge_widget.dart';
+import 'package:orgami/screens/MyProfile/my_tickets_screen.dart';
+import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
+import 'package:orgami/screens/MyProfile/badge_screen.dart';
+import 'package:orgami/screens/MyProfile/Widgets/professional_badge_widget.dart';
 import 'package:orgami/models/badge_model.dart';
 import 'package:orgami/Services/badge_service.dart';
-import 'package:orgami/Screens/Home/account_details_screen.dart';
+import 'package:orgami/screens/Home/account_details_screen.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -1007,7 +1007,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                   });
                   _updateDiscoverability(value);
                 },
-                activeColor: const Color(0xFF667EEA),
+                activeThumbColor: const Color(0xFF667EEA),
                 activeTrackColor: const Color(
                   0xFF667EEA,
                 ).withValues(alpha: 0.3),

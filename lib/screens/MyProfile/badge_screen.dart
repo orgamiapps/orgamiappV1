@@ -85,9 +85,7 @@ class _BadgeScreenState extends State<BadgeScreen>
       // Try to get or generate an existing badge
       UserBadgeModel? badge = await _badgeService.getOrGenerateBadge(userId);
       // If still null, force-generate (first-time creation or stale rules/cache)
-      if (badge == null) {
-        badge = await _badgeService.generateUserBadge(userId);
-      }
+      badge ??= await _badgeService.generateUserBadge(userId);
 
       if (mounted) {
         setState(() {

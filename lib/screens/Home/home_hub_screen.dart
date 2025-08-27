@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/Screens/Home/home_screen.dart' as legacy;
+import 'package:orgami/screens/Home/home_screen.dart' as legacy;
 import 'package:orgami/screens/Home/search_screen.dart';
 import 'package:orgami/screens/QRScanner/qr_scanner_flow_screen.dart';
 import 'package:orgami/firebase/organization_helper.dart';
@@ -427,7 +427,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
 
         return ListView.separated(
           itemCount: docs.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          separatorBuilder: (_, index) => const SizedBox(height: 12),
           itemBuilder: (context, i) {
             final data = docs[i].data();
             final model = _eventFromMap(docs[i].id, data);

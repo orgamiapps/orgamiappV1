@@ -85,7 +85,7 @@ class _CreateOrganizationScreenState extends State<CreateOrganizationScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: _category,
+                initialValue: _category,
                 items: const [
                   DropdownMenuItem(value: 'Business', child: Text('Business')),
                   DropdownMenuItem(value: 'Club', child: Text('Club')),
@@ -166,17 +166,19 @@ class _CreateOrganizationScreenState extends State<CreateOrganizationScreen> {
                                   if (bannerUrl != null) 'bannerUrl': bannerUrl,
                                 });
                           }
-                          if (!mounted) return;
-                          setState(() => _submitting = false);
-                          Navigator.pop(context, id);
+                          if (mounted) {
+                            setState(() => _submitting = false);
+                            Navigator.pop(context, id);
+                          }
                         } else {
-                          if (!mounted) return;
-                          setState(() => _submitting = false);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Failed to create group'),
-                            ),
-                          );
+                          if (mounted) {
+                            setState(() => _submitting = false);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Failed to create group'),
+                              ),
+                            );
+                          }
                         }
                       },
                 child: _submitting

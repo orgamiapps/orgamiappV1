@@ -99,8 +99,10 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
 
       // Get current position with timeout and high accuracy
       Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
       );
 
       LatLng newLatLng = LatLng(position.latitude, position.longitude);

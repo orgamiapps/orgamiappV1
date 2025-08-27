@@ -425,6 +425,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
         context,
       );
 
+      if (!mounted) return;
       final overlay = Overlay.maybeOf(context);
       if (overlay == null) throw Exception('Overlay not available');
 

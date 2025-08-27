@@ -19,21 +19,21 @@ import 'package:orgami/models/attendance_model.dart';
 
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/models/event_question_model.dart';
-import 'package:orgami/Screens/Events/Attendance/attendance_sheet_screen.dart';
+import 'package:orgami/screens/Events/Attendance/attendance_sheet_screen.dart';
 
-import 'package:orgami/Screens/Events/Widget/comments_section.dart';
+import 'package:orgami/screens/Events/Widget/comments_section.dart';
 
-import 'package:orgami/Screens/Events/ticket_management_screen.dart';
-import 'package:orgami/Screens/Events/ticket_scanner_screen.dart';
-import 'package:orgami/Screens/Events/event_analytics_screen.dart';
-import 'package:orgami/Screens/Events/event_feedback_screen.dart';
-import 'package:orgami/Screens/Events/event_feedback_management_screen.dart';
-import 'package:orgami/Screens/Home/attendee_notification_screen.dart';
-import 'package:orgami/Screens/MyProfile/my_tickets_screen.dart';
-import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
+import 'package:orgami/screens/Events/ticket_management_screen.dart';
+import 'package:orgami/screens/Events/ticket_scanner_screen.dart';
+import 'package:orgami/screens/Events/event_analytics_screen.dart';
+import 'package:orgami/screens/Events/event_feedback_screen.dart';
+import 'package:orgami/screens/Events/event_feedback_management_screen.dart';
+import 'package:orgami/screens/Home/attendee_notification_screen.dart';
+import 'package:orgami/screens/MyProfile/my_tickets_screen.dart';
+import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
 
-// import 'package:orgami/Screens/QRScanner/QrScannerScreenForLogedIn.dart';
-import 'package:orgami/Screens/QRScanner/qr_scanner_flow_screen.dart';
+// import 'package:orgami/screens/QRScanner/QrScannerScreenForLogedIn.dart';
+import 'package:orgami/screens/QRScanner/qr_scanner_flow_screen.dart';
 import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:orgami/Utils/toast.dart';
@@ -43,14 +43,14 @@ import 'package:orgami/Services/ticket_payment_service.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
 import 'package:orgami/screens/Events/chose_location_in_map_screen.dart';
-import 'package:orgami/Screens/Events/feature_event_screen.dart';
-import 'package:orgami/Screens/Events/edit_event_screen.dart';
-import 'package:orgami/Screens/Events/event_location_view_screen.dart';
+import 'package:orgami/screens/Events/feature_event_screen.dart';
+import 'package:orgami/screens/Events/edit_event_screen.dart';
+import 'package:orgami/screens/Events/event_location_view_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:orgami/Screens/Events/Widget/access_list_management_widget.dart';
+import 'package:orgami/screens/Events/Widget/access_list_management_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:orgami/Screens/Events/Widget/pre_registered_horizontal_list.dart';
+import 'package:orgami/screens/Events/Widget/pre_registered_horizontal_list.dart';
 
 class SingleEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -1770,7 +1770,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                       minChildSize: 0.5,
                                       maxChildSize: 0.95,
                                       expand: false,
-                                      builder: (_, __) =>
+                                      builder: (_, index) =>
                                           AccessListManagementWidget(
                                             eventModel: eventModel,
                                           ),
@@ -1792,7 +1792,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                       minChildSize: 0.5,
                                       maxChildSize: 0.95,
                                       expand: false,
-                                      builder: (_, __) => _AccessRequestsList(
+                                      builder: (_, index) => _AccessRequestsList(
                                         eventId: eventModel.id,
                                       ),
                                     ),
@@ -2472,6 +2472,28 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       builder: (context, child) {
         return Container(
           margin: const EdgeInsets.only(bottom: 24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [_primaryBlue, _primaryPurple],
+            ),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: _primaryBlue.withValues(alpha: 0.4),
+                spreadRadius: 0,
+                blurRadius: 15,
+                offset: const Offset(0, 6),
+              ),
+              BoxShadow(
+                color: _primaryPurple.withValues(alpha: 0.3),
+                spreadRadius: 0,
+                blurRadius: 25,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
           child: FloatingActionButton.extended(
             onPressed: () => _showEventManagementModal(),
             backgroundColor: Colors.transparent,
@@ -2503,28 +2525,6 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(28),
             ),
-          ),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [_primaryBlue, _primaryPurple],
-            ),
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: _primaryBlue.withValues(alpha: 0.4),
-                spreadRadius: 0,
-                blurRadius: 15,
-                offset: const Offset(0, 6),
-              ),
-              BoxShadow(
-                color: _primaryPurple.withValues(alpha: 0.3),
-                spreadRadius: 0,
-                blurRadius: 25,
-                offset: const Offset(0, 12),
-              ),
-            ],
           ),
         );
       },
@@ -4546,29 +4546,28 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           onTap: () {
                             if (!isAnon) {
                               // Navigate to user profile if not anonymous
-                              FirebaseFirestoreHelper()
-                                  .getSingleCustomer(
-                                    customerId: attendee.customerUid,
-                                  )
-                                  .then((customer) {
-                                    if (customer != null) {
-                                      if (!mounted) return;
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              UserProfileScreen(
-                                                user: customer,
-                                                isOwnProfile:
-                                                    CustomerController
-                                                        .logeInCustomer
-                                                        ?.uid ==
-                                                    customer.uid,
-                                              ),
-                                        ),
-                                      );
-                                    }
-                                  });
+                              () async {
+                                final customer = await FirebaseFirestoreHelper()
+                                    .getSingleCustomer(
+                                      customerId: attendee.customerUid,
+                                    );
+                                if (customer != null && mounted) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          UserProfileScreen(
+                                            user: customer,
+                                            isOwnProfile:
+                                                CustomerController
+                                                    .logeInCustomer
+                                                    ?.uid ==
+                                                customer.uid,
+                                          ),
+                                    ),
+                                  );
+                                }
+                              }();
                             }
                           },
                           child: Container(
@@ -5398,14 +5397,16 @@ class _AccessRequestsList extends StatelessWidget {
         child: StreamBuilder<QuerySnapshot>(
           stream: col.snapshots(),
           builder: (context, snap) {
-            if (!snap.hasData)
+            if (!snap.hasData) {
               return const Center(child: CircularProgressIndicator());
+            }
             final docs = snap.data!.docs;
-            if (docs.isEmpty)
+            if (docs.isEmpty) {
               return const Center(child: Text('No pending requests'));
+            }
             return ListView.separated(
               itemCount: docs.length,
-              separatorBuilder: (_, __) => const Divider(height: 0),
+              separatorBuilder: (_, index) => const Divider(height: 0),
               itemBuilder: (context, i) {
                 final data = docs[i].data() as Map<String, dynamic>;
                 final userId = (data['userId'] ?? '').toString();
@@ -5446,23 +5447,5 @@ class _AccessRequestsList extends StatelessWidget {
     );
   }
 
-  void _showAllAttendeesPopup(List<AttendanceModel> attendees) {
-    // Simple implementation that works
-    print('Show all attendees: ${attendees.length} attendees');
-  }
 
-  String _formatDateTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-
-    if (difference.inDays > 0) {
-      return '${difference.inDays}d ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m ago';
-    } else {
-      return 'Just now';
-    }
-  }
 }

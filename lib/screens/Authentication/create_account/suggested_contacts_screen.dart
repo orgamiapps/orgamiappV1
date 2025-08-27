@@ -118,7 +118,7 @@ class _SuggestedContactsScreenState extends State<SuggestedContactsScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : ListView.separated(
                     itemCount: _filtered.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    separatorBuilder: (_, index) => const Divider(height: 1),
                     itemBuilder: (context, index) {
                       final user = _filtered[index];
                       final isFollowing = _followStatus[user.uid] ?? false;

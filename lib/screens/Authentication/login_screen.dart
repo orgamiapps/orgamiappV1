@@ -2,7 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:orgami/controller/customer_controller.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/Screens/Authentication/forgot_password_screen.dart';
+import 'package:orgami/screens/Authentication/forgot_password_screen.dart';
 import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/images.dart';
 import 'package:orgami/Utils/router.dart';
