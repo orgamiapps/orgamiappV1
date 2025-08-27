@@ -1351,7 +1351,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         parent: AlwaysScrollableScrollPhysics(),
       ),
       itemCount: _searchEvents.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, index) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final event = _searchEvents[index];
         return _buildEventCard(event);
@@ -1374,7 +1374,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         parent: AlwaysScrollableScrollPhysics(),
       ),
       itemCount: _searchUsers.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, index) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final user = _searchUsers[index];
         return _buildUserCard(user);
@@ -1684,7 +1684,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         parent: AlwaysScrollableScrollPhysics(),
       ),
       itemCount: _defaultEvents.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, index) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final event = _defaultEvents[index];
         return _buildEventCard(event);
@@ -1739,7 +1739,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         parent: AlwaysScrollableScrollPhysics(),
       ),
       itemCount: _defaultUsers.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, index) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final user = _defaultUsers[index];
         return GestureDetector(

@@ -1007,7 +1007,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                   });
                   _updateDiscoverability(value);
                 },
-                activeColor: const Color(0xFF667EEA),
+                activeThumbColor: const Color(0xFF667EEA),
                 activeTrackColor: const Color(
                   0xFF667EEA,
                 ).withValues(alpha: 0.3),

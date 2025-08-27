@@ -1770,7 +1770,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                       minChildSize: 0.5,
                                       maxChildSize: 0.95,
                                       expand: false,
-                                      builder: (_, __) =>
+                                      builder: (_, index) =>
                                           AccessListManagementWidget(
                                             eventModel: eventModel,
                                           ),
@@ -1792,7 +1792,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                       minChildSize: 0.5,
                                       maxChildSize: 0.95,
                                       expand: false,
-                                      builder: (_, __) => _AccessRequestsList(
+                                      builder: (_, index) => _AccessRequestsList(
                                         eventId: eventModel.id,
                                       ),
                                     ),
@@ -5398,14 +5398,16 @@ class _AccessRequestsList extends StatelessWidget {
         child: StreamBuilder<QuerySnapshot>(
           stream: col.snapshots(),
           builder: (context, snap) {
-            if (!snap.hasData)
+            if (!snap.hasData) {
               return const Center(child: CircularProgressIndicator());
+            }
             final docs = snap.data!.docs;
-            if (docs.isEmpty)
+            if (docs.isEmpty) {
               return const Center(child: Text('No pending requests'));
+            }
             return ListView.separated(
               itemCount: docs.length,
-              separatorBuilder: (_, __) => const Divider(height: 0),
+              separatorBuilder: (_, index) => const Divider(height: 0),
               itemBuilder: (context, i) {
                 final data = docs[i].data() as Map<String, dynamic>;
                 final userId = (data['userId'] ?? '').toString();

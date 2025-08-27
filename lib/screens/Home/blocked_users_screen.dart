@@ -96,7 +96,7 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
                       ),
                     );
                   },
-                  separatorBuilder: (_, __) => const Divider(height: 0),
+                  separatorBuilder: (_, index) => const Divider(height: 0),
                   itemCount: _blocked.length,
                 ),
     );

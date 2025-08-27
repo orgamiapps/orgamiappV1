@@ -71,24 +71,27 @@ class UserBadgeModel {
   ) {
     List<String> achievements = [];
 
-    if (eventsCreated >= 50)
+    if (eventsCreated >= 50) {
       achievements.add('Master Creator');
-    else if (eventsCreated >= 25)
+    } else if (eventsCreated >= 25) {
       achievements.add('Event Creator');
-    else if (eventsCreated >= 10)
+    } else if (eventsCreated >= 10) {
       achievements.add('Active Creator');
+    }
 
-    if (eventsAttended >= 50)
+    if (eventsAttended >= 50) {
       achievements.add('Super Attendee');
-    else if (eventsAttended >= 25)
+    } else if (eventsAttended >= 25) {
       achievements.add('Regular Attendee');
-    else if (eventsAttended >= 10)
+    } else if (eventsAttended >= 10) {
       achievements.add('Event Explorer');
+    }
 
-    if (dwellHours >= 100)
+    if (dwellHours >= 100) {
       achievements.add('Time Master');
-    else if (dwellHours >= 50)
+    } else if (dwellHours >= 50) {
       achievements.add('Engagement Expert');
+    }
 
     if (eventsCreated >= 10 && eventsAttended >= 10) {
       achievements.add('Community Leader');

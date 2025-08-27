@@ -41,11 +41,13 @@ class _JoinRequestsScreenState extends State<JoinRequestsScreen> {
       }
     }
 
-    if (mounted) setState(() {
-      _requests = items;
-      _userById = userMap;
-      _loading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _requests = items;
+        _userById = userMap;
+        _loading = false;
+      });
+    }
   }
 
   @override
@@ -58,7 +60,7 @@ class _JoinRequestsScreenState extends State<JoinRequestsScreen> {
               ? const Center(child: Text('No pending requests'))
               : ListView.separated(
                   itemCount: _requests.length,
-                  separatorBuilder: (_, __) => const Divider(height: 0),
+                  separatorBuilder: (_, index) => const Divider(height: 0),
                   itemBuilder: (context, i) {
                     final r = _requests[i];
                     final userId = (r['userId'] ?? '').toString();

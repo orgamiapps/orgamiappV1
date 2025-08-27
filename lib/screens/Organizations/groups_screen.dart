@@ -189,15 +189,16 @@ class _GroupsScreenState extends State<GroupsScreen> {
                                   child: ListView.separated(
                                     scrollDirection: Axis.horizontal,
                                     itemCount: _myOrgs.length,
-                                    separatorBuilder: (_, __) =>
+                                    separatorBuilder: (_, index) =>
                                         const SizedBox(width: 12),
                                     itemBuilder: (context, i) {
                                       final org = _myOrgs[i];
                                       return GestureDetector(
                                         onTap: () {
                                           final orgId = org['id'];
-                                          if (orgId == null || orgId.isEmpty)
+                                          if (orgId == null || orgId.isEmpty) {
                                             return;
+                                          }
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(
@@ -229,7 +230,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
               ),
               SliverList.separated(
                 itemCount: _discoverOrgs.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                separatorBuilder: (_, index) => const SizedBox(height: 12),
                 itemBuilder: (context, i) {
                   final o = _discoverOrgs[i];
                   return Container(

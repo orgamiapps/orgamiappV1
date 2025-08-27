@@ -906,7 +906,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
               child: ListView.separated(
                 padding: EdgeInsets.zero,
                 itemCount: _myOrgs.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                separatorBuilder: (_, index) => const SizedBox(height: 8),
                 itemBuilder: (context, index) {
                   final org = _myOrgs[index];
                   final orgId = org['id'] ?? '';
@@ -1477,7 +1477,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
         padding: const EdgeInsets.symmetric(horizontal: 16),
         scrollDirection: Axis.horizontal,
         itemCount: selected.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, index) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           final u = selected[index];
           return Semantics(
@@ -1573,7 +1573,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemCount: 6,
-      itemBuilder: (_, __) => Container(
+      itemBuilder: (_, index) => Container(
         margin: const EdgeInsets.only(bottom: 12),
         child: Shimmer.fromColors(
           baseColor: Colors.grey.shade300,

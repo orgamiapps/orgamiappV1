@@ -432,7 +432,7 @@ class _NotificationSettingsScreenState
       ),
       value: value,
       onChanged: onChanged,
-      activeColor: const Color(0xFF667EEA),
+      activeThumbColor: const Color(0xFF667EEA),
     );
   }
 

@@ -1412,7 +1412,7 @@ class _OrgAboutTab extends StatelessWidget {
                       return ListView.separated(
                         scrollDirection: Axis.horizontal,
                         itemCount: docs.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 12),
+                        separatorBuilder: (_, index) => const SizedBox(width: 12),
                         itemBuilder: (context, i) {
                           final Map<String, dynamic> m =
                               docs[i].data() as Map<String, dynamic>;

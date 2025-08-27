@@ -824,7 +824,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: _selectedGender,
+          initialValue: _selectedGender,
           decoration: InputDecoration(
             hintText: 'Select your gender (optional)',
             prefixIcon: const Icon(Icons.person_outline),
@@ -1109,7 +1109,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: Theme.of(context).colorScheme.primary,
+            activeThumbColor: Theme.of(context).colorScheme.primary,
           ),
         ],
       ),

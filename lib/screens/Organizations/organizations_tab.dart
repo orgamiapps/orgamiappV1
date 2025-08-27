@@ -29,11 +29,12 @@ class _OrganizationsTabState extends State<OrganizationsTab> {
 
   Future<void> _load() async {
     final items = await _helper.getUserOrganizationsLite();
-    if (mounted)
+    if (mounted) {
       setState(() {
         _orgs = items;
         _loading = false;
       });
+    }
   }
 
   @override
@@ -79,7 +80,7 @@ class _OrganizationsTabState extends State<OrganizationsTab> {
           ? const Center(child: Text('No groups yet'))
           : ListView.separated(
               itemCount: _orgs.length,
-              separatorBuilder: (_, __) => const Divider(height: 0),
+              separatorBuilder: (_, index) => const Divider(height: 0),
               itemBuilder: (context, index) {
                 final org = _orgs[index];
                 return ListTile(
@@ -299,7 +300,7 @@ class _OrgMembersTab extends StatelessWidget {
         final docs = snapshot.data!.docs;
         return ListView.separated(
           itemCount: docs.length,
-          separatorBuilder: (_, __) => const Divider(height: 0),
+          separatorBuilder: (_, index) => const Divider(height: 0),
           itemBuilder: (context, i) {
             final data = docs[i].data() as Map<String, dynamic>;
             return ListTile(

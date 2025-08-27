@@ -427,7 +427,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
 
         return ListView.separated(
           itemCount: docs.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          separatorBuilder: (_, index) => const SizedBox(height: 12),
           itemBuilder: (context, i) {
             final data = docs[i].data();
             final model = _eventFromMap(docs[i].id, data);
