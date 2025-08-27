@@ -10,8 +10,8 @@ import 'package:intl/intl.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/models/event_question_model.dart';
-import 'package:orgami/Screens/Events/single_event_screen.dart';
-import 'package:orgami/Screens/Home/dashboard_screen.dart';
+import 'package:orgami/screens/Events/single_event_screen.dart';
+import 'package:orgami/screens/Home/dashboard_screen.dart';
 
 import 'package:orgami/Utils/router.dart';
 

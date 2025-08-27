@@ -9,7 +9,7 @@ import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'dart:convert';
 import 'package:orgami/firebase/firebase_storage_helper.dart';
-import 'package:orgami/Screens/Authentication/forgot_password_screen.dart';
+import 'package:orgami/screens/Authentication/forgot_password_screen.dart';
 import 'package:orgami/Utils/full_screen_image_viewer.dart';
 
 class AccountDetailsScreen extends StatefulWidget {

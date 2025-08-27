@@ -5,8 +5,8 @@ import 'package:orgami/models/ticket_model.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:orgami/Screens/Events/ticket_scanner_screen.dart';
-import 'package:orgami/Screens/Events/ticket_revenue_screen.dart';
+import 'package:orgami/screens/Events/ticket_scanner_screen.dart';
+import 'package:orgami/screens/Events/ticket_revenue_screen.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 class TicketManagementScreen extends StatefulWidget {

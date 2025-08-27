@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/Screens/Home/home_screen.dart' as legacy;
+import 'package:orgami/screens/Home/home_screen.dart' as legacy;
 import 'package:orgami/screens/Home/search_screen.dart';
 import 'package:orgami/screens/QRScanner/qr_scanner_flow_screen.dart';
 import 'package:orgami/firebase/organization_helper.dart';

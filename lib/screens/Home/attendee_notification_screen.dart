@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/services/sms_notification_service.dart';
+import 'package:orgami/Services/sms_notification_service.dart';
 import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/dimensions.dart';
 import 'package:orgami/Utils/toast.dart';
