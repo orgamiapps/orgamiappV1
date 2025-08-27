@@ -6,6 +6,7 @@ import 'package:orgami/Utils/toast.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:orgami/Screens/Events/ticket_scanner_screen.dart';
+import 'package:orgami/Screens/Events/ticket_revenue_screen.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 class TicketManagementScreen extends StatefulWidget {
@@ -26,9 +27,11 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
   bool isLoading = false;
   List<TicketModel> eventTickets = [];
   final TextEditingController _maxTicketsController = TextEditingController();
+  final TextEditingController _ticketPriceController = TextEditingController();
   bool isTicketsEnabled = false;
   int maxTickets = 0;
   int issuedTickets = 0;
+  double? ticketPrice;
 
   @override
   void initState() {
@@ -36,13 +39,18 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
     isTicketsEnabled = widget.eventModel.ticketsEnabled;
     maxTickets = widget.eventModel.maxTickets;
     issuedTickets = widget.eventModel.issuedTickets;
+    ticketPrice = widget.eventModel.ticketPrice;
     _maxTicketsController.text = maxTickets.toString();
+    if (ticketPrice != null && ticketPrice! > 0) {
+      _ticketPriceController.text = ticketPrice!.toStringAsFixed(2);
+    }
     _loadEventTickets();
   }
 
   @override
   void dispose() {
     _maxTicketsController.dispose();
+    _ticketPriceController.dispose();
     super.dispose();
   }
 
@@ -81,6 +89,18 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
       return;
     }
 
+    // Parse ticket price if provided
+    double? priceInput;
+    if (_ticketPriceController.text.isNotEmpty) {
+      priceInput = double.tryParse(_ticketPriceController.text);
+      if (priceInput != null && priceInput < 0) {
+        ShowToast().showNormalToast(
+          msg: 'Please enter a valid ticket price',
+        );
+        return;
+      }
+    }
+
     setState(() {
       isLoading = true;
     });
@@ -89,12 +109,14 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
       await FirebaseFirestoreHelper().enableTicketsForEvent(
         eventId: widget.eventModel.id,
         maxTickets: maxTicketsInput,
+        ticketPrice: priceInput,
       );
 
       if (mounted) {
         setState(() {
           isTicketsEnabled = true;
           maxTickets = maxTicketsInput;
+          ticketPrice = priceInput;
           issuedTickets = 0;
           isLoading = false;
         });
@@ -182,6 +204,10 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                     _buildTicketSettings(),
                     const SizedBox(height: 24),
                     _buildTicketStats(),
+                    if (ticketPrice != null && ticketPrice! > 0) ...[
+                      const SizedBox(height: 24),
+                      _buildRevenueButton(),
+                    ],
                     const SizedBox(height: 24),
                     _buildTicketList(),
                   ],
@@ -377,6 +403,20 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
               ),
             ),
             const SizedBox(height: 16),
+            TextField(
+              controller: _ticketPriceController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: 'Ticket price (USD)',
+                hintText: 'Leave empty for free tickets',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                prefixIcon: const Icon(Icons.attach_money),
+                helperText: 'Set a price per ticket or leave empty for free tickets',
+              ),
+            ),
+            const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               height: 48,
@@ -424,6 +464,31 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                 fontFamily: 'Roboto',
               ),
             ),
+            if (ticketPrice != null && ticketPrice! > 0) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.attach_money, size: 16, color: Color(0xFF10B981)),
+                    Text(
+                      'Ticket Price: \$${ticketPrice!.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF10B981),
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -449,6 +514,93 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildRevenueButton() {
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TicketRevenueScreen(
+              eventModel: widget.eventModel,
+            ),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF10B981), Color(0xFF059669)],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF10B981).withValues(alpha: 0.3),
+              spreadRadius: 0,
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.attach_money,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'View Revenue',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Track your ticket sales and earnings',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white70,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const Icon(
+              Icons.arrow_forward_ios,
+              color: Colors.white,
+              size: 20,
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1226,13 +1226,20 @@ class FirebaseFirestoreHelper {
   Future<void> enableTicketsForEvent({
     required String eventId,
     required int maxTickets,
+    double? ticketPrice,
   }) async {
     try {
-      await _firestore.collection(EventModel.firebaseKey).doc(eventId).update({
+      final updateData = <String, dynamic>{
         'ticketsEnabled': true,
         'maxTickets': maxTickets,
         'issuedTickets': 0,
-      });
+      };
+      
+      if (ticketPrice != null) {
+        updateData['ticketPrice'] = ticketPrice;
+      }
+      
+      await _firestore.collection(EventModel.firebaseKey).doc(eventId).update(updateData);
     } catch (e) {
       Logger.debug('Error enabling tickets for event: $e');
       rethrow;

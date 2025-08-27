@@ -88,6 +88,7 @@ dependencies:
   mobile_scanner: ^7.0.1
   calendar_view: ^1.4.0
   connectivity_plus: ^6.0.5
+  flutter_stripe: ^10.1.1
 
 dev_dependencies:
   flutter_test:

@@ -38,6 +38,8 @@ import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:orgami/Utils/logger.dart';
+import 'package:orgami/Services/ticket_payment_service.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
@@ -2237,21 +2239,28 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     });
 
     try {
-      await FirebaseFirestoreHelper().issueTicket(
-        customerUid: CustomerController.logeInCustomer!.uid,
-        eventId: eventModel.id,
-        customerName: CustomerController.logeInCustomer!.name,
-        eventModel: eventModel,
-      );
+      // Check if the event has a ticket price
+      if (eventModel.ticketPrice != null && eventModel.ticketPrice! > 0) {
+        // Handle paid ticket
+        await _purchaseTicket();
+      } else {
+        // Handle free ticket
+        await FirebaseFirestoreHelper().issueTicket(
+          customerUid: CustomerController.logeInCustomer!.uid,
+          eventId: eventModel.id,
+          customerName: CustomerController.logeInCustomer!.name,
+          eventModel: eventModel,
+        );
 
-      if (mounted) {
-        setState(() {
-          _isGettingTicket = false;
-        });
+        if (mounted) {
+          setState(() {
+            _isGettingTicket = false;
+          });
 
-        ShowToast().showNormalToast(msg: 'Ticket obtained successfully!');
-        // Refresh ticket status
-        checkUserTicket(updateUI: true);
+          ShowToast().showNormalToast(msg: 'Ticket obtained successfully!');
+          // Refresh ticket status
+          checkUserTicket(updateUI: true);
+        }
       }
     } catch (e) {
       Logger.error('Error in _getTicket: $e');
@@ -2281,6 +2290,74 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         }
 
         ShowToast().showNormalToast(msg: errorMessage);
+      }
+    }
+  }
+
+  Future<void> _purchaseTicket() async {
+    try {
+      // Create a temporary ticket ID
+      final ticketId = FirebaseFirestore.instance.collection('Tickets').doc().id;
+      
+      // Create payment intent
+      final paymentData = await TicketPaymentService.createTicketPaymentIntent(
+        eventId: eventModel.id,
+        ticketId: ticketId,
+        amount: eventModel.ticketPrice!,
+        customerUid: CustomerController.logeInCustomer!.uid,
+        customerName: CustomerController.logeInCustomer!.name,
+        customerEmail: CustomerController.logeInCustomer!.email,
+        creatorUid: eventModel.customerUid,
+        eventTitle: eventModel.title,
+      );
+
+      // Process payment
+      final paymentSuccess = await TicketPaymentService.processTicketPayment(
+        clientSecret: paymentData['clientSecret'],
+        eventTitle: eventModel.title,
+      );
+
+      if (paymentSuccess) {
+        // Confirm payment and issue ticket
+        await TicketPaymentService.confirmTicketPayment(
+          paymentIntentId: paymentData['paymentIntentId'],
+          ticketId: ticketId,
+          eventId: eventModel.id,
+        );
+
+        // Issue the paid ticket
+        await TicketPaymentService.issuePaidTicket(
+          eventId: eventModel.id,
+          customerUid: CustomerController.logeInCustomer!.uid,
+          customerName: CustomerController.logeInCustomer!.name,
+          eventModel: eventModel,
+          paymentIntentId: paymentData['paymentIntentId'],
+        );
+
+        if (mounted) {
+          setState(() {
+            _isGettingTicket = false;
+          });
+
+          ShowToast().showNormalToast(msg: 'Ticket purchased successfully!');
+          // Refresh ticket status
+          checkUserTicket(updateUI: true);
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isGettingTicket = false;
+          });
+          ShowToast().showNormalToast(msg: 'Payment cancelled');
+        }
+      }
+    } catch (e) {
+      Logger.error('Error purchasing ticket: $e');
+      if (mounted) {
+        setState(() {
+          _isGettingTicket = false;
+        });
+        ShowToast().showNormalToast(msg: 'Failed to purchase ticket: ${e.toString()}');
       }
     }
   }
@@ -3701,7 +3778,9 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                   child: _buildTabButton(
                     index: 0,
                     icon: Icons.confirmation_number,
-                    label: 'Get Ticket',
+                    label: eventModel.ticketPrice != null && eventModel.ticketPrice! > 0
+                        ? 'Buy Ticket'
+                        : 'Get Ticket',
                     isSelected: _selectedTabIndex == 0,
                   ),
                 ),
@@ -3979,7 +4058,9 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                             ),
                             SizedBox(width: 8),
                             Text(
-                              'Get Ticket',
+                              eventModel.ticketPrice != null && eventModel.ticketPrice! > 0
+                                  ? 'Buy Ticket (\$${eventModel.ticketPrice!.toStringAsFixed(2)})'
+                                  : 'Get Ticket',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
