@@ -1005,10 +1005,12 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                                 : newUsername;
                           });
 
-                          if (mounted) Navigator.pop(context);
-                          ShowToast().showNormalToast(
-                            msg: 'Profile updated successfully',
-                          );
+                          if (mounted) {
+                            Navigator.pop(context);
+                            ShowToast().showNormalToast(
+                              msg: 'Profile updated successfully',
+                            );
+                          }
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppThemeColor.darkBlueColor,

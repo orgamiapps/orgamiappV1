@@ -2472,6 +2472,28 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       builder: (context, child) {
         return Container(
           margin: const EdgeInsets.only(bottom: 24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [_primaryBlue, _primaryPurple],
+            ),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: _primaryBlue.withValues(alpha: 0.4),
+                spreadRadius: 0,
+                blurRadius: 15,
+                offset: const Offset(0, 6),
+              ),
+              BoxShadow(
+                color: _primaryPurple.withValues(alpha: 0.3),
+                spreadRadius: 0,
+                blurRadius: 25,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
           child: FloatingActionButton.extended(
             onPressed: () => _showEventManagementModal(),
             backgroundColor: Colors.transparent,
@@ -2503,28 +2525,6 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(28),
             ),
-          ),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [_primaryBlue, _primaryPurple],
-            ),
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: _primaryBlue.withValues(alpha: 0.4),
-                spreadRadius: 0,
-                blurRadius: 15,
-                offset: const Offset(0, 6),
-              ),
-              BoxShadow(
-                color: _primaryPurple.withValues(alpha: 0.3),
-                spreadRadius: 0,
-                blurRadius: 25,
-                offset: const Offset(0, 12),
-              ),
-            ],
           ),
         );
       },
@@ -4546,29 +4546,28 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           onTap: () {
                             if (!isAnon) {
                               // Navigate to user profile if not anonymous
-                              FirebaseFirestoreHelper()
-                                  .getSingleCustomer(
-                                    customerId: attendee.customerUid,
-                                  )
-                                  .then((customer) {
-                                    if (customer != null) {
-                                      if (!mounted) return;
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              UserProfileScreen(
-                                                user: customer,
-                                                isOwnProfile:
-                                                    CustomerController
-                                                        .logeInCustomer
-                                                        ?.uid ==
-                                                    customer.uid,
-                                              ),
-                                        ),
-                                      );
-                                    }
-                                  });
+                              () async {
+                                final customer = await FirebaseFirestoreHelper()
+                                    .getSingleCustomer(
+                                      customerId: attendee.customerUid,
+                                    );
+                                if (customer != null && mounted) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          UserProfileScreen(
+                                            user: customer,
+                                            isOwnProfile:
+                                                CustomerController
+                                                    .logeInCustomer
+                                                    ?.uid ==
+                                                customer.uid,
+                                          ),
+                                    ),
+                                  );
+                                }
+                              }();
                             }
                           },
                           child: Container(

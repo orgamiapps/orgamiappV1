@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/cupertino.dart';
+
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:orgami/models/customer_model.dart';
@@ -58,7 +58,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
   Timer? _searchDebounce;
   List<String> _recentSearches = [];
   String _lastSearchQuery = '';
-  double _testTextScale = 1.0; // debug-only a11y testing
+  final double _testTextScale = 1.0; // debug-only a11y testing
 
   static const String _prefsKeyMode = 'new_message_last_mode';
   static const String _prefsKeyRecent = 'new_message_recent_searches';
@@ -364,17 +364,20 @@ class _NewMessageScreenState extends State<NewMessageScreen>
         participantIds: participants,
       );
       if (conv == null) {
-        ShowToast().showSnackBar('Failed to create group', context);
+        if (mounted) {
+          ShowToast().showSnackBar('Failed to create group', context);
+        }
         return;
       }
       HapticFeedback.mediumImpact();
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ChatScreen(conversationId: conv.id),
-        ),
-      );
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(conversationId: conv.id),
+          ),
+        );
+      }
     } catch (e) {
       Logger.error('Error creating group: $e');
       if (!mounted) return;
@@ -481,7 +484,9 @@ class _NewMessageScreenState extends State<NewMessageScreen>
       }
 
       if (participantIds.length < 3) {
-        ShowToast().showSnackBar('Group must have at least 3 members', context);
+        if (mounted) {
+          ShowToast().showSnackBar('Group must have at least 3 members', context);
+        }
         return;
       }
 
@@ -490,7 +495,9 @@ class _NewMessageScreenState extends State<NewMessageScreen>
         participantIds: participantIds.toList()..sort(),
       );
       if (conv == null) {
-        ShowToast().showSnackBar('Failed to create group', context);
+        if (mounted) {
+          ShowToast().showSnackBar('Failed to create group', context);
+        }
         return;
       }
 
@@ -574,7 +581,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
     if (kDebugMode) {
       final mq = MediaQuery.of(context);
       return MediaQuery(
-        data: mq.copyWith(textScaleFactor: _testTextScale),
+        data: mq.copyWith(textScaler: TextScaler.linear(_testTextScale)),
         child: scaffold,
       );
     }

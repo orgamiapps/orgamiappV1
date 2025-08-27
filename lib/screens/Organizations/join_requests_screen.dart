@@ -73,11 +73,11 @@ class _JoinRequestsScreenState extends State<JoinRequestsScreen> {
 
                     return ListTile(
                       leading: CircleAvatar(
-                        child: user?.profilePictureUrl == null
-                            ? const Icon(Icons.person)
-                            : null,
                         backgroundImage: user?.profilePictureUrl != null
                             ? NetworkImage(user!.profilePictureUrl!)
+                            : null,
+                        child: user?.profilePictureUrl == null
+                            ? const Icon(Icons.person)
                             : null,
                       ),
                       title: Text(title),

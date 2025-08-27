@@ -144,6 +144,7 @@ class _CalendarScreenState extends State<CalendarScreen>
             // Add all events regardless of status to show past events too
             _allEvents.add(event);
           } catch (e) {
+            // Skip malformed events and continue loading others
           }
         }
 

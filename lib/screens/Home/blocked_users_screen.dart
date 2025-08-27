@@ -62,10 +62,12 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
     await FirebaseFirestoreHelper().unblockUser(blockerId: uid, blockedUserId: blockedUserId);
-    setState(() {
-      _blocked.removeWhere((e) => e.uid == blockedUserId);
-    });
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User unblocked')));
+    if (mounted) {
+      setState(() {
+        _blocked.removeWhere((e) => e.uid == blockedUserId);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User unblocked')));
+    }
   }
 
   @override

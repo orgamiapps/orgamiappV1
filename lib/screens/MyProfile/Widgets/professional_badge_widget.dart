@@ -47,7 +47,7 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
 
   // Compute a UI scale factor that adapts to large text and small layouts
   double _uiScale(BuildContext context) {
-    final textScale = MediaQuery.of(context).textScaleFactor;
+    final textScale = MediaQuery.textScalerOf(context).scale(1.0);
     // When the user increases text size, gently scale down our UI to maintain fit
     final inverseTextScale = 1.0 / textScale;
     return inverseTextScale.clamp(0.85, 1.0);
@@ -182,7 +182,7 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
       PageRouteBuilder(
         opaque: false,
         barrierColor: Colors.black.withValues(alpha: 0.85),
-        pageBuilder: (_, __, ___) {
+        pageBuilder: (context, animation, secondaryAnimation) {
           final scale = _uiScale(context);
           return Scaffold(
             backgroundColor: Colors.black.withValues(alpha: 0.85),
@@ -194,7 +194,7 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
             ),
           );
         },
-        transitionsBuilder: (_, animation, __, child) {
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },
       ),
@@ -524,7 +524,7 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
               data: widget.badge.badgeQrData,
               version: QrVersions.auto,
               gapless: true,
-              foregroundColor: Colors.black,
+
               eyeStyle: const QrEyeStyle(
                 eyeShape: QrEyeShape.square,
                 color: Colors.black,
@@ -879,11 +879,13 @@ class _ActionBar extends StatelessWidget {
                   await launchUrl(url, mode: LaunchMode.externalApplication);
                 }
               } catch (_) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Unable to add to wallet at this time.'),
-                  ),
-                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Unable to add to wallet at this time.'),
+                    ),
+                  );
+                }
               }
             },
           ),
