@@ -38,6 +38,7 @@ import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:orgami/Utils/logger.dart';
+import 'package:orgami/Services/ticket_payment_service.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
@@ -49,7 +50,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:orgami/Screens/Events/Widget/access_list_management_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:orgami/Screens/MyProfile/badge_screen.dart';
 import 'package:orgami/Screens/Events/Widget/pre_registered_horizontal_list.dart';
 
 class SingleEventScreen extends StatefulWidget {
@@ -2237,21 +2237,28 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     });
 
     try {
-      await FirebaseFirestoreHelper().issueTicket(
-        customerUid: CustomerController.logeInCustomer!.uid,
-        eventId: eventModel.id,
-        customerName: CustomerController.logeInCustomer!.name,
-        eventModel: eventModel,
-      );
+      // Check if the event has a ticket price
+      if (eventModel.ticketPrice != null && eventModel.ticketPrice! > 0) {
+        // Handle paid ticket
+        await _purchaseTicket();
+      } else {
+        // Handle free ticket
+        await FirebaseFirestoreHelper().issueTicket(
+          customerUid: CustomerController.logeInCustomer!.uid,
+          eventId: eventModel.id,
+          customerName: CustomerController.logeInCustomer!.name,
+          eventModel: eventModel,
+        );
 
-      if (mounted) {
-        setState(() {
-          _isGettingTicket = false;
-        });
+        if (mounted) {
+          setState(() {
+            _isGettingTicket = false;
+          });
 
-        ShowToast().showNormalToast(msg: 'Ticket obtained successfully!');
-        // Refresh ticket status
-        checkUserTicket(updateUI: true);
+          ShowToast().showNormalToast(msg: 'Ticket obtained successfully!');
+          // Refresh ticket status
+          checkUserTicket(updateUI: true);
+        }
       }
     } catch (e) {
       Logger.error('Error in _getTicket: $e');
@@ -2281,6 +2288,79 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         }
 
         ShowToast().showNormalToast(msg: errorMessage);
+      }
+    }
+  }
+
+  Future<void> _purchaseTicket() async {
+    try {
+      // Create a temporary ticket ID
+      final ticketId = FirebaseFirestore.instance
+          .collection('Tickets')
+          .doc()
+          .id;
+
+      // Create payment intent
+      final paymentData = await TicketPaymentService.createTicketPaymentIntent(
+        eventId: eventModel.id,
+        ticketId: ticketId,
+        amount: eventModel.ticketPrice!,
+        customerUid: CustomerController.logeInCustomer!.uid,
+        customerName: CustomerController.logeInCustomer!.name,
+        customerEmail: CustomerController.logeInCustomer!.email,
+        creatorUid: eventModel.customerUid,
+        eventTitle: eventModel.title,
+      );
+
+      // Process payment
+      final paymentSuccess = await TicketPaymentService.processTicketPayment(
+        clientSecret: paymentData['clientSecret'],
+        eventTitle: eventModel.title,
+      );
+
+      if (paymentSuccess) {
+        // Confirm payment and issue ticket
+        await TicketPaymentService.confirmTicketPayment(
+          paymentIntentId: paymentData['paymentIntentId'],
+          ticketId: ticketId,
+          eventId: eventModel.id,
+        );
+
+        // Issue the paid ticket
+        await TicketPaymentService.issuePaidTicket(
+          eventId: eventModel.id,
+          customerUid: CustomerController.logeInCustomer!.uid,
+          customerName: CustomerController.logeInCustomer!.name,
+          eventModel: eventModel,
+          paymentIntentId: paymentData['paymentIntentId'],
+        );
+
+        if (mounted) {
+          setState(() {
+            _isGettingTicket = false;
+          });
+
+          ShowToast().showNormalToast(msg: 'Ticket purchased successfully!');
+          // Refresh ticket status
+          checkUserTicket(updateUI: true);
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isGettingTicket = false;
+          });
+          ShowToast().showNormalToast(msg: 'Payment cancelled');
+        }
+      }
+    } catch (e) {
+      Logger.error('Error purchasing ticket: $e');
+      if (mounted) {
+        setState(() {
+          _isGettingTicket = false;
+        });
+        ShowToast().showNormalToast(
+          msg: 'Failed to purchase ticket: ${e.toString()}',
+        );
       }
     }
   }
@@ -3701,7 +3781,11 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                   child: _buildTabButton(
                     index: 0,
                     icon: Icons.confirmation_number,
-                    label: 'Get Ticket',
+                    label:
+                        eventModel.ticketPrice != null &&
+                            eventModel.ticketPrice! > 0
+                        ? 'Buy Ticket'
+                        : 'Get Ticket',
                     isSelected: _selectedTabIndex == 0,
                   ),
                 ),
@@ -3855,18 +3939,17 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         const SizedBox(height: 12),
 
         // Description
-        Text(
-          _hasTicket
-              ? 'You have a ticket for this event and are pre-registered. Show the QR code to the event host when you arrive.'
-              : 'Get a free ticket for this event. You\'ll be automatically pre-registered and receive a QR code to show the event host when you arrive.',
-          style: const TextStyle(
-            color: Color(0xFF6B7280),
-            fontSize: 14,
-            fontFamily: 'Roboto',
-            height: 1.4,
+        if (_hasTicket)
+          const Text(
+            'You have a ticket for this event and are pre-registered. Show the QR code to the event host when you arrive.',
+            style: TextStyle(
+              color: Color(0xFF6B7280),
+              fontSize: 14,
+              fontFamily: 'Roboto',
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
           ),
-          textAlign: TextAlign.center,
-        ),
         const SizedBox(height: 20),
 
         // Action Button
@@ -3969,18 +4052,21 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                             strokeWidth: 2,
                           ),
                         )
-                      : const Row(
+                      : Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.confirmation_number,
                               color: Colors.white,
                               size: 20,
                             ),
-                            SizedBox(width: 8),
+                            const SizedBox(width: 8),
                             Text(
-                              'Get Ticket',
-                              style: TextStyle(
+                              eventModel.ticketPrice != null &&
+                                      eventModel.ticketPrice! > 0
+                                  ? 'Buy Ticket (\$${eventModel.ticketPrice!.toStringAsFixed(2)})'
+                                  : 'Get Ticket',
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
@@ -3993,64 +4079,6 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               ),
             ),
           ),
-
-        const SizedBox(height: 12),
-        // My Badge button (under My Tickets)
-        Container(
-          width: double.infinity,
-          height: 48,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF667EEA).withAlpha((0.3 * 255).round()),
-                spreadRadius: 0,
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => BadgeScreen(
-                      userId: CustomerController.logeInCustomer?.uid,
-                      isOwnBadge: true,
-                    ),
-                  ),
-                );
-              },
-              child: const Center(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.military_tech, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'My Badge',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }

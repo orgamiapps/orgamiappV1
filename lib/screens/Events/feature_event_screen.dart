@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:orgami/models/event_model.dart';
+import 'package:orgami/models/payment_model.dart';
+import 'package:orgami/Services/payment_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:orgami/Utils/logger.dart';
 
 class FeatureEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -18,6 +22,8 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
   bool _loading = false;
   final List<int> _tiers = [3, 7, 14];
   bool _untilEvent = false;
+  String? _currentPaymentIntentId;
+  String? _clientSecret;
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -397,6 +403,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
         Row(
           children: _tiers.map((days) {
             final isSelected = _selectedDays == days;
+            final price = FeaturePaymentModel.getPriceForDays(days);
             return Expanded(
               child: GestureDetector(
                 onTap: () {
@@ -408,7 +415,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
                 },
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 4),
-                  height: 60,
+                  height: 80,
                   decoration: BoxDecoration(
                     color: isSelected ? const Color(0xFFFF9800) : Colors.white,
                     borderRadius: BorderRadius.circular(16),
@@ -439,16 +446,33 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
                           ],
                   ),
                   child: Center(
-                    child: Text(
-                      '$days days',
-                      style: TextStyle(
-                        color: isSelected
-                            ? Colors.white
-                            : const Color(0xFFFF9800),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        fontFamily: 'Roboto',
-                      ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '$days days',
+                          style: TextStyle(
+                            color: isSelected
+                                ? Colors.white
+                                : const Color(0xFF1A1A1A),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '\$${price.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            color: isSelected
+                                ? Colors.white
+                                : const Color(0xFF6B7280),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -470,6 +494,14 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
         ? 'Event has started'
         : _formatTimeLeft(now, eventTime);
 
+    // Calculate price based on days until event
+    final daysUntilEvent = eventTime.difference(now).inDays;
+    final price = daysUntilEvent > 0
+        ? FeaturePaymentModel.getPriceForDays(
+            FeaturePaymentModel.getPricingTierForDays(daysUntilEvent),
+          )
+        : 0.0;
+
     return GestureDetector(
       onTap: eventInPast
           ? null
@@ -481,7 +513,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
             },
       child: Container(
         width: double.infinity,
-        height: 60,
+        height: 80,
         decoration: BoxDecoration(
           color: _untilEvent ? const Color(0xFFFF9800) : Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -510,31 +542,50 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
                 ],
         ),
         child: Center(
-          child: RichText(
-            text: TextSpan(
-              children: [
-                TextSpan(
-                  text: 'Until event takes place ',
-                  style: TextStyle(
-                    color: _untilEvent ? Colors.white : const Color(0xFFFF9800),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    fontFamily: 'Roboto',
-                  ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'Until event takes place ',
+                      style: TextStyle(
+                        color: _untilEvent
+                            ? Colors.white
+                            : const Color(0xFF1A1A1A),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                    TextSpan(
+                      text: '(${timeLeftLabel})',
+                      style: TextStyle(
+                        color: _untilEvent
+                            ? Colors.white.withValues(alpha: 0.9)
+                            : const Color(0xFF6B7280),
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
                 ),
-                TextSpan(
-                  text: '(${timeLeftLabel})',
+              ),
+              if (daysUntilEvent > 0) ...[
+                const SizedBox(height: 4),
+                Text(
+                  '\$${price.toStringAsFixed(2)}',
                   style: TextStyle(
-                    color: _untilEvent
-                        ? Colors.white.withValues(alpha: 0.9)
-                        : const Color(0xFF6B7280),
-                    fontWeight: FontWeight.w500,
+                    color: _untilEvent ? Colors.white : const Color(0xFF6B7280),
+                    fontWeight: FontWeight.w600,
                     fontSize: 14,
                     fontFamily: 'Roboto',
                   ),
                 ),
               ],
-            ),
+            ],
           ),
         ),
       ),
@@ -612,7 +663,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
             borderRadius: BorderRadius.circular(16),
             onTap: (_loading || (_selectedDays == null && !_untilEvent))
                 ? null
-                : _featureEvent,
+                : _processPaymentAndFeature,
             child: Center(
               child: _loading
                   ? const SizedBox(
@@ -625,7 +676,7 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
                     )
                   : Text(
                       (_selectedDays != null || _untilEvent)
-                          ? 'Feature Now'
+                          ? 'Pay & Feature Event'
                           : 'Select Duration to Feature',
                       style: TextStyle(
                         color: (_selectedDays != null || _untilEvent)
@@ -643,41 +694,112 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
     );
   }
 
-  Future<void> _featureEvent() async {
-    if (_selectedDays == null && !_untilEvent) return;
+  Future<void> _processPaymentAndFeature() async {
+    if ((_selectedDays == null && !_untilEvent) || _loading) return;
 
     setState(() => _loading = true);
-    DateTime endDate;
-    if (_untilEvent) {
-      endDate = widget.eventModel.selectedDateTime;
-      // Guard: if event time already passed, stop early
-      if (endDate.isBefore(DateTime.now())) {
-        setState(() => _loading = false);
+
+    try {
+      // Determine duration in days
+      int durationDays;
+      if (_untilEvent) {
+        final daysUntilEvent = widget.eventModel.selectedDateTime
+            .difference(DateTime.now())
+            .inDays;
+        if (daysUntilEvent <= 0) {
+          throw Exception('Event has already started or passed');
+        }
+        // Use pricing tier for "until event" option
+        durationDays = FeaturePaymentModel.getPricingTierForDays(
+          daysUntilEvent,
+        );
+      } else {
+        durationDays = _selectedDays!;
+      }
+
+      // Create payment intent via Cloud Function
+      Logger.debug('Creating payment intent...');
+      final paymentData = await PaymentService.createPaymentIntent(
+        eventId: widget.eventModel.id,
+        durationDays: durationDays,
+        customerUid: FirebaseAuth.instance.currentUser!.uid,
+      );
+
+      _clientSecret = paymentData['clientSecret'];
+      _currentPaymentIntentId = paymentData['paymentIntentId'];
+
+      // Process payment with Stripe
+      Logger.debug('Processing payment...');
+      final paymentSuccess = await PaymentService.processPayment(
+        clientSecret: _clientSecret!,
+        eventId: widget.eventModel.id,
+      );
+
+      if (paymentSuccess) {
+        // Payment successful, now feature the event
+        await _featureEventAfterPayment();
+
         if (mounted) {
+          Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Event start time has already passed.'),
-              backgroundColor: Color(0xFFFF9800),
+              content: Text('Payment successful! Your event is now featured!'),
+              backgroundColor: Color(0xFF4CAF50),
             ),
           );
         }
-        return;
+      } else {
+        throw Exception('Payment was cancelled or failed');
+      }
+    } catch (e) {
+      Logger.error('Payment failed: $e', e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Payment failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  Future<void> _featureEventAfterPayment() async {
+    DateTime endDate;
+    if (_untilEvent) {
+      endDate = widget.eventModel.selectedDateTime;
+      if (endDate.isBefore(DateTime.now())) {
+        throw Exception('Event start time has already passed.');
       }
     } else {
       endDate = DateTime.now().add(Duration(days: _selectedDays!));
     }
+
+    // Update the event to featured status
     await FirebaseFirestore.instance
         .collection(EventModel.firebaseKey)
         .doc(widget.eventModel.id)
         .update({'isFeatured': true, 'featureEndDate': endDate});
-    setState(() => _loading = false);
-    if (mounted) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Event is now featured!'),
-          backgroundColor: Color(0xFFFF9800),
-        ),
+
+    // Confirm payment in backend
+    if (_currentPaymentIntentId != null) {
+      final durationDays = _untilEvent
+          ? FeaturePaymentModel.getPricingTierForDays(
+              widget.eventModel.selectedDateTime
+                  .difference(DateTime.now())
+                  .inDays,
+            )
+          : _selectedDays!;
+
+      await PaymentService.confirmFeaturePayment(
+        paymentIntentId: _currentPaymentIntentId!,
+        eventId: widget.eventModel.id,
+        durationDays: durationDays,
+        untilEvent: _untilEvent,
       );
     }
   }
