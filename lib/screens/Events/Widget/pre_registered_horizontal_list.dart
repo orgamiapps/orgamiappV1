@@ -6,7 +6,7 @@ import 'package:orgami/models/event_model.dart';
 import 'package:orgami/models/ticket_model.dart';
 import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/logger.dart';
-import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
+import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
 import 'package:orgami/controller/customer_controller.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 

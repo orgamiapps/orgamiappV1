@@ -425,7 +425,7 @@ class _TicketRevenueScreenState extends State<TicketRevenueScreen> {
                 ],
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );

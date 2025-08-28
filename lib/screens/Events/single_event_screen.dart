@@ -19,21 +19,21 @@ import 'package:orgami/models/attendance_model.dart';
 
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/models/event_question_model.dart';
-import 'package:orgami/Screens/Events/Attendance/attendance_sheet_screen.dart';
+import 'package:orgami/screens/Events/Attendance/attendance_sheet_screen.dart';
 
-import 'package:orgami/Screens/Events/Widget/comments_section.dart';
+import 'package:orgami/screens/Events/Widget/comments_section.dart';
 
-import 'package:orgami/Screens/Events/ticket_management_screen.dart';
-import 'package:orgami/Screens/Events/ticket_scanner_screen.dart';
-import 'package:orgami/Screens/Events/event_analytics_screen.dart';
-import 'package:orgami/Screens/Events/event_feedback_screen.dart';
-import 'package:orgami/Screens/Events/event_feedback_management_screen.dart';
-import 'package:orgami/Screens/Home/attendee_notification_screen.dart';
-import 'package:orgami/Screens/MyProfile/my_tickets_screen.dart';
-import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
+import 'package:orgami/screens/Events/ticket_management_screen.dart';
+import 'package:orgami/screens/Events/ticket_scanner_screen.dart';
+import 'package:orgami/screens/Events/event_analytics_screen.dart';
+import 'package:orgami/screens/Events/event_feedback_screen.dart';
+import 'package:orgami/screens/Events/event_feedback_management_screen.dart';
+import 'package:orgami/screens/Home/attendee_notification_screen.dart';
+import 'package:orgami/screens/MyProfile/my_tickets_screen.dart';
+import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
 
-// import 'package:orgami/Screens/QRScanner/QrScannerScreenForLogedIn.dart';
-import 'package:orgami/Screens/QRScanner/qr_scanner_flow_screen.dart';
+// import 'package:orgami/screens/QRScanner/QrScannerScreenForLogedIn.dart';
+import 'package:orgami/screens/QRScanner/qr_scanner_flow_screen.dart';
 import 'package:orgami/Utils/colors.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:orgami/Utils/toast.dart';
@@ -43,14 +43,14 @@ import 'package:orgami/Services/ticket_payment_service.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
 import 'package:orgami/screens/Events/chose_location_in_map_screen.dart';
-import 'package:orgami/Screens/Events/feature_event_screen.dart';
-import 'package:orgami/Screens/Events/edit_event_screen.dart';
-import 'package:orgami/Screens/Events/event_location_view_screen.dart';
+import 'package:orgami/screens/Events/feature_event_screen.dart';
+import 'package:orgami/screens/Events/edit_event_screen.dart';
+import 'package:orgami/screens/Events/event_location_view_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:orgami/Screens/Events/Widget/access_list_management_widget.dart';
+import 'package:orgami/screens/Events/Widget/access_list_management_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:orgami/Screens/Events/Widget/pre_registered_horizontal_list.dart';
+import 'package:orgami/screens/Events/Widget/pre_registered_horizontal_list.dart';
 
 class SingleEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -74,7 +74,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   bool _isCheckingTicket = false;
   bool _justSignedIn =
       false; // Flag to prevent showing sign-in dialog immediately after sign-in
-  int _selectedTabIndex = 0;
+  // Tab index removed - no longer using tabs
 
   // RSVP state
   bool _isRsvped = false;
@@ -1244,6 +1244,12 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                   newEventModel.latitude != eventModel.latitude ||
                   newEventModel.longitude != eventModel.longitude;
 
+              // Check if ticket settings have changed
+              final ticketSettingsChanged =
+                  newEventModel.ticketsEnabled != eventModel.ticketsEnabled ||
+                  newEventModel.ticketPrice != eventModel.ticketPrice ||
+                  newEventModel.maxTickets != eventModel.maxTickets;
+
               setState(() {
                 eventModel = newEventModel;
                 // Reset address lookup if coordinates changed
@@ -1255,6 +1261,25 @@ class _SingleEventScreenState extends State<SingleEventScreen>
               // Refresh address lookup if coordinates changed
               if (coordinatesChanged) {
                 _getAddressFromCoordinates();
+              }
+
+              // Re-check user ticket status if ticket settings changed
+              if (ticketSettingsChanged) {
+                Logger.info(
+                  'Ticket settings changed - refreshing ticket status',
+                );
+                // If tickets are now disabled, clear the ticket status
+                if (!newEventModel.ticketsEnabled) {
+                  setState(() {
+                    _hasTicket = false;
+                  });
+                } else {
+                  // Re-check if user has a ticket for this event
+                  checkUserTicket(updateUI: true);
+                }
+
+                // Refresh the attendance and ticket counts
+                loadEventSummary();
               }
             }
           }
@@ -1451,6 +1476,17 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
   Future<void> checkUserTicket({bool updateUI = true}) async {
     if (CustomerController.logeInCustomer == null) {
+      return;
+    }
+
+    // If tickets are not enabled for this event, user can't have a ticket
+    if (!eventModel.ticketsEnabled) {
+      if (mounted && updateUI) {
+        setState(() {
+          _hasTicket = false;
+          _isCheckingTicket = false;
+        });
+      }
       return;
     }
 
@@ -1770,7 +1806,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                       minChildSize: 0.5,
                                       maxChildSize: 0.95,
                                       expand: false,
-                                      builder: (_, __) =>
+                                      builder: (_, index) =>
                                           AccessListManagementWidget(
                                             eventModel: eventModel,
                                           ),
@@ -1792,9 +1828,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                       minChildSize: 0.5,
                                       maxChildSize: 0.95,
                                       expand: false,
-                                      builder: (_, __) => _AccessRequestsList(
-                                        eventId: eventModel.id,
-                                      ),
+                                      builder: (_, index) =>
+                                          _AccessRequestsList(
+                                            eventId: eventModel.id,
+                                          ),
                                     ),
                                   ).then((_) => _showEventManagementModal());
                                 },
@@ -2131,6 +2168,22 @@ Join us at: $eventUrl
     SharePlus.instance.share(ShareParams(text: shareText));
   }
 
+  void _handleSignIn() {
+    // Check if already signed in
+    if (signedIn == null || signedIn!) {
+      ShowToast().showNormalToast(
+        msg: 'You\'re already signed in for this event.',
+      );
+      return;
+    }
+
+    // Navigate to QR Scanner Flow Screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const QRScannerFlowScreen()),
+    );
+  }
+
   void _addToCalendar() async {
     if (!mounted) return;
 
@@ -2230,6 +2283,12 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
   Future<void> _getTicket() async {
     if (CustomerController.logeInCustomer == null) {
       ShowToast().showNormalToast(msg: 'Please log in to get a ticket');
+      return;
+    }
+
+    // Check if tickets are enabled for this event
+    if (!eventModel.ticketsEnabled) {
+      ShowToast().showNormalToast(msg: 'This event does not require tickets');
       return;
     }
 
@@ -2472,6 +2531,28 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       builder: (context, child) {
         return Container(
           margin: const EdgeInsets.only(bottom: 24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [_primaryBlue, _primaryPurple],
+            ),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: _primaryBlue.withValues(alpha: 0.4),
+                spreadRadius: 0,
+                blurRadius: 15,
+                offset: const Offset(0, 6),
+              ),
+              BoxShadow(
+                color: _primaryPurple.withValues(alpha: 0.3),
+                spreadRadius: 0,
+                blurRadius: 25,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
           child: FloatingActionButton.extended(
             onPressed: () => _showEventManagementModal(),
             backgroundColor: Colors.transparent,
@@ -2503,28 +2584,6 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(28),
             ),
-          ),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [_primaryBlue, _primaryPurple],
-            ),
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: _primaryBlue.withValues(alpha: 0.4),
-                spreadRadius: 0,
-                blurRadius: 15,
-                offset: const Offset(0, 6),
-              ),
-              BoxShadow(
-                color: _primaryPurple.withValues(alpha: 0.3),
-                spreadRadius: 0,
-                blurRadius: 25,
-                offset: const Offset(0, 12),
-              ),
-            ],
           ),
         );
       },
@@ -2603,9 +2662,15 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                         ],
                       )
                     else
-                      // Calendar, Favorite, and Share buttons for non-creators
+                      // QR Scanner, Calendar, Favorite, and Share buttons for non-creators
                       Row(
                         children: [
+                          _buildModernButton(
+                            icon: Icons.qr_code_scanner,
+                            onTap: () => _handleSignIn(),
+                            tooltip: 'Sign In',
+                          ),
+                          const SizedBox(width: 16),
                           _buildModernButton(
                             icon: Icons.calendar_today,
                             onTap: () => _addToCalendar(),
@@ -3747,120 +3812,151 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     );
   }
 
-  // Tabbed Content Section - Clean and organized
+  // Modern Event Ticket Section with Professional UI/UX
   Widget _buildTabbedContentSection() {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha((0.08 * 255).round()),
+            color: const Color(0xFF000000).withValues(alpha: 0.04),
             spreadRadius: 0,
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: const Color(0xFF000000).withValues(alpha: 0.02),
+            spreadRadius: 0,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Column(
-        children: [
-          // Tab Headers
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8F9FA),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildTabButton(
-                    index: 0,
-                    icon: Icons.confirmation_number,
-                    label:
-                        eventModel.ticketPrice != null &&
-                            eventModel.ticketPrice! > 0
-                        ? 'Buy Ticket'
-                        : 'Get Ticket',
-                    isSelected: _selectedTabIndex == 0,
-                  ),
-                ),
-                Expanded(
-                  child: _buildTabButton(
-                    index: 1,
-                    icon: Icons.qr_code_scanner,
-                    label: 'Sign In',
-                    isSelected: _selectedTabIndex == 1,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Tab Content
-          Container(
-            padding: const EdgeInsets.all(20),
-            child: _buildTabContent(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabButton({
-    required int index,
-    required IconData icon,
-    required String label,
-    required bool isSelected,
-  }) {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedTabIndex = index;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withAlpha((0.1 * 255).round()),
-                    spreadRadius: 0,
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: isSelected
-                  ? const Color(0xFF667EEA)
-                  : const Color(0xFF6B7280),
-              size: 20,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected
-                    ? const Color(0xFF667EEA)
-                    : const Color(0xFF6B7280),
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                fontSize: 12,
-                fontFamily: 'Roboto',
+            // Modern gradient header - Dynamic based on ticket status
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: eventModel.ticketsEnabled
+                      ? [const Color(0xFFFFF4E6), const Color(0xFFFFEDD5)]
+                      : [const Color(0xFFF0FDF4), const Color(0xFFDCFCE7)],
+                ),
               ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: eventModel.ticketsEnabled
+                              ? const Color(0xFFFF9800).withValues(alpha: 0.2)
+                              : const Color(0xFF10B981).withValues(alpha: 0.2),
+                          spreadRadius: 0,
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      eventModel.ticketsEnabled
+                          ? Icons.confirmation_number_rounded
+                          : Icons.event_available_rounded,
+                      color: eventModel.ticketsEnabled
+                          ? const Color(0xFFFF9800)
+                          : const Color(0xFF10B981),
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          eventModel.ticketsEnabled
+                              ? 'Event Ticket'
+                              : 'Event Access',
+                          style: const TextStyle(
+                            color: Color(0xFF1F2937),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 17,
+                            fontFamily: 'Roboto',
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          eventModel.ticketsEnabled
+                              ? (eventModel.ticketPrice != null &&
+                                        eventModel.ticketPrice! > 0
+                                    ? 'Price: \$${eventModel.ticketPrice!.toStringAsFixed(2)}'
+                                    : 'Free Ticket Required')
+                              : 'Open Event - No Ticket Required',
+                          style: const TextStyle(
+                            color: Color(0xFF6B7280),
+                            fontWeight: FontWeight.w500,
+                            fontSize: 13,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_hasTicket && eventModel.ticketsEnabled)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.check_circle,
+                            color: Color(0xFF10B981),
+                            size: 14,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'Obtained',
+                            style: TextStyle(
+                              color: Color(0xFF10B981),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            // Ticket Content with padding
+            Container(
+              padding: const EdgeInsets.all(20),
+              child: _buildTicketsTab(),
             ),
           ],
         ),
@@ -3868,37 +3964,39 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     );
   }
 
-  Widget _buildTabContent() {
-    switch (_selectedTabIndex) {
-      case 0:
-        return _buildTicketsTab();
-      case 1:
-        return _buildSignInTab();
-      default:
-        return _buildTicketsTab();
-    }
-  }
-
   Widget _buildTicketsTab() {
     if (!eventModel.ticketsEnabled) {
-      return const Center(
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.event_busy, color: Color(0xFF6B7280), size: 48),
-            SizedBox(height: 16),
-            Text(
-              'Tickets Not Available',
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(
+                Icons.event_available_rounded,
+                color: Color(0xFF10B981),
+                size: 40,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Free Entry',
               style: TextStyle(
-                color: Color(0xFF1A1A1A),
+                color: Color(0xFF1F2937),
                 fontWeight: FontWeight.w600,
                 fontSize: 16,
                 fontFamily: 'Roboto',
+                letterSpacing: -0.2,
               ),
             ),
-            SizedBox(height: 8),
-            Text(
-              'This event doesn\'t offer tickets.',
+            const SizedBox(height: 8),
+            const Text(
+              'No ticket required for this event',
               style: TextStyle(
                 color: Color(0xFF6B7280),
                 fontSize: 14,
@@ -3912,46 +4010,107 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     }
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Ticket Status
-        Row(
-          children: [
-            Icon(
-              _hasTicket ? Icons.check_circle : Icons.confirmation_number,
-              color: _hasTicket
-                  ? const Color(0xFF10B981)
-                  : const Color(0xFFFF9800),
-              size: 24,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                _hasTicket ? 'Ticket Received' : 'Get Event Ticket',
-                style: const TextStyle(
-                  color: Color(0xFF1A1A1A),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  fontFamily: 'Roboto',
-                ),
+        // Status message with modern design
+        if (_hasTicket) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF10B981).withValues(alpha: 0.05),
+                  const Color(0xFF059669).withValues(alpha: 0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                width: 1,
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 12),
-
-        // Description
-        if (_hasTicket)
-          const Text(
-            'You have a ticket for this event and are pre-registered. Show the QR code to the event host when you arrive.',
-            style: TextStyle(
-              color: Color(0xFF6B7280),
-              fontSize: 14,
-              fontFamily: 'Roboto',
-              height: 1.4,
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.check_circle_rounded,
+                    color: Color(0xFF10B981),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'You\'re all set!',
+                        style: TextStyle(
+                          color: Color(0xFF065F46),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Show your QR code at the event entrance',
+                        style: TextStyle(
+                          color: Color(0xFF047857),
+                          fontSize: 13,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            textAlign: TextAlign.center,
           ),
-        const SizedBox(height: 20),
+          const SizedBox(height: 20),
+        ] else ...[
+          // Info card for getting ticket
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF9FAFB),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.info_outline_rounded,
+                  color: Color(0xFF6B7280),
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    eventModel.ticketPrice != null &&
+                            eventModel.ticketPrice! > 0
+                        ? 'Secure your spot for this event'
+                        : 'Reserve your free ticket now',
+                    style: const TextStyle(
+                      color: Color(0xFF4B5563),
+                      fontSize: 14,
+                      fontFamily: 'Roboto',
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
 
         // Action Button
         if (_isCheckingTicket)
@@ -4031,17 +4190,17 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFFF9800).withAlpha((0.3 * 255).round()),
+                  color: const Color(0xFFFF9800).withValues(alpha: 0.25),
                   spreadRadius: 0,
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 onTap: _isGettingTicket ? null : _getTicket,
                 child: Center(
                   child: _isGettingTicket
@@ -4050,28 +4209,29 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           height: 20,
                           child: CircularProgressIndicator(
                             color: Colors.white,
-                            strokeWidth: 2,
+                            strokeWidth: 2.5,
                           ),
                         )
                       : Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Icon(
-                              Icons.confirmation_number,
+                              Icons.shopping_bag_rounded,
                               color: Colors.white,
                               size: 20,
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 10),
                             Text(
                               eventModel.ticketPrice != null &&
                                       eventModel.ticketPrice! > 0
-                                  ? 'Buy Ticket (\$${eventModel.ticketPrice!.toStringAsFixed(2)})'
-                                  : 'Get Ticket',
+                                  ? 'Buy Ticket • \$${eventModel.ticketPrice!.toStringAsFixed(2)}'
+                                  : 'Get Free Ticket',
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
                                 fontFamily: 'Roboto',
+                                letterSpacing: -0.2,
                               ),
                             ),
                           ],
@@ -4080,138 +4240,6 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               ),
             ),
           ),
-      ],
-    );
-  }
-
-  Widget _buildSignInTab() {
-    if (signedIn == null || signedIn!) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.check_circle, color: Color(0xFF10B981), size: 48),
-            SizedBox(height: 16),
-            Text(
-              'Already Signed In',
-              style: TextStyle(
-                color: Color(0xFF1A1A1A),
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-                fontFamily: 'Roboto',
-              ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'You\'re already signed in for this event.',
-              style: TextStyle(
-                color: Color(0xFF6B7280),
-                fontSize: 14,
-                fontFamily: 'Roboto',
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        // Header
-        Row(
-          children: [
-            const Icon(
-              Icons.qr_code_scanner,
-              color: Color(0xFF10B981),
-              size: 24,
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                'Sign In to Event',
-                style: TextStyle(
-                  color: Color(0xFF1A1A1A),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  fontFamily: 'Roboto',
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-
-        // Description
-        const Text(
-          'Scan QR code or manually enter the event code to sign in.',
-          style: TextStyle(
-            color: Color(0xFF6B7280),
-            fontSize: 14,
-            fontFamily: 'Roboto',
-            height: 1.4,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 20),
-
-        // QR Code Scanner Button
-        Container(
-          width: double.infinity,
-          height: 48,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF10B981), Color(0xFF059669)],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF10B981).withAlpha((0.3 * 255).round()),
-                spreadRadius: 0,
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const QRScannerFlowScreen(),
-                  ),
-                );
-              },
-              child: const Center(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      CupertinoIcons.qrcode_viewfinder,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    SizedBox(width: 8),
-                    Text(
-                      'Scan QR Code or Enter Code',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -4546,29 +4574,27 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           onTap: () {
                             if (!isAnon) {
                               // Navigate to user profile if not anonymous
-                              FirebaseFirestoreHelper()
-                                  .getSingleCustomer(
-                                    customerId: attendee.customerUid,
-                                  )
-                                  .then((customer) {
-                                    if (customer != null) {
-                                      if (!mounted) return;
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              UserProfileScreen(
-                                                user: customer,
-                                                isOwnProfile:
-                                                    CustomerController
-                                                        .logeInCustomer
-                                                        ?.uid ==
-                                                    customer.uid,
-                                              ),
-                                        ),
-                                      );
-                                    }
-                                  });
+                              () async {
+                                final customer = await FirebaseFirestoreHelper()
+                                    .getSingleCustomer(
+                                      customerId: attendee.customerUid,
+                                    );
+                                if (customer != null && mounted) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => UserProfileScreen(
+                                        user: customer,
+                                        isOwnProfile:
+                                            CustomerController
+                                                .logeInCustomer
+                                                ?.uid ==
+                                            customer.uid,
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }();
                             }
                           },
                           child: Container(
@@ -5398,14 +5424,16 @@ class _AccessRequestsList extends StatelessWidget {
         child: StreamBuilder<QuerySnapshot>(
           stream: col.snapshots(),
           builder: (context, snap) {
-            if (!snap.hasData)
+            if (!snap.hasData) {
               return const Center(child: CircularProgressIndicator());
+            }
             final docs = snap.data!.docs;
-            if (docs.isEmpty)
+            if (docs.isEmpty) {
               return const Center(child: Text('No pending requests'));
+            }
             return ListView.separated(
               itemCount: docs.length,
-              separatorBuilder: (_, __) => const Divider(height: 0),
+              separatorBuilder: (_, index) => const Divider(height: 0),
               itemBuilder: (context, i) {
                 final data = docs[i].data() as Map<String, dynamic>;
                 final userId = (data['userId'] ?? '').toString();
@@ -5444,25 +5472,5 @@ class _AccessRequestsList extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  void _showAllAttendeesPopup(List<AttendanceModel> attendees) {
-    // Simple implementation that works
-    print('Show all attendees: ${attendees.length} attendees');
-  }
-
-  String _formatDateTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-
-    if (difference.inDays > 0) {
-      return '${difference.inDays}d ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m ago';
-    } else {
-      return 'Just now';
-    }
   }
 }

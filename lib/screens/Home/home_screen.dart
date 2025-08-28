@@ -13,18 +13,18 @@ import 'package:flutter/foundation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:orgami/models/event_model.dart';
 import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/Screens/Events/single_event_screen.dart';
-import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
+import 'package:orgami/screens/Events/single_event_screen.dart';
+import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:orgami/Screens/Events/Widget/single_event_list_view_item.dart';
+import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/controller/customer_controller.dart';
 import 'package:orgami/Utils/toast.dart';
-import 'package:orgami/Screens/QRScanner/qr_scanner_flow_screen.dart';
+import 'package:orgami/screens/QRScanner/qr_scanner_flow_screen.dart';
 
 import 'package:orgami/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
@@ -197,13 +197,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     // Initialize animations with reduced durations for better performance
     _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 800), // Slightly increased for smoother animation
       vsync: this,
     );
-    _pulseAnimation = Tween<double>(begin: 0.9, end: 1.1).animate(
+    _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate( // Reduced animation range
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
-    _pulseController.repeat(reverse: true);
+    // Defer animation start to reduce initial load
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        _pulseController.repeat(reverse: true);
+      }
+    });
 
     // Initialize fade animation
     _fadeController = AnimationController(
@@ -232,18 +237,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       CurvedAnimation(parent: _fabOpacityController, curve: Curves.easeInOut),
     );
 
-    // Load default content
-    _loadDefaultEvents();
-    _loadDefaultUsers();
-
-    // Remove the artificial loading delay - let StreamBuilder handle loading state
-    // Future.delayed(const Duration(seconds: 2), () {
-    //   if (mounted) {
-    //     setState(() {
-    //       isLoading = false;
-    //     });
-    //   }
-    // });
+    // Defer loading default content to avoid blocking the UI
+    // This allows the screen to render immediately while data loads in background
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        _loadDefaultEvents();
+        _loadDefaultUsers();
+      }
+    });
 
     // Set loading to false immediately since StreamBuilder will handle the loading state
     setState(() {
@@ -1351,7 +1352,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         parent: AlwaysScrollableScrollPhysics(),
       ),
       itemCount: _searchEvents.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, index) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final event = _searchEvents[index];
         return _buildEventCard(event);
@@ -1374,7 +1375,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         parent: AlwaysScrollableScrollPhysics(),
       ),
       itemCount: _searchUsers.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, index) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final user = _searchUsers[index];
         return _buildUserCard(user);
@@ -1557,16 +1558,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // Load default events (all events, past and present)
   Future<void> _loadDefaultEvents() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoadingDefaultEvents = true;
     });
 
     try {
       // Get all non-private events from Firestore without complex ordering
+      // Use smaller limit initially for faster load
       final querySnapshot = await FirebaseFirestore.instance
           .collection(EventModel.firebaseKey)
           .where('private', isEqualTo: false)
-          .limit(50)
+          .limit(20) // Reduced from 50 to improve initial load
           .get();
 
       if (mounted) {
@@ -1599,6 +1603,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // Load default users (ascending by name)
   Future<void> _loadDefaultUsers() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoadingDefaultUsers = true;
     });
@@ -1606,7 +1612,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     try {
       final users = await FirebaseFirestoreHelper().searchUsers(
         searchQuery: '', // Empty query to get all users
-        limit: 50,
+        limit: 20, // Reduced from 50 to improve initial load
       );
 
       if (mounted) {
@@ -1684,7 +1690,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         parent: AlwaysScrollableScrollPhysics(),
       ),
       itemCount: _defaultEvents.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, index) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final event = _defaultEvents[index];
         return _buildEventCard(event);
@@ -1739,7 +1745,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         parent: AlwaysScrollableScrollPhysics(),
       ),
       itemCount: _defaultUsers.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, index) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final user = _defaultUsers[index];
         return GestureDetector(

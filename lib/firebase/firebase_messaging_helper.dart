@@ -43,16 +43,13 @@ class FirebaseMessagingHelper {
         final connectivity = await Connectivity().checkConnectivity().timeout(
           const Duration(milliseconds: 500),
         );
-        if (connectivity is ConnectivityResult) {
-          isOnline = connectivity != ConnectivityResult.none;
-        } else if (connectivity is Iterable) {
-          final list = List<ConnectivityResult>.from(
-            connectivity.cast<ConnectivityResult>(),
-          );
-          isOnline =
-              list.isNotEmpty &&
-              !list.every((c) => c == ConnectivityResult.none);
-        }
+        // connectivity is always a List<ConnectivityResult> in newer versions
+        final list = List<ConnectivityResult>.from(
+          connectivity.cast<ConnectivityResult>(),
+        );
+        isOnline =
+            list.isNotEmpty &&
+            !list.every((c) => c == ConnectivityResult.none);
       } catch (_) {
         // Assume online if check fails
         isOnline = true;

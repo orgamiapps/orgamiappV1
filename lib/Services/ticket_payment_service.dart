@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:orgami/models/ticket_payment_model.dart';
 import 'package:orgami/models/ticket_model.dart';
 import 'package:orgami/models/event_model.dart';
@@ -11,7 +11,7 @@ import 'package:orgami/Utils/logger.dart';
 class TicketPaymentService {
   static final FirebaseFunctions _functions = FirebaseFunctions.instance;
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  static final FirebaseAuth _auth = FirebaseAuth.instance;
+
 
   /// Create a payment intent for purchasing a ticket
   static Future<Map<String, dynamic>> createTicketPaymentIntent({

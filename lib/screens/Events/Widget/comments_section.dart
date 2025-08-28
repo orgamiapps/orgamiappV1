@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/models/comment_model.dart';
 import 'package:orgami/models/event_model.dart';
-import 'package:orgami/Screens/MyProfile/user_profile_screen.dart';
+import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
 import 'package:orgami/Utils/router.dart';
 import 'package:orgami/Utils/logger.dart';
 

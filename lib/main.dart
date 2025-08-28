@@ -9,7 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:orgami/Utils/error_handler.dart';
 import 'package:firebase_messaging/firebase_messaging.dart' as fcm;
-import 'package:firebase_app_check/firebase_app_check.dart';
+// import 'package:firebase_app_check/firebase_app_check.dart'; // Commented out until App Check API is enabled
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
@@ -29,75 +29,84 @@ void main() async {
 
   Logger.info('Starting app initialization...');
 
-  // Quick Firebase initialization
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    Logger.success('Firebase core initialized');
-  } catch (e, st) {
-    Logger.error('Firebase initialization failed', e, st);
-  }
-
-  // Load theme preference in parallel
-  final themeFuture = SharedPreferences.getInstance().then(
-    (prefs) => prefs.getBool('isDarkMode') ?? false,
-  );
-
-  // Get theme result
-  final isDarkMode = await themeFuture;
-
-  // Initialize Stripe
-  // TODO: Replace with your actual Stripe publishable key
-  // For testing, you can use Stripe's test publishable key
-  Stripe.publishableKey = 'pk_test_YOUR_PUBLISHABLE_KEY';
-  Logger.info('Stripe initialized');
-
-  Logger.success('App initialization complete');
-
-  // Run the app immediately
+  // Run the app immediately with minimal initialization
   runApp(
     ChangeNotifierProvider(
-      create: (context) => ThemeProvider()..loadTheme(isDarkMode),
+      create: (context) => ThemeProvider()..loadTheme(false), // Use default theme initially
       child: const MyApp(),
     ),
   );
 
-  // Defer heavy initialization to after the app starts
-  _initializeBackgroundServices();
+  // Defer ALL heavy initialization to after first frame
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    // Initialize Firebase after UI is rendered
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      Logger.success('Firebase core initialized');
+    } catch (e, st) {
+      Logger.error('Firebase initialization failed', e, st);
+    }
+
+    // Load theme preference and update if needed
+    SharedPreferences.getInstance().then((prefs) {
+      final isDarkMode = prefs.getBool('isDarkMode') ?? false;
+      if (isDarkMode) {
+        // Only update if not default
+        ThemeProvider().loadTheme(isDarkMode);
+      }
+    });
+
+    // Initialize Stripe
+    // TODO: Replace with your actual Stripe publishable key
+    // For testing, you can use Stripe's test publishable key
+    Stripe.publishableKey = 'pk_test_YOUR_PUBLISHABLE_KEY';
+    Logger.info('Stripe initialized');
+
+    Logger.success('App initialization complete');
+
+    // Defer heavy initialization to after the app starts
+    _initializeBackgroundServices();
+  });
 }
 
 /// Initialize background services after app startup
 Future<void> _initializeBackgroundServices() async {
   try {
-    // Configure Firestore settings
-    try {
-      FirebaseFirestore.instance.settings = const Settings(
-        persistenceEnabled: true,
-        cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-      );
-    } catch (e) {
-      Logger.warning('Configuring Firestore settings failed: $e');
-    }
+    // Defer Firestore settings configuration
+    Future.delayed(const Duration(seconds: 1), () {
+      try {
+        FirebaseFirestore.instance.settings = const Settings(
+          persistenceEnabled: true,
+          cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+        );
+      } catch (e) {
+        Logger.warning('Configuring Firestore settings failed: $e');
+      }
+    });
 
-    // Quick connectivity check without DNS lookups
-    final dynamic connectivityResult = await Connectivity().checkConnectivity();
-    bool isOffline = false;
-    if (connectivityResult is ConnectivityResult) {
-      isOffline = connectivityResult == ConnectivityResult.none;
-    } else if (connectivityResult is Iterable) {
-      final list = List<ConnectivityResult>.from(
-        connectivityResult.cast<ConnectivityResult>(),
-      );
-      isOffline =
-          list.isEmpty || list.every((c) => c == ConnectivityResult.none);
-    }
+    // Quick connectivity check without blocking
+    Connectivity().checkConnectivity().then((connectivityResult) {
+      bool isOffline = false;
+      if (connectivityResult is ConnectivityResult) {
+        isOffline = connectivityResult == ConnectivityResult.none;
+      } else {
+        // Handle newer API returning List<ConnectivityResult>
+        final list = List<ConnectivityResult>.from(
+          (connectivityResult as Iterable).cast<ConnectivityResult>(),
+        );
+        isOffline =
+            list.isEmpty || list.every((c) => c == ConnectivityResult.none);
+      }
 
-    // Skip DNS checks - they're blocking the main thread
-    // Instead, just use connectivity status
-    final bool isReachable = !isOffline;
+      final bool isReachable = !isOffline;
 
     // Initialize App Check in background if reachable
+    // TEMPORARILY DISABLED: App Check API needs to be enabled in Firebase Console
+    // Uncomment this block after enabling the API at:
+    // https://console.developers.google.com/apis/api/firebaseappcheck.googleapis.com/overview?project=951311475019
+    /*
     if (isReachable) {
       FirebaseAppCheck.instance.activate(
         androidProvider: AndroidProvider.debug,
@@ -106,6 +115,7 @@ Future<void> _initializeBackgroundServices() async {
         Logger.warning('App Check activation failed: $e');
       });
     }
+    */
 
     // Configure Firestore network based on connectivity
     if (!isReachable) {
@@ -147,15 +157,18 @@ Future<void> _initializeBackgroundServices() async {
       return;
     });
 
-    // Initialize Firebase Messaging in background if online
-    if (isReachable) {
-      // Delay messaging initialization to avoid blocking
-      Future.delayed(const Duration(seconds: 2), () {
-        FirebaseMessagingHelper().initialize().catchError((e) {
-          Logger.warning('Firebase Messaging initialization failed: $e');
+      // Initialize Firebase Messaging in background if online
+      if (isReachable) {
+        // Delay messaging initialization to avoid blocking
+        Future.delayed(const Duration(seconds: 3), () {
+          FirebaseMessagingHelper().initialize().catchError((e) {
+            Logger.warning('Firebase Messaging initialization failed: $e');
+          });
         });
-      });
-    }
+      }
+    }).catchError((e) {
+      Logger.warning('Connectivity check failed: $e');
+    });
 
     Logger.success('Background services initialized');
   } catch (e) {

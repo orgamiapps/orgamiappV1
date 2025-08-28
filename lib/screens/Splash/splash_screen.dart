@@ -38,7 +38,7 @@ class _SplashScreenState extends State<SplashScreen>
     _startLoadingSequence();
 
     // Set a shorter global timeout to prevent getting stuck
-    _timeoutTimer = Timer(const Duration(seconds: 5), () {
+    _timeoutTimer = Timer(const Duration(seconds: 3), () {
       if (mounted && !_hasNavigated) {
         debugPrint('⏰ Global timeout - forcing navigation');
         _navigateToSecondSplash();
@@ -47,16 +47,16 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   void _initializeAnimations() {
-    // Logo scale and opacity animation
+    // Logo scale and opacity animation - simplified for better performance
     _logoAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 800), // Reduced from 1200ms
       vsync: this,
     );
 
     _logoScaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _logoAnimationController,
-        curve: Curves.elasticOut,
+        curve: Curves.easeOutCubic, // Simpler curve than elasticOut
       ),
     );
 
@@ -69,7 +69,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Fade animation for text
     _fadeAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 500), // Reduced from 800ms
       vsync: this,
     );
 
@@ -79,7 +79,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Loading animation
     _loadingAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 1000), // Reduced from 1500ms
       vsync: this,
     );
 
@@ -88,22 +88,20 @@ class _SplashScreenState extends State<SplashScreen>
 
   void _startLoadingSequence() async {
     try {
-      // Start logo animation
+      // Start all animations in parallel for faster startup
       _logoAnimationController.forward();
-
-      // Start fade animation after logo starts
-      await Future.delayed(const Duration(milliseconds: 600));
-      if (!mounted) return;
-
-      _fadeAnimationController.forward();
+      
+      // Start fade animation with minimal delay
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (mounted) _fadeAnimationController.forward();
+      });
 
       // Start loading animation
-      await Future.delayed(const Duration(milliseconds: 400));
-      if (!mounted) return;
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) _loadingAnimationController.repeat();
+      });
 
-      _loadingAnimationController.repeat();
-
-      // Start user loading process
+      // Start user loading process immediately
       _getUser();
     } catch (e) {
       debugPrint('❌ Error in loading sequence: $e');
@@ -135,7 +133,7 @@ class _SplashScreenState extends State<SplashScreen>
         final userData = await FirebaseFirestoreHelper()
             .getSingleCustomer(customerId: firebaseUser.uid)
             .timeout(
-              const Duration(seconds: 3),
+              const Duration(seconds: 2), // Reduced from 3s
               onTimeout: () {
                 debugPrint('⏰ Timeout getting user data');
                 return null;
@@ -153,7 +151,7 @@ class _SplashScreenState extends State<SplashScreen>
           debugPrint('✅ User data loaded successfully');
 
           // Brief pause to show welcome message
-          await Future.delayed(const Duration(milliseconds: 800));
+          await Future.delayed(const Duration(milliseconds: 300)); // Reduced from 800ms
 
           if (!mounted || _hasNavigated) return;
           _navigateToHome();
@@ -169,7 +167,7 @@ class _SplashScreenState extends State<SplashScreen>
           _loadingText = "Welcome to Orgami";
         });
 
-        await Future.delayed(const Duration(milliseconds: 800));
+        await Future.delayed(const Duration(milliseconds: 300)); // Reduced from 800ms
         if (!mounted || _hasNavigated) return;
         _navigateToSecondSplash();
       }

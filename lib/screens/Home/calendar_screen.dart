@@ -125,11 +125,9 @@ class _CalendarScreenState extends State<CalendarScreen>
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        print('No user logged in');
         return;
       }
 
-      print('Loading events for user: ${user.uid}');
 
       // Load ALL events without filters to avoid permission issues
       try {
@@ -138,7 +136,6 @@ class _CalendarScreenState extends State<CalendarScreen>
             .collection('Events')
             .get();
 
-        print('Loaded ${eventsSnapshot.docs.length} event documents');
 
         _allEvents = [];
         for (var doc in eventsSnapshot.docs) {
@@ -146,11 +143,8 @@ class _CalendarScreenState extends State<CalendarScreen>
             final event = EventModel.fromJson(doc);
             // Add all events regardless of status to show past events too
             _allEvents.add(event);
-            print(
-              'Added event: ${event.title} on ${event.selectedDateTime} (status: ${event.status})',
-            );
           } catch (e) {
-            print('Error parsing event document ${doc.id}: $e');
+            // Skip malformed events and continue loading others
           }
         }
 
@@ -159,9 +153,7 @@ class _CalendarScreenState extends State<CalendarScreen>
           (a, b) => a.selectedDateTime.compareTo(b.selectedDateTime),
         );
 
-        print('Total active events loaded: ${_allEvents.length}');
       } catch (e) {
-        print('Error loading events: $e');
         // Try to load user's own events at least
         try {
           final userEventsSnapshot = await FirebaseFirestore.instance
@@ -169,14 +161,12 @@ class _CalendarScreenState extends State<CalendarScreen>
               .where('customerUid', isEqualTo: user.uid)
               .get();
 
-          print('Loaded ${userEventsSnapshot.docs.length} user events');
 
           _allEvents = userEventsSnapshot.docs
               .map((doc) {
                 try {
                   return EventModel.fromJson(doc);
                 } catch (e) {
-                  print('Error parsing user event: $e');
                   return null;
                 }
               })
@@ -188,7 +178,6 @@ class _CalendarScreenState extends State<CalendarScreen>
             (a, b) => a.selectedDateTime.compareTo(b.selectedDateTime),
           );
         } catch (userEventsError) {
-          print('Error loading user events: $userEventsError');
           _allEvents = [];
         }
       }
@@ -241,17 +230,10 @@ class _CalendarScreenState extends State<CalendarScreen>
           eventDate.year == day.year &&
           eventDate.month == day.month &&
           eventDate.day == day.day;
-      if (isSameDay) {
-        print(
-          'Event "${event.title}" found for ${DateFormat('yyyy-MM-dd').format(day)} at ${DateFormat('HH:mm').format(eventDate)}',
-        );
-      }
+      // Event found for this day
       return isSameDay;
     }).toList();
 
-    print(
-      'Found ${dayEvents.length} events for ${DateFormat('yyyy-MM-dd').format(day)}',
-    );
     return dayEvents;
   }
 
@@ -912,8 +894,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                           ),
                           // Events overlay
                           ...events
-                              .map((event) => _buildEventBlock(event))
-                              .toList(),
+                              .map((event) => _buildEventBlock(event)),
                           // Current time indicator (only if today)
                           if (isToday)
                             Positioned(
