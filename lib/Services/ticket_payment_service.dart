@@ -12,7 +12,6 @@ class TicketPaymentService {
   static final FirebaseFunctions _functions = FirebaseFunctions.instance;
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-
   /// Create a payment intent for purchasing a ticket
   static Future<Map<String, dynamic>> createTicketPaymentIntent({
     required String eventId,
@@ -27,7 +26,8 @@ class TicketPaymentService {
     try {
       Logger.debug('Creating ticket payment intent for event: $eventId');
 
-      final amountInCents = (amount * 100).round(); // Convert to cents for Stripe
+      final amountInCents = (amount * 100)
+          .round(); // Convert to cents for Stripe
 
       final callable = _functions.httpsCallable('createTicketPaymentIntent');
       final result = await callable.call({
@@ -193,7 +193,9 @@ class TicketPaymentService {
   }
 
   /// Get revenue from ticket sales for an event creator
-  static Future<Map<String, dynamic>> getTicketRevenue(String creatorUid) async {
+  static Future<Map<String, dynamic>> getTicketRevenue(
+    String creatorUid,
+  ) async {
     try {
       final querySnapshot = await _firestore
           .collection(TicketPaymentModel.firebaseKey)
@@ -216,15 +218,14 @@ class TicketPaymentService {
       };
     } catch (e) {
       Logger.error('Failed to fetch ticket revenue: $e', e);
-      return {
-        'totalRevenue': 0.0,
-        'totalTicketsSold': 0,
-      };
+      return {'totalRevenue': 0.0, 'totalTicketsSold': 0};
     }
   }
 
   /// Get revenue for a specific event
-  static Future<Map<String, dynamic>> getEventTicketRevenue(String eventId) async {
+  static Future<Map<String, dynamic>> getEventTicketRevenue(
+    String eventId,
+  ) async {
     try {
       final querySnapshot = await _firestore
           .collection(TicketPaymentModel.firebaseKey)
@@ -247,10 +248,119 @@ class TicketPaymentService {
       };
     } catch (e) {
       Logger.error('Failed to fetch event ticket revenue: $e', e);
+      return {'totalRevenue': 0.0, 'totalTicketsSold': 0};
+    }
+  }
+
+  /// Create a payment intent for upgrading a ticket to skip-the-line
+  static Future<Map<String, dynamic>> createTicketUpgradePaymentIntent({
+    required String ticketId,
+    required double originalPrice,
+    required String customerUid,
+    required String customerName,
+    required String customerEmail,
+    required String eventTitle,
+  }) async {
+    try {
+      Logger.debug(
+        'Creating ticket upgrade payment intent for ticket: $ticketId',
+      );
+
+      // Calculate upgrade price (5x the original price)
+      final upgradeAmount = originalPrice * 5;
+      final amountInCents = (upgradeAmount * 100).round();
+
+      final callable = _functions.httpsCallable(
+        'createTicketUpgradePaymentIntent',
+      );
+      final result = await callable.call({
+        'ticketId': ticketId,
+        'amount': amountInCents,
+        'currency': 'usd',
+        'customerUid': customerUid,
+        'customerName': customerName,
+        'customerEmail': customerEmail,
+        'eventTitle': eventTitle,
+      });
+
+      Logger.debug('Ticket upgrade payment intent created successfully');
       return {
-        'totalRevenue': 0.0,
-        'totalTicketsSold': 0,
+        'clientSecret': result.data['clientSecret'],
+        'paymentIntentId': result.data['paymentIntentId'],
+        'upgradeAmount': upgradeAmount,
       };
+    } catch (e) {
+      Logger.error('Failed to create ticket upgrade payment intent: $e', e);
+      throw Exception('Failed to create upgrade payment: ${e.toString()}');
+    }
+  }
+
+  /// Process ticket upgrade payment
+  static Future<bool> processTicketUpgrade({
+    required String clientSecret,
+    required String eventTitle,
+    required double upgradeAmount,
+  }) async {
+    try {
+      Logger.debug('Initializing payment sheet for ticket upgrade');
+
+      // Initialize payment sheet
+      await Stripe.instance.initPaymentSheet(
+        paymentSheetParameters: SetupPaymentSheetParameters(
+          paymentIntentClientSecret: clientSecret,
+          merchantDisplayName: 'Orgami',
+          style: ThemeMode.system,
+          googlePay: const PaymentSheetGooglePay(
+            merchantCountryCode: 'US',
+            testEnv: true, // Set to false for production
+          ),
+          applePay: const PaymentSheetApplePay(merchantCountryCode: 'US'),
+          customFlow: false,
+          returnURL: 'orgami://stripe-redirect',
+          allowsDelayedPaymentMethods: false,
+        ),
+      );
+
+      Logger.debug('Presenting payment sheet for upgrade');
+      // Present payment sheet
+      await Stripe.instance.presentPaymentSheet();
+
+      Logger.success('Ticket upgrade payment successful');
+      return true;
+    } on StripeException catch (e) {
+      Logger.error('Stripe error: ${e.error.localizedMessage}', e);
+      if (e.error.code == FailureCode.Canceled) {
+        Logger.debug('Upgrade payment cancelled by user');
+      }
+      return false;
+    } catch (e) {
+      Logger.error('Ticket upgrade payment error: $e', e);
+      return false;
+    }
+  }
+
+  /// Confirm ticket upgrade after successful payment
+  static Future<void> confirmTicketUpgrade({
+    required String ticketId,
+    required String paymentIntentId,
+  }) async {
+    try {
+      Logger.debug('Confirming ticket upgrade for ticket: $ticketId');
+
+      // Update ticket in Firestore
+      await _firestore
+          .collection(TicketModel.firebaseKey)
+          .doc(ticketId)
+          .update({
+            'isSkipTheLine': true,
+            'upgradedAt': DateTime.now(),
+            'upgradePaymentIntentId': paymentIntentId,
+          });
+
+      Logger.success('Ticket upgraded to skip-the-line successfully');
+    } catch (e) {
+      Logger.error('Failed to confirm ticket upgrade: $e', e);
+      throw Exception('Failed to confirm upgrade: ${e.toString()}');
     }
   }
 }

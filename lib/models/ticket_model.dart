@@ -21,6 +21,9 @@ class TicketModel {
   bool isPaid; // Whether the ticket has been paid for
   String? paymentIntentId; // Stripe payment intent ID
   DateTime? paidAt; // When the ticket was paid for
+  bool isSkipTheLine; // Whether this is a skip-the-line/VIP ticket
+  DateTime? upgradedAt; // When the ticket was upgraded to skip-the-line
+  String? upgradePaymentIntentId; // Stripe payment intent ID for the upgrade
 
   TicketModel({
     required this.id,
@@ -40,6 +43,9 @@ class TicketModel {
     this.isPaid = false,
     this.paymentIntentId,
     this.paidAt,
+    this.isSkipTheLine = false,
+    this.upgradedAt,
+    this.upgradePaymentIntentId,
   });
 
   factory TicketModel.fromJson(dynamic parsedJson) {
@@ -69,6 +75,11 @@ class TicketModel {
       paidAt: data['paidAt'] != null
           ? (data['paidAt'] as Timestamp).toDate()
           : null,
+      isSkipTheLine: data['isSkipTheLine'] ?? false,
+      upgradedAt: data['upgradedAt'] != null
+          ? (data['upgradedAt'] as Timestamp).toDate()
+          : null,
+      upgradePaymentIntentId: data['upgradePaymentIntentId'],
     );
   }
 
@@ -91,6 +102,9 @@ class TicketModel {
       'isPaid': isPaid,
       'paymentIntentId': paymentIntentId,
       'paidAt': paidAt,
+      'isSkipTheLine': isSkipTheLine,
+      'upgradedAt': upgradedAt,
+      'upgradePaymentIntentId': upgradePaymentIntentId,
     };
   }
 

@@ -1939,6 +1939,102 @@ exports.confirmTicketPayment = onCall({ region: "us-central1" }, async (req) => 
 });
 
 /**
+ * Create a payment intent for upgrading a ticket to skip-the-line
+ */
+exports.createTicketUpgradePaymentIntent = onCall({ region: "us-central1" }, async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new Error("UNAUTHENTICATED");
+
+  const {
+    ticketId,
+    amount,
+    currency = 'usd',
+    customerUid,
+    customerName,
+    customerEmail,
+    eventTitle,
+  } = req.data || {};
+
+  // Validate input
+  if (!ticketId || !amount || !customerEmail || !eventTitle) {
+    throw new Error("INVALID_ARGUMENT: Missing required fields");
+  }
+
+  if (amount <= 0) {
+    throw new Error("INVALID_ARGUMENT: Invalid amount");
+  }
+
+  try {
+    const db = admin.firestore();
+    
+    // Verify the ticket exists and belongs to the user
+    const ticketDoc = await db.collection('Tickets').doc(ticketId).get();
+    
+    if (!ticketDoc.exists) {
+      throw new Error("Ticket not found");
+    }
+    
+    const ticketData = ticketDoc.data();
+    
+    if (ticketData.customerUid !== uid) {
+      throw new Error("PERMISSION_DENIED: You can only upgrade your own tickets");
+    }
+    
+    if (ticketData.isSkipTheLine) {
+      throw new Error("ALREADY_EXISTS: Ticket is already upgraded");
+    }
+    
+    if (ticketData.isUsed) {
+      throw new Error("FAILED_PRECONDITION: Cannot upgrade used tickets");
+    }
+
+    // Create payment intent with Stripe
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount, // Amount should already be in cents
+      currency: currency,
+      metadata: {
+        type: 'ticket_upgrade',
+        ticketId: ticketId,
+        eventId: ticketData.eventId,
+        customerUid: customerUid,
+        customerName: customerName,
+        customerEmail: customerEmail,
+        eventTitle: eventTitle,
+      },
+      receipt_email: customerEmail,
+      description: `Skip-the-Line Upgrade for ${eventTitle}`,
+    });
+
+    // Create a payment record in Firestore
+    const paymentDoc = {
+      id: paymentIntent.id,
+      type: 'ticket_upgrade',
+      ticketId: ticketId,
+      eventId: ticketData.eventId,
+      eventTitle: eventTitle,
+      customerUid: customerUid,
+      customerName: customerName,
+      customerEmail: customerEmail,
+      amount: amount / 100, // Store in dollars
+      currency: currency,
+      paymentIntentId: paymentIntent.id,
+      status: 'pending',
+      createdAt: admin.firestore.Timestamp.now(),
+    };
+
+    await db.collection('TicketUpgradePayments').doc(paymentIntent.id).set(paymentDoc);
+
+    return {
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+    };
+  } catch (error) {
+    logger.error('Error creating upgrade payment intent:', error);
+    throw new Error(`INTERNAL: ${error.message}`);
+  }
+});
+
+/**
  * Webhook handler for Stripe events
  */
 exports.stripeWebhook = onCall({ region: "us-central1" }, async (req) => {
@@ -1967,17 +2063,36 @@ exports.stripeWebhook = onCall({ region: "us-central1" }, async (req) => {
         completedAt: admin.firestore.Timestamp.now(),
       });
       
-      // Issue the ticket if not already issued
-      const { eventId, ticketId, customerUid } = paymentIntent.metadata;
-      if (ticketId) {
+      // Check if this is an upgrade payment
+      const { type, eventId, ticketId, customerUid } = paymentIntent.metadata;
+      
+      if (type === 'ticket_upgrade') {
+        // Handle ticket upgrade
         await db.collection('Tickets').doc(ticketId).update({
-          isPaid: true,
-          paymentIntentId: paymentIntent.id,
-          paidAt: admin.firestore.Timestamp.now(),
+          isSkipTheLine: true,
+          upgradedAt: admin.firestore.Timestamp.now(),
+          upgradePaymentIntentId: paymentIntent.id,
         });
+        
+        await db.collection('TicketUpgradePayments').doc(paymentIntent.id).update({
+          status: 'completed',
+          completedAt: admin.firestore.Timestamp.now(),
+        });
+        
+        logger.info('Ticket upgrade succeeded:', paymentIntent.id);
+      } else {
+        // Handle regular ticket purchase
+        if (ticketId) {
+          await db.collection('Tickets').doc(ticketId).update({
+            isPaid: true,
+            paymentIntentId: paymentIntent.id,
+            paidAt: admin.firestore.Timestamp.now(),
+          });
+        }
+        
+        logger.info('Payment succeeded:', paymentIntent.id);
       }
       
-      logger.info('Payment succeeded:', paymentIntent.id);
       break;
 
     case 'payment_intent.payment_failed':

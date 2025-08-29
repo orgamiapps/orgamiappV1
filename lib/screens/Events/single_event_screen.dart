@@ -2403,6 +2403,12 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
           ShowToast().showNormalToast(msg: 'Ticket purchased successfully!');
           // Refresh ticket status
           checkUserTicket(updateUI: true);
+
+          // Show upgrade option
+          _UpgradeDialogHelper.showUpgradeOptionDialog(
+            context,
+            eventModel.ticketPrice!,
+          );
         }
       } else {
         if (mounted) {
@@ -2671,8 +2677,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                             tooltip: 'Sign In',
                           ),
                           const SizedBox(width: 16),
-                          _buildModernButton(
-                            icon: Icons.calendar_today,
+                          _buildCalendarAddButton(
                             onTap: () => _addToCalendar(),
                             tooltip: 'Add to Calendar',
                           ),
@@ -2762,6 +2767,75 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                       color: isActive ? _primaryBlue : _darkText,
                       size: 20,
                     ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildCalendarAddButton({
+    required VoidCallback? onTap,
+    required String tooltip,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: AnimatedBuilder(
+        animation: _pulseAnimation,
+        builder: (context, child) {
+          return GestureDetector(
+            onTap: onTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _borderColor, width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    spreadRadius: 0,
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Stack(
+                children: [
+                  // Main calendar icon
+                  Center(
+                    child: Icon(
+                      Icons.calendar_today,
+                      color: _darkText,
+                      size: 20,
+                    ),
+                  ),
+                  // Plus badge in top-right corner
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: _primaryBlue,
+                        borderRadius: BorderRadius.circular(7),
+                        border: Border.all(
+                          color: const Color(0xFFF3F4F6),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.add,
+                        color: Colors.white,
+                        size: 8,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         },
@@ -4354,49 +4428,105 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     final bool isManager = eventModel.hasManagementPermissions(uid);
     if (isManager) return const SizedBox.shrink();
 
-    return SizedBox(
+    return Container(
       width: double.infinity,
-      height: 48,
-      child: ElevatedButton(
-        onPressed: _isRsvpLoading ? null : _rsvpForEvent,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _isRsvped
-              ? const Color(0xFF10B981)
-              : const Color(0xFF667EEA),
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          elevation: 0,
+      height: 64,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: _isRsvped
+              ? [const Color(0xFF10B981), const Color(0xFF059669)]
+              : [const Color(0xFF667EEA), const Color(0xFF5B67CA)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: _isRsvpLoading
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    _isRsvped ? Icons.check_circle : Icons.event_available,
-                    size: 20,
-                    color: Colors.white,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _isRsvped ? "RSVP'd" : 'RSVP',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      fontFamily: 'Roboto',
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color:
+                (_isRsvped ? const Color(0xFF10B981) : const Color(0xFF667EEA))
+                    .withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _isRsvpLoading ? null : _rsvpForEvent,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _isRsvpLoading
+                ? const Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
                     ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          _isRsvped
+                              ? Icons.check_circle_outline
+                              : Icons.calendar_today_outlined,
+                          size: 22,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _isRsvped ? 'Spot Reserved' : 'Reserve Your Spot',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 17,
+                                fontFamily: 'Roboto',
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            if (_isRsvped) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                'See you at the event',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.9),
+                                  fontWeight: FontWeight.w400,
+                                  fontSize: 13,
+                                  fontFamily: 'Roboto',
+                                  letterSpacing: 0.1,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      if (!_isRsvped)
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: Colors.white.withOpacity(0.8),
+                        ),
+                    ],
                   ),
-                ],
-              ),
+          ),
+        ),
       ),
     );
   }
@@ -5470,6 +5600,246 @@ class _AccessRequestsList extends StatelessWidget {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _UpgradeDialogHelper {
+  static void showUpgradeOptionDialog(
+    BuildContext context,
+    double ticketPrice,
+  ) {
+    final upgradePrice = ticketPrice * 5;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Success icon
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF10B981), Color(0xFF059669)],
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check, color: Colors.white, size: 48),
+              ),
+              const SizedBox(height: 20),
+
+              // Success message
+              const Text(
+                'Ticket Purchased Successfully!',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1F2937),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+
+              // Upgrade offer
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFFFFD700).withValues(alpha: 0.1),
+                      const Color(0xFFFFA500).withValues(alpha: 0.1),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFFFFD700).withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.flash_on,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Upgrade to VIP?',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1F2937),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Skip the line with VIP access!',
+                      style: TextStyle(fontSize: 16, color: Color(0xFF6B7280)),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Benefits
+                    _buildUpgradeBenefit('Priority entry - no waiting'),
+                    _buildUpgradeBenefit('VIP treatment at venue'),
+                    _buildUpgradeBenefit('Exclusive skip-the-line QR'),
+
+                    const SizedBox(height: 16),
+
+                    // Price
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'Only',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '\$${upgradePrice.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1F2937),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'more',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Action buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: const BorderSide(color: Color(0xFFE5E7EB)),
+                      ),
+                      child: const Text(
+                        'Maybe Later',
+                        style: TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(
+                              0xFFFFD700,
+                            ).withValues(alpha: 0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.pop(context);
+                            // Navigate to My Tickets screen where they can upgrade
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const MyTicketsScreen(),
+                              ),
+                            );
+                            ShowToast().showNormalToast(
+                              msg:
+                                  'You can upgrade your ticket from My Tickets',
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            child: const Center(
+                              child: Text(
+                                'Upgrade Now',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static Widget _buildUpgradeBenefit(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle, color: Color(0xFFFFD700), size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 14, color: Color(0xFF1F2937)),
+            ),
+          ),
+        ],
       ),
     );
   }

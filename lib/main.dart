@@ -29,7 +29,23 @@ void main() async {
 
   Logger.info('Starting app initialization...');
 
-  // Run the app immediately with minimal initialization
+  // Initialize Firebase first (critical for app functionality)
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    Logger.success('Firebase core initialized');
+  } catch (e, st) {
+    Logger.error('Firebase initialization failed', e, st);
+  }
+
+  // Initialize Stripe
+  // TODO: Replace with your actual Stripe publishable key
+  // For testing, you can use Stripe's test publishable key
+  Stripe.publishableKey = 'pk_test_YOUR_PUBLISHABLE_KEY';
+  Logger.info('Stripe initialized');
+
+  // Run the app with minimal initialization
   runApp(
     ChangeNotifierProvider(
       create: (context) => ThemeProvider()..loadTheme(false), // Use default theme initially
@@ -37,18 +53,10 @@ void main() async {
     ),
   );
 
-  // Defer ALL heavy initialization to after first frame
-  WidgetsBinding.instance.addPostFrameCallback((_) async {
-    // Initialize Firebase after UI is rendered
-    try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-      Logger.success('Firebase core initialized');
-    } catch (e, st) {
-      Logger.error('Firebase initialization failed', e, st);
-    }
+  Logger.success('App initialization complete');
 
+  // Defer heavy initialization to after first frame
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
     // Load theme preference and update if needed
     SharedPreferences.getInstance().then((prefs) {
       final isDarkMode = prefs.getBool('isDarkMode') ?? false;
@@ -57,14 +65,6 @@ void main() async {
         ThemeProvider().loadTheme(isDarkMode);
       }
     });
-
-    // Initialize Stripe
-    // TODO: Replace with your actual Stripe publishable key
-    // For testing, you can use Stripe's test publishable key
-    Stripe.publishableKey = 'pk_test_YOUR_PUBLISHABLE_KEY';
-    Logger.info('Stripe initialized');
-
-    Logger.success('App initialization complete');
 
     // Defer heavy initialization to after the app starts
     _initializeBackgroundServices();

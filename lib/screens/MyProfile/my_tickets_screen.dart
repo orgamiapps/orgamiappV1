@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:orgami/controller/customer_controller.dart';
 import 'package:orgami/firebase/firebase_firestore_helper.dart';
 import 'package:orgami/models/ticket_model.dart';
+import 'package:orgami/Services/ticket_payment_service.dart';
 import 'package:orgami/Utils/toast.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -24,6 +25,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   bool isLoading = true;
   int selectedTab = 0; // 0 = All, 1 = Active, 2 = Used
   final GlobalKey ticketShareKey = GlobalKey();
+  bool _isUpgrading = false;
 
   @override
   void initState() {
@@ -312,26 +314,77 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: statusColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: statusColor.withValues(alpha: 0.5),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            if (ticket.isSkipTheLine) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                margin: const EdgeInsets.only(bottom: 4),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFFFFD700),
+                                      Color(0xFFFFA500),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(
+                                        0xFFFFD700,
+                                      ).withValues(alpha: 0.3),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.flash_on,
+                                      color: Colors.white,
+                                      size: 12,
+                                    ),
+                                    SizedBox(width: 3),
+                                    Text(
+                                      'VIP',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: statusColor.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              child: Text(
+                                statusText,
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
                             ),
-                          ),
-                          child: Text(
-                            statusText,
-                            style: TextStyle(
-                              color: statusColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
@@ -806,6 +859,54 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                                             ),
                                           ],
                                         ),
+                                        if (ticket.isSkipTheLine) ...[
+                                          const SizedBox(height: 12),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 12,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              gradient: const LinearGradient(
+                                                colors: [
+                                                  Color(0xFFFFD700),
+                                                  Color(0xFFFFA500),
+                                                ],
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: const Color(
+                                                    0xFFFFD700,
+                                                  ).withValues(alpha: 0.3),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 4),
+                                                ),
+                                              ],
+                                            ),
+                                            child: const Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  Icons.flash_on,
+                                                  color: Colors.white,
+                                                  size: 20,
+                                                ),
+                                                SizedBox(width: 8),
+                                                Text(
+                                                  'VIP Skip-the-Line Ticket',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                         const SizedBox(height: 16),
                                         // Details
                                         _buildDetailRow(
@@ -830,6 +931,14 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                                           Icons.access_time,
                                           'Issued: ${DateFormat('MMMM dd, yyyy').format(ticket.issuedDateTime)}',
                                         ),
+                                        // Upgrade button for eligible tickets
+                                        if (!ticket.isUsed &&
+                                            !ticket.isSkipTheLine &&
+                                            ticket.price != null &&
+                                            ticket.price! > 0) ...[
+                                          const SizedBox(height: 16),
+                                          _buildUpgradeButton(ticket),
+                                        ],
                                         const SizedBox(height: 24),
                                         // QR Code
                                         Center(
@@ -918,6 +1027,275 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildUpgradeButton(TicketModel ticket) {
+    return Container(
+      width: double.infinity,
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _isUpgrading ? null : () => _showUpgradeDialog(ticket),
+          borderRadius: BorderRadius.circular(16),
+          child: Center(
+            child: _isUpgrading
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.rocket_launch,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Upgrade to Skip-the-Line',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'Priority entry • \$${(ticket.price! * 5).toStringAsFixed(2)}',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showUpgradeDialog(TicketModel ticket) {
+    final upgradePrice = ticket.price! * 5;
+
+    showDialog(
+      context: context,
+      barrierDismissible: !_isUpgrading,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Column(
+            children: [
+              Icon(Icons.flash_on, color: Colors.white, size: 48),
+              SizedBox(height: 8),
+              Text(
+                'Upgrade to VIP Skip-the-Line',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 32),
+            const SizedBox(height: 16),
+            const Text(
+              'Skip the line benefits:',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            _buildBenefitRow('Priority entry - no waiting in line'),
+            _buildBenefitRow('VIP treatment at the venue'),
+            _buildBenefitRow('Exclusive skip-the-line QR code'),
+            _buildBenefitRow('Same ticket, upgraded experience'),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  const Text(
+                    'Upgrade Price',
+                    style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '\$${upgradePrice.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1F2937),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Original ticket: \$${ticket.price!.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: _isUpgrading ? null : () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Color(0xFF6B7280)),
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _isUpgrading ? null : () => _upgradeTicket(ticket),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                  child: const Text(
+                    'Upgrade Now',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBenefitRow(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          const Icon(Icons.check, color: Color(0xFF10B981), size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 14, color: Color(0xFF1F2937)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _upgradeTicket(TicketModel ticket) async {
+    setState(() {
+      _isUpgrading = true;
+    });
+
+    try {
+      // Create upgrade payment intent
+      final paymentData =
+          await TicketPaymentService.createTicketUpgradePaymentIntent(
+            ticketId: ticket.id,
+            originalPrice: ticket.price!,
+            customerUid: CustomerController.logeInCustomer!.uid,
+            customerName: CustomerController.logeInCustomer!.name,
+            customerEmail: CustomerController.logeInCustomer!.email,
+            eventTitle: ticket.eventTitle,
+          );
+
+      // Process payment
+      final paymentSuccess = await TicketPaymentService.processTicketUpgrade(
+        clientSecret: paymentData['clientSecret'],
+        eventTitle: ticket.eventTitle,
+        upgradeAmount: paymentData['upgradeAmount'],
+      );
+
+      if (paymentSuccess) {
+        // Confirm upgrade
+        await TicketPaymentService.confirmTicketUpgrade(
+          ticketId: ticket.id,
+          paymentIntentId: paymentData['paymentIntentId'],
+        );
+
+        if (mounted) {
+          Navigator.pop(context); // Close dialog
+          ShowToast().showNormalToast(
+            msg: '🎉 Ticket upgraded to VIP Skip-the-Line!',
+          );
+          // Reload tickets to show updated status
+          await _loadUserTickets();
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isUpgrading = false;
+          });
+          ShowToast().showNormalToast(msg: 'Upgrade cancelled');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isUpgrading = false;
+        });
+        ShowToast().showNormalToast(
+          msg: 'Failed to upgrade ticket: ${e.toString()}',
+        );
+      }
+    }
   }
 
   // Removed unused _buildCompactChip helper

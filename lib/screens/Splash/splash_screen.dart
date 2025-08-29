@@ -35,10 +35,13 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
     _initializeAnimations();
-    _startLoadingSequence();
+    // Delay the loading sequence to ensure Firebase is initialized
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startLoadingSequence();
+    });
 
-    // Set a shorter global timeout to prevent getting stuck
-    _timeoutTimer = Timer(const Duration(seconds: 3), () {
+    // Set a reasonable global timeout to prevent getting stuck
+    _timeoutTimer = Timer(const Duration(seconds: 10), () {
       if (mounted && !_hasNavigated) {
         debugPrint('⏰ Global timeout - forcing navigation');
         _navigateToSecondSplash();
@@ -90,7 +93,7 @@ class _SplashScreenState extends State<SplashScreen>
     try {
       // Start all animations in parallel for faster startup
       _logoAnimationController.forward();
-      
+
       // Start fade animation with minimal delay
       Future.delayed(const Duration(milliseconds: 200), () {
         if (mounted) _fadeAnimationController.forward();
@@ -101,8 +104,15 @@ class _SplashScreenState extends State<SplashScreen>
         if (mounted) _loadingAnimationController.repeat();
       });
 
-      // Start user loading process immediately
-      _getUser();
+      // Give animations time to start and Firebase to be ready
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      // Now get user - run in next frame to avoid blocking UI
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (mounted && !_hasNavigated) {
+          await _getUser();
+        }
+      });
     } catch (e) {
       debugPrint('❌ Error in loading sequence: $e');
       if (mounted && !_hasNavigated) {
@@ -133,7 +143,7 @@ class _SplashScreenState extends State<SplashScreen>
         final userData = await FirebaseFirestoreHelper()
             .getSingleCustomer(customerId: firebaseUser.uid)
             .timeout(
-              const Duration(seconds: 2), // Reduced from 3s
+              const Duration(seconds: 5), // Increased for better reliability
               onTimeout: () {
                 debugPrint('⏰ Timeout getting user data');
                 return null;
@@ -151,13 +161,20 @@ class _SplashScreenState extends State<SplashScreen>
           debugPrint('✅ User data loaded successfully');
 
           // Brief pause to show welcome message
-          await Future.delayed(const Duration(milliseconds: 300)); // Reduced from 800ms
+          await Future.delayed(
+            const Duration(milliseconds: 300),
+          ); // Reduced from 800ms
 
           if (!mounted || _hasNavigated) return;
           _navigateToHome();
         } else {
-          debugPrint('❌ User data is null');
-          _showErrorDialog();
+          debugPrint('❌ User data is null - navigating to login');
+          // If we can't get user data, just go to login screen
+          if (mounted && !_hasNavigated) {
+            // Sign out to clear any invalid session
+            await FirebaseAuth.instance.signOut();
+            _navigateToSecondSplash();
+          }
         }
       } else {
         debugPrint('🔍 No user found, navigating to second splash');
@@ -167,14 +184,17 @@ class _SplashScreenState extends State<SplashScreen>
           _loadingText = "Welcome to Orgami";
         });
 
-        await Future.delayed(const Duration(milliseconds: 300)); // Reduced from 800ms
+        await Future.delayed(
+          const Duration(milliseconds: 300),
+        ); // Reduced from 800ms
         if (!mounted || _hasNavigated) return;
         _navigateToSecondSplash();
       }
     } catch (e) {
       debugPrint('❌ Error in _getUser: $e');
       if (mounted && !_hasNavigated) {
-        _showErrorDialog();
+        // On any error, just navigate to second splash
+        _navigateToSecondSplash();
       }
     }
   }
@@ -191,51 +211,6 @@ class _SplashScreenState extends State<SplashScreen>
     _hasNavigated = true;
     _timeoutTimer?.cancel();
     RouterClass().secondSplashScreenRoute(context: context);
-  }
-
-  void _showErrorDialog() {
-    if (_hasNavigated) return;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text('Connection Error'),
-          content: const Text(
-            'Unable to connect to our servers. Please check your internet connection and try again.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                if (mounted && !_hasNavigated) {
-                  _getUser(); // Retry
-                }
-              },
-              child: const Text('Retry'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                if (mounted && !_hasNavigated) {
-                  FirebaseAuth.instance.signOut();
-                  Timer(const Duration(seconds: 1), () {
-                    if (mounted && !_hasNavigated) {
-                      _navigateToSecondSplash();
-                    }
-                  });
-                }
-              },
-              child: const Text('Continue as Guest'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   @override
