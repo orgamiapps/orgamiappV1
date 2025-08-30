@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/Utils/colors.dart';
+import 'package:attendus/Utils/colors.dart';
 import 'package:provider/provider.dart';
-import 'package:orgami/screens/Authentication/create_account/create_account_view_model.dart';
+import 'package:attendus/screens/Authentication/create_account/create_account_view_model.dart';
 
 class StepPassword extends StatefulWidget {
   const StepPassword({super.key, required this.onNext});

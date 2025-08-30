@@ -1,14 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/models/attendance_model.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/models/event_question_model.dart';
-import 'package:orgami/screens/Events/single_event_screen.dart';
-import 'package:orgami/Utils/app_app_bar_view.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/router.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/models/attendance_model.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/models/event_question_model.dart';
+import 'package:attendus/screens/Events/single_event_screen.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/Utils/router.dart';
+import 'package:attendus/Utils/toast.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
 class AnsQuestionsToSignInEventScreen extends StatefulWidget {

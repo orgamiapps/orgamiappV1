@@ -2,10 +2,10 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/controller/customer_controller.dart';
-import 'package:orgami/firebase/firebase_storage_helper.dart';
-import 'package:orgami/models/customer_model.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/firebase/firebase_storage_helper.dart';
+import 'package:attendus/models/customer_model.dart';
 
 class StepProfilePhoto extends StatefulWidget {
   const StepProfilePhoto({super.key, required this.onSkip, required this.onNext});

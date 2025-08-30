@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/controller/customer_controller.dart';
-import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
-import 'package:orgami/Utils/cached_image.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
+import 'package:attendus/Utils/cached_image.dart';
+import 'package:attendus/Utils/toast.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:orgami/screens/MyProfile/my_tickets_screen.dart';
-import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
-import 'package:orgami/screens/MyProfile/badge_screen.dart';
-import 'package:orgami/screens/MyProfile/Widgets/professional_badge_widget.dart';
-import 'package:orgami/models/badge_model.dart';
-import 'package:orgami/Services/badge_service.dart';
-import 'package:orgami/screens/Home/account_details_screen.dart';
+import 'package:attendus/screens/MyProfile/my_tickets_screen.dart';
+import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
+import 'package:attendus/screens/MyProfile/badge_screen.dart';
+import 'package:attendus/screens/MyProfile/Widgets/professional_badge_widget.dart';
+import 'package:attendus/models/badge_model.dart';
+import 'package:attendus/Services/badge_service.dart';
+import 'package:attendus/screens/Home/account_details_screen.dart';
 
 // Enum for sort options
 enum SortOption {

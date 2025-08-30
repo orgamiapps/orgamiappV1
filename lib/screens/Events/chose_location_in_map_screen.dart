@@ -3,8 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import 'package:orgami/screens/Events/add_questions_prompt_screen.dart';
-import 'package:orgami/Utils/router.dart';
+import 'package:attendus/screens/Events/add_questions_prompt_screen.dart';
+import 'package:attendus/Utils/router.dart';
 
 class ChoseLocationInMapScreen extends StatefulWidget {
   final DateTime? selectedDateTime;

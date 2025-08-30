@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:orgami/models/event_model.dart';
+import 'package:attendus/models/event_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:orgami/Utils/logger.dart';
+import 'package:attendus/Utils/logger.dart';
 
 class EngagementPredictor {
   static const double engagementBoostWeight = 0.15;

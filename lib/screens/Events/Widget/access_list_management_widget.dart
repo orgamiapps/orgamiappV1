@@ -1,12 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/Utils/toast.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:orgami/Utils/app_constants.dart';
+import 'package:attendus/Utils/app_constants.dart';
 
 class AccessListManagementWidget extends StatefulWidget {
   final EventModel eventModel;

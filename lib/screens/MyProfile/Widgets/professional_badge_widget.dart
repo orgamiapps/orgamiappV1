@@ -775,7 +775,7 @@ class _FullScreenBadgeViewState extends State<_FullScreenBadgeView> {
                 );
                 await SharePlus.instance.share(
                   ShareParams(
-                    text: 'My Orgami badge',
+                    text: 'My AttendUs badge',
                     files: [XFile(file.path)],
                   ),
                 );

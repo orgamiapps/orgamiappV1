@@ -1,4 +1,4 @@
-import 'package:orgami/models/customer_model.dart';
+import 'package:attendus/models/customer_model.dart';
 
 class CustomerController {
   static CustomerModel? logeInCustomer;

@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/Utils/logger.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/Utils/logger.dart';
 
 /// Optimized Firestore operations to prevent main thread blocking
 class OptimizedFirestoreHelper {

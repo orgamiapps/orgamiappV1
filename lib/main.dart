@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:orgami/firebase_options.dart';
-import 'package:orgami/screens/Splash/splash_screen.dart';
-import 'package:orgami/Utils/logger.dart';
-import 'package:orgami/Utils/theme_provider.dart';
+import 'package:attendus/firebase_options.dart';
+import 'package:attendus/screens/Splash/splash_screen.dart';
+import 'package:attendus/Utils/logger.dart';
+import 'package:attendus/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:orgami/Utils/error_handler.dart';
+import 'package:attendus/Utils/error_handler.dart';
 import 'package:firebase_messaging/firebase_messaging.dart' as fcm;
 // import 'package:firebase_app_check/firebase_app_check.dart'; // Commented out until App Check API is enabled
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
-import 'package:orgami/Services/notification_service.dart';
-import 'package:orgami/firebase/firebase_messaging_helper.dart';
+import 'package:attendus/Services/notification_service.dart';
+import 'package:attendus/firebase/firebase_messaging_helper.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';

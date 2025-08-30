@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/controller/customer_controller.dart';
-import 'package:orgami/Utils/app_app_bar_view.dart';
-import 'package:orgami/Utils/app_constants.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/text_fields.dart';
-import 'package:orgami/Utils/dimensions.dart';
-import 'package:orgami/Utils/toast.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
+import 'package:attendus/Utils/app_constants.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/Utils/text_fields.dart';
+import 'package:attendus/Utils/dimensions.dart';
+import 'package:attendus/Utils/toast.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
 class FeedbackScreen extends StatefulWidget {

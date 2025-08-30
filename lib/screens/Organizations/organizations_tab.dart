@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:orgami/firebase/organization_helper.dart';
-import 'package:orgami/screens/Organizations/create_organization_screen.dart';
+import 'package:attendus/firebase/organization_helper.dart';
+import 'package:attendus/screens/Organizations/create_organization_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:orgami/screens/Organizations/join_requests_screen.dart';
-import 'package:orgami/screens/Organizations/role_permissions_screen.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
-import 'package:orgami/screens/Events/single_event_screen.dart';
+import 'package:attendus/screens/Organizations/join_requests_screen.dart';
+import 'package:attendus/screens/Organizations/role_permissions_screen.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
+import 'package:attendus/screens/Events/single_event_screen.dart';
 
 class OrganizationsTab extends StatefulWidget {
   const OrganizationsTab({super.key});

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The QR code ticket system has been successfully implemented in the Orgami app, providing a complete ticket management solution with QR code functionality. The system follows the process you specified:
+The QR code ticket system has been successfully implemented in the AttendUs app, providing a complete ticket management solution with QR code functionality. The system follows the process you specified:
 
 1. **Event Creator enables tickets**: Creator can enable a specific number of tickets for an event
 2. **Users get tickets**: Users can obtain tickets with QR codes and unique ticket numbers
@@ -91,7 +91,7 @@ static String generateTicketCode() {
 
 ### QR Code Data Format
 ```
-orgami_ticket_{ticketId}_{eventId}_{ticketCode}
+attendus_ticket_{ticketId}_{eventId}_{ticketCode}
 ```
 
 ### Ticket Model Structure

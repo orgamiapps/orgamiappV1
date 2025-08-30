@@ -7,19 +7,19 @@ import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/models/event_question_model.dart';
-import 'package:orgami/screens/Events/single_event_screen.dart';
-import 'package:orgami/screens/Home/dashboard_screen.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/models/event_question_model.dart';
+import 'package:attendus/screens/Events/single_event_screen.dart';
+import 'package:attendus/screens/Home/dashboard_screen.dart';
 
-import 'package:orgami/Utils/router.dart';
+import 'package:attendus/Utils/router.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
 import 'dart:io';
-import 'package:orgami/firebase/organization_helper.dart'; // ignore: unused_import
-import 'package:orgami/controller/customer_controller.dart';
+import 'package:attendus/firebase/organization_helper.dart'; // ignore: unused_import
+import 'package:attendus/controller/customer_controller.dart';
 
 class CreateEventScreen extends StatefulWidget {
   final DateTime? selectedDateTime;

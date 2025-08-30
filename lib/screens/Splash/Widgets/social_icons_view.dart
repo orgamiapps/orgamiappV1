@@ -1,14 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:orgami/controller/customer_controller.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/firebase/firebase_google_auth_helper.dart';
-import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/Utils/app_constants.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/router.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/firebase/firebase_google_auth_helper.dart';
+import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/Utils/app_constants.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/Utils/router.dart';
+import 'package:attendus/Utils/toast.dart';
 
 class SocialLoginView extends StatefulWidget {
   const SocialLoginView({super.key});

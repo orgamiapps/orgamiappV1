@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/screens/Events/add_questions_to_event_screen.dart';
-import 'package:orgami/screens/Events/create_event_screen.dart';
-import 'package:orgami/Utils/router.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/screens/Events/add_questions_to_event_screen.dart';
+import 'package:attendus/screens/Events/create_event_screen.dart';
+import 'package:attendus/Utils/router.dart';
 
 class AddQuestionsPromptScreen extends StatefulWidget {
   final DateTime? selectedDateTime;

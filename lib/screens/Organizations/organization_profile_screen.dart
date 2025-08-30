@@ -3,19 +3,19 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:orgami/firebase/organization_helper.dart';
-import 'package:orgami/firebase/firebase_storage_helper.dart';
-import 'package:orgami/screens/Organizations/join_requests_screen.dart';
-import 'package:orgami/screens/Organizations/role_permissions_screen.dart';
+import 'package:attendus/firebase/organization_helper.dart';
+import 'package:attendus/firebase/firebase_storage_helper.dart';
+import 'package:attendus/screens/Organizations/join_requests_screen.dart';
+import 'package:attendus/screens/Organizations/role_permissions_screen.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
-import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
-import 'package:orgami/controller/customer_controller.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
-import 'package:orgami/screens/Events/single_event_screen.dart';
+import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
+import 'package:attendus/screens/Events/single_event_screen.dart';
 
 class OrganizationProfileScreen extends StatelessWidget {
   final String organizationId;
@@ -32,7 +32,7 @@ class OrganizationProfileScreen extends StatelessWidget {
       final category = (data?['category'] ?? 'Other').toString();
       final desc = (data?['description'] ?? '').toString();
       final buffer = StringBuffer()
-        ..writeln('Check out "$name" on Orgami')
+        ..writeln('Check out "$name" on AttendUs')
         ..writeln('Category: $category');
       if (desc.trim().isNotEmpty) buffer.writeln(desc.trim());
       buffer

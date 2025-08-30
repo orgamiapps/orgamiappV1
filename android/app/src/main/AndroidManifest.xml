@@ -32,7 +32,7 @@
     </queries>
 
     <application
-        android:label="Orgami"
+        android:label="AttendUs"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true">
@@ -62,8 +62,8 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="orgamiapp.page.link" />
-                <data android:scheme="https" android:host="orgami.app" />
+                <data android:scheme="https" android:host="attendusapp.page.link" />
+                <data android:scheme="https" android:host="attendus.app" />
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
@@ -78,7 +78,7 @@
         <!-- Firebase Messaging -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="orgami_channel" />
+            android:value="attendus_channel" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@mipmap/ic_launcher" />

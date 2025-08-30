@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/controller/customer_controller.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/models/ticket_model.dart';
-import 'package:orgami/Services/ticket_payment_service.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/models/ticket_model.dart';
+import 'package:attendus/Services/ticket_payment_service.dart';
+import 'package:attendus/Utils/toast.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -521,7 +521,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
       await SharePlus.instance.share(
         ShareParams(
           text:
-              'My Orgami Ticket • ${ticket.eventTitle} • Code: ${ticket.ticketCode}',
+              'My AttendUs Ticket • ${ticket.eventTitle} • Code: ${ticket.ticketCode}',
           files: [XFile(file.path)],
         ),
       );
@@ -695,7 +695,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                   const Divider(height: 20),
                   const Center(
                     child: Text(
-                      'Powered by Orgami',
+                      'Powered by AttendUs',
                       style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
                     ),
                   ),
@@ -974,7 +974,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                                         // Footer
                                         const Center(
                                           child: Text(
-                                            'Show QR to event organizer\nPowered by Orgami',
+                                            'Show QR to event organizer\nPowered by AttendUs',
                                             textAlign: TextAlign.center,
                                             style: TextStyle(
                                               color: Colors.grey,

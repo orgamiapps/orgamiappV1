@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/screens/Authentication/login_screen.dart';
-import 'package:orgami/screens/Authentication/create_account/create_account_screen.dart';
-import 'package:orgami/screens/Splash/Widgets/social_icons_view.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/images.dart';
-import 'package:orgami/Utils/router.dart';
-import 'package:orgami/screens/QRScanner/qr_scanner_flow_screen.dart';
+import 'package:attendus/screens/Authentication/login_screen.dart';
+import 'package:attendus/screens/Authentication/create_account/create_account_screen.dart';
+import 'package:attendus/screens/Splash/Widgets/social_icons_view.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/Utils/images.dart';
+import 'package:attendus/Utils/router.dart';
+import 'package:attendus/screens/QRScanner/qr_scanner_flow_screen.dart';
 
 class SecondSplashScreen extends StatefulWidget {
   const SecondSplashScreen({super.key});

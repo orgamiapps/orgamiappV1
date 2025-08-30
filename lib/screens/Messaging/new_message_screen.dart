@@ -4,24 +4,24 @@ import 'package:flutter/foundation.dart';
 
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/firebase/firebase_messaging_helper.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/dimensions.dart';
-import 'package:orgami/Utils/cached_image.dart';
-import 'package:orgami/screens/Messaging/chat_screen.dart';
-import 'package:orgami/Utils/toast.dart';
-import 'package:orgami/Utils/theme_provider.dart';
+import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/firebase/firebase_messaging_helper.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/Utils/dimensions.dart';
+import 'package:attendus/Utils/cached_image.dart';
+import 'package:attendus/screens/Messaging/chat_screen.dart';
+import 'package:attendus/Utils/toast.dart';
+import 'package:attendus/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:orgami/Utils/logger.dart';
+import 'package:attendus/Utils/logger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:orgami/firebase/organization_helper.dart';
+import 'package:attendus/firebase/organization_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 // intl not used here; keep code lean
 import 'package:share_plus/share_plus.dart';
-import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
-import 'package:orgami/screens/Organizations/groups_screen.dart';
+import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
+import 'package:attendus/screens/Organizations/groups_screen.dart';
 
 class NewMessageScreen extends StatefulWidget {
   const NewMessageScreen({super.key});
@@ -1702,7 +1702,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
 
   void _inviteFriends() {
     SharePlus.instance.share(
-      ShareParams(text: 'Join me on Orgami to chat and collaborate!'),
+      ShareParams(text: 'Join me on AttendUs to chat and collaborate!'),
     );
   }
 

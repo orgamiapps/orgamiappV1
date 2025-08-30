@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/models/payment_model.dart';
-import 'package:orgami/Services/payment_service.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/models/payment_model.dart';
+import 'package:attendus/Services/payment_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:orgami/Utils/logger.dart';
+import 'package:attendus/Utils/logger.dart';
 
 class FeatureEventScreen extends StatefulWidget {
   final EventModel eventModel;

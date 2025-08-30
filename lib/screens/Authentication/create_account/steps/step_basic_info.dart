@@ -5,10 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:orgami/Utils/app_constants.dart';
-import 'package:orgami/Utils/colors.dart';
+import 'package:attendus/Utils/app_constants.dart';
+import 'package:attendus/Utils/colors.dart';
 import 'package:provider/provider.dart';
-import 'package:orgami/screens/Authentication/create_account/create_account_view_model.dart';
+import 'package:attendus/screens/Authentication/create_account/create_account_view_model.dart';
 
 class StepBasicInfo extends StatefulWidget {
   const StepBasicInfo({super.key, required this.onNext});

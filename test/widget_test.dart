@@ -9,8 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
-import 'package:orgami/main.dart';
-import 'package:orgami/Utils/theme_provider.dart';
+import 'package:attendus/main.dart';
+import 'package:attendus/Utils/theme_provider.dart';
 
 void main() {
   testWidgets('App builds with ThemeProvider', (tester) async {

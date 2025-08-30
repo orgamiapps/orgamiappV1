@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/router.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/Utils/router.dart';
 import 'package:provider/provider.dart';
-import 'package:orgami/screens/Authentication/create_account/create_account_view_model.dart';
-import 'package:orgami/screens/Authentication/create_account/steps/step_basic_info.dart';
-import 'package:orgami/screens/Authentication/create_account/steps/step_password.dart';
-import 'package:orgami/screens/Authentication/create_account/steps/step_profile_photo.dart';
-import 'package:orgami/screens/Authentication/create_account/steps/step_professional_info.dart';
-import 'package:orgami/screens/Authentication/create_account/steps/step_contacts.dart';
+import 'package:attendus/screens/Authentication/create_account/create_account_view_model.dart';
+import 'package:attendus/screens/Authentication/create_account/steps/step_basic_info.dart';
+import 'package:attendus/screens/Authentication/create_account/steps/step_password.dart';
+import 'package:attendus/screens/Authentication/create_account/steps/step_profile_photo.dart';
+import 'package:attendus/screens/Authentication/create_account/steps/step_professional_info.dart';
+import 'package:attendus/screens/Authentication/create_account/steps/step_contacts.dart';
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});

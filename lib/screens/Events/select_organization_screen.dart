@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/firebase/organization_helper.dart';
-import 'package:orgami/Utils/router.dart';
-import 'package:orgami/screens/Events/chose_sign_in_methods_screen.dart';
+import 'package:attendus/firebase/organization_helper.dart';
+import 'package:attendus/Utils/router.dart';
+import 'package:attendus/screens/Events/chose_sign_in_methods_screen.dart';
 
 class SelectOrganizationScreen extends StatefulWidget {
   const SelectOrganizationScreen({super.key});

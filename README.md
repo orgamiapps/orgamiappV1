@@ -1,6 +1,6 @@
-# orgami
+# AttendUs
 
-A new Flutter project.
+AttendUs - Event attendance management app.
 
 ## Getting Started
 
