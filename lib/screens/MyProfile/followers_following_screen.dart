@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/dimensions.dart';
-import 'package:orgami/Utils/cached_image.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/Utils/toast.dart';
-import 'package:orgami/controller/customer_controller.dart';
+import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/Utils/dimensions.dart';
+import 'package:attendus/Utils/cached_image.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/Utils/toast.dart';
+import 'package:attendus/controller/customer_controller.dart';
 
 class FollowersFollowingScreen extends StatefulWidget {
   final CustomerModel user;

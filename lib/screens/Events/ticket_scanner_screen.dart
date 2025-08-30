@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/models/ticket_model.dart';
-import 'package:orgami/models/attendance_model.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/models/ticket_model.dart';
+import 'package:attendus/models/attendance_model.dart';
+import 'package:attendus/Utils/toast.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:orgami/models/badge_model.dart';
+import 'package:attendus/models/badge_model.dart';
 
 class TicketScannerScreen extends StatefulWidget {
   final String eventId;

@@ -167,7 +167,7 @@ class _BadgeScreenState extends State<BadgeScreen>
       await SharePlus.instance.share(
         ShareParams(
           text:
-              'Check out my Orgami Event Badge! 🏆\n\n'
+              'Check out my AttendUs Event Badge! 🏆\n\n'
               'Level: ${_badge!.badgeLevel}\n'
               'Events Created: ${_badge!.eventsCreated}\n'
               'Events Attended: ${_badge!.eventsAttended}\n'

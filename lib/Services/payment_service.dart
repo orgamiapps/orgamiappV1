@@ -3,8 +3,8 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'package:orgami/models/payment_model.dart';
-import 'package:orgami/Utils/logger.dart';
+import 'package:attendus/models/payment_model.dart';
+import 'package:attendus/Utils/logger.dart';
 
 class PaymentService {
   static final FirebaseFunctions _functions = FirebaseFunctions.instance;

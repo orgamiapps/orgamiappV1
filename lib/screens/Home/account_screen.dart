@@ -3,26 +3,26 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:provider/provider.dart';
-import 'package:orgami/controller/customer_controller.dart';
-// import 'package:orgami/firebase/FirebaseFirestoreHelper.dart'; // Unused import
+import 'package:attendus/controller/customer_controller.dart';
+// import 'package:attendus/firebase/FirebaseFirestoreHelper.dart'; // Unused import
 
-import 'package:orgami/screens/Feedback/feedback_screen.dart';
+import 'package:attendus/screens/Feedback/feedback_screen.dart';
 
-import 'package:orgami/screens/Home/analytics_dashboard_screen.dart';
-import 'package:orgami/Utils/app_constants.dart';
-import 'package:orgami/Utils/router.dart';
-import 'package:orgami/Utils/theme_provider.dart';
+import 'package:attendus/screens/Home/analytics_dashboard_screen.dart';
+import 'package:attendus/Utils/app_constants.dart';
+import 'package:attendus/Utils/router.dart';
+import 'package:attendus/Utils/theme_provider.dart';
 
-import 'package:orgami/Utils/web_view_page.dart';
-// import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/Utils/toast.dart';
-import 'package:orgami/screens/Home/delete_account_screen.dart';
+import 'package:attendus/Utils/web_view_page.dart';
+// import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/Utils/toast.dart';
+import 'package:attendus/screens/Home/delete_account_screen.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
-import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
+import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 
-import 'package:orgami/screens/Home/attendee_notification_screen.dart';
-import 'package:orgami/screens/Home/blocked_users_screen.dart';
+import 'package:attendus/screens/Home/attendee_notification_screen.dart';
+import 'package:attendus/screens/Home/blocked_users_screen.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});

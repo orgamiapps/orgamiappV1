@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'package:orgami/models/customer_model.dart';
+import 'package:attendus/models/customer_model.dart';
 import 'package:flutter/foundation.dart';
 
 class SMSNotificationService {

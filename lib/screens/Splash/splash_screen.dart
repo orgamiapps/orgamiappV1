@@ -2,11 +2,11 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:orgami/controller/customer_controller.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
 
-import 'package:orgami/Utils/images.dart';
-import 'package:orgami/Utils/router.dart';
+import 'package:attendus/Utils/images.dart';
+import 'package:attendus/Utils/router.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});

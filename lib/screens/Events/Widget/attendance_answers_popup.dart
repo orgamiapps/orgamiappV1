@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/models/attendance_model.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/Utils/colors.dart';
+import 'package:attendus/models/attendance_model.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/Utils/colors.dart';
 
 class AttendanceAnswersPopup extends StatelessWidget {
   final EventModel eventModel;

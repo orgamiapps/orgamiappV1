@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/dimensions.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/Utils/dimensions.dart';
+import 'package:attendus/Utils/toast.dart';
 
 class QRCodeGeneratorScreen extends StatefulWidget {
   final String eventId;

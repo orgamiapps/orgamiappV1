@@ -3,12 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/screens/Events/single_event_screen.dart';
-import 'package:orgami/screens/Events/chose_sign_in_methods_screen.dart';
-import 'package:orgami/Utils/router.dart';
-import 'package:orgami/Utils/toast.dart';
-import 'package:orgami/widgets/month_year_picker.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/screens/Events/single_event_screen.dart';
+import 'package:attendus/screens/Events/chose_sign_in_methods_screen.dart';
+import 'package:attendus/Utils/router.dart';
+import 'package:attendus/Utils/toast.dart';
+import 'package:attendus/widgets/month_year_picker.dart';
 import 'dart:async';
 
 class CalendarScreen extends StatefulWidget {

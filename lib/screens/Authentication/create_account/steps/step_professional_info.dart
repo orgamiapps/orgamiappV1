@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:orgami/Utils/colors.dart';
+import 'package:attendus/Utils/colors.dart';
 
 class StepProfessionalInfo extends StatefulWidget {
   const StepProfessionalInfo({super.key, required this.onSkip, required this.onNext});

@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:attendus/Utils/toast.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class PermissionsHelperClass {

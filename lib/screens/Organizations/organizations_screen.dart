@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:orgami/firebase/organization_helper.dart';
-import 'package:orgami/screens/Organizations/organization_profile_screen.dart';
-import 'package:orgami/screens/Organizations/create_organization_screen.dart';
+import 'package:attendus/firebase/organization_helper.dart';
+import 'package:attendus/screens/Organizations/organization_profile_screen.dart';
+import 'package:attendus/screens/Organizations/create_organization_screen.dart';
 
 class OrganizationsScreen extends StatefulWidget {
   const OrganizationsScreen({super.key});

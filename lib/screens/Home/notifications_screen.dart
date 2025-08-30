@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:orgami/firebase/firebase_messaging_helper.dart';
-import 'package:orgami/models/notification_model.dart';
+import 'package:attendus/firebase/firebase_messaging_helper.dart';
+import 'package:attendus/models/notification_model.dart';
 import 'package:intl/intl.dart';
-import 'package:orgami/screens/Home/notification_settings_screen.dart';
+import 'package:attendus/screens/Home/notification_settings_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/screens/Events/single_event_screen.dart';
-import 'package:orgami/screens/Messaging/chat_screen.dart';
-import 'package:orgami/screens/Organizations/organization_profile_screen.dart';
-import 'package:orgami/screens/Events/event_feedback_management_screen.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/screens/Events/single_event_screen.dart';
+import 'package:attendus/screens/Messaging/chat_screen.dart';
+import 'package:attendus/screens/Organizations/organization_profile_screen.dart';
+import 'package:attendus/screens/Events/event_feedback_management_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 

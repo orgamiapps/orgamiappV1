@@ -3,13 +3,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/firebase/ai_analytics_helper.dart';
-import 'package:orgami/models/attendance_model.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/dimensions.dart';
-import 'package:orgami/Utils/toast.dart';
-import 'package:orgami/Utils/logger.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/firebase/ai_analytics_helper.dart';
+import 'package:attendus/models/attendance_model.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/Utils/dimensions.dart';
+import 'package:attendus/Utils/toast.dart';
+import 'package:attendus/Utils/logger.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -2210,7 +2210,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
         ShareParams(
           files: [XFile(file.path)],
           subject: 'Event Analytics - ${widget.eventId}',
-          text: 'Event analytics data exported from Orgami app',
+          text: 'Event analytics data exported from AttendUs app',
         ),
       );
       if (!mounted) return;

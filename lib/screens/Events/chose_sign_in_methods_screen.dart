@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:orgami/screens/Events/chose_location_in_map_screen.dart';
-import 'package:orgami/screens/Events/add_questions_prompt_screen.dart';
-import 'package:orgami/screens/Events/Widget/sign_in_methods_selector.dart';
-import 'package:orgami/Utils/router.dart';
+import 'package:attendus/screens/Events/chose_location_in_map_screen.dart';
+import 'package:attendus/screens/Events/add_questions_prompt_screen.dart';
+import 'package:attendus/screens/Events/Widget/sign_in_methods_selector.dart';
+import 'package:attendus/Utils/router.dart';
 
 class ChoseSignInMethodsScreen extends StatefulWidget {
   final DateTime? selectedDateTime;

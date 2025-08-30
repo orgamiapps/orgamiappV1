@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:orgami/Utils/logger.dart';
+import 'package:attendus/Utils/logger.dart';
 
 /// Global error handler for the app
 class ErrorHandler {

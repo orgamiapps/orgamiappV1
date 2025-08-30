@@ -1,17 +1,17 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:orgami/controller/customer_controller.dart';
-import 'package:orgami/models/attendance_model.dart';
-import 'package:orgami/models/comment_model.dart';
-import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/models/event_question_model.dart';
-import 'package:orgami/models/ticket_model.dart';
-import 'package:orgami/models/event_feedback_model.dart';
-import 'package:orgami/models/app_feedback_model.dart';
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/models/attendance_model.dart';
+import 'package:attendus/models/comment_model.dart';
+import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/models/event_question_model.dart';
+import 'package:attendus/models/ticket_model.dart';
+import 'package:attendus/models/event_feedback_model.dart';
+import 'package:attendus/models/app_feedback_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:orgami/Utils/logger.dart';
+import 'package:attendus/Utils/logger.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 class FirebaseFirestoreHelper {

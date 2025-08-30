@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:orgami/models/ticket_payment_model.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/Services/ticket_payment_service.dart';
-import 'package:orgami/controller/customer_controller.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:attendus/models/ticket_payment_model.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/Services/ticket_payment_service.dart';
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/Utils/toast.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 

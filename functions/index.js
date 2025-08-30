@@ -49,7 +49,7 @@ exports.dispatchPendingPush = onDocumentCreated("pendingPushNotifications/{docId
   const data = snap.data();
   try {
     const token = data.fcmToken;
-    const title = data.title || "Orgami";
+    const title = data.title || "AttendUs";
     const body = data.body || "New notification";
     if (!token || typeof token !== 'string' || token.length < 10) {
       logger.warn("No valid fcmToken, removing pending push", { id: snap.id });
@@ -68,7 +68,7 @@ exports.dispatchPendingPush = onDocumentCreated("pendingPushNotifications/{docId
       },
       android: {
         priority: 'high',
-        notification: { channelId: 'orgami_channel' },
+        notification: { channelId: 'attendus_channel' },
       },
       apns: {
         payload: { aps: { sound: 'default' } },
@@ -168,14 +168,14 @@ async function generateGoogleSaveUrl(uid) {
     typ: 'savetowallet',
     iat,
     exp,
-    origins: ['https://orgami.app'],
+    origins: ['https://attendus.app'],
     payload: {
       genericObjects: [
         {
           id: objectId,
           classId: classId,
-          logo: { sourceUri: { uri: 'https://orgami.app/logo.png' } },
-          cardTitle: { defaultValue: { language: 'en-US', value: 'Orgami Badge' } },
+          logo: { sourceUri: { uri: 'https://attendus.app/logo.png' } },
+          cardTitle: { defaultValue: { language: 'en-US', value: 'AttendUs Badge' } },
           header: { defaultValue: { language: 'en-US', value: 'Member Badge' } },
           hexBackgroundColor: '#4A90E2',
           textModulesData: [
@@ -183,7 +183,7 @@ async function generateGoogleSaveUrl(uid) {
           ],
           barcode: {
             type: 'QR_CODE',
-            value: `orgami_user_${uid}`,
+            value: `attendus_user_${uid}`,
           },
         },
       ],
@@ -744,7 +744,7 @@ exports.sendScheduledNotifications = onSchedule({
           },
           android: {
             notification: {
-              channelId: "orgami_channel",
+              channelId: "attendus_channel",
               priority: "high",
               defaultSound: true,
               defaultVibrateTimings: true,

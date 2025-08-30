@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/models/ticket_model.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/models/ticket_model.dart';
+import 'package:attendus/Utils/toast.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:orgami/screens/Events/ticket_scanner_screen.dart';
-import 'package:orgami/screens/Events/ticket_revenue_screen.dart';
+import 'package:attendus/screens/Events/ticket_scanner_screen.dart';
+import 'package:attendus/screens/Events/ticket_revenue_screen.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 class TicketManagementScreen extends StatefulWidget {

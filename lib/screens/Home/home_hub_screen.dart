@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/screens/Home/home_screen.dart' as legacy;
-import 'package:orgami/screens/Home/search_screen.dart';
-import 'package:orgami/screens/QRScanner/qr_scanner_flow_screen.dart';
-import 'package:orgami/firebase/organization_helper.dart';
+import 'package:attendus/screens/Home/home_screen.dart' as legacy;
+import 'package:attendus/screens/Home/search_screen.dart';
+import 'package:attendus/screens/QRScanner/qr_scanner_flow_screen.dart';
+import 'package:attendus/firebase/organization_helper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:orgami/Utils/router.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/screens/Events/single_event_screen.dart';
-import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
-import 'package:orgami/screens/Events/chose_sign_in_methods_screen.dart';
-import 'package:orgami/screens/Home/calendar_screen.dart';
+import 'package:attendus/Utils/router.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/screens/Events/single_event_screen.dart';
+import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
+import 'package:attendus/screens/Events/chose_sign_in_methods_screen.dart';
+import 'package:attendus/screens/Home/calendar_screen.dart';
 
 class HomeHubScreen extends StatefulWidget {
   const HomeHubScreen({super.key});

@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/models/event_question_model.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/models/event_question_model.dart';
 
 class AddQuestionPopup extends StatefulWidget {
   final EventModel eventModel;

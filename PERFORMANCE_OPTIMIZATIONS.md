@@ -1,4 +1,4 @@
-# Performance Optimizations for Orgami App
+# Performance Optimizations for AttendUs App
 
 This document outlines the performance optimizations implemented to improve app loading times and overall performance.
 
