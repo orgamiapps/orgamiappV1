@@ -4,16 +4,16 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
-import 'package:orgami/screens/Events/single_event_screen.dart';
-import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
-import 'package:orgami/controller/customer_controller.dart';
+import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
+import 'package:attendus/screens/Events/single_event_screen.dart';
+import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
+import 'package:attendus/controller/customer_controller.dart';
 
-import 'package:orgami/firebase/engagement_predictor.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/firebase/recommendation_analytics.dart';
-import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/models/event_model.dart';
+import 'package:attendus/firebase/engagement_predictor.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/firebase/recommendation_analytics.dart';
+import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/models/event_model.dart';
 import 'package:shimmer/shimmer.dart';
 
 class SearchScreen extends StatefulWidget {

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:orgami/Utils/logger.dart';
+import 'package:attendus/Utils/logger.dart';
 
 /// Centralized location management to prevent permission conflicts
 class LocationHelper {

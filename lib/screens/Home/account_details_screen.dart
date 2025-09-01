@@ -1,16 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:orgami/controller/customer_controller.dart';
-import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/Utils/app_app_bar_view.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
+import 'package:attendus/Utils/toast.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'dart:convert';
-import 'package:orgami/firebase/firebase_storage_helper.dart';
-import 'package:orgami/screens/Authentication/forgot_password_screen.dart';
-import 'package:orgami/Utils/full_screen_image_viewer.dart';
+import 'package:attendus/firebase/firebase_storage_helper.dart';
+import 'package:attendus/screens/Authentication/forgot_password_screen.dart';
+import 'package:attendus/Utils/full_screen_image_viewer.dart';
 
 class AccountDetailsScreen extends StatefulWidget {
   const AccountDetailsScreen({super.key});

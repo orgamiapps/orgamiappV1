@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:orgami/Utils/logger.dart';
+import 'package:attendus/Utils/logger.dart';
 
 class DwellTimeTracker {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;

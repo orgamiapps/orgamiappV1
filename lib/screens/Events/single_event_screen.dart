@@ -7,50 +7,50 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:orgami/models/customer_model.dart';
+import 'package:attendus/models/customer_model.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:intl/intl.dart';
-import 'package:orgami/controller/customer_controller.dart';
-import 'package:orgami/firebase/dwell_time_tracker.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/models/attendance_model.dart';
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/firebase/dwell_time_tracker.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/models/attendance_model.dart';
 
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/models/event_question_model.dart';
-import 'package:orgami/screens/Events/Attendance/attendance_sheet_screen.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/models/event_question_model.dart';
+import 'package:attendus/screens/Events/Attendance/attendance_sheet_screen.dart';
 
-import 'package:orgami/screens/Events/Widget/comments_section.dart';
+import 'package:attendus/screens/Events/Widget/comments_section.dart';
 
-import 'package:orgami/screens/Events/ticket_management_screen.dart';
-import 'package:orgami/screens/Events/ticket_scanner_screen.dart';
-import 'package:orgami/screens/Events/event_analytics_screen.dart';
-import 'package:orgami/screens/Events/event_feedback_screen.dart';
-import 'package:orgami/screens/Events/event_feedback_management_screen.dart';
-import 'package:orgami/screens/Home/attendee_notification_screen.dart';
-import 'package:orgami/screens/MyProfile/my_tickets_screen.dart';
-import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
+import 'package:attendus/screens/Events/ticket_management_screen.dart';
+import 'package:attendus/screens/Events/ticket_scanner_screen.dart';
+import 'package:attendus/screens/Events/event_analytics_screen.dart';
+import 'package:attendus/screens/Events/event_feedback_screen.dart';
+import 'package:attendus/screens/Events/event_feedback_management_screen.dart';
+import 'package:attendus/screens/Home/attendee_notification_screen.dart';
+import 'package:attendus/screens/MyProfile/my_tickets_screen.dart';
+import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 
-// import 'package:orgami/screens/QRScanner/QrScannerScreenForLogedIn.dart';
-import 'package:orgami/screens/QRScanner/qr_scanner_flow_screen.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/router.dart';
-import 'package:orgami/Utils/toast.dart';
-import 'package:orgami/Utils/logger.dart';
-import 'package:orgami/Services/ticket_payment_service.dart';
+// import 'package:attendus/screens/QRScanner/QrScannerScreenForLogedIn.dart';
+import 'package:attendus/screens/QRScanner/qr_scanner_flow_screen.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/Utils/router.dart';
+import 'package:attendus/Utils/toast.dart';
+import 'package:attendus/Utils/logger.dart';
+import 'package:attendus/Services/ticket_payment_service.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
-import 'package:orgami/screens/Events/chose_location_in_map_screen.dart';
-import 'package:orgami/screens/Events/feature_event_screen.dart';
-import 'package:orgami/screens/Events/edit_event_screen.dart';
-import 'package:orgami/screens/Events/event_location_view_screen.dart';
+import 'package:attendus/screens/Events/chose_location_in_map_screen.dart';
+import 'package:attendus/screens/Events/feature_event_screen.dart';
+import 'package:attendus/screens/Events/edit_event_screen.dart';
+import 'package:attendus/screens/Events/event_location_view_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:orgami/screens/Events/Widget/access_list_management_widget.dart';
+import 'package:attendus/screens/Events/Widget/access_list_management_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:orgami/screens/Events/Widget/pre_registered_horizontal_list.dart';
+import 'package:attendus/screens/Events/Widget/pre_registered_horizontal_list.dart';
 
 class SingleEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -2151,7 +2151,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   }
 
   void _shareEventDetails() {
-    final eventUrl = 'https://orgami.app/event/${eventModel.id}';
+    final eventUrl = 'https://attendus.app/event/${eventModel.id}';
     final shareText =
         '''
 ${eventModel.title}
@@ -2404,11 +2404,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
           // Refresh ticket status
           checkUserTicket(updateUI: true);
 
-          // Show upgrade option
-          _UpgradeDialogHelper.showUpgradeOptionDialog(
-            context,
-            eventModel.ticketPrice!,
-          );
+          // Removed post-purchase upgrade prompt per new UX
         }
       } else {
         if (mounted) {

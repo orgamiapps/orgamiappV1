@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:orgami/Utils/logger.dart';
+import 'package:attendus/Utils/logger.dart';
 
 class RecommendationAnalytics {
   /// Track when recommendations are shown to a user

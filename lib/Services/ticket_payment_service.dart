@@ -3,10 +3,10 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'package:orgami/models/ticket_payment_model.dart';
-import 'package:orgami/models/ticket_model.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/Utils/logger.dart';
+import 'package:attendus/models/ticket_payment_model.dart';
+import 'package:attendus/models/ticket_model.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/Utils/logger.dart';
 
 class TicketPaymentService {
   static final FirebaseFunctions _functions = FirebaseFunctions.instance;
@@ -256,6 +256,7 @@ class TicketPaymentService {
   static Future<Map<String, dynamic>> createTicketUpgradePaymentIntent({
     required String ticketId,
     required double originalPrice,
+    required double upgradePrice,
     required String customerUid,
     required String customerName,
     required String customerEmail,
@@ -266,8 +267,8 @@ class TicketPaymentService {
         'Creating ticket upgrade payment intent for ticket: $ticketId',
       );
 
-      // Calculate upgrade price (5x the original price)
-      final upgradeAmount = originalPrice * 5;
+      // Use the upgrade price configured by the event creator
+      final upgradeAmount = upgradePrice;
       final amountInCents = (upgradeAmount * 100).round();
 
       final callable = _functions.httpsCallable(

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/firebase/firebase_messaging_helper.dart';
-import 'package:orgami/models/notification_model.dart';
-import 'package:orgami/Utils/toast.dart';
-import 'package:orgami/Services/notification_service.dart'; // Added import for NotificationService
+import 'package:attendus/firebase/firebase_messaging_helper.dart';
+import 'package:attendus/models/notification_model.dart';
+import 'package:attendus/Utils/toast.dart';
+import 'package:attendus/Services/notification_service.dart'; // Added import for NotificationService
 import 'dart:convert'; // Added import for json
 
 class NotificationSettingsScreen extends StatefulWidget {

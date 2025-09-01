@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:orgami/Utils/logger.dart';
-import 'package:orgami/models/organization_model.dart';
-import 'package:orgami/models/organization_membership_model.dart';
+import 'package:attendus/Utils/logger.dart';
+import 'package:attendus/models/organization_model.dart';
+import 'package:attendus/models/organization_membership_model.dart';
 
 class OrganizationHelper {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/controller/customer_controller.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/controller/customer_controller.dart';
 
 class SuggestedContactsScreen extends StatefulWidget {
   const SuggestedContactsScreen({super.key});

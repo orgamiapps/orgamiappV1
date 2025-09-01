@@ -1,11 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/firebase/engagement_predictor.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/firebase/engagement_predictor.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:math';
-import 'package:orgami/Utils/logger.dart';
+import 'package:attendus/Utils/logger.dart';
 
 class EventRecommendationHelper {
   static const double locationWeight = 0.25;

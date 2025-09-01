@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
-import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/dimensions.dart';
-import 'package:orgami/Utils/cached_image.dart';
-import 'package:orgami/firebase/firebase_storage_helper.dart';
+import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/Utils/dimensions.dart';
+import 'package:attendus/Utils/cached_image.dart';
+import 'package:attendus/firebase/firebase_storage_helper.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/Utils/toast.dart';
-import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
-import 'package:orgami/controller/customer_controller.dart';
-import 'package:orgami/screens/MyProfile/followers_following_screen.dart';
-import 'package:orgami/screens/Messaging/new_message_screen.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/Utils/toast.dart';
+import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/screens/MyProfile/followers_following_screen.dart';
+import 'package:attendus/screens/Messaging/new_message_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final CustomerModel user;
@@ -755,7 +755,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   void _shareProfile() {
     SharePlus.instance.share(
-      ShareParams(text: 'Check out ${widget.user.name}\'s profile on Orgami!'),
+      ShareParams(text: 'Check out ${widget.user.name}\'s profile on AttendUs!'),
     );
   }
 

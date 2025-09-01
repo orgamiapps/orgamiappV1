@@ -2,10 +2,10 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/toast.dart';
-import 'package:orgami/Utils/logger.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/Utils/toast.dart';
+import 'package:attendus/Utils/logger.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:qr_flutter/qr_flutter.dart';

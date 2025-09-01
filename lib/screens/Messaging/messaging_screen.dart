@@ -2,21 +2,21 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:orgami/models/message_model.dart';
+import 'package:attendus/models/message_model.dart';
 import 'package:provider/provider.dart';
 
-import 'package:orgami/firebase/firebase_messaging_helper.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/dimensions.dart';
-import 'package:orgami/Utils/cached_image.dart';
-import 'package:orgami/Utils/theme_provider.dart';
-import 'package:orgami/screens/Messaging/chat_screen.dart';
-import 'package:orgami/screens/Messaging/new_message_screen.dart';
+import 'package:attendus/firebase/firebase_messaging_helper.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/Utils/dimensions.dart';
+import 'package:attendus/Utils/cached_image.dart';
+import 'package:attendus/Utils/theme_provider.dart';
+import 'package:attendus/screens/Messaging/chat_screen.dart';
+import 'package:attendus/screens/Messaging/new_message_screen.dart';
 import 'package:intl/intl.dart';
-import 'package:orgami/models/customer_model.dart';
+import 'package:attendus/models/customer_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:orgami/Utils/logger.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/Utils/logger.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
 
 class MessagingScreen extends StatefulWidget {
   const MessagingScreen({super.key});

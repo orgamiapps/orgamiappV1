@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/Utils/app_buttons.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/dimensions.dart';
+import 'package:attendus/Utils/app_buttons.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/Utils/dimensions.dart';
 
 class AppAppBarView {
   static Widget appBarView({

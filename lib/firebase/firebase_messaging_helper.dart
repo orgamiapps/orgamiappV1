@@ -7,11 +7,11 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
 // import 'dart:typed_data' show Int64List; // Unused; Int64List available via foundation
 
-import 'package:orgami/models/message_model.dart';
-import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/models/notification_model.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/Utils/logger.dart';
+import 'package:attendus/models/message_model.dart';
+import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/models/notification_model.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/Utils/logger.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
 class NotificationPage {

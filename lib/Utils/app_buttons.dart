@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/Utils/colors.dart';
+import 'package:attendus/Utils/colors.dart';
 
 class AppButtons {
   static Widget button1({

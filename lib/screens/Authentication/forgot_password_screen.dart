@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/images.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/Utils/images.dart';
 import 'package:flutter/foundation.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:attendus/Utils/toast.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {

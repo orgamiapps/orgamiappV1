@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/firebase/organization_helper.dart';
+import 'package:attendus/firebase/organization_helper.dart';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:orgami/firebase/firebase_storage_helper.dart';
+import 'package:attendus/firebase/firebase_storage_helper.dart';
 import 'package:flutter/services.dart';
 
 class CreateOrganizationScreen extends StatefulWidget {

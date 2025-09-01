@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/models/ticket_model.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/models/ticket_model.dart';
+import 'package:attendus/Utils/toast.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:orgami/screens/Events/ticket_scanner_screen.dart';
-import 'package:orgami/screens/Events/ticket_revenue_screen.dart';
+import 'package:attendus/screens/Events/ticket_scanner_screen.dart';
+import 'package:attendus/Services/ticket_payment_service.dart';
+import 'package:attendus/screens/Events/ticket_revenue_screen.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 class TicketManagementScreen extends StatefulWidget {
@@ -28,10 +29,13 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
   List<TicketModel> eventTickets = [];
   final TextEditingController _maxTicketsController = TextEditingController();
   final TextEditingController _ticketPriceController = TextEditingController();
+  final TextEditingController _upgradePriceController = TextEditingController();
   bool isTicketsEnabled = false;
   int maxTickets = 0;
   int issuedTickets = 0;
   double? ticketPrice;
+  bool isUpgradeEnabled = false;
+  double? upgradePrice;
 
   @override
   void initState() {
@@ -40,9 +44,14 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
     maxTickets = widget.eventModel.maxTickets;
     issuedTickets = widget.eventModel.issuedTickets;
     ticketPrice = widget.eventModel.ticketPrice;
+    isUpgradeEnabled = widget.eventModel.ticketUpgradeEnabled;
+    upgradePrice = widget.eventModel.ticketUpgradePrice;
     _maxTicketsController.text = maxTickets.toString();
     if (ticketPrice != null && ticketPrice! > 0) {
       _ticketPriceController.text = ticketPrice!.toStringAsFixed(2);
+    }
+    if (upgradePrice != null && upgradePrice! > 0) {
+      _upgradePriceController.text = upgradePrice!.toStringAsFixed(2);
     }
     _loadEventTickets();
   }
@@ -51,6 +60,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
   void dispose() {
     _maxTicketsController.dispose();
     _ticketPriceController.dispose();
+    _upgradePriceController.dispose();
     super.dispose();
   }
 
@@ -94,8 +104,23 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
     if (_ticketPriceController.text.isNotEmpty) {
       priceInput = double.tryParse(_ticketPriceController.text);
       if (priceInput != null && priceInput < 0) {
+        ShowToast().showNormalToast(msg: 'Please enter a valid ticket price');
+        return;
+      }
+    }
+
+    // Parse upgrade price if upgrade is enabled
+    double? upgradePriceInput;
+    if (isUpgradeEnabled && _upgradePriceController.text.isNotEmpty) {
+      upgradePriceInput = double.tryParse(_upgradePriceController.text);
+      if (upgradePriceInput == null || upgradePriceInput < 0) {
+        ShowToast().showNormalToast(msg: 'Please enter a valid upgrade price');
+        return;
+      }
+      // Ensure upgrade price is higher than base ticket price
+      if (priceInput != null && upgradePriceInput <= priceInput) {
         ShowToast().showNormalToast(
-          msg: 'Please enter a valid ticket price',
+          msg: 'Upgrade price must be higher than base ticket price',
         );
         return;
       }
@@ -110,6 +135,8 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
         eventId: widget.eventModel.id,
         maxTickets: maxTicketsInput,
         ticketPrice: priceInput,
+        ticketUpgradeEnabled: isUpgradeEnabled,
+        ticketUpgradePrice: upgradePriceInput,
       );
 
       if (mounted) {
@@ -117,6 +144,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
           isTicketsEnabled = true;
           maxTickets = maxTicketsInput;
           ticketPrice = priceInput;
+          upgradePrice = upgradePriceInput;
           issuedTickets = 0;
           isLoading = false;
         });
@@ -405,7 +433,9 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: _ticketPriceController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: InputDecoration(
                 labelText: 'Ticket price (USD)',
                 hintText: 'Leave empty for free tickets',
@@ -413,7 +443,87 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 prefixIcon: const Icon(Icons.attach_money),
-                helperText: 'Set a price per ticket or leave empty for free tickets',
+                helperText:
+                    'Set a price per ticket or leave empty for free tickets',
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.rocket_launch,
+                        color: Color(0xFF764BA2),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'VIP Skip-the-Line Upgrades (Optional)',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A1A1A),
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: isUpgradeEnabled,
+                        onChanged: (value) {
+                          setState(() {
+                            isUpgradeEnabled = value ?? false;
+                          });
+                        },
+                        activeColor: const Color(0xFF764BA2),
+                      ),
+                      const Expanded(
+                        child: Text(
+                          'Allow ticket holders to upgrade to VIP',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF6B7280),
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (isUpgradeEnabled) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _upgradePriceController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'VIP Upgrade Price (USD)',
+                        hintText: 'Total price for VIP ticket',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        prefixIcon: const Icon(
+                          Icons.star,
+                          color: Color(0xFFFFD700),
+                        ),
+                        helperText:
+                            'This is the total price (not additional cost)',
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
             const SizedBox(height: 16),
@@ -467,7 +577,10 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
             if (ticketPrice != null && ticketPrice! > 0) ...[
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF10B981).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
@@ -475,7 +588,11 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.attach_money, size: 16, color: Color(0xFF10B981)),
+                    const Icon(
+                      Icons.attach_money,
+                      size: 16,
+                      color: Color(0xFF10B981),
+                    ),
                     Text(
                       'Ticket Price: \$${ticketPrice!.toStringAsFixed(2)}',
                       style: const TextStyle(
@@ -524,9 +641,8 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => TicketRevenueScreen(
-              eventModel: widget.eventModel,
-            ),
+            builder: (context) =>
+                TicketRevenueScreen(eventModel: widget.eventModel),
           ),
         );
       },
@@ -594,11 +710,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                 ),
               ],
             ),
-            const Icon(
-              Icons.arrow_forward_ios,
-              color: Colors.white,
-              size: 20,
-            ),
+            const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 20),
           ],
         ),
       ),
@@ -1020,6 +1132,39 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                 ),
               ),
             ],
+            const SizedBox(height: 12),
+            if (!ticket.isUsed &&
+                !ticket.isSkipTheLine &&
+                (ticket.price ?? 0) > 0 &&
+                widget.eventModel.ticketUpgradeEnabled &&
+                widget.eventModel.ticketUpgradePrice != null) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton.icon(
+                  onPressed: () => _showUpgradeDialog(ticket),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF764BA2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(
+                    Icons.rocket_launch,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                  label: Text(
+                    'Upgrade to VIP • \$${widget.eventModel.ticketUpgradePrice!.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -1102,6 +1247,40 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
+                    if (!ticket.isUsed &&
+                        !ticket.isSkipTheLine &&
+                        (ticket.price ?? 0) > 0 &&
+                        widget.eventModel.ticketUpgradeEnabled &&
+                        widget.eventModel.ticketUpgradePrice != null) ...[
+                      _buildInlineUpgradeBanner(ticket),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _showUpgradeDialog(ticket);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF667EEA),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          icon: const Icon(Icons.flash_on, color: Colors.white),
+                          label: Text(
+                            'Upgrade to VIP • \$${widget.eventModel.ticketUpgradePrice!.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     // Event image and title
                     ClipRRect(
                       borderRadius: BorderRadius.circular(16),
@@ -1303,6 +1482,177 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildInlineUpgradeBanner(TicketModel ticket) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFFFFD700).withValues(alpha: 0.15),
+            const Color(0xFFFFA500).withValues(alpha: 0.15),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFFFFD700).withValues(alpha: 0.5),
+          width: 1.5,
+        ),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.priority_high, color: Color(0xFFFFA500), size: 22),
+          SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'VIP Skip-the-Line Available',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFFF8C00),
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Upgrade now for priority entry at the venue.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF6B7280),
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showUpgradeDialog(TicketModel ticket) {
+    final upgradePrice = widget.eventModel.ticketUpgradePrice ?? 0;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.flash_on, color: Colors.white),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Upgrade to VIP Skip-the-Line',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildInlineUpgradeBanner(ticket),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  'Upgrade Price:',
+                  style: TextStyle(color: Color(0xFF6B7280)),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '\$${upgradePrice.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Color(0xFF6B7280)),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _upgradeTicket(ticket);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF667EEA),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              'Upgrade Now',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _upgradeTicket(TicketModel ticket) async {
+    try {
+      final paymentData =
+          await TicketPaymentService.createTicketUpgradePaymentIntent(
+            ticketId: ticket.id,
+            originalPrice: ticket.price ?? 0,
+            upgradePrice: widget.eventModel.ticketUpgradePrice ?? 0,
+            customerUid: ticket.customerUid,
+            customerName: ticket.customerName,
+            customerEmail:
+                'noreply@orgami.app', // Fallback if email not fetched here
+            eventTitle: ticket.eventTitle,
+          );
+
+      final paid = await TicketPaymentService.processTicketUpgrade(
+        clientSecret: paymentData['clientSecret'],
+        eventTitle: ticket.eventTitle,
+        upgradeAmount: paymentData['upgradeAmount'],
+      );
+
+      if (!paid) {
+        ShowToast().showNormalToast(msg: 'Upgrade cancelled');
+        return;
+      }
+
+      await TicketPaymentService.confirmTicketUpgrade(
+        ticketId: ticket.id,
+        paymentIntentId: paymentData['paymentIntentId'],
+      );
+
+      ShowToast().showNormalToast(msg: 'Ticket upgraded to VIP');
+      _loadEventTickets();
+    } catch (e) {
+      ShowToast().showNormalToast(msg: 'Failed to upgrade: $e');
+    }
   }
 
   Widget _buildTicketDetailRow({

@@ -1,16 +1,16 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:orgami/controller/customer_controller.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/screens/Authentication/forgot_password_screen.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/images.dart';
-import 'package:orgami/Utils/router.dart';
-import 'package:orgami/Utils/toast.dart';
-import 'package:orgami/Utils/logger.dart';
-import 'package:orgami/Utils/app_constants.dart';
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/screens/Authentication/forgot_password_screen.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/Utils/images.dart';
+import 'package:attendus/Utils/router.dart';
+import 'package:attendus/Utils/toast.dart';
+import 'package:attendus/Utils/logger.dart';
+import 'package:attendus/Utils/app_constants.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
-import 'package:orgami/firebase/firebase_google_auth_helper.dart';
+import 'package:attendus/firebase/firebase_google_auth_helper.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});

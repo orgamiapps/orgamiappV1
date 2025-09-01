@@ -4,11 +4,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
-import 'package:orgami/models/message_model.dart';
-import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/firebase/firebase_messaging_helper.dart';
-import 'package:orgami/Utils/toast.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/models/message_model.dart';
+import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/firebase/firebase_messaging_helper.dart';
+import 'package:attendus/Utils/toast.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;

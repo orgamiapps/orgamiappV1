@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:orgami/screens/Home/analytics_dashboard_screen.dart';
-import 'package:orgami/screens/Splash/second_splash_screen.dart';
+import 'package:attendus/screens/Home/analytics_dashboard_screen.dart';
+import 'package:attendus/screens/Splash/second_splash_screen.dart';
 
 class RouterClass {
   static late BuildContext splashContext;

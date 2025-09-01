@@ -1,4 +1,4 @@
-# Badge System - Orgami Event App
+# Badge System - AttendUs Event App
 
 ## Overview
 The Badge System is a gamified feature that provides users with professional, license-like digital badges showcasing their event participation and hosting achievements. The system creates unique, personalized badges for each user with hyper-realistic design elements.

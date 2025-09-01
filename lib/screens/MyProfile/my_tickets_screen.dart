@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/controller/customer_controller.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/models/ticket_model.dart';
-import 'package:orgami/Services/ticket_payment_service.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/models/ticket_model.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/Services/ticket_payment_service.dart';
+import 'package:attendus/Utils/toast.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -22,6 +23,7 @@ class MyTicketsScreen extends StatefulWidget {
 
 class _MyTicketsScreenState extends State<MyTicketsScreen> {
   List<TicketModel> userTickets = [];
+  Map<String, EventModel> _eventCache = {};
   bool isLoading = true;
   int selectedTab = 0; // 0 = All, 1 = Active, 2 = Used
   final GlobalKey ticketShareKey = GlobalKey();
@@ -47,6 +49,19 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
       final tickets = await FirebaseFirestoreHelper().getUserTickets(
         customerUid: CustomerController.logeInCustomer!.uid,
       );
+
+      // Fetch event data for each unique event
+      final uniqueEventIds = tickets.map((t) => t.eventId).toSet();
+      for (final eventId in uniqueEventIds) {
+        try {
+          final event = await FirebaseFirestoreHelper().getSingleEvent(eventId);
+          if (event != null) {
+            _eventCache[eventId] = event;
+          }
+        } catch (e) {
+          // Continue loading even if one event fails
+        }
+      }
 
       if (mounted) {
         setState(() {
@@ -521,7 +536,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
       await SharePlus.instance.share(
         ShareParams(
           text:
-              'My Orgami Ticket • ${ticket.eventTitle} • Code: ${ticket.ticketCode}',
+              'My AttendUs Ticket • ${ticket.eventTitle} • Code: ${ticket.ticketCode}',
           files: [XFile(file.path)],
         ),
       );
@@ -695,7 +710,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                   const Divider(height: 20),
                   const Center(
                     child: Text(
-                      'Powered by Orgami',
+                      'Powered by AttendUs',
                       style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
                     ),
                   ),
@@ -935,7 +950,13 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                                         if (!ticket.isUsed &&
                                             !ticket.isSkipTheLine &&
                                             ticket.price != null &&
-                                            ticket.price! > 0) ...[
+                                            ticket.price! > 0 &&
+                                            _eventCache[ticket.eventId]
+                                                    ?.ticketUpgradeEnabled ==
+                                                true &&
+                                            _eventCache[ticket.eventId]
+                                                    ?.ticketUpgradePrice !=
+                                                null) ...[
                                           const SizedBox(height: 16),
                                           _buildUpgradeButton(ticket),
                                         ],
@@ -974,7 +995,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                                         // Footer
                                         const Center(
                                           child: Text(
-                                            'Show QR to event organizer\nPowered by Orgami',
+                                            'Show QR to event organizer\nPowered by AttendUs',
                                             textAlign: TextAlign.center,
                                             style: TextStyle(
                                               color: Colors.grey,
@@ -1083,7 +1104,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                             ),
                           ),
                           Text(
-                            'Priority entry • \$${(ticket.price! * 5).toStringAsFixed(2)}',
+                            'Priority entry • \$${(_eventCache[ticket.eventId]?.ticketUpgradePrice ?? 0).toStringAsFixed(2)}',
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.9),
                               fontSize: 12,
@@ -1100,7 +1121,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   }
 
   void _showUpgradeDialog(TicketModel ticket) {
-    final upgradePrice = ticket.price! * 5;
+    final upgradePrice = _eventCache[ticket.eventId]?.ticketUpgradePrice ?? 0;
 
     showDialog(
       context: context,
@@ -1250,6 +1271,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
           await TicketPaymentService.createTicketUpgradePaymentIntent(
             ticketId: ticket.id,
             originalPrice: ticket.price!,
+            upgradePrice: _eventCache[ticket.eventId]?.ticketUpgradePrice ?? 0,
             customerUid: CustomerController.logeInCustomer!.uid,
             customerName: CustomerController.logeInCustomer!.name,
             customerEmail: CustomerController.logeInCustomer!.email,

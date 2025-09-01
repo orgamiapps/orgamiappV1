@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/models/event_question_model.dart';
-import 'package:orgami/screens/Events/Widget/add_question_popup.dart';
-import 'package:orgami/screens/Events/create_event_screen.dart';
-import 'package:orgami/Utils/router.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/models/event_question_model.dart';
+import 'package:attendus/screens/Events/Widget/add_question_popup.dart';
+import 'package:attendus/screens/Events/create_event_screen.dart';
+import 'package:attendus/Utils/router.dart';
 
 class AddQuestionsToEventScreen extends StatefulWidget {
   final EventModel eventModel;

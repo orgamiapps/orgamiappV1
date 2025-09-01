@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:orgami/models/event_model.dart';
+import 'package:attendus/models/event_model.dart';
 
 class TestConnectivityScreen extends StatefulWidget {
   const TestConnectivityScreen({super.key});

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/Services/sms_notification_service.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/dimensions.dart';
-import 'package:orgami/Utils/toast.dart';
+import 'package:attendus/Services/sms_notification_service.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/Utils/dimensions.dart';
+import 'package:attendus/Utils/toast.dart';
 import 'package:intl/intl.dart';
-import 'package:orgami/models/customer_model.dart';
+import 'package:attendus/models/customer_model.dart';
 
 class AttendeeNotificationScreen extends StatefulWidget {
   const AttendeeNotificationScreen({super.key});

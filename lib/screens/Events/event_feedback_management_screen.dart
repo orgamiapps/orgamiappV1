@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/models/event_feedback_model.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/logger.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/models/event_feedback_model.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/Utils/logger.dart';
 
 class EventFeedbackManagementScreen extends StatefulWidget {
   final EventModel eventModel;

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:orgami/models/event_model.dart';
+import 'package:attendus/models/event_model.dart';
 
 class SignInMethodsDisplay extends StatelessWidget {
   final EventModel eventModel;

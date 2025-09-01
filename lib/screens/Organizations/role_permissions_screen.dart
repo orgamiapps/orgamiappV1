@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:orgami/firebase/organization_helper.dart';
+import 'package:attendus/firebase/organization_helper.dart';
 
 class RolePermissionsScreen extends StatelessWidget {
   final String organizationId;

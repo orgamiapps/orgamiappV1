@@ -17,7 +17,7 @@ const messaging = firebase.messaging();
 
 // Handle background messages
 messaging.onBackgroundMessage(function(payload) {
-  const title = (payload.notification && payload.notification.title) || 'Orgami';
+  const title = (payload.notification && payload.notification.title) || 'AttendUs';
   const body = (payload.notification && payload.notification.body) || '';
   const data = payload.data || {};
   self.registration.showNotification(title, {

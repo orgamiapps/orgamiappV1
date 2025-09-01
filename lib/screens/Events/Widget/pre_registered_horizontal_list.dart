@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/models/attendance_model.dart';
-import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/models/ticket_model.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/logger.dart';
-import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
-import 'package:orgami/controller/customer_controller.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/models/attendance_model.dart';
+import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/models/ticket_model.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/Utils/logger.dart';
+import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
+import 'package:attendus/controller/customer_controller.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PreRegisteredHorizontalList extends StatefulWidget {

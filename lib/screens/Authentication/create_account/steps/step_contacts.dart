@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:orgami/Utils/colors.dart';
-import 'package:orgami/Utils/router.dart';
-import 'package:orgami/screens/Authentication/create_account/suggested_contacts_screen.dart';
+import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/Utils/router.dart';
+import 'package:attendus/screens/Authentication/create_account/suggested_contacts_screen.dart';
 
 class StepContacts extends StatelessWidget {
   const StepContacts({super.key, required this.onFinish});

@@ -11,26 +11,26 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:orgami/models/event_model.dart';
-import 'package:orgami/models/customer_model.dart';
-import 'package:orgami/screens/Events/single_event_screen.dart';
-import 'package:orgami/screens/MyProfile/user_profile_screen.dart';
-import 'package:orgami/Utils/router.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/screens/Events/single_event_screen.dart';
+import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
+import 'package:attendus/Utils/router.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:orgami/screens/Events/Widget/single_event_list_view_item.dart';
-import 'package:orgami/firebase/firebase_firestore_helper.dart';
-import 'package:orgami/controller/customer_controller.dart';
-import 'package:orgami/Utils/toast.dart';
-import 'package:orgami/screens/QRScanner/qr_scanner_flow_screen.dart';
+import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/Utils/toast.dart';
+import 'package:attendus/screens/QRScanner/qr_scanner_flow_screen.dart';
 
-import 'package:orgami/Utils/theme_provider.dart';
+import 'package:attendus/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:orgami/Utils/location_helper.dart';
-import 'package:orgami/Utils/logger.dart';
-import 'package:orgami/screens/Events/chose_sign_in_methods_screen.dart';
+import 'package:attendus/Utils/location_helper.dart';
+import 'package:attendus/Utils/logger.dart';
+import 'package:attendus/screens/Events/chose_sign_in_methods_screen.dart';
 
 // Enum for sort options
 enum SortOption {

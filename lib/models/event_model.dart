@@ -20,6 +20,8 @@ class EventModel {
   int maxTickets;
   int issuedTickets;
   double? ticketPrice; // Price per ticket in USD
+  bool ticketUpgradeEnabled; // Whether skip-the-line upgrades are available
+  double? ticketUpgradePrice; // Price to upgrade to skip-the-line (total price, not additional)
   int eventDuration; // Duration in hours
   List<String> coHosts; // Array of user IDs who are co-hosts
   String? organizationId; // Optional organization context for the event
@@ -56,6 +58,8 @@ class EventModel {
     this.maxTickets = 0,
     this.issuedTickets = 0,
     this.ticketPrice,
+    this.ticketUpgradeEnabled = false,
+    this.ticketUpgradePrice,
     this.eventDuration = 2, // Default 2 hours
     this.coHosts = const [],
     this.organizationId,
@@ -104,6 +108,8 @@ class EventModel {
       maxTickets: data['maxTickets'] ?? 0,
       issuedTickets: data['issuedTickets'] ?? 0,
       ticketPrice: data['ticketPrice']?.toDouble(),
+      ticketUpgradeEnabled: data['ticketUpgradeEnabled'] ?? false,
+      ticketUpgradePrice: data['ticketUpgradePrice']?.toDouble(),
       eventDuration: data['eventDuration'] ?? 2,
       coHosts: (data.containsKey('coHosts') && data['coHosts'] != null)
           ? List<String>.from(data['coHosts'])
@@ -202,6 +208,8 @@ class EventModel {
     data['maxTickets'] = maxTickets;
     data['issuedTickets'] = issuedTickets;
     if (ticketPrice != null) data['ticketPrice'] = ticketPrice;
+    data['ticketUpgradeEnabled'] = ticketUpgradeEnabled;
+    if (ticketUpgradePrice != null) data['ticketUpgradePrice'] = ticketUpgradePrice;
     data['eventDuration'] = eventDuration;
     data['coHosts'] = coHosts;
     if (organizationId != null) data['organizationId'] = organizationId;
