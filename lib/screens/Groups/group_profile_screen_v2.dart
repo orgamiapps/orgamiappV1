@@ -5,8 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:attendus/firebase/organization_helper.dart';
 import 'package:attendus/firebase/firebase_storage_helper.dart';
-import 'package:attendus/screens/Organizations/join_requests_screen.dart';
-import 'package:attendus/screens/Organizations/role_permissions_screen.dart';
+import 'package:attendus/screens/Groups/join_requests_screen.dart';
+import 'package:attendus/screens/Groups/role_permissions_screen.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
@@ -21,15 +21,15 @@ import 'dart:ui';
 
 /// Modern, innovative Group/Organization Profile Screen
 /// Features a completely redesigned UI with enhanced engagement features
-class OrganizationProfileScreenV2 extends StatefulWidget {
+class GroupProfileScreenV2 extends StatefulWidget {
   final String organizationId;
-  const OrganizationProfileScreenV2({super.key, required this.organizationId});
+  const GroupProfileScreenV2({super.key, required this.organizationId});
 
   @override
-  State<OrganizationProfileScreenV2> createState() => _OrganizationProfileScreenV2State();
+  State<GroupProfileScreenV2> createState() => _GroupProfileScreenV2State();
 }
 
-class _OrganizationProfileScreenV2State extends State<OrganizationProfileScreenV2>
+class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
     with TickerProviderStateMixin {
   late TabController _tabController;
   late AnimationController _headerAnimationController;

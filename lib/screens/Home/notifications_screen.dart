@@ -8,7 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/screens/Messaging/chat_screen.dart';
-import 'package:attendus/screens/Organizations/organization_profile_screen_v2.dart';
+import 'package:attendus/screens/Groups/group_profile_screen_v2.dart';
 import 'package:attendus/screens/Events/event_feedback_management_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
@@ -579,7 +579,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => OrganizationProfileScreenV2(organizationId: orgId),
+              builder: (_) => GroupProfileScreenV2(organizationId: orgId),
             ),
           );
         }

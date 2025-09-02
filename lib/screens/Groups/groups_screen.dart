@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/firebase/organization_helper.dart';
-import 'package:attendus/screens/Organizations/organization_profile_screen_v2.dart';
-import 'package:attendus/screens/Organizations/create_organization_screen.dart';
+import 'package:attendus/screens/Groups/group_profile_screen_v2.dart';
+import 'package:attendus/screens/Groups/create_group_screen.dart';
 import 'dart:async';
 
 class GroupsScreen extends StatefulWidget {
@@ -97,7 +97,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
   Future<void> _goToCreate() async {
     await Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (_) => const CreateOrganizationScreen()));
+    ).push(MaterialPageRoute(builder: (_) => const CreateGroupScreen()));
     _initStreams();
   }
 
@@ -203,7 +203,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
                                             context,
                                             MaterialPageRoute(
                                               builder: (_) =>
-                                                  OrganizationProfileScreenV2(
+                                                  GroupProfileScreenV2(
                                                     organizationId: orgId,
                                                   ),
                                             ),
@@ -244,7 +244,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
                         if (orgId == null || orgId.isEmpty) return;
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => OrganizationProfileScreenV2(
+                            builder: (_) => GroupProfileScreenV2(
                               organizationId: orgId,
                             ),
                           ),

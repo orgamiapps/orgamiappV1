@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:attendus/firebase/organization_helper.dart';
-import 'package:attendus/screens/Organizations/create_organization_screen.dart';
+import 'package:attendus/screens/Groups/create_group_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:attendus/screens/Organizations/join_requests_screen.dart';
-import 'package:attendus/screens/Organizations/role_permissions_screen.dart';
+import 'package:attendus/screens/Groups/join_requests_screen.dart';
+import 'package:attendus/screens/Groups/role_permissions_screen.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
-import 'package:attendus/screens/Organizations/organization_profile_screen_v2.dart';
+import 'package:attendus/screens/Groups/group_profile_screen_v2.dart';
 
 class OrganizationsTab extends StatefulWidget {
   const OrganizationsTab({super.key});
@@ -62,7 +62,7 @@ class _OrganizationsTabState extends State<OrganizationsTab> {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const CreateOrganizationScreen(),
+                  builder: (_) => const CreateGroupScreen(),
                 ),
               );
               if (!mounted) return;
@@ -91,7 +91,7 @@ class _OrganizationsTabState extends State<OrganizationsTab> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => OrganizationProfileScreenV2(
+                        builder: (_) => GroupProfileScreenV2(
                           organizationId: org['id']!,
                         ),
                       ),
@@ -105,9 +105,9 @@ class _OrganizationsTabState extends State<OrganizationsTab> {
   }
 }
 
-class OrganizationProfileScreen extends StatelessWidget {
+class GroupProfileScreen extends StatelessWidget {
   final String organizationId;
-  const OrganizationProfileScreen({super.key, required this.organizationId});
+  const GroupProfileScreen({super.key, required this.organizationId});
 
   @override
   Widget build(BuildContext context) {

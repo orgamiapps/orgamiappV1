@@ -5,15 +5,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/firebase/firebase_storage_helper.dart';
 import 'package:flutter/services.dart';
 
-class CreateOrganizationScreen extends StatefulWidget {
-  const CreateOrganizationScreen({super.key});
+class CreateGroupScreen extends StatefulWidget {
+  const CreateGroupScreen({super.key});
 
   @override
-  State<CreateOrganizationScreen> createState() =>
-      _CreateOrganizationScreenState();
+  State<CreateGroupScreen> createState() =>
+      _CreateGroupScreenState();
 }
 
-class _CreateOrganizationScreenState extends State<CreateOrganizationScreen> {
+class _CreateGroupScreenState extends State<CreateGroupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtlr = TextEditingController();
   final _descCtlr = TextEditingController();

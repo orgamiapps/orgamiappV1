@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/firebase/organization_helper.dart';
-import 'package:attendus/screens/Organizations/organization_profile_screen_v2.dart';
-import 'package:attendus/screens/Organizations/create_organization_screen.dart';
+import 'package:attendus/screens/Groups/group_profile_screen_v2.dart';
+import 'package:attendus/screens/Groups/create_group_screen.dart';
 
-class OrganizationsScreen extends StatefulWidget {
-  const OrganizationsScreen({super.key});
+class GroupsListScreen extends StatefulWidget {
+  const GroupsListScreen({super.key});
 
   @override
-  State<OrganizationsScreen> createState() => _OrganizationsScreenState();
+  State<GroupsListScreen> createState() => _GroupsListScreenState();
 }
 
-class _OrganizationsScreenState extends State<OrganizationsScreen> {
+class _GroupsListScreenState extends State<GroupsListScreen> {
   final TextEditingController _searchCtlr = TextEditingController();
   List<Map<String, String>> _myOrgs = [];
   List<Map<String, dynamic>> _discoverOrgs = [];
@@ -79,7 +79,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
   Future<void> _goToCreate() async {
     await Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (_) => const CreateOrganizationScreen()));
+    ).push(MaterialPageRoute(builder: (_) => const CreateGroupScreen()));
     _initStreams();
   }
 
@@ -159,7 +159,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                                       context,
                                       MaterialPageRoute(
                                         builder: (_) =>
-                                            OrganizationProfileScreenV2(
+                                            GroupProfileScreenV2(
                                               organizationId: orgId,
                                             ),
                                       ),
@@ -200,7 +200,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                         if (orgId == null || orgId.isEmpty) return;
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => OrganizationProfileScreenV2(
+                            builder: (_) => GroupProfileScreenV2(
                               organizationId: orgId,
                             ),
                           ),

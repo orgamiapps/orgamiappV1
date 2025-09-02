@@ -3,15 +3,15 @@ import 'package:attendus/firebase/organization_helper.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/screens/Events/chose_sign_in_methods_screen.dart';
 
-class SelectOrganizationScreen extends StatefulWidget {
-  const SelectOrganizationScreen({super.key});
+class SelectGroupScreen extends StatefulWidget {
+  const SelectGroupScreen({super.key});
 
   @override
-  State<SelectOrganizationScreen> createState() =>
-      _SelectOrganizationScreenState();
+  State<SelectGroupScreen> createState() =>
+      _SelectGroupScreenState();
 }
 
-class _SelectOrganizationScreenState extends State<SelectOrganizationScreen> {
+class _SelectGroupScreenState extends State<SelectGroupScreen> {
   bool _loading = true;
   List<Map<String, String>> _orgs = const [];
 
