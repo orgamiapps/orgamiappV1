@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/firebase/organization_helper.dart';
-import 'package:attendus/screens/Organizations/organization_profile_screen.dart';
+import 'package:attendus/screens/Organizations/organization_profile_screen_v2.dart';
 import 'package:attendus/screens/Organizations/create_organization_screen.dart';
 
 class OrganizationsScreen extends StatefulWidget {
@@ -159,7 +159,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                                       context,
                                       MaterialPageRoute(
                                         builder: (_) =>
-                                            OrganizationProfileScreen(
+                                            OrganizationProfileScreenV2(
                                               organizationId: orgId,
                                             ),
                                       ),
@@ -200,7 +200,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                         if (orgId == null || orgId.isEmpty) return;
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => OrganizationProfileScreen(
+                            builder: (_) => OrganizationProfileScreenV2(
                               organizationId: orgId,
                             ),
                           ),

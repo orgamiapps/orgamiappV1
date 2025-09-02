@@ -8,6 +8,7 @@ import 'package:attendus/screens/Organizations/role_permissions_screen.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
+import 'package:attendus/screens/Organizations/organization_profile_screen_v2.dart';
 
 class OrganizationsTab extends StatefulWidget {
   const OrganizationsTab({super.key});
@@ -90,7 +91,7 @@ class _OrganizationsTabState extends State<OrganizationsTab> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => OrganizationProfileScreen(
+                        builder: (_) => OrganizationProfileScreenV2(
                           organizationId: org['id']!,
                         ),
                       ),
