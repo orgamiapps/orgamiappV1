@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/firebase/organization_helper.dart';
-import 'package:attendus/screens/Organizations/organization_profile_screen.dart';
-import 'package:attendus/screens/Organizations/create_organization_screen.dart';
+import 'package:attendus/screens/Groups/group_profile_screen_v2.dart';
+import 'package:attendus/screens/Groups/create_group_screen.dart';
 import 'dart:async';
 
 class GroupsScreen extends StatefulWidget {
@@ -19,6 +19,8 @@ class _GroupsScreenState extends State<GroupsScreen> {
   List<Map<String, dynamic>> _discoverOrgs = [];
   String? _selectedCategoryLower;
   bool _isLoadingMyOrgs = true;
+  bool _isLoadingDiscover = false;
+  bool _isInitialLoad = true;
   Timer? _debounce;
   final List<Map<String, String>> _categoryOptions = const [
     {'label': 'All', 'value': ''},
@@ -44,65 +46,144 @@ class _GroupsScreenState extends State<GroupsScreen> {
   }
 
   Future<void> _initStreams() async {
-    final helper = OrganizationHelper();
-    if (mounted) setState(() => _isLoadingMyOrgs = true);
-    final my = await helper.getUserOrganizationsLite();
-    if (mounted) {
-      setState(() {
-        _myOrgs = my;
-        _isLoadingMyOrgs = false;
+    try {
+      final helper = OrganizationHelper();
+      if (mounted) setState(() => _isLoadingMyOrgs = true);
+
+      // Load user organizations with error handling
+      try {
+        final my = await helper.getUserOrganizationsLite();
+        if (mounted) {
+          setState(() {
+            _myOrgs = my;
+            _isLoadingMyOrgs = false;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error loading user organizations: $e');
+        if (mounted) {
+          setState(() {
+            _myOrgs = [];
+            _isLoadingMyOrgs = false;
+          });
+        }
+      }
+
+      // Set up stream listener with error handling
+      _myOrgsStream ??= helper.streamUserOrganizationsLite();
+      _myOrgsStream!.listen(
+        (list) {
+          if (!mounted) return;
+          setState(() {
+            _myOrgs = list;
+            _isLoadingMyOrgs = false;
+          });
+        },
+        onError: (error) {
+          debugPrint('Stream error: $error');
+          if (mounted) {
+            setState(() => _isLoadingMyOrgs = false);
+          }
+        },
+      );
+
+      // Discover organizations asynchronously without blocking
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted) _discover();
       });
+    } catch (e) {
+      debugPrint('Error in _initStreams: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingMyOrgs = false;
+          _isInitialLoad = false;
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isInitialLoad = false);
+      }
     }
-
-    _myOrgsStream ??= helper.streamUserOrganizationsLite();
-    _myOrgsStream!.listen((list) {
-      if (!mounted) return;
-      setState(() {
-        _myOrgs = list;
-        _isLoadingMyOrgs = false;
-      });
-    });
-
-    _discover();
   }
 
   Future<void> _discover() async {
-    Query query = FirebaseFirestore.instance
-        .collection('Organizations')
-        .limit(25);
-    final q = _searchCtlr.text.trim().toLowerCase();
-    if (_selectedCategoryLower != null && _selectedCategoryLower!.isNotEmpty) {
-      query = query.where(
-        'category_lowercase',
-        isEqualTo: _selectedCategoryLower,
+    try {
+      if (mounted) setState(() => _isLoadingDiscover = true);
+
+      Query query = FirebaseFirestore.instance
+          .collection('Organizations')
+          .limit(25);
+      final q = _searchCtlr.text.trim().toLowerCase();
+
+      if (_selectedCategoryLower != null &&
+          _selectedCategoryLower!.isNotEmpty) {
+        query = query.where(
+          'category_lowercase',
+          isEqualTo: _selectedCategoryLower,
+        );
+      }
+
+      if (q.isNotEmpty) {
+        final String end =
+            q.substring(0, q.length - 1) +
+            String.fromCharCode(q.codeUnitAt(q.length - 1) + 1);
+        query = query.orderBy('name_lowercase').startAt([q]).endBefore([end]);
+      } else {
+        query = query.orderBy('name_lowercase');
+      }
+
+      // Add timeout to prevent hanging
+      final snap = await query.get().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint('Firestore query timeout');
+          throw TimeoutException('Query timeout');
+        },
       );
+
+      final list = snap.docs.map((d) {
+        final data = d.data() as Map<String, dynamic>;
+        data['id'] = d.id;
+        return data;
+      }).toList();
+
+      if (mounted)
+        setState(() {
+          _discoverOrgs = list;
+          _isLoadingDiscover = false;
+        });
+    } catch (e) {
+      debugPrint('Error discovering organizations: $e');
+      if (mounted) {
+        setState(() {
+          _discoverOrgs = [];
+          _isLoadingDiscover = false;
+        });
+      }
     }
-    if (q.isNotEmpty) {
-      final String end =
-          q.substring(0, q.length - 1) +
-          String.fromCharCode(q.codeUnitAt(q.length - 1) + 1);
-      query = query.orderBy('name_lowercase').startAt([q]).endBefore([end]);
-    } else {
-      query = query.orderBy('name_lowercase');
-    }
-    final snap = await query.get();
-    final list = snap.docs.map((d) {
-      final data = d.data() as Map<String, dynamic>;
-      data['id'] = d.id;
-      return data;
-    }).toList();
-    if (mounted) setState(() => _discoverOrgs = list);
   }
 
   Future<void> _goToCreate() async {
     await Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (_) => const CreateOrganizationScreen()));
+    ).push(MaterialPageRoute(builder: (_) => const CreateGroupScreen()));
     _initStreams();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Show loading indicator during initial load
+    if (_isInitialLoad) {
+      return Scaffold(
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black87,
+          title: const Text('Groups'),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -203,7 +284,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
                                             context,
                                             MaterialPageRoute(
                                               builder: (_) =>
-                                                  OrganizationProfileScreen(
+                                                  GroupProfileScreenV2(
                                                     organizationId: orgId,
                                                   ),
                                             ),
@@ -228,32 +309,44 @@ class _GroupsScreenState extends State<GroupsScreen> {
                   ],
                 ),
               ),
-              SliverList.separated(
-                itemCount: _discoverOrgs.length,
-                separatorBuilder: (_, index) => const SizedBox(height: 12),
-                itemBuilder: (context, i) {
-                  final o = _discoverOrgs[i];
-                  return Container(
-                    decoration: _cardDeco(),
-                    child: ListTile(
-                      leading: const CircleAvatar(child: Icon(Icons.apartment)),
-                      title: Text(o['name']?.toString() ?? ''),
-                      subtitle: Text(o['category']?.toString() ?? 'Other'),
-                      onTap: () {
-                        final String? orgId = o['id']?.toString();
-                        if (orgId == null || orgId.isEmpty) return;
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => OrganizationProfileScreen(
-                              organizationId: orgId,
+              _isLoadingDiscover
+                  ? const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 32),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                    )
+                  : SliverList.separated(
+                      itemCount: _discoverOrgs.length,
+                      separatorBuilder: (_, index) =>
+                          const SizedBox(height: 12),
+                      itemBuilder: (context, i) {
+                        final o = _discoverOrgs[i];
+                        return Container(
+                          decoration: _cardDeco(),
+                          child: ListTile(
+                            leading: const CircleAvatar(
+                              child: Icon(Icons.apartment),
                             ),
+                            title: Text(o['name']?.toString() ?? ''),
+                            subtitle: Text(
+                              o['category']?.toString() ?? 'Other',
+                            ),
+                            onTap: () {
+                              final String? orgId = o['id']?.toString();
+                              if (orgId == null || orgId.isEmpty) return;
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => GroupProfileScreenV2(
+                                    organizationId: orgId,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         );
                       },
                     ),
-                  );
-                },
-              ),
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
             ],
           ),

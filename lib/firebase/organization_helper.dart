@@ -71,28 +71,69 @@ class OrganizationHelper {
           .where('userId', isEqualTo: user.uid)
           .where('status', isEqualTo: 'approved')
           .limit(50)
-          .get();
+          .get()
+          .timeout(
+            const Duration(seconds: 3),
+            onTimeout: () {
+              Logger.warning('getUserOrganizationsLite timeout');
+              throw Exception('Query timeout');
+            },
+          );
 
-      final List<Map<String, String>> result = [];
+      // Collect all org IDs first
+      final Set<String> orgIds = {};
       for (final doc in query.docs) {
-        try {
-          // Prefer stored field, fall back to parent path id for legacy docs
-          final String? orgId =
-              (doc.data()['organizationId'] as String?) ??
-              doc.reference.parent.parent?.id;
-          if (orgId == null || orgId.isEmpty) continue;
-          final orgSnap = await _firestore
-              .collection('Organizations')
-              .doc(orgId)
-              .get();
-          if (orgSnap.exists) {
-            final name = orgSnap.data()!['name']?.toString() ?? '';
-            result.add({'id': orgId, 'name': name});
-          }
-        } catch (e) {
-          Logger.error('Error resolving organization from membership: $e');
+        final String? orgId =
+            (doc.data()['organizationId'] as String?) ??
+            doc.reference.parent.parent?.id;
+        if (orgId != null && orgId.isNotEmpty) {
+          orgIds.add(orgId);
         }
       }
+
+      if (orgIds.isEmpty) return [];
+
+      // Fetch all organizations in parallel
+      final futures = orgIds.map((id) => 
+        _firestore
+          .collection('Organizations')
+          .doc(id)
+          .get()
+          .timeout(
+            const Duration(seconds: 2),
+            onTimeout: () {
+              Logger.warning('Organization fetch timeout for $id');
+              throw Exception('Fetch timeout');
+            },
+          )
+      ).toList();
+
+      // Wait for all with error handling
+      final List<Map<String, String>> result = [];
+      try {
+        final orgDocs = await Future.wait(
+          futures,
+          eagerError: false, // Don't fail all if one fails
+        );
+        
+        for (final orgSnap in orgDocs) {
+          if (orgSnap.exists) {
+            final name = orgSnap.data()!['name']?.toString() ?? '';
+            result.add({'id': orgSnap.id, 'name': name});
+          }
+        }
+      } catch (e) {
+        Logger.error('Error fetching organizations in parallel: $e');
+        // Still return what we could fetch
+      }
+
+      // Sort by name
+      result.sort((a, b) => 
+        (a['name'] ?? '').toLowerCase().compareTo(
+          (b['name'] ?? '').toLowerCase()
+        )
+      );
+      
       return result;
     } catch (e) {
       Logger.error('getUserOrganizationsLite failed: $e');

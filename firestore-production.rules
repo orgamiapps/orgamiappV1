@@ -1,0 +1,138 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user is a member of an organization
+    function isMember(orgId) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/Organizations/$(orgId)/Members/$(request.auth.uid));
+    }
+    
+    // Helper function to check if user is an admin of an organization
+    function isAdmin(orgId) {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/Organizations/$(orgId)/Members/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Helper function to check if user is the creator of an organization
+    function isCreator(orgId) {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/Organizations/$(orgId)).data.createdBy == request.auth.uid;
+    }
+    
+    // Organizations collection rules
+    match /Organizations/{orgId} {
+      // Allow read access to all authenticated users
+      allow read: if isAuthenticated();
+      
+      // Allow create for authenticated users
+      allow create: if isAuthenticated();
+      
+      // Allow update/delete for admins and creators
+      allow update, delete: if isAdmin(orgId) || isCreator(orgId);
+      
+      // Members subcollection
+      match /Members/{memberId} {
+        // Allow read for authenticated users
+        allow read: if isAuthenticated();
+        
+        // Allow write for admins and the member themselves
+        allow write: if isAdmin(orgId) || request.auth.uid == memberId;
+      }
+      
+      // Feed subcollection (for announcements and polls)
+      match /Feed/{feedId} {
+        // Allow read for all authenticated users
+        allow read: if isAuthenticated();
+        
+        // Allow create for members, admins, and creators
+        allow create: if isAuthenticated() && 
+          (isMember(orgId) || isAdmin(orgId) || isCreator(orgId) ||
+           // Also allow if user is creating as a member (for new groups)
+           request.auth.uid == request.resource.data.authorId);
+        
+        // Allow update for the author, admins, and creators
+        allow update: if isAuthenticated() && 
+          (resource.data.authorId == request.auth.uid || 
+           isAdmin(orgId) || 
+           isCreator(orgId) ||
+           // Allow voting on polls
+           (resource.data.type == 'poll' && 
+            request.resource.data.options != null));
+        
+        // Allow delete for author, admins, and creators
+        allow delete: if isAuthenticated() && 
+          (resource.data.authorId == request.auth.uid || 
+           isAdmin(orgId) || 
+           isCreator(orgId));
+      }
+      
+      // Join Requests subcollection
+      match /JoinRequests/{requestId} {
+        // Allow read for admins and the requester
+        allow read: if isAdmin(orgId) || request.auth.uid == requestId;
+        
+        // Allow create for authenticated users
+        allow create: if isAuthenticated() && request.auth.uid == requestId;
+        
+        // Allow update/delete for admins
+        allow update, delete: if isAdmin(orgId);
+      }
+    }
+    
+    // Events collection rules
+    match /Events/{eventId} {
+      // Allow read for all authenticated users
+      allow read: if isAuthenticated();
+      
+      // Allow create for authenticated users
+      allow create: if isAuthenticated();
+      
+      // Allow update/delete for event creator and org admins
+      allow update, delete: if isAuthenticated() && 
+        (resource.data.createdBy == request.auth.uid ||
+         (resource.data.organizationId != null && 
+          isAdmin(resource.data.organizationId)));
+      
+      // Attendees subcollection
+      match /Attendees/{attendeeId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
+      }
+    }
+    
+    // Users/Customers collection rules
+    match /Customers/{userId} {
+      // Allow read for authenticated users
+      allow read: if isAuthenticated();
+      
+      // Allow write for the user themselves
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Subcollections
+      match /{subcollection}/{document} {
+        allow read: if isAuthenticated() && request.auth.uid == userId;
+        allow write: if isAuthenticated() && request.auth.uid == userId;
+      }
+    }
+    
+    // Messages collection rules
+    match /Messages/{messageId} {
+      allow read, write: if isAuthenticated();
+      
+      match /messages/{subMessageId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+    
+    // Default rule: deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

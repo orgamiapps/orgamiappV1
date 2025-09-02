@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">AttendUs</string>
-    <!-- Facebook Configuration - Replace with your actual Facebook App ID -->
-    <string name="facebook_app_id">YOUR_FACEBOOK_APP_ID</string>
-    <string name="facebook_client_token">YOUR_FACEBOOK_CLIENT_TOKEN</string>
-    <string name="fb_login_protocol_scheme">fbYOUR_FACEBOOK_APP_ID</string>
+    <string name="app_name">Attendus</string>
+    <!-- Facebook Configuration - Disabled to prevent errors -->
+    <string name="facebook_app_id"></string>
+    <string name="facebook_client_token"></string>
+    <string name="fb_login_protocol_scheme"></string>
 </resources> 

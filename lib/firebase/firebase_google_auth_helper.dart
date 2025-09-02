@@ -4,7 +4,7 @@ import 'package:attendus/Utils/logger.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:attendus/Utils/app_constants.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+// import 'package:flutter_facebook_auth/flutter_facebook_auth.dart'; // Temporarily disabled
 // import 'package:twitter_login/twitter_login.dart'; // Disabled due to namespace issues
 
 class FirebaseGoogleAuthHelper extends ChangeNotifier {
@@ -103,6 +103,11 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
   }
 
   Future<User?> loginWithFacebook() async {
+    // Facebook authentication temporarily disabled due to configuration issues
+    Logger.warning('Facebook authentication is currently disabled');
+    return null;
+
+    /*
     try {
       // Trigger the Facebook authentication flow
       final LoginResult result = await FacebookAuth.instance.login(
@@ -138,6 +143,7 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
       Logger.error('Facebook sign-in error: $error', error);
       return null;
     }
+    */
   }
 
   Future<User?> loginWithX() async {

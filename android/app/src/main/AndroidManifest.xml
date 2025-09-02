@@ -32,7 +32,7 @@
     </queries>
 
     <application
-        android:label="AttendUs"
+        android:label="Attendus"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true">

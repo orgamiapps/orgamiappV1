@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/firebase/organization_helper.dart';
-import 'package:attendus/screens/Organizations/organization_profile_screen.dart';
-import 'package:attendus/screens/Organizations/create_organization_screen.dart';
+import 'package:attendus/screens/Groups/group_profile_screen_v2.dart';
+import 'package:attendus/screens/Groups/create_group_screen.dart';
 
-class OrganizationsScreen extends StatefulWidget {
-  const OrganizationsScreen({super.key});
+class GroupsListScreen extends StatefulWidget {
+  const GroupsListScreen({super.key});
 
   @override
-  State<OrganizationsScreen> createState() => _OrganizationsScreenState();
+  State<GroupsListScreen> createState() => _GroupsListScreenState();
 }
 
-class _OrganizationsScreenState extends State<OrganizationsScreen> {
+class _GroupsListScreenState extends State<GroupsListScreen> {
   final TextEditingController _searchCtlr = TextEditingController();
   List<Map<String, String>> _myOrgs = [];
   List<Map<String, dynamic>> _discoverOrgs = [];
@@ -35,51 +35,72 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
   }
 
   Future<void> _initStreams() async {
-    final helper = OrganizationHelper();
-    final my = await helper.getUserOrganizationsLite();
-    if (mounted) setState(() => _myOrgs = my);
+    try {
+      final helper = OrganizationHelper();
 
-    _myOrgsStream ??= helper.streamUserOrganizationsLite();
-    _myOrgsStream!.listen((list) {
-      if (!mounted) return;
-      setState(() => _myOrgs = list);
-    });
+      // Load user organizations asynchronously
+      final my = await helper.getUserOrganizationsLite();
+      if (mounted) setState(() => _myOrgs = my);
 
-    _discover();
+      _myOrgsStream ??= helper.streamUserOrganizationsLite();
+      _myOrgsStream!.listen((list) {
+        if (!mounted) return;
+        setState(() => _myOrgs = list);
+      });
+
+      // Load discover organizations asynchronously
+      await _discover();
+    } catch (e) {
+      // Handle errors gracefully without blocking the UI
+      debugPrint('Error initializing groups: $e');
+    }
   }
 
   Future<void> _discover() async {
-    Query query = FirebaseFirestore.instance
-        .collection('Organizations')
-        .limit(25);
-    final q = _searchCtlr.text.trim().toLowerCase();
-    if (_selectedCategoryLower != null && _selectedCategoryLower!.isNotEmpty) {
-      query = query.where(
-        'category_lowercase',
-        isEqualTo: _selectedCategoryLower,
-      );
+    try {
+      Query query = FirebaseFirestore.instance
+          .collection('Organizations')
+          .limit(25);
+      final q = _searchCtlr.text.trim().toLowerCase();
+
+      if (_selectedCategoryLower != null &&
+          _selectedCategoryLower!.isNotEmpty) {
+        query = query.where(
+          'category_lowercase',
+          isEqualTo: _selectedCategoryLower,
+        );
+      }
+
+      if (q.isNotEmpty) {
+        final String end =
+            q.substring(0, q.length - 1) +
+            String.fromCharCode(q.codeUnitAt(q.length - 1) + 1);
+        query = query.orderBy('name_lowercase').startAt([q]).endBefore([end]);
+      } else {
+        query = query.orderBy('name_lowercase');
+      }
+
+      final snap = await query.get();
+      final list = snap.docs.map((d) {
+        final data = d.data() as Map<String, dynamic>;
+        data['id'] = d.id;
+        return data;
+      }).toList();
+
+      if (mounted) setState(() => _discoverOrgs = list);
+    } catch (e) {
+      // Handle Firestore errors gracefully
+      debugPrint('Error discovering organizations: $e');
+      if (mounted) {
+        setState(() => _discoverOrgs = []);
+      }
     }
-    if (q.isNotEmpty) {
-      final String end =
-          q.substring(0, q.length - 1) +
-          String.fromCharCode(q.codeUnitAt(q.length - 1) + 1);
-      query = query.orderBy('name_lowercase').startAt([q]).endBefore([end]);
-    } else {
-      query = query.orderBy('name_lowercase');
-    }
-    final snap = await query.get();
-    final list = snap.docs.map((d) {
-      final data = d.data() as Map<String, dynamic>;
-      data['id'] = d.id;
-      return data;
-    }).toList();
-    if (mounted) setState(() => _discoverOrgs = list);
   }
 
   Future<void> _goToCreate() async {
     await Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (_) => const CreateOrganizationScreen()));
+    ).push(MaterialPageRoute(builder: (_) => const CreateGroupScreen()));
     _initStreams();
   }
 
@@ -158,10 +179,9 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (_) =>
-                                            OrganizationProfileScreen(
-                                              organizationId: orgId,
-                                            ),
+                                        builder: (_) => GroupProfileScreenV2(
+                                          organizationId: orgId,
+                                        ),
                                       ),
                                     );
                                   },
@@ -200,9 +220,8 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                         if (orgId == null || orgId.isEmpty) return;
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => OrganizationProfileScreen(
-                              organizationId: orgId,
-                            ),
+                            builder: (_) =>
+                                GroupProfileScreenV2(organizationId: orgId),
                           ),
                         );
                       },
