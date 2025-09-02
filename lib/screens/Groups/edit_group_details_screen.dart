@@ -37,8 +37,16 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
   ];
 
   final List<Map<String, String>> _eventVisibilityOptions = [
-    {'value': 'public', 'label': 'Public', 'description': 'Events visible to everyone'},
-    {'value': 'private', 'label': 'Members Only', 'description': 'Events visible to members only'},
+    {
+      'value': 'public',
+      'label': 'Public',
+      'description': 'Events visible to everyone',
+    },
+    {
+      'value': 'private',
+      'label': 'Members Only',
+      'description': 'Events visible to members only',
+    },
   ];
 
   @override
@@ -156,6 +164,10 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
         foregroundColor: Colors.black87,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         actions: [
           if (_hasChanges)
             TextButton(
@@ -178,7 +190,9 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
             // Basic Information Card
             Card(
               elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -186,16 +200,22 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.info_outline, color: const Color(0xFF667EEA)),
+                        Icon(
+                          Icons.info_outline,
+                          color: const Color(0xFF667EEA),
+                        ),
                         const SizedBox(width: 8),
                         const Text(
                           'Basic Information',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 20),
-                    
+
                     // Group Name
                     TextFormField(
                       controller: _nameController,
@@ -283,7 +303,9 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
             // Contact Information Card
             Card(
               elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -291,11 +313,17 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.contact_page, color: const Color(0xFF667EEA)),
+                        Icon(
+                          Icons.contact_page,
+                          color: const Color(0xFF667EEA),
+                        ),
                         const SizedBox(width: 8),
                         const Text(
                           'Contact Information',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
@@ -333,7 +361,9 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
             // Event Settings Card
             Card(
               elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -341,11 +371,17 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.event_available, color: const Color(0xFF667EEA)),
+                        Icon(
+                          Icons.event_available,
+                          color: const Color(0xFF667EEA),
+                        ),
                         const SizedBox(width: 8),
                         const Text(
                           'Event Settings',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
@@ -353,7 +389,10 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
 
                     const Text(
                       'Default Event Visibility',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
@@ -409,14 +448,19 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
                               ),
                             ),
                             SizedBox(width: 12),
                             Text('Saving...'),
                           ],
                         )
-                      : const Text('Save Changes', style: TextStyle(fontSize: 16)),
+                      : const Text(
+                          'Save Changes',
+                          style: TextStyle(fontSize: 16),
+                        ),
                 ),
               ),
 
