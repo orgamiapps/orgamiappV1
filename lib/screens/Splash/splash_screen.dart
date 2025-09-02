@@ -181,7 +181,7 @@ class _SplashScreenState extends State<SplashScreen>
         if (!mounted || _hasNavigated) return;
 
         setState(() {
-          _loadingText = "Welcome to Orgami";
+          _loadingText = "Welcome to Attendus";
         });
 
         await Future.delayed(
@@ -299,7 +299,7 @@ class _SplashScreenState extends State<SplashScreen>
                             child: const Column(
                               children: [
                                 Text(
-                                  'ORGAMI',
+                                  'ATTENDUS',
                                   style: TextStyle(
                                     fontSize: 32,
                                     fontWeight: FontWeight.bold,

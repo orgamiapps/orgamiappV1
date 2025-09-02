@@ -29,7 +29,7 @@ class AppConstants {
 
   // Feature flags
   // Toggle to re-enable Apple Sign-In when Apple Developer setup is complete.
-  static const bool enableAppleSignIn = false;
+  static const bool enableAppleSignIn = true;
 
   static Uri buildInviteUri(String eventId) {
     return Uri.parse('https://orgami.app/invite?eventId=$eventId');

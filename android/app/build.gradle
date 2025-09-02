@@ -46,6 +46,8 @@ android {
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.4"
+    // Facebook SDK
+    implementation 'com.facebook.android:facebook-android-sdk:17.0.2'
 }
 
 flutter {

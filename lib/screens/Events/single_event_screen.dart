@@ -79,6 +79,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   // RSVP state
   bool _isRsvped = false;
   bool _isRsvpLoading = false;
+  bool _isRsvpStatusLoading = true; // Track if we're still checking initial RSVP status
 
   // _isLoading removed - no longer needed after removing manual code input
 
@@ -198,9 +199,16 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       if (mounted) {
         setState(() {
           _isRsvped = isRegistered;
+          _isRsvpStatusLoading = false; // Mark status loading as complete
         });
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isRsvpStatusLoading = false; // Mark status loading as complete even on error
+        });
+      }
+    }
   }
 
   Future<void> _rsvpForEvent() async {
@@ -4429,17 +4437,20 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       height: 64,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: _isRsvped
-              ? [const Color(0xFF10B981), const Color(0xFF059669)]
-              : [const Color(0xFF667EEA), const Color(0xFF5B67CA)],
+          colors: _isRsvpStatusLoading
+              ? [const Color(0xFF9CA3AF), const Color(0xFF6B7280)] // Gray gradient while loading
+              : _isRsvped
+                  ? [const Color(0xFF10B981), const Color(0xFF059669)]
+                  : [const Color(0xFF667EEA), const Color(0xFF5B67CA)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color:
-                (_isRsvped ? const Color(0xFF10B981) : const Color(0xFF667EEA))
+            color: _isRsvpStatusLoading
+                ? const Color(0xFF9CA3AF).withOpacity(0.3)
+                : (_isRsvped ? const Color(0xFF10B981) : const Color(0xFF667EEA))
                     .withOpacity(0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
@@ -4449,11 +4460,11 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: _isRsvpLoading ? null : _rsvpForEvent,
+          onTap: (_isRsvpLoading || _isRsvpStatusLoading) ? null : _rsvpForEvent,
           borderRadius: BorderRadius.circular(16),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: _isRsvpLoading
+            child: (_isRsvpLoading || _isRsvpStatusLoading)
                 ? const Center(
                     child: SizedBox(
                       width: 20,
@@ -4488,7 +4499,9 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _isRsvped ? 'Spot Reserved' : 'Reserve Your Spot',
+                              _isRsvpStatusLoading 
+                                  ? 'Loading...'
+                                  : _isRsvped ? 'Spot Reserved' : 'Reserve Your Spot',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w700,
@@ -4497,7 +4510,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                                 letterSpacing: -0.2,
                               ),
                             ),
-                            if (_isRsvped) ...[
+                            if (_isRsvped && !_isRsvpStatusLoading) ...[
                               const SizedBox(height: 2),
                               Text(
                                 'See you at the event',
@@ -4513,7 +4526,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           ],
                         ),
                       ),
-                      if (!_isRsvped)
+                      if (!_isRsvped && !_isRsvpStatusLoading)
                         Icon(
                           Icons.arrow_forward_ios,
                           size: 16,

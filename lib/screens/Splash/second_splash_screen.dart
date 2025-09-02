@@ -2,11 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:attendus/screens/Authentication/login_screen.dart';
 import 'package:attendus/screens/Authentication/create_account/create_account_screen.dart';
-import 'package:attendus/screens/Splash/Widgets/social_icons_view.dart';
-import 'package:attendus/Utils/colors.dart';
+
 import 'package:attendus/Utils/images.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/screens/QRScanner/qr_scanner_flow_screen.dart';
+import 'package:attendus/firebase/firebase_google_auth_helper.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/Utils/toast.dart';
+import 'package:attendus/Utils/app_constants.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class SecondSplashScreen extends StatefulWidget {
   const SecondSplashScreen({super.key});
@@ -31,6 +38,12 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
   late Animation<double> _buttonScaleAnimation;
   late Animation<double> _floatUpDownAnimation;
   late Animation<double> _shimmerOpacityAnimation;
+
+  // Social login loading states
+  bool _googleLoading = false;
+  bool _appleLoading = false;
+  bool _facebookLoading = false;
+  bool _xLoading = false;
 
   @override
   void initState() {
@@ -133,6 +146,189 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
     _floatAnimation.dispose();
     _shimmerAnimation.dispose();
     super.dispose();
+  }
+
+  // Social authentication methods
+  Future<void> _signInWithGoogle() async {
+    if (_googleLoading) return;
+
+    setState(() {
+      _googleLoading = true;
+    });
+
+    try {
+      final helper = FirebaseGoogleAuthHelper();
+      final user = await helper.loginWithGoogle();
+
+      if (user != null) {
+        await _handleSuccessfulLogin(user);
+      } else {
+        ShowToast().showNormalToast(msg: 'Google sign-in failed');
+      }
+    } catch (e) {
+      ShowToast().showNormalToast(msg: 'Google sign-in error: ${e.toString()}');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _googleLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _signInWithApple() async {
+    if (_appleLoading) return;
+
+    if (!AppConstants.enableAppleSignIn) {
+      ShowToast().showNormalToast(msg: 'Apple sign-in is currently disabled');
+      return;
+    }
+
+    setState(() {
+      _appleLoading = true;
+    });
+
+    try {
+      final helper = FirebaseGoogleAuthHelper();
+      final user = await helper.loginWithApple();
+
+      if (user != null) {
+        await _handleSuccessfulLogin(user);
+      } else {
+        ShowToast().showNormalToast(
+          msg: 'Apple sign-in is not available on this device',
+        );
+      }
+    } catch (e) {
+      String errorMessage = 'Apple sign-in failed';
+      if (e.toString().contains('not available')) {
+        errorMessage = 'Apple sign-in is only available on iOS devices';
+      } else if (e.toString().contains('webAuthenticationOptions')) {
+        errorMessage = 'Apple sign-in configuration error';
+      }
+      ShowToast().showNormalToast(msg: errorMessage);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _appleLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _signInWithFacebook() async {
+    if (_facebookLoading) return;
+
+    setState(() {
+      _facebookLoading = true;
+    });
+
+    try {
+      final helper = FirebaseGoogleAuthHelper();
+      final user = await helper.loginWithFacebook();
+
+      if (user != null) {
+        await _handleSuccessfulLogin(user);
+      } else {
+        ShowToast().showNormalToast(msg: 'Facebook sign-in failed');
+      }
+    } catch (e) {
+      ShowToast().showNormalToast(
+        msg: 'Facebook sign-in error: ${e.toString()}',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _facebookLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _signInWithX() async {
+    if (_xLoading) return;
+
+    setState(() {
+      _xLoading = true;
+    });
+
+    try {
+      final helper = FirebaseGoogleAuthHelper();
+      final user = await helper.loginWithX();
+
+      if (user != null) {
+        await _handleSuccessfulLogin(user);
+      } else {
+        ShowToast().showNormalToast(
+          msg: 'X sign-in is only available on web platform',
+        );
+      }
+    } catch (e) {
+      String errorMessage = 'X sign-in failed';
+      if (e.toString().contains('web-based')) {
+        errorMessage = 'X sign-in is only available on web platform';
+      }
+      ShowToast().showNormalToast(msg: errorMessage);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _xLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleSuccessfulLogin(user) async {
+    try {
+      // Check if user exists in Firestore
+      final userData = await FirebaseFirestoreHelper().getSingleCustomer(
+        customerId: user.uid,
+      );
+
+      if (userData != null) {
+        // Existing user
+        setState(() {
+          CustomerController.logeInCustomer = userData;
+        });
+        if (!mounted) return;
+        RouterClass().homeScreenRoute(context: context);
+      } else {
+        // New user - create profile
+        final newCustomerModel = CustomerModel(
+          uid: user.uid,
+          name: user.displayName ?? '',
+          email: user.email ?? '',
+          createdAt: DateTime.now(),
+        );
+        await _createNewUser(newCustomerModel);
+      }
+    } catch (e) {
+      ShowToast().showNormalToast(
+        msg: 'Error loading user data: ${e.toString()}',
+      );
+    }
+  }
+
+  Future<void> _createNewUser(CustomerModel newCustomerModel) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection(CustomerModel.firebaseKey)
+          .doc(newCustomerModel.uid)
+          .set(CustomerModel.getMap(newCustomerModel));
+
+      ShowToast().showNormalToast(msg: 'Welcome to ${AppConstants.appName}!');
+
+      setState(() {
+        CustomerController.logeInCustomer = newCustomerModel;
+      });
+
+      if (!mounted) return;
+      RouterClass().homeScreenRoute(context: context);
+    } catch (e) {
+      ShowToast().showNormalToast(
+        msg: 'Error creating account: ${e.toString()}',
+      );
+    }
   }
 
   @override
@@ -525,27 +721,35 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _buildSocialButton(
-                icon: Icons.g_mobiledata,
+                icon: FontAwesomeIcons.google,
                 color: const Color(0xFF4285F4),
-                onTap: () {
-                  // Google login logic
-                },
+                backgroundColor: Colors.white,
+                isLoading: _googleLoading,
+                onTap: _signInWithGoogle,
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               _buildSocialButton(
-                icon: Icons.apple,
-                color: Colors.black,
-                onTap: () {
-                  // Apple login logic
-                },
+                icon: FontAwesomeIcons.apple,
+                color: Colors.white,
+                backgroundColor: Colors.black,
+                isLoading: _appleLoading,
+                onTap: _signInWithApple,
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               _buildSocialButton(
-                icon: Icons.facebook,
-                color: const Color(0xFF1877F2),
-                onTap: () {
-                  // Facebook login logic
-                },
+                icon: FontAwesomeIcons.facebookF,
+                color: Colors.white,
+                backgroundColor: const Color(0xFF1877F2),
+                isLoading: _facebookLoading,
+                onTap: _signInWithFacebook,
+              ),
+              const SizedBox(width: 12),
+              _buildSocialButton(
+                icon: FontAwesomeIcons.xTwitter,
+                color: Colors.white,
+                backgroundColor: Colors.black,
+                isLoading: _xLoading,
+                onTap: _signInWithX,
               ),
             ],
           ),
@@ -557,26 +761,52 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
   Widget _buildSocialButton({
     required IconData icon,
     required Color color,
-    required VoidCallback onTap,
+    required Color backgroundColor,
+    required bool isLoading,
+    required Future<void> Function() onTap,
   }) {
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 56,
-        height: 56,
+      onTap: isLoading ? null : onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 60,
+        height: 60,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: backgroundColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey[300]!, width: 1),
+          border: backgroundColor == Colors.white
+              ? Border.all(
+                  color: isLoading ? Colors.grey[400]! : Colors.grey[300]!,
+                  width: 1,
+                )
+              : null,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: backgroundColor == Colors.white
+                  ? Colors.black.withOpacity(isLoading ? 0.02 : 0.08)
+                  : backgroundColor.withOpacity(isLoading ? 0.3 : 0.4),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+              spreadRadius: 0,
             ),
           ],
         ),
-        child: Icon(icon, color: color, size: 28),
+        child: Center(
+          child: isLoading
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      backgroundColor == Colors.white
+                          ? Colors.grey[600]!
+                          : Colors.white,
+                    ),
+                  ),
+                )
+              : FaIcon(icon, color: color, size: 22),
+        ),
       ),
     );
   }
