@@ -5,8 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:attendus/firebase/organization_helper.dart';
 import 'package:attendus/firebase/firebase_storage_helper.dart';
-import 'package:attendus/screens/Organizations/join_requests_screen.dart';
-import 'package:attendus/screens/Organizations/role_permissions_screen.dart';
+import 'package:attendus/screens/Groups/join_requests_screen.dart';
+import 'package:attendus/screens/Groups/role_permissions_screen.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
@@ -17,9 +17,9 @@ import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
 
-class OrganizationProfileScreen extends StatelessWidget {
+class GroupProfileScreen extends StatelessWidget {
   final String organizationId;
-  const OrganizationProfileScreen({super.key, required this.organizationId});
+  const GroupProfileScreen({super.key, required this.organizationId});
 
   Future<void> _shareOrganization(BuildContext context) async {
     try {

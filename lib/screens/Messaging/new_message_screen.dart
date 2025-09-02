@@ -21,7 +21,7 @@ import 'package:shimmer/shimmer.dart';
 // intl not used here; keep code lean
 import 'package:share_plus/share_plus.dart';
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
-import 'package:attendus/screens/Organizations/groups_screen.dart';
+import 'package:attendus/screens/Groups/groups_screen.dart';
 
 class NewMessageScreen extends StatefulWidget {
   const NewMessageScreen({super.key});

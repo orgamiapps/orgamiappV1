@@ -2,21 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/firebase/organization_helper.dart';
-import 'package:attendus/screens/Organizations/organization_profile_screen.dart';
-import 'package:attendus/screens/Organizations/create_organization_screen.dart';
+import 'package:attendus/screens/Groups/group_profile_screen_v2.dart';
+import 'package:attendus/screens/Groups/create_group_screen.dart';
+import 'dart:async';
 
-class OrganizationsScreen extends StatefulWidget {
-  const OrganizationsScreen({super.key});
+class GroupsScreen extends StatefulWidget {
+  const GroupsScreen({super.key});
 
   @override
-  State<OrganizationsScreen> createState() => _OrganizationsScreenState();
+  State<GroupsScreen> createState() => _GroupsScreenState();
 }
 
-class _OrganizationsScreenState extends State<OrganizationsScreen> {
+class _GroupsScreenState extends State<GroupsScreen> {
   final TextEditingController _searchCtlr = TextEditingController();
   List<Map<String, String>> _myOrgs = [];
   List<Map<String, dynamic>> _discoverOrgs = [];
   String? _selectedCategoryLower;
+  bool _isLoadingMyOrgs = true;
+  Timer? _debounce;
   final List<Map<String, String>> _categoryOptions = const [
     {'label': 'All', 'value': ''},
     {'label': 'Business', 'value': 'business'},
@@ -34,15 +37,30 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
     _initStreams();
   }
 
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
   Future<void> _initStreams() async {
     final helper = OrganizationHelper();
+    if (mounted) setState(() => _isLoadingMyOrgs = true);
     final my = await helper.getUserOrganizationsLite();
-    if (mounted) setState(() => _myOrgs = my);
+    if (mounted) {
+      setState(() {
+        _myOrgs = my;
+        _isLoadingMyOrgs = false;
+      });
+    }
 
     _myOrgsStream ??= helper.streamUserOrganizationsLite();
     _myOrgsStream!.listen((list) {
       if (!mounted) return;
-      setState(() => _myOrgs = list);
+      setState(() {
+        _myOrgs = list;
+        _isLoadingMyOrgs = false;
+      });
     });
 
     _discover();
@@ -79,7 +97,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
   Future<void> _goToCreate() async {
     await Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (_) => const CreateOrganizationScreen()));
+    ).push(MaterialPageRoute(builder: (_) => const CreateGroupScreen()));
     _initStreams();
   }
 
@@ -98,12 +116,13 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
-        title: const Text('Organizations'),
+        title: const Text('Groups'),
         actions: [
-          IconButton(
-            tooltip: 'Create Organization',
-            icon: const Icon(Icons.add_business),
+          TextButton.icon(
             onPressed: _goToCreate,
+            icon: const Icon(Icons.add, size: 20),
+            label: const Text('Create'),
+            style: TextButton.styleFrom(foregroundColor: Colors.black87),
           ),
         ],
         bottom: const PreferredSize(
@@ -125,54 +144,79 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                       controller: _searchCtlr,
                       textInputAction: TextInputAction.search,
                       decoration: InputDecoration(
-                        hintText: 'Search organizations',
+                        hintText: 'Search groups',
                         prefixIcon: const Icon(Icons.search),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                         isDense: true,
                       ),
-                      onSubmitted: (_) => _discover(),
+                      onChanged: (value) {
+                        _debounce?.cancel();
+                        _debounce = Timer(
+                          const Duration(milliseconds: 300),
+                          _discover,
+                        );
+                      },
+                      onSubmitted: (_) {
+                        _debounce?.cancel();
+                        _discover();
+                      },
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'My Organizations',
+                      'My Groups',
                       style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 8),
-                    _myOrgs.isEmpty
-                        ? _EmptyStateCard(onCreate: _goToCreate)
-                        : SizedBox(
+                    _isLoadingMyOrgs
+                        ? SizedBox(
                             height: 110,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: _myOrgs.length,
-                              separatorBuilder: (_, index) =>
-                                  const SizedBox(width: 12),
-                              itemBuilder: (context, i) {
-                                final org = _myOrgs[i];
-                                return GestureDetector(
-                                  onTap: () {
-                                    final orgId = org['id'];
-                                    if (orgId == null || orgId.isEmpty) return;
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            OrganizationProfileScreen(
-                                              organizationId: orgId,
-                                            ),
-                                      ),
-                                    );
-                                  },
-                                  child: _pill(
-                                    org['name'] ?? '',
-                                    icon: Icons.apartment,
-                                  ),
-                                );
-                              },
+                            child: Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
                             ),
-                          ),
+                          )
+                        : (_myOrgs.isEmpty
+                              ? _EmptyStateCard(onCreate: _goToCreate)
+                              : SizedBox(
+                                  height: 110,
+                                  child: ListView.separated(
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: _myOrgs.length,
+                                    separatorBuilder: (_, index) =>
+                                        const SizedBox(width: 12),
+                                    itemBuilder: (context, i) {
+                                      final org = _myOrgs[i];
+                                      return GestureDetector(
+                                        onTap: () {
+                                          final orgId = org['id'];
+                                          if (orgId == null || orgId.isEmpty) {
+                                            return;
+                                          }
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  GroupProfileScreenV2(
+                                                    organizationId: orgId,
+                                                  ),
+                                            ),
+                                          );
+                                        },
+                                        child: _pill(
+                                          org['name'] ?? '',
+                                          icon: Icons.apartment,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                )),
                     const SizedBox(height: 16),
                     const Text(
                       'Discover',
@@ -200,7 +244,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
                         if (orgId == null || orgId.isEmpty) return;
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => OrganizationProfileScreen(
+                            builder: (_) => GroupProfileScreenV2(
                               organizationId: orgId,
                             ),
                           ),
@@ -296,9 +340,7 @@ class _EmptyStateCard extends StatelessWidget {
         children: [
           const Icon(Icons.info_outline, color: Color(0xFF6B7280)),
           const SizedBox(width: 12),
-          const Expanded(
-            child: Text('You have not joined any organizations yet.'),
-          ),
+          const Expanded(child: Text('You have not joined any groups yet.')),
           const SizedBox(width: 12),
           FilledButton(onPressed: onCreate, child: const Text('Create')),
         ],

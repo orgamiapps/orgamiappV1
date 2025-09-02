@@ -3,7 +3,7 @@ import 'package:attendus/screens/Home/home_hub_screen.dart';
 import 'package:attendus/screens/MyProfile/my_profile_screen.dart';
 import 'package:attendus/screens/Home/notifications_screen.dart';
 import 'package:attendus/screens/Messaging/messaging_screen.dart';
-import 'package:attendus/screens/Organizations/groups_screen.dart';
+import 'package:attendus/screens/Groups/groups_screen.dart';
 import 'package:attendus/screens/Home/account_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
