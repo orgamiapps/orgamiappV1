@@ -11,6 +11,7 @@ import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/screens/Events/create_event_screen.dart';
 import 'package:attendus/screens/Groups/create_announcement_screen.dart';
 import 'package:attendus/screens/Groups/create_poll_screen.dart';
+import 'package:attendus/screens/Groups/group_admin_settings_screen.dart';
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 import 'package:attendus/models/customer_model.dart';
 
@@ -638,11 +639,16 @@ class _FeedTabState extends State<_FeedTab> {
                 return _PollCard(
                   data: data,
                   docId: doc.id,
+                  organizationId: widget.organizationId,
                   onVote: (optionIndex) => _votePoll(doc.id, optionIndex),
                   currentUserId: _currentUser?.uid,
                 );
               } else {
-                return _AnnouncementCard(data: data);
+                return _AnnouncementCard(
+                  data: data,
+                  docId: doc.id,
+                  organizationId: widget.organizationId,
+                );
               }
             },
           ),
@@ -794,9 +800,172 @@ class _FeedTabState extends State<_FeedTab> {
   }
 }
 
-class _AnnouncementCard extends StatelessWidget {
+class _AnnouncementCard extends StatefulWidget {
   final Map<String, dynamic> data;
-  const _AnnouncementCard({required this.data});
+  final String docId;
+  final String organizationId;
+
+  const _AnnouncementCard({
+    required this.data,
+    required this.docId,
+    required this.organizationId,
+  });
+
+  @override
+  State<_AnnouncementCard> createState() => _AnnouncementCardState();
+}
+
+class _AnnouncementCardState extends State<_AnnouncementCard> {
+  bool _isAdmin = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAdminStatus();
+  }
+
+  Future<void> _checkAdminStatus() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
+      // Check if user is admin or creator
+      final orgDoc = await FirebaseFirestore.instance
+          .collection('Organizations')
+          .doc(widget.organizationId)
+          .get();
+
+      final createdBy = orgDoc.data()?['createdBy'];
+
+      // Check if user is creator
+      if (createdBy == user.uid) {
+        setState(() {
+          _isAdmin = true;
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Check if user is admin in Members collection
+      final memberDoc = await FirebaseFirestore.instance
+          .collection('Organizations')
+          .doc(widget.organizationId)
+          .collection('Members')
+          .doc(user.uid)
+          .get();
+
+      if (memberDoc.exists) {
+        final role = memberDoc.data()?['role'];
+        setState(() {
+          _isAdmin = role == 'admin' || role == 'owner';
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _handleAdminAction(String action) {
+    switch (action) {
+      case 'pin':
+        _togglePin();
+        break;
+      case 'delete':
+        _showDeleteDialog();
+        break;
+    }
+  }
+
+  Future<void> _togglePin() async {
+    try {
+      final isPinned = widget.data['isPinned'] ?? false;
+      await FirebaseFirestore.instance
+          .collection('Organizations')
+          .doc(widget.organizationId)
+          .collection('Feed')
+          .doc(widget.docId)
+          .update({'isPinned': !isPinned});
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isPinned ? 'Announcement unpinned' : 'Announcement pinned',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _showDeleteDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Announcement'),
+        content: const Text(
+          'Are you sure you want to delete this announcement? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deletePost();
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deletePost() async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('Organizations')
+          .doc(widget.organizationId)
+          .collection('Feed')
+          .doc(widget.docId)
+          .delete();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Announcement deleted'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting announcement: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   String _formatDate(Timestamp? timestamp) {
     if (timestamp == null) return '';
@@ -823,8 +992,8 @@ class _AnnouncementCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isPinned = data['isPinned'] ?? false;
-    final createdAt = data['createdAt'] as Timestamp?;
+    final isPinned = widget.data['isPinned'] ?? false;
+    final createdAt = widget.data['createdAt'] as Timestamp?;
     final dateStr = _formatDate(createdAt);
 
     return Container(
@@ -904,7 +1073,7 @@ class _AnnouncementCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            data['title'] ?? 'Announcement',
+                            widget.data['title'] ?? 'Announcement',
                             style: const TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w700,
@@ -922,7 +1091,7 @@ class _AnnouncementCard extends StatelessWidget {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                data['authorName'] ?? 'Admin',
+                                widget.data['authorName'] ?? 'Admin',
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: Colors.grey.shade600,
@@ -944,11 +1113,46 @@ class _AnnouncementCard extends StatelessWidget {
                         ],
                       ),
                     ),
+                    if (_isAdmin && !_isLoading) ...[
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert, size: 20),
+                        onSelected: (value) => _handleAdminAction(value),
+                        itemBuilder: (context) => [
+                          PopupMenuItem(
+                            value: 'pin',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isPinned
+                                      ? Icons.push_pin_outlined
+                                      : Icons.push_pin,
+                                ),
+                                const SizedBox(width: 12),
+                                Text(isPinned ? 'Unpin' : 'Pin'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete, color: Colors.red),
+                                SizedBox(width: 12),
+                                Text(
+                                  'Delete',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  data['content'] ?? '',
+                  widget.data['content'] ?? '',
                   style: const TextStyle(
                     fontSize: 15,
                     color: Color(0xFF3A3A3A),
@@ -964,29 +1168,158 @@ class _AnnouncementCard extends StatelessWidget {
   }
 }
 
-class _PollCard extends StatelessWidget {
+class _PollCard extends StatefulWidget {
   final Map<String, dynamic> data;
   final String docId;
+  final String organizationId;
   final Function(int) onVote;
   final String? currentUserId;
 
   const _PollCard({
     required this.data,
     required this.docId,
+    required this.organizationId,
     required this.onVote,
     this.currentUserId,
   });
 
+  @override
+  State<_PollCard> createState() => _PollCardState();
+}
+
+class _PollCardState extends State<_PollCard> {
+  bool _isAdmin = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAdminStatus();
+  }
+
+  Future<void> _checkAdminStatus() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
+      // Check if user is admin or creator
+      final orgDoc = await FirebaseFirestore.instance
+          .collection('Organizations')
+          .doc(widget.organizationId)
+          .get();
+
+      final createdBy = orgDoc.data()?['createdBy'];
+
+      // Check if user is creator
+      if (createdBy == user.uid) {
+        setState(() {
+          _isAdmin = true;
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Check if user is admin in Members collection
+      final memberDoc = await FirebaseFirestore.instance
+          .collection('Organizations')
+          .doc(widget.organizationId)
+          .collection('Members')
+          .doc(user.uid)
+          .get();
+
+      if (memberDoc.exists) {
+        final role = memberDoc.data()?['role'];
+        setState(() {
+          _isAdmin = role == 'admin' || role == 'owner';
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
   bool get hasVoted {
-    final voters = List<String>.from(data['voters'] ?? []);
-    return currentUserId != null && voters.contains(currentUserId);
+    final voters = List<String>.from(widget.data['voters'] ?? []);
+    return widget.currentUserId != null &&
+        voters.contains(widget.currentUserId);
+  }
+
+  void _handleAdminAction(String action) {
+    switch (action) {
+      case 'delete':
+        _showDeleteDialog();
+        break;
+    }
+  }
+
+  void _showDeleteDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Poll'),
+        content: const Text(
+          'Are you sure you want to delete this poll? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deletePoll();
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deletePoll() async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('Organizations')
+          .doc(widget.organizationId)
+          .collection('Feed')
+          .doc(widget.docId)
+          .delete();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Poll deleted'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting poll: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final options = List<Map<String, dynamic>>.from(data['options'] ?? []);
-    final totalVotes = data['totalVotes'] ?? 0;
-    final createdAt = data['createdAt'] as Timestamp?;
+    final options = List<Map<String, dynamic>>.from(
+      widget.data['options'] ?? [],
+    );
+    final totalVotes = widget.data['totalVotes'] ?? 0;
+    final createdAt = widget.data['createdAt'] as Timestamp?;
     final dateStr = createdAt != null
         ? '${createdAt.toDate().day}/${createdAt.toDate().month}/${createdAt.toDate().year}'
         : '';
@@ -1020,7 +1353,7 @@ class _PollCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        'by ${data['authorName'] ?? 'Admin'} • $dateStr',
+                        'by ${widget.data['authorName'] ?? 'Admin'} • $dateStr',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade600,
@@ -1044,11 +1377,30 @@ class _PollCard extends StatelessWidget {
                       style: const TextStyle(fontSize: 12),
                     ),
                   ),
+                if (_isAdmin && !_isLoading) ...[
+                  const SizedBox(width: 8),
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert, size: 20),
+                    onSelected: (value) => _handleAdminAction(value),
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, color: Colors.red),
+                            SizedBox(width: 12),
+                            Text('Delete', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 16),
             Text(
-              data['question'] ?? 'Poll Question',
+              widget.data['question'] ?? 'Poll Question',
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 16),
@@ -1061,12 +1413,13 @@ class _PollCard extends StatelessWidget {
                   ? (voteCount / totalVotes * 100)
                   : 0.0;
               final userVoted =
-                  currentUserId != null && votes.contains(currentUserId);
+                  widget.currentUserId != null &&
+                  votes.contains(widget.currentUserId);
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: InkWell(
-                  onTap: hasVoted ? null : () => onVote(index),
+                  onTap: hasVoted ? null : () => widget.onVote(index),
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     decoration: BoxDecoration(
@@ -2192,6 +2545,26 @@ class _AdminFabState extends State<_AdminFab> {
                 }
               },
             ),
+            const Divider(height: 32),
+            ListTile(
+              leading: const Icon(
+                Icons.admin_panel_settings,
+                color: Color(0xFF667EEA),
+              ),
+              title: const Text('Admin Settings'),
+              subtitle: const Text('Manage group settings and content'),
+              onTap: () async {
+                Navigator.pop(context);
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => GroupAdminSettingsScreen(
+                      organizationId: widget.organizationId,
+                    ),
+                  ),
+                );
+              },
+            ),
             const SizedBox(height: 20),
           ],
         ),
@@ -2212,8 +2585,8 @@ class _AdminFabState extends State<_AdminFab> {
     return FloatingActionButton.extended(
       onPressed: () => _showCreateOptions(context),
       backgroundColor: const Color(0xFF667EEA),
-      icon: const Icon(Icons.add),
-      label: const Text('New'),
+      icon: const Icon(Icons.admin_panel_settings),
+      label: const Text('Manage Group'),
     );
   }
 }
