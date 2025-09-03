@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/models/organization_model.dart';
+import 'package:attendus/firebase/firebase_storage_helper.dart';
+import 'dart:io';
 
 class EditGroupDetailsScreen extends StatefulWidget {
   final String organizationId;
@@ -25,8 +27,17 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
 
   String _selectedCategory = 'Other';
   String _selectedEventVisibility = 'public';
+  String _selectedAnnouncementVisibility = 'public';
+  String _selectedPollVisibility = 'public';
+  String _selectedPhotoVisibility = 'public';
   bool _isLoading = false;
   bool _hasChanges = false;
+
+  // Image management
+  File? _logoFile;
+  File? _bannerFile;
+  String? _currentLogoUrl;
+  String? _currentBannerUrl;
 
   final List<String> _categories = [
     'Business',
@@ -36,16 +47,16 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
     'Other',
   ];
 
-  final List<Map<String, String>> _eventVisibilityOptions = [
+  final List<Map<String, String>> _visibilityOptions = [
     {
       'value': 'public',
       'label': 'Public',
-      'description': 'Events visible to everyone',
+      'description': 'Visible to everyone',
     },
     {
       'value': 'private',
       'label': 'Members Only',
-      'description': 'Events visible to members only',
+      'description': 'Visible to members only',
     },
   ];
 
@@ -60,6 +71,12 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
     _descriptionController.text = widget.organization.description;
     _selectedCategory = widget.organization.category;
     _selectedEventVisibility = widget.organization.defaultEventVisibility;
+
+    // Initialize other visibility settings to same as events for consistency
+    _selectedAnnouncementVisibility =
+        widget.organization.defaultEventVisibility;
+    _selectedPollVisibility = widget.organization.defaultEventVisibility;
+    _selectedPhotoVisibility = widget.organization.defaultEventVisibility;
 
     // Add listeners to track changes
     _nameController.addListener(_onFieldChanged);
@@ -80,8 +97,27 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
       if (doc.exists) {
         final data = doc.data()!;
         final website = data['website']?.toString() ?? '';
+        final logoUrl = data['logoUrl']?.toString();
+        final bannerUrl = data['bannerUrl']?.toString();
+
+        // Load visibility settings or use defaults
+        final announcementVisibility =
+            data['defaultAnnouncementVisibility']?.toString() ??
+            _selectedEventVisibility;
+        final pollVisibility =
+            data['defaultPollVisibility']?.toString() ??
+            _selectedEventVisibility;
+        final photoVisibility =
+            data['defaultPhotoVisibility']?.toString() ??
+            _selectedEventVisibility;
+
         setState(() {
           _websiteController.text = website;
+          _currentLogoUrl = logoUrl;
+          _currentBannerUrl = bannerUrl;
+          _selectedAnnouncementVisibility = announcementVisibility;
+          _selectedPollVisibility = pollVisibility;
+          _selectedPhotoVisibility = photoVisibility;
         });
       }
     } catch (e) {
@@ -95,6 +131,10 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
     }
   }
 
+  void _onImageChanged() {
+    _onFieldChanged();
+  }
+
   Future<void> _saveChanges() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -104,6 +144,26 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception('User not authenticated');
 
+      // Upload images if they have been changed
+      String? logoUrl = _currentLogoUrl;
+      String? bannerUrl = _currentBannerUrl;
+
+      if (_logoFile != null) {
+        logoUrl = await FirebaseStorageHelper.uploadOrganizationImage(
+          organizationId: widget.organizationId,
+          imageFile: _logoFile!,
+          isBanner: false,
+        );
+      }
+
+      if (_bannerFile != null) {
+        bannerUrl = await FirebaseStorageHelper.uploadOrganizationImage(
+          organizationId: widget.organizationId,
+          imageFile: _bannerFile!,
+          isBanner: true,
+        );
+      }
+
       // Prepare update data
       final updateData = <String, dynamic>{
         'name': _nameController.text.trim(),
@@ -112,10 +172,21 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
         'category': _selectedCategory,
         'category_lowercase': _selectedCategory.toLowerCase(),
         'defaultEventVisibility': _selectedEventVisibility,
+        'defaultAnnouncementVisibility': _selectedAnnouncementVisibility,
+        'defaultPollVisibility': _selectedPollVisibility,
+        'defaultPhotoVisibility': _selectedPhotoVisibility,
         'website': _websiteController.text.trim(),
         'updatedAt': FieldValue.serverTimestamp(),
         'updatedBy': user.uid,
       };
+
+      // Add image URLs if they exist
+      if (logoUrl != null) {
+        updateData['logoUrl'] = logoUrl;
+      }
+      if (bannerUrl != null) {
+        updateData['bannerUrl'] = bannerUrl;
+      }
 
       await FirebaseFirestore.instance
           .collection('Organizations')
@@ -300,6 +371,86 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
 
             const SizedBox(height: 16),
 
+            // Image Management Card
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.image, color: const Color(0xFF667EEA)),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Group Images',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Logo
+                    _ImagePickerTile(
+                      label: 'Logo',
+                      hint: 'Recommended 512x512 PNG',
+                      file: _logoFile,
+                      currentImageUrl: _currentLogoUrl,
+                      onPick: () async {
+                        final f =
+                            await FirebaseStorageHelper.pickImageFromGallery();
+                        if (f != null) {
+                          setState(() => _logoFile = f);
+                          _onImageChanged();
+                        }
+                      },
+                      onClear: () {
+                        setState(() {
+                          _logoFile = null;
+                          _currentLogoUrl = null;
+                        });
+                        _onImageChanged();
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Banner
+                    _ImagePickerTile(
+                      label: 'Banner',
+                      hint: 'Recommended 1600x600 JPG',
+                      file: _bannerFile,
+                      currentImageUrl: _currentBannerUrl,
+                      onPick: () async {
+                        final f =
+                            await FirebaseStorageHelper.pickImageFromGallery();
+                        if (f != null) {
+                          setState(() => _bannerFile = f);
+                          _onImageChanged();
+                        }
+                      },
+                      onClear: () {
+                        setState(() {
+                          _bannerFile = null;
+                          _currentBannerUrl = null;
+                        });
+                        _onImageChanged();
+                      },
+                      isBanner: true,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
             // Contact Information Card
             Card(
               elevation: 2,
@@ -358,7 +509,7 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
 
             const SizedBox(height: 16),
 
-            // Event Settings Card
+            // Group Settings Card
             Card(
               elevation: 2,
               shape: RoundedRectangleBorder(
@@ -371,13 +522,10 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
                   children: [
                     Row(
                       children: [
-                        Icon(
-                          Icons.event_available,
-                          color: const Color(0xFF667EEA),
-                        ),
+                        Icon(Icons.settings, color: const Color(0xFF667EEA)),
                         const SizedBox(width: 8),
                         const Text(
-                          'Event Settings',
+                          'Group Settings',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
@@ -385,39 +533,75 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
-
-                    const Text(
-                      'Default Event Visibility',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Choose who can see events created in this group by default.',
+                      'Configure default visibility settings for different types of content in your group.',
                       style: TextStyle(color: Colors.grey, fontSize: 14),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
-                    ..._eventVisibilityOptions.map((option) {
-                      return RadioListTile<String>(
-                        value: option['value']!,
-                        groupValue: _selectedEventVisibility,
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() {
-                              _selectedEventVisibility = value;
-                              _onFieldChanged();
-                            });
-                          }
-                        },
-                        title: Text(option['label']!),
-                        subtitle: Text(option['description']!),
-                        contentPadding: EdgeInsets.zero,
-                      );
-                    }).toList(),
+                    // Events Visibility
+                    _buildVisibilitySection(
+                      title: 'Events',
+                      icon: Icons.event,
+                      description: 'Who can see events created in this group',
+                      selectedValue: _selectedEventVisibility,
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedEventVisibility = value;
+                          _onFieldChanged();
+                        });
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Announcements Visibility
+                    _buildVisibilitySection(
+                      title: 'Announcements',
+                      icon: Icons.campaign,
+                      description:
+                          'Who can see announcements posted in this group',
+                      selectedValue: _selectedAnnouncementVisibility,
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedAnnouncementVisibility = value;
+                          _onFieldChanged();
+                        });
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Polls Visibility
+                    _buildVisibilitySection(
+                      title: 'Polls',
+                      icon: Icons.poll,
+                      description: 'Who can see polls created in this group',
+                      selectedValue: _selectedPollVisibility,
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedPollVisibility = value;
+                          _onFieldChanged();
+                        });
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Photos Visibility
+                    _buildVisibilitySection(
+                      title: 'Photos',
+                      icon: Icons.photo_library,
+                      description: 'Who can see photos shared in this group',
+                      selectedValue: _selectedPhotoVisibility,
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedPhotoVisibility = value;
+                          _onFieldChanged();
+                        });
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -468,6 +652,240 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildVisibilitySection({
+    required String title,
+    required IconData icon,
+    required String description,
+    required String selectedValue,
+    required Function(String) onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 20, color: const Color(0xFF667EEA)),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            description,
+            style: TextStyle(color: Colors.grey[600], fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              for (int i = 0; i < _visibilityOptions.length; i++) ...[
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => onChanged(_visibilityOptions[i]['value']!),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: selectedValue == _visibilityOptions[i]['value']
+                            ? const Color(0xFF667EEA)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: selectedValue == _visibilityOptions[i]['value']
+                              ? const Color(0xFF667EEA)
+                              : Colors.grey[300]!,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            _visibilityOptions[i]['value'] == 'public'
+                                ? Icons.public
+                                : Icons.group,
+                            color:
+                                selectedValue == _visibilityOptions[i]['value']
+                                ? Colors.white
+                                : Colors.grey[600],
+                            size: 20,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _visibilityOptions[i]['label']!,
+                            style: TextStyle(
+                              color:
+                                  selectedValue ==
+                                      _visibilityOptions[i]['value']
+                                  ? Colors.white
+                                  : Colors.grey[800],
+                              fontWeight: FontWeight.w500,
+                              fontSize: 12,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                if (i < _visibilityOptions.length - 1) const SizedBox(width: 8),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ImagePickerTile extends StatelessWidget {
+  final String label;
+  final String hint;
+  final File? file;
+  final String? currentImageUrl;
+  final VoidCallback onClear;
+  final VoidCallback onPick;
+  final bool isBanner;
+
+  const _ImagePickerTile({
+    required this.label,
+    required this.hint,
+    required this.file,
+    this.currentImageUrl,
+    required this.onPick,
+    required this.onClear,
+    this.isBanner = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              if (file != null || currentImageUrl != null)
+                IconButton(
+                  tooltip: 'Remove',
+                  icon: const Icon(Icons.close),
+                  onPressed: onClear,
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            hint,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+          ),
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: onPick,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              height: isBanner ? 120 : 100,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFFF8FAFC),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              alignment: Alignment.center,
+              child: _buildImageContent(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageContent() {
+    if (file != null) {
+      // Show selected file
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.file(
+          file!,
+          width: double.infinity,
+          height: isBanner ? 120 : 100,
+          fit: BoxFit.cover,
+        ),
+      );
+    } else if (currentImageUrl != null && currentImageUrl!.isNotEmpty) {
+      // Show current image from URL
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.network(
+          currentImageUrl!,
+          width: double.infinity,
+          height: isBanner ? 120 : 100,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return _buildPlaceholder();
+          },
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Center(
+              child: CircularProgressIndicator(
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded /
+                          loadingProgress.expectedTotalBytes!
+                    : null,
+              ),
+            );
+          },
+        ),
+      );
+    } else {
+      // Show placeholder
+      return _buildPlaceholder();
+    }
+  }
+
+  Widget _buildPlaceholder() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: const [
+        Icon(Icons.add_photo_alternate_outlined, color: Color(0xFF6B7280)),
+        SizedBox(height: 6),
+        Text('Tap to select image'),
+      ],
     );
   }
 }

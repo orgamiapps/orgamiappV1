@@ -220,7 +220,7 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
                   pinned: true,
                   floating: false,
                   expandedHeight:
-                      320, // Increased to accommodate all header elements
+                      260, // Compact height while keeping header content visible
                   collapsedHeight:
                       kToolbarHeight + 48, // Account for tab bar height
                   elevation: 0,
@@ -270,7 +270,7 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
                           left: 0,
                           right: 0,
                           height:
-                              160, // Increased height for better gradient coverage
+                              140, // Compact gradient coverage while maintaining readability
                           child: Container(
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
@@ -288,8 +288,7 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
                         ),
                         // Group info overlay
                         Positioned(
-                          bottom:
-                              96, // Raised to ensure full visibility above the tab bar
+                          bottom: 96, // Added cushion below group profile info
                           left: 0,
                           right: 0,
                           child: Padding(
@@ -451,33 +450,36 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
                     ),
                   ),
                   bottom: PreferredSize(
-                    preferredSize: const Size.fromHeight(48),
+                    preferredSize: const Size.fromHeight(60),
                     child: Container(
                       color: Colors.white,
-                      child: TabBar(
-                        isScrollable: false,
-                        tabAlignment: TabAlignment.fill,
-                        labelColor: const Color(0xFF667EEA),
-                        unselectedLabelColor: Colors.black54,
-                        indicatorColor: const Color(0xFF667EEA),
-                        indicatorWeight: 3,
-                        labelStyle: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: TabBar(
+                          isScrollable: false,
+                          tabAlignment: TabAlignment.fill,
+                          labelColor: const Color(0xFF667EEA),
+                          unselectedLabelColor: Colors.black54,
+                          indicatorColor: const Color(0xFF667EEA),
+                          indicatorWeight: 3,
+                          labelStyle: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                          unselectedLabelStyle: const TextStyle(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 15,
+                          ),
+                          labelPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          tabs: const [
+                            Tab(text: 'Feed'),
+                            Tab(text: 'Members'),
+                            Tab(text: 'About'),
+                          ],
                         ),
-                        unselectedLabelStyle: const TextStyle(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 15,
-                        ),
-                        labelPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        tabs: const [
-                          Tab(text: 'Feed'),
-                          Tab(text: 'Members'),
-                          Tab(text: 'About'),
-                        ],
                       ),
                     ),
                   ),

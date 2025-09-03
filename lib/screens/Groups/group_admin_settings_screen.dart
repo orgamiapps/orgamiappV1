@@ -3,8 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/models/organization_model.dart';
 import 'package:attendus/screens/Groups/edit_group_details_screen.dart';
-import 'package:attendus/screens/Groups/manage_feed_posts_screen.dart';
-import 'package:attendus/screens/Groups/manage_members_screen.dart';
 
 class GroupAdminSettingsScreen extends StatefulWidget {
   final String organizationId;
@@ -156,15 +154,9 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
           _buildSectionCard('Group Information', Icons.info_outline, [
             _buildSettingTile(
               'Edit Group Details',
-              'Change name, description, category',
+              'Change name, description, category, images',
               Icons.edit,
               () => _editGroupDetails(),
-            ),
-            _buildSettingTile(
-              'Manage Images',
-              'Update logo and banner images',
-              Icons.image,
-              () => _manageImages(),
             ),
             _buildSettingTile(
               'Location Settings',
@@ -353,17 +345,7 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
     ).then((_) => _checkAdminAndLoadData());
   }
 
-  void _manageImages() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ManageGroupImagesScreen(
-          organizationId: widget.organizationId,
-          organization: _organization!,
-        ),
-      ),
-    ).then((_) => _checkAdminAndLoadData());
-  }
+
 
   void _editLocation() {
     Navigator.push(
@@ -477,24 +459,7 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
 // Import the actual implementation
 // The EditGroupDetailsScreen is implemented in edit_group_details_screen.dart
 
-class ManageGroupImagesScreen extends StatelessWidget {
-  final String organizationId;
-  final OrganizationModel organization;
 
-  const ManageGroupImagesScreen({
-    super.key,
-    required this.organizationId,
-    required this.organization,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Manage Images')),
-      body: const Center(child: Text('Manage Images Screen')),
-    );
-  }
-}
 
 class EditGroupLocationScreen extends StatelessWidget {
   final String organizationId;

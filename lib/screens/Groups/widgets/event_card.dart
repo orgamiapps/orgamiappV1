@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/models/event_model.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/Utils/cached_image.dart';
 
@@ -61,6 +62,24 @@ class EventCard extends StatelessWidget {
     final location = data['selectedLocation'] ?? data['location'] ?? '';
     final imageUrl = data['imageUrl'] ?? '';
     final creatorName = data['customerName'] ?? 'Unknown';
+
+    Future<String> _resolveCreatorName() async {
+      final raw = creatorName.toString().trim();
+      if (raw.isNotEmpty && raw.toLowerCase() != 'unknown') return raw;
+      final String? creatorId = data['customerUid'] ?? data['authorId'];
+      if (creatorId != null && creatorId.isNotEmpty) {
+        final user = await FirebaseFirestoreHelper().getSingleCustomer(
+          customerId: creatorId,
+        );
+        if (user != null) {
+          final resolved = user.name.trim().isNotEmpty
+              ? user.name
+              : (user.username ?? '').trim();
+          if (resolved.isNotEmpty) return resolved;
+        }
+      }
+      return 'Unknown';
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -312,12 +331,19 @@ class EventCard extends StatelessWidget {
                   // Creator info
                   Row(
                     children: [
-                      Text(
-                        'by $creatorName',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade500,
-                        ),
+                      FutureBuilder<String>(
+                        future: _resolveCreatorName(),
+                        builder: (context, snapshot) {
+                          final displayName = (snapshot.data ?? creatorName)
+                              .trim();
+                          return Text(
+                            'by ${displayName.isNotEmpty ? displayName : 'Unknown'}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade500,
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),

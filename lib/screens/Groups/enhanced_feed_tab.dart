@@ -11,7 +11,7 @@ import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 import 'package:attendus/Utils/cached_image.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/controller/customer_controller.dart';
-import 'package:attendus/screens/Groups/widgets/event_card.dart';
+import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
 
 class EnhancedFeedTab extends StatefulWidget {
   final String organizationId;
@@ -27,10 +27,10 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
   String _selectedFilter = 'All';
   final List<String> _filterOptions = [
     'All',
+    'Events',
     'Announcements',
     'Polls',
     'Photos',
-    'Events',
   ];
 
   Future<bool> _checkIfAdmin() async {
@@ -398,11 +398,21 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                               // Display event as a card
                               final doc = item['doc'] as DocumentSnapshot;
                               final data = doc.data() as Map<String, dynamic>;
-                              return EventCard(
-                                data: data,
-                                docId: doc.id,
-                                organizationId: widget.organizationId,
-                                isAdmin: isAdmin,
+                              final eventModel = EventModel.fromJson({
+                                ...data,
+                                'id': doc.id,
+                                'groupName':
+                                    data['groupName'] ??
+                                    data['customerName'] ??
+                                    data['organizationName'] ??
+                                    'Organizer',
+                                'customerUid':
+                                    data['customerUid'] ??
+                                    data['authorId'] ??
+                                    '',
+                              });
+                              return SingleEventListViewItem(
+                                eventModel: eventModel,
                               );
                             } else if (item['type'] == 'feed') {
                               final doc = item['doc'] as DocumentSnapshot;
@@ -797,6 +807,24 @@ class _PhotoPostCard extends StatelessWidget {
     final authorRole = data['authorRole'] ?? 'member';
     final createdAt = data['createdAt'] as Timestamp?;
 
+    Future<String> _resolveAuthorName() async {
+      final raw = authorName.toString().trim();
+      if (raw.isNotEmpty && raw.toLowerCase() != 'unknown') return raw;
+      final String? authorId = data['authorId'];
+      if (authorId != null && authorId.isNotEmpty) {
+        final user = await FirebaseFirestoreHelper().getSingleCustomer(
+          customerId: authorId,
+        );
+        if (user != null) {
+          final resolved = user.name.trim().isNotEmpty
+              ? user.name
+              : (user.username ?? '').trim();
+          if (resolved.isNotEmpty) return resolved;
+        }
+      }
+      return 'Unknown';
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -843,92 +871,126 @@ class _PhotoPostCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                GestureDetector(
-                  onTap: () async {
-                    final authorId = data['authorId'];
-                    if (authorId == null) return;
-                    try {
-                      final user = await FirebaseFirestoreHelper()
-                          .getSingleCustomer(customerId: authorId);
-                      if (user == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('User not found')),
-                        );
-                        return;
-                      }
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => UserProfileScreen(
-                            user: user,
-                            isOwnProfile:
-                                CustomerController.logeInCustomer?.uid ==
-                                user.uid,
-                          ),
-                        ),
-                      );
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error loading profile: $e')),
-                      );
-                    }
-                  },
-                  child: CircleAvatar(
-                    radius: 20,
-                    backgroundColor: const Color(0xFF667EEA),
-                    child: Text(
-                      authorName[0].toUpperCase(),
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                  child: FutureBuilder<String>(
+                    future: _resolveAuthorName(),
+                    builder: (context, snapshot) {
+                      final displayName = (snapshot.data ?? authorName).trim();
+                      return Row(
                         children: [
-                          Text(
-                            authorName,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
-                          if (authorRole == 'admin' ||
-                              authorRole == 'owner') ...[
-                            const SizedBox(width: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF667EEA).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
+                          GestureDetector(
+                            onTap: () async {
+                              final authorId = data['authorId'];
+                              if (authorId == null) return;
+                              try {
+                                final user = await FirebaseFirestoreHelper()
+                                    .getSingleCustomer(customerId: authorId);
+                                if (user == null) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('User not found'),
+                                      ),
+                                    );
+                                  }
+                                  return;
+                                }
+                                if (context.mounted) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => UserProfileScreen(
+                                        user: user,
+                                        isOwnProfile:
+                                            CustomerController
+                                                .logeInCustomer
+                                                ?.uid ==
+                                            user.uid,
+                                      ),
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Error loading profile: $e',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                            child: CircleAvatar(
+                              radius: 20,
+                              backgroundColor: const Color(0xFF667EEA),
                               child: Text(
-                                authorRole.toUpperCase(),
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  color: Color(0xFF667EEA),
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                displayName.isNotEmpty
+                                    ? displayName[0].toUpperCase()
+                                    : 'U',
+                                style: const TextStyle(color: Colors.white),
                               ),
                             ),
-                          ],
-                        ],
-                      ),
-                      if (createdAt != null)
-                        Text(
-                          _getTimeAgo(createdAt.toDate()),
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 12,
                           ),
-                        ),
-                    ],
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      displayName.isNotEmpty
+                                          ? displayName
+                                          : 'Unknown',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    if (authorRole == 'admin' ||
+                                        authorRole == 'owner') ...[
+                                      const SizedBox(width: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(
+                                            0xFF667EEA,
+                                          ).withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          authorRole.toUpperCase(),
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            color: Color(0xFF667EEA),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                if (createdAt != null)
+                                  Text(
+                                    _getTimeAgo(createdAt.toDate()),
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
                 if (isAdmin)
@@ -1201,6 +1263,24 @@ class _AnnouncementCard extends StatelessWidget {
     final createdAt = data['createdAt'] as Timestamp?;
     final likes = List<String>.from(data['likes'] ?? []);
 
+    Future<String> _resolveAuthorName() async {
+      final raw = authorName.toString().trim();
+      if (raw.isNotEmpty && raw.toLowerCase() != 'unknown') return raw;
+      final String? authorId = data['authorId'];
+      if (authorId != null && authorId.isNotEmpty) {
+        final user = await FirebaseFirestoreHelper().getSingleCustomer(
+          customerId: authorId,
+        );
+        if (user != null) {
+          final resolved = user.name.trim().isNotEmpty
+              ? user.name
+              : (user.username ?? '').trim();
+          if (resolved.isNotEmpty) return resolved;
+        }
+      }
+      return 'Unknown';
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -1343,27 +1423,42 @@ class _AnnouncementCard extends StatelessWidget {
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    CircleAvatar(
-                      radius: 16,
-                      backgroundColor: const Color(0xFF667EEA).withOpacity(0.1),
-                      child: Text(
-                        authorName.isNotEmpty
-                            ? authorName[0].toUpperCase()
-                            : 'A',
-                        style: const TextStyle(
-                          color: Color(0xFF667EEA),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      authorName.isNotEmpty ? authorName : 'Anonymous',
-                      style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontSize: 12,
-                      ),
+                    FutureBuilder<String>(
+                      future: _resolveAuthorName(),
+                      builder: (context, snapshot) {
+                        final displayName = (snapshot.data ?? authorName)
+                            .trim();
+                        return Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 16,
+                              backgroundColor: const Color(
+                                0xFF667EEA,
+                              ).withOpacity(0.1),
+                              child: Text(
+                                displayName.isNotEmpty
+                                    ? displayName[0].toUpperCase()
+                                    : 'A',
+                                style: const TextStyle(
+                                  color: Color(0xFF667EEA),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              displayName.isNotEmpty
+                                  ? displayName
+                                  : 'Anonymous',
+                              style: TextStyle(
+                                color: Colors.grey.shade700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(width: 8),
                     Text('•', style: TextStyle(color: Colors.grey.shade400)),
@@ -1465,6 +1560,24 @@ class _PollCard extends StatelessWidget {
     final hasVoted = currentUserId != null && voters.contains(currentUserId);
     final authorName = data['authorName'] ?? 'Unknown';
     final createdAt = data['createdAt'] as Timestamp?;
+
+    Future<String> _resolveAuthorName() async {
+      final raw = authorName.toString().trim();
+      if (raw.isNotEmpty && raw.toLowerCase() != 'unknown') return raw;
+      final String? authorId = data['authorId'];
+      if (authorId != null && authorId.isNotEmpty) {
+        final user = await FirebaseFirestoreHelper().getSingleCustomer(
+          customerId: authorId,
+        );
+        if (user != null) {
+          final resolved = user.name.trim().isNotEmpty
+              ? user.name
+              : (user.username ?? '').trim();
+          if (resolved.isNotEmpty) return resolved;
+        }
+      }
+      return 'Unknown';
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -1712,12 +1825,19 @@ class _PollCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text('•', style: TextStyle(color: Colors.grey.shade400)),
                     const SizedBox(width: 8),
-                    Text(
-                      'by $authorName',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 12,
-                      ),
+                    FutureBuilder<String>(
+                      future: _resolveAuthorName(),
+                      builder: (context, snapshot) {
+                        final displayName = (snapshot.data ?? authorName)
+                            .trim();
+                        return Text(
+                          'by ${displayName.isNotEmpty ? displayName : 'Unknown'}',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 12,
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
