@@ -921,6 +921,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
                   final org = _myOrgs[index];
                   final orgId = org['id'] ?? '';
                   final orgName = org['name'] ?? 'Group';
+                  final logoUrl = (org['logoUrl'] ?? '').toString();
                   final selected = _selectedOrgId == orgId;
                   return Container(
                     decoration: BoxDecoration(
@@ -944,12 +945,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
                         horizontal: 12,
                         vertical: 6,
                       ),
-                      leading: CircleAvatar(
-                        backgroundColor: isDark
-                            ? const Color(0xFF4A90E2)
-                            : AppThemeColor.lightBlueColor,
-                        child: const Icon(Icons.group, color: Colors.white),
-                      ),
+                      leading: _buildOrgAvatar(logoUrl, isDark),
                       title: Text(
                         orgName,
                         style: TextStyle(
@@ -1004,6 +1000,24 @@ class _NewMessageScreenState extends State<NewMessageScreen>
             ),
         ],
       ),
+    );
+  }
+
+  Widget _buildOrgAvatar(String logoUrl, bool isDark) {
+    final bgColor = isDark
+        ? const Color(0xFF4A90E2)
+        : AppThemeColor.lightBlueColor;
+    if (logoUrl.isEmpty) {
+      return CircleAvatar(
+        backgroundColor: bgColor,
+        child: const Icon(Icons.group, color: Colors.white),
+      );
+    }
+    return CircleAvatar(
+      backgroundColor: bgColor,
+      foregroundImage: NetworkImage(logoUrl),
+      onForegroundImageError: (_, __) {},
+      child: const Icon(Icons.group, color: Colors.white),
     );
   }
 

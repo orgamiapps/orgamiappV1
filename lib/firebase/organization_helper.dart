@@ -50,7 +50,8 @@ class OrganizationHelper {
         if (!doc.exists) continue;
         final data = doc.data()!;
         final String name = (data['name'] ?? data['title'] ?? '').toString();
-        list.add({'id': doc.id, 'name': name});
+        final String? logo = data['logoUrl']?.toString();
+        list.add({'id': doc.id, 'name': name, 'logoUrl': logo ?? ''});
       }
       list.sort(
         (a, b) => (a['name'] ?? '').toLowerCase().compareTo(
@@ -94,19 +95,21 @@ class OrganizationHelper {
       if (orgIds.isEmpty) return [];
 
       // Fetch all organizations in parallel
-      final futures = orgIds.map((id) => 
-        _firestore
-          .collection('Organizations')
-          .doc(id)
-          .get()
-          .timeout(
-            const Duration(seconds: 2),
-            onTimeout: () {
-              Logger.warning('Organization fetch timeout for $id');
-              throw Exception('Fetch timeout');
-            },
+      final futures = orgIds
+          .map(
+            (id) => _firestore
+                .collection('Organizations')
+                .doc(id)
+                .get()
+                .timeout(
+                  const Duration(seconds: 2),
+                  onTimeout: () {
+                    Logger.warning('Organization fetch timeout for $id');
+                    throw Exception('Fetch timeout');
+                  },
+                ),
           )
-      ).toList();
+          .toList();
 
       // Wait for all with error handling
       final List<Map<String, String>> result = [];
@@ -115,11 +118,13 @@ class OrganizationHelper {
           futures,
           eagerError: false, // Don't fail all if one fails
         );
-        
+
         for (final orgSnap in orgDocs) {
           if (orgSnap.exists) {
-            final name = orgSnap.data()!['name']?.toString() ?? '';
-            result.add({'id': orgSnap.id, 'name': name});
+            final data = orgSnap.data()!;
+            final String name = data['name']?.toString() ?? '';
+            final String logo = data['logoUrl']?.toString() ?? '';
+            result.add({'id': orgSnap.id, 'name': name, 'logoUrl': logo});
           }
         }
       } catch (e) {
@@ -128,12 +133,12 @@ class OrganizationHelper {
       }
 
       // Sort by name
-      result.sort((a, b) => 
-        (a['name'] ?? '').toLowerCase().compareTo(
-          (b['name'] ?? '').toLowerCase()
-        )
+      result.sort(
+        (a, b) => (a['name'] ?? '').toLowerCase().compareTo(
+          (b['name'] ?? '').toLowerCase(),
+        ),
       );
-      
+
       return result;
     } catch (e) {
       Logger.error('getUserOrganizationsLite failed: $e');
