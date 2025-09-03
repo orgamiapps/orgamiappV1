@@ -130,6 +130,22 @@
         { "fieldPath": "category_lowercase", "order": "ASCENDING" },
         { "fieldPath": "name_lowercase", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "Events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationId", "order": "ASCENDING" },
+        { "fieldPath": "selectedDateTime", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "Events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationId", "order": "ASCENDING" },
+        { "fieldPath": "selectedDateTime", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

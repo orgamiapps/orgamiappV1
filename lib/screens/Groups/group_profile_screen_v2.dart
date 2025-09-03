@@ -11,6 +11,8 @@ import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/screens/Events/create_event_screen.dart';
 import 'package:attendus/screens/Groups/create_announcement_screen.dart';
 import 'package:attendus/screens/Groups/create_poll_screen.dart';
+import 'package:attendus/screens/Groups/create_photo_post_screen.dart';
+import 'package:attendus/screens/Groups/enhanced_feed_tab.dart';
 import 'package:attendus/screens/Groups/group_admin_settings_screen.dart';
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 import 'package:attendus/models/customer_model.dart';
@@ -137,10 +139,68 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
     await Share.share('Check out $name on Orgami!\n$description');
   }
 
+  Widget _buildDefaultBanner(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color(0xFF667EEA), // Primary blue
+            Color(0xFF764BA2), // Purple accent
+            Color(0xFF8B5FBF), // Deeper purple
+          ],
+          stops: [0.0, 0.7, 1.0],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Stack(
+        children: [
+          // Subtle geometric pattern overlay
+          Positioned.fill(
+            child: CustomPaint(painter: _GeometricPatternPainter()),
+          ),
+          // Elegant gradient overlay for depth
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withOpacity(0.05),
+                  Colors.transparent,
+                ],
+                stops: const [0.0, 0.5, 1.0],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+          ),
+          // Subtle light reflection effect
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 100, // Adjusted to be proportional to header height
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.white.withOpacity(0.15), Colors.transparent],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4,
+      length: 3,
       child: StreamBuilder<DocumentSnapshot>(
         stream: _db
             .collection('Organizations')
@@ -159,7 +219,8 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
                 SliverAppBar(
                   pinned: true,
                   floating: false,
-                  expandedHeight: 300,
+                  expandedHeight:
+                      320, // Increased to accommodate all header elements
                   collapsedHeight:
                       kToolbarHeight + 48, // Account for tab bar height
                   elevation: 0,
@@ -183,184 +244,210 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
                   ],
                   flexibleSpace: FlexibleSpaceBar(
                     collapseMode: CollapseMode.pin,
-                    background: Container(
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        image: bannerUrl != null
-                            ? DecorationImage(
-                                image: NetworkImage(bannerUrl),
-                                fit: BoxFit.cover,
-                                colorFilter: ColorFilter.mode(
-                                  Colors.black.withOpacity(0.3),
-                                  BlendMode.darken,
-                                ),
-                              )
-                            : null,
-                      ),
-                      child: SafeArea(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Container(
-                                    margin: const EdgeInsets.only(top: 8),
-                                    child: CircleAvatar(
-                                      radius: 36,
-                                      backgroundColor: Colors.white,
-                                      backgroundImage: logoUrl != null
-                                          ? NetworkImage(logoUrl)
-                                          : null,
-                                      child: logoUrl == null
-                                          ? const Icon(
-                                              Icons.apartment,
-                                              size: 32,
-                                              color: Color(0xFF667EEA),
-                                            )
-                                          : null,
+                    background: Stack(
+                      children: [
+                        // Default banner or custom banner
+                        Container(
+                          decoration: BoxDecoration(
+                            image: bannerUrl != null
+                                ? DecorationImage(
+                                    image: NetworkImage(bannerUrl),
+                                    fit: BoxFit.cover,
+                                    colorFilter: ColorFilter.mode(
+                                      Colors.black.withOpacity(0.3),
+                                      BlendMode.darken,
                                     ),
+                                  )
+                                : null,
+                          ),
+                          child: bannerUrl == null
+                              ? _buildDefaultBanner(context)
+                              : null,
+                        ),
+                        // Gradient overlay for better text visibility
+                        Positioned(
+                          bottom: 48, // Start from tab bar height
+                          left: 0,
+                          right: 0,
+                          height:
+                              160, // Increased height for better gradient coverage
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withOpacity(0.2),
+                                  Colors.black.withOpacity(0.4),
+                                ],
+                                stops: const [0.0, 0.6, 1.0],
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Group info overlay
+                        Positioned(
+                          bottom:
+                              96, // Raised to ensure full visibility above the tab bar
+                          left: 0,
+                          right: 0,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                CircleAvatar(
+                                  radius:
+                                      22, // Slightly reduced to avoid clipping
+                                  backgroundColor: Colors.white,
+                                  backgroundImage: logoUrl != null
+                                      ? NetworkImage(logoUrl)
+                                      : null,
+                                  child: logoUrl == null
+                                      ? const Icon(
+                                          Icons.apartment,
+                                          size: 20, // Proportionally reduced
+                                          color: Color(0xFF667EEA),
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(width: 12), // Reduced from 16
+                                Expanded(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        name.isEmpty ? 'Group' : name,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 18, // Further reduced
+                                          fontWeight: FontWeight.w700,
+                                          shadows: [
+                                            Shadow(
+                                              offset: Offset(0, 1),
+                                              blurRadius: 3,
+                                              color: Colors.black26,
+                                            ),
+                                          ],
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(
+                                        height: 1,
+                                      ), // Minimal spacing
+                                      Text(
+                                        category,
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 12, // Further reduced
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Container(
-                                      margin: const EdgeInsets.only(top: 8),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            name.isEmpty ? 'Group' : name,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 24,
-                                              fontWeight: FontWeight.w700,
-                                              shadows: [
-                                                Shadow(
-                                                  offset: Offset(0, 1),
-                                                  blurRadius: 3,
-                                                  color: Colors.black26,
-                                                ),
-                                              ],
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            category,
-                                            style: const TextStyle(
-                                              color: Colors.white70,
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ],
+                                ),
+                                if (!_isMember && !_checkingMembership) ...[
+                                  const SizedBox(width: 8), // Reduced from 12
+                                  Container(
+                                    child: FilledButton(
+                                      onPressed: _hasRequestedJoin
+                                          ? null
+                                          : _requestToJoin,
+                                      style: FilledButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 6,
+                                        ), // Compact padding
+                                        backgroundColor: _hasRequestedJoin
+                                            ? Colors.grey.shade400
+                                            : Colors.white,
+                                        foregroundColor: _hasRequestedJoin
+                                            ? Colors.white
+                                            : const Color(0xFF667EEA),
+                                        disabledBackgroundColor:
+                                            Colors.grey.shade400,
+                                        disabledForegroundColor: Colors.white,
+                                      ),
+                                      child: Text(
+                                        _hasRequestedJoin
+                                            ? 'Requested'
+                                            : 'Join',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                  if (!_isMember && !_checkingMembership) ...[
-                                    const SizedBox(width: 12),
-                                    Container(
-                                      margin: const EdgeInsets.only(top: 8),
-                                      child: FilledButton(
-                                        onPressed: _hasRequestedJoin
-                                            ? null
-                                            : _requestToJoin,
-                                        style: FilledButton.styleFrom(
-                                          backgroundColor: _hasRequestedJoin
-                                              ? Colors.grey.shade400
-                                              : Colors.white,
-                                          foregroundColor: _hasRequestedJoin
-                                              ? Colors.white
-                                              : const Color(0xFF667EEA),
-                                          disabledBackgroundColor:
-                                              Colors.grey.shade400,
-                                          disabledForegroundColor: Colors.white,
+                                ] else if (_isMember &&
+                                    !_checkingMembership) ...[
+                                  const SizedBox(width: 8), // Reduced from 12
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, // Further reduced
+                                      vertical: 3, // Further reduced
+                                    ),
+                                    decoration: BoxDecoration(
+                                      gradient:
+                                          _memberRole == 'Owner' ||
+                                              _memberRole == 'Admin'
+                                          ? LinearGradient(
+                                              colors: [
+                                                Colors.amber.shade400,
+                                                Colors.orange.shade400,
+                                              ],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            )
+                                          : null,
+                                      color:
+                                          _memberRole == 'Owner' ||
+                                              _memberRole == 'Admin'
+                                          ? null
+                                          : Colors.white.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.3),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          _memberRole == 'Owner'
+                                              ? Icons.star
+                                              : _memberRole == 'Admin'
+                                              ? Icons.shield
+                                              : Icons.check_circle,
+                                          size: 12, // Further reduced
+                                          color: Colors.white,
                                         ),
-                                        child: Text(
-                                          _hasRequestedJoin
-                                              ? 'Requested'
-                                              : 'Join',
+                                        const SizedBox(
+                                          width: 3,
+                                        ), // Reduced spacing
+                                        Text(
+                                          _memberRole.isEmpty
+                                              ? 'Member'
+                                              : _memberRole,
                                           style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 11, // Further reduced
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
-                                      ),
+                                      ],
                                     ),
-                                  ] else if (_isMember &&
-                                      !_checkingMembership) ...[
-                                    const SizedBox(width: 12),
-                                    Container(
-                                      margin: const EdgeInsets.only(top: 8),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        gradient:
-                                            _memberRole == 'Owner' ||
-                                                _memberRole == 'Admin'
-                                            ? LinearGradient(
-                                                colors: [
-                                                  Colors.amber.shade400,
-                                                  Colors.orange.shade400,
-                                                ],
-                                                begin: Alignment.topLeft,
-                                                end: Alignment.bottomRight,
-                                              )
-                                            : null,
-                                        color:
-                                            _memberRole == 'Owner' ||
-                                                _memberRole == 'Admin'
-                                            ? null
-                                            : Colors.white.withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(
-                                          color: Colors.white.withOpacity(0.3),
-                                          width: 1,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            _memberRole == 'Owner'
-                                                ? Icons.star
-                                                : _memberRole == 'Admin'
-                                                ? Icons.shield
-                                                : Icons.check_circle,
-                                            size: 16,
-                                            color: Colors.white,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            _memberRole.isEmpty
-                                                ? 'Member'
-                                                : _memberRole,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ],
-                              ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                   bottom: PreferredSize(
@@ -388,7 +475,6 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
                         ),
                         tabs: const [
                           Tab(text: 'Feed'),
-                          Tab(text: 'Events'),
                           Tab(text: 'Members'),
                           Tab(text: 'About'),
                         ],
@@ -399,8 +485,7 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
               ],
               body: TabBarView(
                 children: [
-                  _FeedTab(organizationId: widget.organizationId),
-                  _EventsTab(organizationId: widget.organizationId),
+                  EnhancedFeedTab(organizationId: widget.organizationId),
                   _MembersTab(organizationId: widget.organizationId),
                   _AboutTab(organizationId: widget.organizationId),
                 ],
@@ -1845,6 +1930,7 @@ class _AboutTab extends StatelessWidget {
             .collection('Events')
             .where('organizationId', isEqualTo: organizationId)
             .get(),
+        _getAttendanceDataForOrganization(organizationId),
       ]),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -1863,6 +1949,7 @@ class _AboutTab extends StatelessWidget {
         final orgSnapshot = snapshot.data![0] as DocumentSnapshot;
         final membersSnapshot = snapshot.data![1] as QuerySnapshot;
         final eventsSnapshot = snapshot.data![2] as QuerySnapshot;
+        final totalAttendees = snapshot.data![3] as int;
 
         final data = orgSnapshot.data() as Map<String, dynamic>?;
         final description = (data?['description'] ?? '').toString();
@@ -1961,12 +2048,13 @@ class _AboutTab extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _buildStatCard(
+                    child: _buildStatCardWithDynamicText(
                       context,
-                      'Past Events',
-                      (eventCount - activeEvents).toString(),
-                      Icons.history_outlined,
-                      const Color(0xFF757575),
+                      'Total Attendees',
+                      totalAttendees.toString(),
+                      Icons.people_alt_outlined,
+                      const Color(0xFFFF6B6B),
+                      totalAttendees,
                     ),
                   ),
                 ],
@@ -2025,6 +2113,56 @@ class _AboutTab extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<int> _getAttendanceDataForOrganization(String organizationId) async {
+    try {
+      // First get all events for this organization
+      final eventsSnapshot = await FirebaseFirestore.instance
+          .collection('Events')
+          .where('organizationId', isEqualTo: organizationId)
+          .get();
+
+      if (eventsSnapshot.docs.isEmpty) {
+        return 0;
+      }
+
+      // Get all event IDs
+      final eventIds = eventsSnapshot.docs.map((doc) => doc.id).toList();
+
+      // Get all attendance records for these events
+      final Set<String> uniqueAttendees = {};
+
+      // Process events in batches to avoid Firestore limits
+      const batchSize = 10;
+      for (int i = 0; i < eventIds.length; i += batchSize) {
+        final batch = eventIds.skip(i).take(batchSize).toList();
+
+        final attendanceSnapshot = await FirebaseFirestore.instance
+            .collection('Attendance')
+            .where('eventId', whereIn: batch)
+            .get();
+
+        // Add unique customer UIDs (excluding anonymous and without_login users)
+        for (var doc in attendanceSnapshot.docs) {
+          final data = doc.data();
+          final customerUid = data['customerUid']?.toString();
+          final isAnonymous = data['isAnonymous'] ?? false;
+
+          if (customerUid != null &&
+              customerUid != 'without_login' &&
+              !isAnonymous &&
+              customerUid.isNotEmpty) {
+            uniqueAttendees.add(customerUid);
+          }
+        }
+      }
+
+      return uniqueAttendees.length;
+    } catch (e) {
+      debugPrint('Error getting attendance data: $e');
+      return 0;
+    }
   }
 
   Widget _buildSection(
@@ -2123,6 +2261,64 @@ class _AboutTab extends StatelessWidget {
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
               color: theme.textTheme.headlineSmall?.color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatCardWithDynamicText(
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+    int numericValue,
+  ) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    // Dynamic font size based on number of digits
+    double getFontSize() {
+      if (numericValue < 10) return 28.0; // Single digit: largest
+      if (numericValue < 100) return 26.0; // Two digits: large
+      if (numericValue < 1000) return 24.0; // Three digits: medium
+      if (numericValue < 10000) return 22.0; // Four digits: smaller
+      return 20.0; // Five+ digits: smallest
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey[850] : Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 8),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.textTheme.headlineSmall?.color,
+                fontSize: getFontSize(),
+              ),
             ),
           ),
           const SizedBox(height: 4),
@@ -2403,15 +2599,16 @@ class _AdminFab extends StatefulWidget {
 
 class _AdminFabState extends State<_AdminFab> {
   bool _isAdmin = false;
+  bool _isMember = false;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _checkAdminStatus();
+    _checkMembershipStatus();
   }
 
-  Future<void> _checkAdminStatus() async {
+  Future<void> _checkMembershipStatus() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       setState(() => _isLoading = false);
@@ -2431,12 +2628,13 @@ class _AdminFabState extends State<_AdminFab> {
       if (createdBy == user.uid) {
         setState(() {
           _isAdmin = true;
+          _isMember = true;
           _isLoading = false;
         });
         return;
       }
 
-      // Check if user is admin in Members collection
+      // Check if user is a member
       final memberDoc = await FirebaseFirestore.instance
           .collection('Organizations')
           .doc(widget.organizationId)
@@ -2448,6 +2646,7 @@ class _AdminFabState extends State<_AdminFab> {
         final role = memberDoc.data()?['role'];
         setState(() {
           _isAdmin = role == 'admin' || role == 'owner';
+          _isMember = true;
           _isLoading = false;
         });
       } else {
@@ -2459,16 +2658,6 @@ class _AdminFabState extends State<_AdminFab> {
   }
 
   void _showCreateOptions(BuildContext context) {
-    if (!_isAdmin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Only group admins can create content'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -2488,83 +2677,111 @@ class _AdminFabState extends State<_AdminFab> {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
+            // Photo sharing available to all members
             ListTile(
-              leading: const Icon(Icons.event, color: Color(0xFF667EEA)),
-              title: const Text('Create Event'),
-              subtitle: const Text('Schedule a new event for this group'),
+              leading: const Icon(Icons.photo_camera, color: Color(0xFF667EEA)),
+              title: const Text('Share Photo'),
+              subtitle: const Text('Post photos to share with the group'),
               onTap: () async {
                 Navigator.pop(context);
-                // Navigate to create event screen with preselected organization
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => CreateEventScreen(
-                      selectedLocation: const LatLng(0, 0), // Default location
-                      radios: 100, // Default radius
-                      preselectedOrganizationId: widget.organizationId,
-                      forceOrganizationEvent: true,
-                    ),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.announcement, color: Color(0xFF667EEA)),
-              title: const Text('Post Announcement'),
-              subtitle: const Text('Share important updates with members'),
-              onTap: () async {
-                Navigator.pop(context);
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CreateAnnouncementScreen(
+                    builder: (_) => CreatePhotoPostScreen(
                       organizationId: widget.organizationId,
                     ),
                   ),
                 );
-                if (result == true && context.mounted) {
-                  // Feed will auto-refresh via stream
-                }
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.poll, color: Color(0xFF667EEA)),
-              title: const Text('Create Poll'),
-              subtitle: const Text('Get feedback from group members'),
-              onTap: () async {
-                Navigator.pop(context);
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        CreatePollScreen(organizationId: widget.organizationId),
-                  ),
-                );
-                if (result == true && context.mounted) {
-                  // Feed will auto-refresh via stream
-                }
-              },
-            ),
-            const Divider(height: 32),
-            ListTile(
-              leading: const Icon(
-                Icons.admin_panel_settings,
-                color: Color(0xFF667EEA),
+            // Admin-only options
+            if (_isAdmin) ...[
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.event, color: Color(0xFF667EEA)),
+                title: const Text('Create Event'),
+                subtitle: const Text('Schedule a new event for this group'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  // Navigate to create event screen with preselected organization
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CreateEventScreen(
+                        selectedLocation: const LatLng(
+                          0,
+                          0,
+                        ), // Default location
+                        radios: 100, // Default radius
+                        preselectedOrganizationId: widget.organizationId,
+                        forceOrganizationEvent: true,
+                      ),
+                    ),
+                  );
+                },
               ),
-              title: const Text('Admin Settings'),
-              subtitle: const Text('Manage group settings and content'),
-              onTap: () async {
-                Navigator.pop(context);
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => GroupAdminSettingsScreen(
-                      organizationId: widget.organizationId,
+              ListTile(
+                leading: const Icon(
+                  Icons.announcement,
+                  color: Color(0xFF667EEA),
+                ),
+                title: const Text('Post Announcement'),
+                subtitle: const Text('Share important updates with members'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CreateAnnouncementScreen(
+                        organizationId: widget.organizationId,
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
+                  );
+                  if (result == true && context.mounted) {
+                    // Feed will auto-refresh via stream
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.poll, color: Color(0xFF667EEA)),
+                title: const Text('Create Poll'),
+                subtitle: const Text('Get feedback from group members'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CreatePollScreen(
+                        organizationId: widget.organizationId,
+                      ),
+                    ),
+                  );
+                  if (result == true && context.mounted) {
+                    // Feed will auto-refresh via stream
+                  }
+                },
+              ),
+              const Divider(height: 32),
+              ListTile(
+                leading: const Icon(
+                  Icons.admin_panel_settings,
+                  color: Color(0xFF667EEA),
+                ),
+                title: const Text('Admin Settings'),
+                subtitle: const Text('Manage group settings and content'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => GroupAdminSettingsScreen(
+                        organizationId: widget.organizationId,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
             const SizedBox(height: 20),
           ],
         ),
@@ -2578,15 +2795,15 @@ class _AdminFabState extends State<_AdminFab> {
       return const SizedBox.shrink();
     }
 
-    if (!_isAdmin) {
+    if (!_isMember) {
       return const SizedBox.shrink();
     }
 
     return FloatingActionButton.extended(
       onPressed: () => _showCreateOptions(context),
       backgroundColor: const Color(0xFF667EEA),
-      icon: const Icon(Icons.admin_panel_settings),
-      label: const Text('Manage Group'),
+      icon: Icon(_isAdmin ? Icons.admin_panel_settings : Icons.add),
+      label: Text(_isAdmin ? 'Manage Group' : 'Create Post'),
     );
   }
 }
@@ -2626,4 +2843,64 @@ class _EmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+// Custom painter for elegant geometric pattern
+class _GeometricPatternPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.08)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    final path = Path();
+
+    // Create subtle geometric lines inspired by Apple's design language
+    const spacing = 80.0;
+    const offset = 40.0;
+
+    // Diagonal lines creating a subtle diamond pattern
+    for (double i = -spacing; i < size.width + spacing; i += spacing) {
+      // Top-left to bottom-right diagonals
+      path.moveTo(i, 0);
+      path.lineTo(i + size.height, size.height);
+
+      // Top-right to bottom-left diagonals
+      path.moveTo(i + offset, 0);
+      path.lineTo(i + offset - size.height, size.height);
+    }
+
+    // Add some subtle curved elements for elegance
+    final curvePaint = Paint()
+      ..color = Colors.white.withOpacity(0.04)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    // Subtle curved arcs in corners
+    final arcPath = Path();
+
+    // Top-left arc
+    arcPath.addArc(
+      Rect.fromCircle(center: const Offset(-50, -50), radius: 120),
+      0,
+      1.57, // 90 degrees in radians
+    );
+
+    // Bottom-right arc
+    arcPath.addArc(
+      Rect.fromCircle(
+        center: Offset(size.width + 50, size.height + 50),
+        radius: 120,
+      ),
+      3.14, // 180 degrees
+      1.57, // 90 degrees
+    );
+
+    canvas.drawPath(path, paint);
+    canvas.drawPath(arcPath, curvePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
