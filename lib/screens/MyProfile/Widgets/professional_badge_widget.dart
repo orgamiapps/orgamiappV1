@@ -2,13 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'dart:io';
-import 'dart:ui' as ui;
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:flutter/rendering.dart';
-import 'package:cloud_functions/cloud_functions.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../models/badge_model.dart';
 import '../../../Utils/colors.dart';
 
@@ -19,7 +12,6 @@ class ProfessionalBadgeWidget extends StatefulWidget {
   final bool showActions;
   final VoidCallback? onShare;
   final VoidCallback? onDownload;
-  final bool enableFullScreenOnTap;
 
   const ProfessionalBadgeWidget({
     super.key,
@@ -29,7 +21,6 @@ class ProfessionalBadgeWidget extends StatefulWidget {
     this.showActions = true,
     this.onShare,
     this.onDownload,
-    this.enableFullScreenOnTap = true,
   });
 
   @override
@@ -123,11 +114,7 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
                             alignment: Alignment.topLeft,
                             child: card,
                           );
-                          if (!widget.enableFullScreenOnTap) return scaled;
-                          return GestureDetector(
-                            onTap: () => _openFullScreenBadge(context),
-                            child: scaled,
-                          );
+                          return scaled;
                         },
                       ),
                     ),
@@ -172,30 +159,6 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
             _buildHolographicEffect(),
           ],
         ),
-      ),
-    );
-  }
-
-  void _openFullScreenBadge(BuildContext context) {
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        opaque: false,
-        barrierColor: Colors.black.withValues(alpha: 0.85),
-        pageBuilder: (context, animation, secondaryAnimation) {
-          final scale = _uiScale(context);
-          return Scaffold(
-            backgroundColor: Colors.black.withValues(alpha: 0.85),
-            body: _FullScreenBadgeView(
-              badgeUid: widget.badge.uid,
-              baseScale: scale,
-              buildCard: _buildBadgeCard,
-              onClose: () => Navigator.of(context).pop(),
-            ),
-          );
-        },
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
       ),
     );
   }
@@ -654,233 +617,5 @@ class CompactBadgeWidget extends StatelessWidget {
       default:
         return const Color(0xFF9B59B6);
     }
-  }
-}
-
-class _FullScreenBadgeView extends StatefulWidget {
-  final String badgeUid;
-  final double baseScale;
-  final Widget Function() buildCard;
-  final VoidCallback? onClose;
-  const _FullScreenBadgeView({
-    required this.badgeUid,
-    required this.baseScale,
-    required this.buildCard,
-    this.onClose,
-  });
-
-  @override
-  State<_FullScreenBadgeView> createState() => _FullScreenBadgeViewState();
-}
-
-class _FullScreenBadgeViewState extends State<_FullScreenBadgeView> {
-  final TransformationController _tc = TransformationController();
-
-  @override
-  void dispose() {
-    _tc.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width - 32;
-    final height = width * (220 / 340);
-    return SafeArea(
-      child: Stack(
-        children: [
-          Center(
-            child: Hero(
-              tag: 'badge_fullscreen_${widget.badgeUid}',
-              child: InteractiveViewer(
-                transformationController: _tc,
-                minScale: 0.8,
-                maxScale: 3.0,
-                boundaryMargin: const EdgeInsets.all(48),
-                child: Material(
-                  color: Colors.transparent,
-                  child: Transform.scale(
-                    scale: widget.baseScale,
-                    child: SizedBox(
-                      width: width,
-                      height: height,
-                      child: widget.buildCard(),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // Top-right close
-          Positioned(
-            top: 8,
-            right: 8,
-            child: IconButton(
-              icon: const Icon(Icons.close, color: Colors.white),
-              onPressed: widget.onClose,
-              tooltip: 'Close',
-            ),
-          ),
-
-          // Bottom actions
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 16,
-            child: _ActionBar(
-              onShare: () async {
-                final file = await _exportBadgePngStatic(
-                  context,
-                  widget.buildCard,
-                  width,
-                  height,
-                );
-                await SharePlus.instance.share(
-                  ShareParams(
-                    text: 'My AttendUs badge',
-                    files: [XFile(file.path)],
-                  ),
-                );
-              },
-              onSave: () async {
-                final file = await _exportBadgePngStatic(
-                  context,
-                  widget.buildCard,
-                  width,
-                  height,
-                );
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Saved to: ${file.path}')),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<File> _exportBadgePngStatic(
-    BuildContext context,
-    Widget Function() builder,
-    double width,
-    double height,
-  ) async {
-    final repaintKey = GlobalKey();
-    final repaint = RepaintBoundary(
-      key: repaintKey,
-      child: SizedBox(width: width, height: height, child: builder()),
-    );
-
-    final overlay = Overlay.of(context);
-    final entry = OverlayEntry(
-      builder: (_) => Center(child: Opacity(opacity: 0.0, child: repaint)),
-    );
-    overlay.insert(entry);
-    await Future.delayed(const Duration(milliseconds: 16));
-    final boundary =
-        repaintKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
-    final image = await boundary.toImage(pixelRatio: 3.0);
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
-    final dir = await getTemporaryDirectory();
-    final file = File(
-      '${dir.path}/badge_${DateTime.now().millisecondsSinceEpoch}.png',
-    );
-    await file.writeAsBytes(data!.buffer.asUint8List());
-    entry.remove();
-    return file;
-  }
-}
-
-class _ActionBar extends StatelessWidget {
-  final VoidCallback onShare;
-  final VoidCallback onSave;
-  const _ActionBar({required this.onShare, required this.onSave});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _pillButton(icon: Icons.share, label: 'Share', onTap: onShare),
-          _pillButton(
-            icon: Icons.download_rounded,
-            label: 'Save',
-            onTap: onSave,
-          ),
-          _pillButton(
-            icon: Icons.account_balance_wallet_outlined,
-            label: 'Save to Wallet',
-            onTap: () async {
-              try {
-                // Determine platform hint
-                final platform = Theme.of(context).platform;
-                final isApple =
-                    platform == TargetPlatform.iOS ||
-                    platform == TargetPlatform.macOS;
-                final callable = FirebaseFunctions.instance.httpsCallable(
-                  'generateUserBadgePass',
-                );
-                final result = await callable.call({
-                  'uid':
-                      (ModalRoute.of(context)?.settings.arguments
-                          as Map?)?['uid'] ??
-                      '',
-                  'platform': isApple ? 'apple' : 'google',
-                });
-                final url = Uri.parse(result.data['url'] as String);
-                if (await canLaunchUrl(url)) {
-                  await launchUrl(url, mode: LaunchMode.externalApplication);
-                }
-              } catch (_) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Unable to add to wallet at this time.'),
-                    ),
-                  );
-                }
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _pillButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        child: Row(
-          children: [
-            Icon(icon, color: Colors.white, size: 18),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

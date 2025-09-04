@@ -10,11 +10,12 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:attendus/screens/MyProfile/my_tickets_screen.dart';
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
-import 'package:attendus/screens/MyProfile/badge_screen.dart';
 import 'package:attendus/screens/MyProfile/Widgets/professional_badge_widget.dart';
 import 'package:attendus/models/badge_model.dart';
 import 'package:attendus/Services/badge_service.dart';
 import 'package:attendus/screens/Home/account_details_screen.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -220,16 +221,132 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     }
   }
 
-  void _navigateToBadgeScreen() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => BadgeScreen(
-          userId: CustomerController.logeInCustomer?.uid,
-          isOwnBadge: true,
-        ),
+  void _showBadgeWalletModal(BuildContext context) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black.withValues(alpha: 0.9),
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return Scaffold(
+            backgroundColor: Colors.black.withValues(alpha: 0.9),
+            body: SafeArea(
+              child: Stack(
+                children: [
+                  // Full screen badge
+                  Center(
+                    child: Hero(
+                      tag: 'badge_photo_view',
+                      child: Container(
+                        margin: const EdgeInsets.all(32),
+                        child: ProfessionalBadgeWidget(
+                          badge: _userBadge!,
+                          width: MediaQuery.of(context).size.width - 64,
+                          height:
+                              (MediaQuery.of(context).size.width - 64) *
+                              (180 / 280),
+                          showActions: false,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Close button
+                  Positioned(
+                    top: 16,
+                    right: 16,
+                    child: IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.black.withValues(alpha: 0.5),
+                        shape: const CircleBorder(),
+                      ),
+                    ),
+                  ),
+
+                  // Save to Wallet button at bottom
+                  Positioned(
+                    left: 24,
+                    right: 24,
+                    bottom: 32,
+                    child: ElevatedButton(
+                      onPressed: () => _saveToWallet(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF667EEA),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        elevation: 8,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.account_balance_wallet_outlined,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Save to Wallet',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
       ),
     );
+  }
+
+  Future<void> _saveToWallet(BuildContext context) async {
+    try {
+      // Determine platform hint
+      final platform = Theme.of(context).platform;
+      final isApple =
+          platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
+
+      final callable = FirebaseFunctions.instance.httpsCallable(
+        'generateUserBadgePass',
+      );
+
+      final result = await callable.call({
+        'uid': CustomerController.logeInCustomer?.uid ?? '',
+        'platform': isApple ? 'apple' : 'google',
+      });
+
+      final url = Uri.parse(result.data['url'] as String);
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+        if (!context.mounted) return;
+        Navigator.pop(context);
+        ShowToast().showNormalToast(msg: 'Badge saved to wallet!');
+      }
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to add to wallet at this time.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   // Selection methods
@@ -862,39 +979,6 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                   ],
                 ),
               ),
-              GestureDetector(
-                onTap: _navigateToBadgeScreen,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF667EEA).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        'View Full Badge',
-                        style: TextStyle(
-                          color: Color(0xFF667EEA),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                          fontFamily: 'Roboto',
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.arrow_forward_ios,
-                        color: Color(0xFF667EEA),
-                        size: 12,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             ],
           ),
           AnimatedCrossFade(
@@ -903,7 +987,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                 const SizedBox(height: 16),
                 Center(
                   child: GestureDetector(
-                    onTap: _navigateToBadgeScreen,
+                    onTap: () => _showBadgeWalletModal(context),
                     child: LayoutBuilder(
                       builder: (context, constraints) {
                         final availableWidth = constraints.maxWidth;
