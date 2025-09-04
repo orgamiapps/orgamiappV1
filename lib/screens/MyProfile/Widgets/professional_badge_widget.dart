@@ -168,7 +168,6 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
             _buildGradientBackground(),
             _buildShimmerEffect(),
             _buildContrastOverlay(),
-            _buildCenterQr(),
             _buildBadgeContent(),
             _buildHolographicEffect(),
           ],
@@ -291,19 +290,19 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
 
   Widget _buildBadgeContent() {
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Expanded(
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 _buildProfileSection(),
-                const SizedBox(width: 16),
-                Expanded(child: _buildStatsSection()),
+                const SizedBox(width: 12),
+                Expanded(child: Center(child: _buildQrSection())),
               ],
             ),
           ),
@@ -314,50 +313,26 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
   }
 
   Widget _buildHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'ORGAMI',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: Colors.white.withValues(alpha: 0.98),
-                letterSpacing: 2,
-                shadows: _textShadows(),
-              ),
-            ),
-            Text(
-              'EVENT BADGE',
-              style: TextStyle(
-                fontSize: 9,
-                color: Colors.white.withValues(alpha: 0.9),
-                letterSpacing: 1.5,
-                shadows: _textShadows(small: true),
-              ),
-            ),
-          ],
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.35),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+        Text(
+          'ATTENDUS',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: Colors.white.withValues(alpha: 0.98),
+            letterSpacing: 2,
+            shadows: _textShadows(),
           ),
-          child: Text(
-            'ID: ${widget.badge.uid.substring(0, 8)}',
-            style: TextStyle(
-              fontSize: 8,
-              color: Colors.white.withValues(alpha: 0.9),
-              fontFamily: 'Courier',
-              letterSpacing: 0.5,
-              shadows: _textShadows(small: true),
-            ),
+        ),
+        Text(
+          'EVENT BADGE',
+          style: TextStyle(
+            fontSize: 9,
+            color: Colors.white.withValues(alpha: 0.9),
+            letterSpacing: 1.5,
+            shadows: _textShadows(small: true),
           ),
         ),
       ],
@@ -366,12 +341,13 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
 
   Widget _buildProfileSection() {
     final scale = _uiScale(context);
-    final avatarSize = 50.0 * scale;
-    final spacing = 6.0 * scale;
+    final avatarSize = 45.0 * scale;
+    final spacing = 4.0 * scale;
     return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 80, maxWidth: 120),
+      constraints: const BoxConstraints(minWidth: 70, maxWidth: 100),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
             width: avatarSize,
@@ -411,12 +387,12 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
           Text(
             widget.badge.userName,
             style: const TextStyle(
-              fontSize: 10,
+              fontSize: 9,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
             textAlign: TextAlign.center,
-            maxLines: 2,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
         ],
@@ -424,117 +400,104 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
     );
   }
 
-  Widget _buildStatsSection() {
-    // Align labels closer to their numeric chips on the right side
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        _buildRightAlignedStat(
-          'Events Created',
-          widget.badge.eventsCreated.toString(),
-        ),
-        _buildRightAlignedStat(
-          'Events Attended',
-          widget.badge.eventsAttended.toString(),
-        ),
-        _buildRightAlignedStat('Member Since', widget.badge.membershipDuration),
-      ],
-    );
-  }
+  // Removed _buildStatsSection as it's no longer needed
 
-  Widget _buildRightAlignedStat(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          // Label pill first (left), followed by the numeric chip on the right
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.35),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-            ),
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 9,
-                color: Colors.white,
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.right,
-            ),
+  // Removed _buildRightAlignedStat as it's no longer needed
+  // Removed _buildStatsSection as it's no longer needed
+
+  // Build the QR code section with modern UI design
+  Widget _buildQrSection() {
+    final scale = _uiScale(context);
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Container(
+        padding: EdgeInsets.all(10 * scale),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.25),
+            width: 1,
           ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.25),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Icon and title row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.qr_code_scanner,
+                  color: Colors.white.withValues(alpha: 0.9),
+                  size: 14 * scale,
+                ),
+                SizedBox(width: 4 * scale),
+                Text(
+                  'SCAN TO ACTIVATE',
+                  style: TextStyle(
+                    fontSize: 8 * scale,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white.withValues(alpha: 0.95),
+                    letterSpacing: 0.8,
+                    shadows: _textShadows(small: true),
+                  ),
                 ),
               ],
             ),
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+            SizedBox(height: 6 * scale),
+            // QR Code
+            _buildQrCode(),
+            SizedBox(height: 4 * scale),
+            // Description text
+            Text(
+              'Valid for all your tickets',
+              style: TextStyle(
+                fontSize: 6.5 * scale,
+                color: Colors.white.withValues(alpha: 0.75),
+                fontWeight: FontWeight.w500,
+                shadows: _textShadows(small: true),
               ),
+              textAlign: TextAlign.center,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  // Center QR positioned in the open middle area of the card
-  Widget _buildCenterQr() {
+  // Build QR code widget
+  Widget _buildQrCode() {
     final scale = _uiScale(context);
-    final size = 100.0 * scale;
-    return Positioned.fill(
-      child: Align(
-        alignment: Alignment.center,
-        child: Transform.translate(
-          offset: Offset(-24.0 * scale, 0),
-          child: Container(
-            width: size,
-            height: size,
-            padding: EdgeInsets.all(4 * scale),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.95),
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: QrImageView(
-              data: widget.badge.badgeQrData,
-              version: QrVersions.auto,
-              gapless: true,
-
-              eyeStyle: const QrEyeStyle(
-                eyeShape: QrEyeShape.square,
-                color: Colors.black,
-              ),
-              dataModuleStyle: const QrDataModuleStyle(
-                dataModuleShape: QrDataModuleShape.square,
-                color: Colors.black,
-              ),
-            ),
+    final size = 80.0 * scale;
+    return Container(
+      width: size,
+      height: size,
+      padding: EdgeInsets.all(4 * scale),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
+        ],
+      ),
+      child: QrImageView(
+        data: widget.badge.badgeQrData,
+        version: QrVersions.auto,
+        gapless: true,
+        eyeStyle: const QrEyeStyle(
+          eyeShape: QrEyeShape.square,
+          color: Colors.black,
+        ),
+        dataModuleStyle: const QrDataModuleStyle(
+          dataModuleShape: QrDataModuleShape.square,
+          color: Colors.black,
         ),
       ),
     );

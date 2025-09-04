@@ -162,13 +162,18 @@ class UserBadgeModel {
   }
 
   // QR payload for scanning user's badge to resolve tickets at an event
-  String get badgeQrData => 'orgami_user_$uid';
+  String get badgeQrData => 'attendus_user_$uid';
 
   // Parse a user badge QR and return the user id if valid
   static String? parseBadgeQr(String data) {
-    const prefix = 'orgami_user_';
-    if (data.startsWith(prefix)) {
-      return data.substring(prefix.length);
+    const oldPrefix = 'orgami_user_';
+    const newPrefix = 'attendus_user_';
+    
+    // Support both old and new prefixes for backward compatibility
+    if (data.startsWith(newPrefix)) {
+      return data.substring(newPrefix.length);
+    } else if (data.startsWith(oldPrefix)) {
+      return data.substring(oldPrefix.length);
     }
     return null;
   }
