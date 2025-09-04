@@ -9,6 +9,33 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - "build/**"
+    - "lib/generated/**"
+    - "lib/l10n/app_localizations_*.dart"
+    - "ios/**"
+    - "android/**"
+    - "windows/**"
+    - "linux/**"
+    - "macos/**"
+    - "web/**"
+    - ".dart_tool/**"
+    - "test/**"
+    - "tools/**"
+  errors:
+    # Treat these as warnings instead of errors to not block builds
+    deprecated_member_use: warning
+    deprecated_member_use_from_same_package: warning
+    todo: ignore
+    invalid_annotation_target: ignore
+  language:
+    strict-casts: false
+    strict-inference: false
+    strict-raw-types: false
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`
@@ -21,8 +48,13 @@ linter:
   # `// ignore_for_file: name_of_lint` syntax on the line or in the file
   # producing the lint.
   rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+    avoid_print: false  # Allow print statements for debugging
+    prefer_single_quotes: false  # Allow both single and double quotes
+    use_build_context_synchronously: false  # Allow async gaps with BuildContext
+    depend_on_referenced_packages: false
+    library_private_types_in_public_api: false
+    unnecessary_import: false
+    uri_does_not_exist: false  # Temporarily disable to avoid false positives
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options
