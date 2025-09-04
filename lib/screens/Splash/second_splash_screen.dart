@@ -406,36 +406,72 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
             ),
             // Main content
             SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // Calculate responsive spacing based on screen height
+                  final screenHeight = MediaQuery.of(context).size.height;
+                  final isSmallScreen = screenHeight < 700;
+                  final isMediumScreen =
+                      screenHeight >= 700 && screenHeight < 800;
+
+                  // Adaptive spacing values
+                  final topSpacing = isSmallScreen
+                      ? 20.0
+                      : isMediumScreen
+                      ? 25.0
+                      : 30.0;
+                  final sectionSpacing = isSmallScreen
+                      ? 20.0
+                      : isMediumScreen
+                      ? 25.0
+                      : 30.0;
+                  final welcomeSpacing = isSmallScreen
+                      ? 15.0
+                      : isMediumScreen
+                      ? 20.0
+                      : 25.0;
+                  final bottomSpacing = isSmallScreen
+                      ? 20.0
+                      : isMediumScreen
+                      ? 25.0
+                      : 30.0;
+
+                  return SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
                           minHeight: constraints.maxHeight,
                         ),
-                        child: SizedBox(
-                          height: constraints.maxHeight,
+                        child: IntrinsicHeight(
                           child: Column(
                             children: [
-                              const SizedBox(height: 30),
+                              SizedBox(height: topSpacing),
                               _buildLogoSection(),
-                              const SizedBox(height: 30),
+                              SizedBox(height: sectionSpacing),
                               _buildWelcomeSection(),
-                              const SizedBox(height: 25),
+                              SizedBox(height: welcomeSpacing),
                               _buildQRCodeSection(),
-                              const Spacer(),
+                              // Flexible spacing that adjusts to available space
+                              Flexible(
+                                child: SizedBox(
+                                  height: isSmallScreen
+                                      ? 20
+                                      : isMediumScreen
+                                      ? 40
+                                      : 60,
+                                ),
+                              ),
                               _buildActionButtons(),
-                              const SizedBox(height: 30),
+                              SizedBox(height: bottomSpacing),
                             ],
                           ),
                         ),
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  );
+                },
               ),
             ),
           ],
@@ -448,6 +484,13 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
     return AnimatedBuilder(
       animation: Listenable.merge([_logoAnimation, _floatAnimation]),
       builder: (context, child) {
+        final screenHeight = MediaQuery.of(context).size.height;
+        final isSmallScreen = screenHeight < 700;
+        final logoHeight = isSmallScreen ? 80.0 : 100.0;
+        final logoWidth = isSmallScreen ? 150.0 : 180.0;
+        final logoPaddingH = isSmallScreen ? 24.0 : 32.0;
+        final logoPaddingV = isSmallScreen ? 18.0 : 24.0;
+
         return Transform.translate(
           offset: Offset(0, _floatUpDownAnimation.value),
           child: Transform.rotate(
@@ -479,9 +522,9 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
                   ],
                 ),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 24,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: logoPaddingH,
+                    vertical: logoPaddingV,
                   ),
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -489,8 +532,8 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
                   ),
                   child: Image.asset(
                     Images.inAppLogo,
-                    height: 100,
-                    width: 180,
+                    height: logoHeight,
+                    width: logoWidth,
                     fit: BoxFit.contain,
                     filterQuality: FilterQuality.high,
                   ),
@@ -506,30 +549,39 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
   Widget _buildWelcomeSection() {
     return FadeTransition(
       opacity: _fadeInAnimation,
-      child: Column(
-        children: [
-          const Text(
-            'Welcome to Attendus',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1A1F36),
-              letterSpacing: -0.5,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Your gateway to seamless event experiences',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              height: 1.5,
-            ),
-          ),
-        ],
+      child: Builder(
+        builder: (context) {
+          final screenHeight = MediaQuery.of(context).size.height;
+          final isSmallScreen = screenHeight < 700;
+          final titleSize = isSmallScreen ? 24.0 : 28.0;
+          final subtitleSize = isSmallScreen ? 14.0 : 16.0;
+
+          return Column(
+            children: [
+              Text(
+                'Welcome to Attendus',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: titleSize,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF1A1F36),
+                  letterSpacing: -0.5,
+                ),
+              ),
+              SizedBox(height: isSmallScreen ? 8 : 12),
+              Text(
+                'Your gateway to seamless event experiences',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: subtitleSize,
+                  fontWeight: FontWeight.w500,
+                  height: 1.5,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -540,82 +592,98 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
       child: GestureDetector(
         onTap: () =>
             RouterClass.nextScreenNormal(context, const QRScannerFlowScreen()),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Colors.white, Colors.grey[50]!],
-            ),
-            border: Border.all(color: Colors.grey[200]!, width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-                spreadRadius: 0,
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              // QR Icon
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF7B61FF), Color(0xFF00BCD4)],
+        child: Builder(
+          builder: (context) {
+            final screenHeight = MediaQuery.of(context).size.height;
+            final isSmallScreen = screenHeight < 700;
+            final padding = isSmallScreen ? 16.0 : 20.0;
+            final iconSize = isSmallScreen ? 50.0 : 60.0;
+            final iconInnerSize = isSmallScreen ? 28.0 : 32.0;
+            final titleSize = isSmallScreen ? 16.0 : 18.0;
+            final subtitleSize = isSmallScreen ? 12.0 : 14.0;
+
+            return Container(
+              padding: EdgeInsets.all(padding),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Colors.white, Colors.grey[50]!],
+                ),
+                border: Border.all(color: Colors.grey[200]!, width: 1),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                    spreadRadius: 0,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF7B61FF).withOpacity(0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.qr_code_scanner,
-                  color: Colors.white,
-                  size: 32,
-                ),
+                ],
               ),
-              const SizedBox(width: 16),
-              // Text content
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Quick Check-In',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A1F36),
+              child: Row(
+                children: [
+                  // QR Icon
+                  Container(
+                    width: iconSize,
+                    height: iconSize,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF7B61FF), Color(0xFF00BCD4)],
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF7B61FF).withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Scan QR code for instant event access',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                        height: 1.3,
-                      ),
+                    child: Icon(
+                      Icons.qr_code_scanner,
+                      color: Colors.white,
+                      size: iconInnerSize,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 16),
+                  // Text content
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Quick Check-In',
+                          style: TextStyle(
+                            fontSize: titleSize,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF1A1F36),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Scan QR code for instant event access',
+                          style: TextStyle(
+                            fontSize: subtitleSize,
+                            color: Colors.grey[600],
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Arrow icon
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 18,
+                    color: Colors.grey[400],
+                  ),
+                ],
               ),
-              // Arrow icon
-              Icon(Icons.arrow_forward_ios, size: 18, color: Colors.grey[400]),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -624,136 +692,159 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
   Widget _buildActionButtons() {
     return ScaleTransition(
       scale: _buttonScaleAnimation,
-      child: Column(
-        children: [
-          // Create Account Button
-          GestureDetector(
-            onTap: () => RouterClass.nextScreenNormal(
-              context,
-              const CreateAccountScreen(),
-            ),
-            child: Container(
-              width: double.infinity,
-              height: 56,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF7B61FF), Color(0xFF5B3FDB)],
+      child: Builder(
+        builder: (context) {
+          final screenHeight = MediaQuery.of(context).size.height;
+          final isSmallScreen = screenHeight < 700;
+          final buttonHeight = isSmallScreen ? 50.0 : 56.0;
+          final fontSize = isSmallScreen ? 15.0 : 17.0;
+          final socialButtonSize = isSmallScreen ? 50.0 : 60.0;
+          final socialIconSize = isSmallScreen ? 18.0 : 22.0;
+
+          return Column(
+            children: [
+              // Create Account Button
+              GestureDetector(
+                onTap: () => RouterClass.nextScreenNormal(
+                  context,
+                  const CreateAccountScreen(),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF7B61FF).withOpacity(0.4),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
+                child: Container(
+                  width: double.infinity,
+                  height: buttonHeight,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF7B61FF), Color(0xFF5B3FDB)],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF7B61FF).withOpacity(0.4),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
                   ),
-                ],
+                  child: Center(
+                    child: Text(
+                      'Create Account',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              child: const Center(
-                child: Text(
-                  'Create Account',
-                  style: TextStyle(
+              SizedBox(height: isSmallScreen ? 12 : 16),
+              // Login Button
+              GestureDetector(
+                onTap: () =>
+                    RouterClass.nextScreenNormal(context, const LoginScreen()),
+                child: Container(
+                  width: double.infinity,
+                  height: buttonHeight,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
                     color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
+                    border: Border.all(color: Colors.grey[300]!, width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Sign In',
+                      style: TextStyle(
+                        color: const Color(0xFF1A1F36),
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Login Button
-          GestureDetector(
-            onTap: () =>
-                RouterClass.nextScreenNormal(context, const LoginScreen()),
-            child: Container(
-              width: double.infinity,
-              height: 56,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                color: Colors.white,
-                border: Border.all(color: Colors.grey[300]!, width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+              SizedBox(height: isSmallScreen ? 16 : 24),
+              // Divider with text
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(height: 1, color: Colors.grey[300]),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      'or continue with',
+                      style: TextStyle(
+                        color: Colors.grey[500],
+                        fontSize: isSmallScreen ? 12 : 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Container(height: 1, color: Colors.grey[300]),
                   ),
                 ],
               ),
-              child: const Center(
-                child: Text(
-                  'Sign In',
-                  style: TextStyle(
-                    color: Color(0xFF1A1F36),
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
+              SizedBox(height: isSmallScreen ? 12 : 20),
+              // Social login buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildSocialButton(
+                    icon: FontAwesomeIcons.google,
+                    color: const Color(0xFF4285F4),
+                    backgroundColor: Colors.white,
+                    isLoading: _googleLoading,
+                    onTap: _signInWithGoogle,
+                    size: socialButtonSize,
+                    iconSize: socialIconSize,
                   ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          // Divider with text
-          Row(
-            children: [
-              Expanded(child: Container(height: 1, color: Colors.grey[300])),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  'or continue with',
-                  style: TextStyle(
-                    color: Colors.grey[500],
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                  const SizedBox(width: 12),
+                  _buildSocialButton(
+                    icon: FontAwesomeIcons.apple,
+                    color: Colors.white,
+                    backgroundColor: Colors.black,
+                    isLoading: _appleLoading,
+                    onTap: _signInWithApple,
+                    size: socialButtonSize,
+                    iconSize: socialIconSize,
                   ),
-                ),
-              ),
-              Expanded(child: Container(height: 1, color: Colors.grey[300])),
-            ],
-          ),
-          const SizedBox(height: 20),
-          // Social login buttons
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildSocialButton(
-                icon: FontAwesomeIcons.google,
-                color: const Color(0xFF4285F4),
-                backgroundColor: Colors.white,
-                isLoading: _googleLoading,
-                onTap: _signInWithGoogle,
-              ),
-              const SizedBox(width: 12),
-              _buildSocialButton(
-                icon: FontAwesomeIcons.apple,
-                color: Colors.white,
-                backgroundColor: Colors.black,
-                isLoading: _appleLoading,
-                onTap: _signInWithApple,
-              ),
-              const SizedBox(width: 12),
-              _buildSocialButton(
-                icon: FontAwesomeIcons.facebookF,
-                color: Colors.white,
-                backgroundColor: const Color(0xFF1877F2),
-                isLoading: _facebookLoading,
-                onTap: _signInWithFacebook,
-              ),
-              const SizedBox(width: 12),
-              _buildSocialButton(
-                icon: FontAwesomeIcons.xTwitter,
-                color: Colors.white,
-                backgroundColor: Colors.black,
-                isLoading: _xLoading,
-                onTap: _signInWithX,
+                  const SizedBox(width: 12),
+                  _buildSocialButton(
+                    icon: FontAwesomeIcons.facebookF,
+                    color: Colors.white,
+                    backgroundColor: const Color(0xFF1877F2),
+                    isLoading: _facebookLoading,
+                    onTap: _signInWithFacebook,
+                    size: socialButtonSize,
+                    iconSize: socialIconSize,
+                  ),
+                  const SizedBox(width: 12),
+                  _buildSocialButton(
+                    icon: FontAwesomeIcons.xTwitter,
+                    color: Colors.white,
+                    backgroundColor: Colors.black,
+                    isLoading: _xLoading,
+                    onTap: _signInWithX,
+                    size: socialButtonSize,
+                    iconSize: socialIconSize,
+                  ),
+                ],
               ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -764,13 +855,15 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
     required Color backgroundColor,
     required bool isLoading,
     required Future<void> Function() onTap,
+    required double size,
+    required double iconSize,
   }) {
     return GestureDetector(
       onTap: isLoading ? null : onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        width: 60,
-        height: 60,
+        width: size,
+        height: size,
         decoration: BoxDecoration(
           color: backgroundColor,
           borderRadius: BorderRadius.circular(16),
@@ -805,7 +898,7 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
                     ),
                   ),
                 )
-              : FaIcon(icon, color: color, size: 22),
+              : FaIcon(icon, color: color, size: iconSize),
         ),
       ),
     );

@@ -94,7 +94,7 @@ class _MonthYearPickerSheetState extends State<MonthYearPickerSheet>
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
+                color: Colors.black.withOpacity(0.1),
                 blurRadius: 20,
                 offset: const Offset(0, -5),
               ),
@@ -227,14 +227,14 @@ class _MonthYearPickerSheetState extends State<MonthYearPickerSheet>
                 color: isSelected
                     ? const Color(0xFF667EEA)
                     : isCurrentYear
-                    ? const Color(0xFF667EEA).withValues(alpha: 0.1)
+                    ? const Color(0xFF667EEA).withOpacity(0.1)
                     : const Color(0xFFF9FAFB),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: isSelected
                       ? const Color(0xFF667EEA)
                       : isCurrentYear
-                      ? const Color(0xFF667EEA).withValues(alpha: 0.3)
+                      ? const Color(0xFF667EEA).withOpacity(0.3)
                       : const Color(0xFFE5E7EB),
                   width: isSelected ? 2 : 1,
                 ),
@@ -264,7 +264,7 @@ class _MonthYearPickerSheetState extends State<MonthYearPickerSheet>
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF667EEA).withValues(alpha: 0.2),
+                        color: const Color(0xFF667EEA).withOpacity(0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Text(
@@ -356,7 +356,7 @@ class _MonthYearPickerSheetState extends State<MonthYearPickerSheet>
                       : null,
                   color: !isSelected
                       ? isCurrentMonth
-                            ? const Color(0xFF667EEA).withValues(alpha: 0.1)
+                            ? const Color(0xFF667EEA).withOpacity(0.1)
                             : const Color(0xFFF9FAFB)
                       : null,
                   borderRadius: BorderRadius.circular(16),
@@ -364,16 +364,14 @@ class _MonthYearPickerSheetState extends State<MonthYearPickerSheet>
                     color: isSelected
                         ? Colors.transparent
                         : isCurrentMonth
-                        ? const Color(0xFF667EEA).withValues(alpha: 0.3)
+                        ? const Color(0xFF667EEA).withOpacity(0.3)
                         : const Color(0xFFE5E7EB),
                     width: isSelected ? 0 : 1.5,
                   ),
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: const Color(
-                              0xFF667EEA,
-                            ).withValues(alpha: 0.3),
+                            color: const Color(0xFF667EEA).withOpacity(0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 4),
                           ),
