@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geocoding/geocoding.dart';
 
 import 'package:image_picker/image_picker.dart';
 
@@ -17,6 +19,7 @@ import 'package:attendus/Utils/toast.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 import 'package:attendus/screens/Events/Widget/sign_in_methods_selector.dart';
 import 'package:attendus/screens/Events/geofence_setup_screen.dart';
+import 'package:attendus/screens/Events/location_picker_screen.dart';
 import 'dart:io';
 
 class EditEventScreen extends StatefulWidget {
@@ -52,6 +55,11 @@ class _EditEventScreenState extends State<EditEventScreen>
   // Sign-in methods
   List<String> _selectedSignInMethods = ['qr_code', 'manual_code'];
   String? _manualCode;
+
+  // Location selection
+  LatLng? _selectedLocationInternal;
+  String? _resolvedAddress;
+  bool _isResolvingAddress = false;
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -101,6 +109,12 @@ class _EditEventScreenState extends State<EditEventScreen>
     privateEvent = event.private;
     _selectedSignInMethods = List.from(event.signInMethods);
     _manualCode = event.manualCode;
+
+    // Initialize location
+    _selectedLocationInternal = LatLng(event.latitude, event.longitude);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _reverseGeocodeSelectedLocation();
+    });
   }
 
   @override
@@ -133,6 +147,56 @@ class _EditEventScreenState extends State<EditEventScreen>
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  Future<void> _pickLocation() async {
+    final picked = await Navigator.of(context).push<LatLng>(
+      MaterialPageRoute(
+        builder: (_) =>
+            LocationPickerScreen(initialLocation: _selectedLocationInternal),
+      ),
+    );
+    if (picked != null) {
+      setState(() => _selectedLocationInternal = picked);
+      await _reverseGeocodeSelectedLocation();
+    }
+  }
+
+  Future<void> _reverseGeocodeSelectedLocation() async {
+    if (_selectedLocationInternal == null) return;
+    setState(() => _isResolvingAddress = true);
+    try {
+      final placemarks = await placemarkFromCoordinates(
+        _selectedLocationInternal!.latitude,
+        _selectedLocationInternal!.longitude,
+      );
+      if (placemarks.isNotEmpty) {
+        final p = placemarks.first;
+        final parts = <String>[
+          if ((p.street ?? '').isNotEmpty) p.street!,
+          if ((p.locality ?? '').isNotEmpty) p.locality!,
+          if ((p.administrativeArea ?? '').isNotEmpty) p.administrativeArea!,
+          if ((p.postalCode ?? '').isNotEmpty) p.postalCode!,
+          if ((p.country ?? '').isNotEmpty) p.country!,
+        ];
+        final addr = parts.isNotEmpty
+            ? parts.join(', ')
+            : '${_selectedLocationInternal!.latitude.toStringAsFixed(6)}, ${_selectedLocationInternal!.longitude.toStringAsFixed(6)}';
+        setState(() {
+          _resolvedAddress = addr;
+          locationEdtController.text = addr;
+        });
+      }
+    } catch (_) {
+      final lat = _selectedLocationInternal!.latitude.toStringAsFixed(6);
+      final lng = _selectedLocationInternal!.longitude.toStringAsFixed(6);
+      setState(() {
+        _resolvedAddress = 'Coordinates: $lat, $lng';
+        locationEdtController.text = _resolvedAddress!;
+      });
+    } finally {
+      if (mounted) setState(() => _isResolvingAddress = false);
     }
   }
 
@@ -182,6 +246,17 @@ class _EditEventScreenState extends State<EditEventScreen>
       _btnCtlr.start();
 
       try {
+        if (_selectedLocationInternal == null) {
+          _btnCtlr.reset();
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please pick the event location'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
         String? imageUrl = await _uploadToFirebaseHosting();
 
         if (imageUrl != null) {
@@ -205,8 +280,8 @@ class _EditEventScreenState extends State<EditEventScreen>
             isFeatured: widget.eventModel.isFeatured,
             status: widget.eventModel.status,
             eventGenerateTime: widget.eventModel.eventGenerateTime,
-            latitude: widget.eventModel.latitude,
-            longitude: widget.eventModel.longitude,
+            latitude: _selectedLocationInternal!.latitude,
+            longitude: _selectedLocationInternal!.longitude,
             organizationId: widget.eventModel.organizationId,
             accessList: widget.eventModel.accessList,
             signInMethods: _selectedSignInMethods,
@@ -598,19 +673,8 @@ class _EditEventScreenState extends State<EditEventScreen>
           ),
           const SizedBox(height: 16),
 
-          // Location
-          AppTextFields.textField2(
-            controller: locationEdtController,
-            hintText: 'Event Location',
-            titleText: 'Event Location',
-            width: double.infinity,
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please enter event location';
-              }
-              return null;
-            },
-          ),
+          // Location selector
+          _buildLocationSelector(),
           const SizedBox(height: 16),
 
           // Description
@@ -628,6 +692,122 @@ class _EditEventScreenState extends State<EditEventScreen>
             },
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLocationSelector() {
+    final hasLocation =
+        _selectedLocationInternal != null &&
+        !(_selectedLocationInternal!.latitude == 0 &&
+            _selectedLocationInternal!.longitude == 0);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Location',
+              style: TextStyle(
+                color: Color(0xFF1A1A1A),
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                fontFamily: 'Roboto',
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.location_on,
+                    color: Color(0xFF667EEA),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (hasLocation) ...[
+                        Text(
+                          _resolvedAddress ?? locationEdtController.text,
+                          style: const TextStyle(
+                            color: Color(0xFF1A1A1A),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '${_selectedLocationInternal!.latitude.toStringAsFixed(6)}, ${_selectedLocationInternal!.longitude.toStringAsFixed(6)}',
+                          style: TextStyle(
+                            color: Colors.grey.withValues(alpha: 0.8),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ] else ...[
+                        const Text(
+                          'No location selected',
+                          style: TextStyle(
+                            color: Color(0xFF6B7280),
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                      if (_isResolvingAddress) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Color(0xFF667EEA),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text('Resolving address...'),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: _pickLocation,
+                  icon: const Icon(Icons.map_outlined),
+                  label: Text(hasLocation ? 'Change' : 'Pick'),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF667EEA)),
+                    foregroundColor: const Color(0xFF667EEA),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

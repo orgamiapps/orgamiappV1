@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
@@ -20,6 +21,8 @@ import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 import 'dart:io';
 import 'package:attendus/firebase/organization_helper.dart'; // ignore: unused_import
 import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/firebase/firebase_messaging_helper.dart';
+import 'package:attendus/screens/Events/location_picker_screen.dart';
 
 class CreateEventScreen extends StatefulWidget {
   final DateTime? selectedDateTime;
@@ -111,6 +114,63 @@ class _CreateEventScreenState extends State<CreateEventScreen>
     return hours;
   }
 
+  // Location selection state
+  LatLng? _selectedLocationInternal;
+  String? _resolvedAddress;
+  bool _isResolvingAddress = false;
+
+  Future<void> _pickLocation() async {
+    final picked = await Navigator.of(context).push<LatLng>(
+      MaterialPageRoute(
+        builder: (_) => LocationPickerScreen(
+          initialLocation: _selectedLocationInternal,
+        ),
+      ),
+    );
+    if (picked != null) {
+      setState(() => _selectedLocationInternal = picked);
+      await _reverseGeocodeSelectedLocation();
+    }
+  }
+
+  Future<void> _reverseGeocodeSelectedLocation() async {
+    if (_selectedLocationInternal == null) return;
+    setState(() => _isResolvingAddress = true);
+    try {
+      final placemarks = await placemarkFromCoordinates(
+        _selectedLocationInternal!.latitude,
+        _selectedLocationInternal!.longitude,
+      );
+      if (placemarks.isNotEmpty) {
+        final p = placemarks.first;
+        final parts = <String>[
+          if ((p.street ?? '').isNotEmpty) p.street!,
+          if ((p.locality ?? '').isNotEmpty) p.locality!,
+          if ((p.administrativeArea ?? '').isNotEmpty) p.administrativeArea!,
+          if ((p.postalCode ?? '').isNotEmpty) p.postalCode!,
+          if ((p.country ?? '').isNotEmpty) p.country!,
+        ];
+        final addr = parts.isNotEmpty
+            ? parts.join(', ')
+            : '${_selectedLocationInternal!.latitude.toStringAsFixed(6)}, ${_selectedLocationInternal!.longitude.toStringAsFixed(6)}';
+        setState(() {
+          _resolvedAddress = addr;
+          locationEdtController.text = addr;
+        });
+      }
+    } catch (_) {
+      // Fallback to coordinates text
+      final lat = _selectedLocationInternal!.latitude.toStringAsFixed(6);
+      final lng = _selectedLocationInternal!.longitude.toStringAsFixed(6);
+      setState(() {
+        _resolvedAddress = 'Coordinates: $lat, $lng';
+        locationEdtController.text = _resolvedAddress!;
+      });
+    } finally {
+      if (mounted) setState(() => _isResolvingAddress = false);
+    }
+  }
+
   Future _pickImage() async {
     try {
       final ImagePicker picker = ImagePicker();
@@ -178,6 +238,18 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
   void _handleSubmit() async {
     if (_formKey.currentState!.validate()) {
+      if (_selectedLocationInternal == null ||
+          (_selectedLocationInternal!.latitude == 0 &&
+              _selectedLocationInternal!.longitude == 0)) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please pick the event location'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
       if (!_hasDateTime) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -245,8 +317,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           status: '',
           getLocation: true,
           radius: widget.radios,
-          longitude: widget.selectedLocation.longitude,
-          latitude: widget.selectedLocation.latitude,
+          longitude: _selectedLocationInternal!.longitude,
+          latitude: _selectedLocationInternal!.latitude,
           private: privateEvent,
           categories: _selectedCategories,
           eventDuration: _durationHours,
@@ -264,6 +336,17 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             .collection(EventModel.firebaseKey)
             .doc(docId)
             .set(data);
+
+        // Create notification for event creator
+        final messagingHelper = FirebaseMessagingHelper();
+        await messagingHelper.createLocalNotification(
+          title: 'Event Created Successfully',
+          body:
+              'Your event "${titleEdtController.text}" has been created and is now live!',
+          type: 'new_event',
+          eventId: docId,
+          eventTitle: titleEdtController.text,
+        );
 
         // Save questions if provided
         if (widget.questions != null && widget.questions!.isNotEmpty) {
@@ -369,6 +452,12 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       final DateTime end = dt.add(Duration(hours: duration));
       _endTime = TimeOfDay(hour: end.hour, minute: end.minute);
     }
+
+    // Initialize location from incoming value and resolve address
+    _selectedLocationInternal = widget.selectedLocation;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _reverseGeocodeSelectedLocation();
+    });
   }
 
   Future<void> _prefillOrganizerWithCurrentUser() async {
@@ -1102,19 +1191,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           // Image Field
           _buildImageField(),
           const SizedBox(height: 16),
-          // Location Field
-          _buildTextField(
-            controller: locationEdtController,
-            label: 'Location',
-            hint: 'Type here...',
-            icon: Icons.location_on,
-            validator: (value) {
-              if (value!.isEmpty) {
-                return 'Enter Location first!';
-              }
-              return null;
-            },
-          ),
+          // Location Picker
+          _buildLocationSelector(),
           const SizedBox(height: 16),
           // Description Field
           _buildTextField(
@@ -1126,6 +1204,103 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             validator: (value) {
               return null;
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLocationSelector() {
+    final hasLocation = _selectedLocationInternal != null &&
+        !(_selectedLocationInternal!.latitude == 0 &&
+            _selectedLocationInternal!.longitude == 0);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Location',
+            style: TextStyle(
+              color: Color(0xFF1A1A1A),
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              fontFamily: 'Roboto',
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.location_on, color: Color(0xFF667EEA), size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (hasLocation) ...[
+                      Text(
+                        _resolvedAddress ?? locationEdtController.text,
+                        style: const TextStyle(
+                          color: Color(0xFF1A1A1A),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '${_selectedLocationInternal!.latitude.toStringAsFixed(6)}, ${_selectedLocationInternal!.longitude.toStringAsFixed(6)}',
+                        style: TextStyle(color: Colors.grey.withValues(alpha: 0.8), fontSize: 12),
+                      ),
+                    ] else ...[
+                      const Text(
+                        'No location selected',
+                        style: TextStyle(color: Color(0xFF6B7280), fontSize: 14),
+                      ),
+                    ],
+                    if (_isResolvingAddress) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA))),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('Resolving address...'),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: _pickLocation,
+                icon: const Icon(Icons.map_outlined),
+                label: Text(hasLocation ? 'Change' : 'Pick'),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFF667EEA)),
+                  foregroundColor: const Color(0xFF667EEA),
+                ),
+              ),
+            ],
           ),
         ],
       ),

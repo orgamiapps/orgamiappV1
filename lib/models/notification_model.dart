@@ -5,7 +5,7 @@ class NotificationModel {
   final String title;
   final String body;
   final String
-  type; // 'event_reminder', 'new_event', 'ticket_update', 'event_feedback', 'general'
+      type; // 'event_reminder', 'new_event', 'group_event', 'ticket_update', 'event_feedback', 'general', etc.
   final String? eventId;
   final String? eventTitle;
   final DateTime createdAt;
@@ -86,6 +86,7 @@ class UserNotificationSettings {
   // New smart notification toggles
   final bool eventChanges; // time/venue/agenda updates
   final bool geofenceCheckIn; // near-venue prompt
+  final bool messagesAll; // all new messages
   final bool messageMentions; // @mentions and replies
   final bool organizationUpdates; // join requests/approvals/role changes
   final bool organizerFeedback; // feedback received for organizer
@@ -102,6 +103,7 @@ class UserNotificationSettings {
     this.generalNotifications = true,
     this.eventChanges = true,
     this.geofenceCheckIn = true,
+    this.messagesAll = true,
     this.messageMentions = true,
     this.organizationUpdates = true,
     this.organizerFeedback = true,
@@ -120,6 +122,7 @@ class UserNotificationSettings {
       generalNotifications: map['generalNotifications'] ?? true,
       eventChanges: map['eventChanges'] ?? true,
       geofenceCheckIn: map['geofenceCheckIn'] ?? true,
+      messagesAll: map['messagesAll'] ?? true,
       messageMentions: map['messageMentions'] ?? true,
       organizationUpdates: map['organizationUpdates'] ?? true,
       organizerFeedback: map['organizerFeedback'] ?? true,
@@ -139,6 +142,7 @@ class UserNotificationSettings {
       'generalNotifications': generalNotifications,
       'eventChanges': eventChanges,
       'geofenceCheckIn': geofenceCheckIn,
+      'messagesAll': messagesAll,
       'messageMentions': messageMentions,
       'organizationUpdates': organizationUpdates,
       'organizerFeedback': organizerFeedback,
@@ -157,6 +161,7 @@ class UserNotificationSettings {
     bool? generalNotifications,
     bool? eventChanges,
     bool? geofenceCheckIn,
+    bool? messagesAll,
     bool? messageMentions,
     bool? organizationUpdates,
     bool? organizerFeedback,
@@ -173,6 +178,7 @@ class UserNotificationSettings {
       generalNotifications: generalNotifications ?? this.generalNotifications,
       eventChanges: eventChanges ?? this.eventChanges,
       geofenceCheckIn: geofenceCheckIn ?? this.geofenceCheckIn,
+      messagesAll: messagesAll ?? this.messagesAll,
       messageMentions: messageMentions ?? this.messageMentions,
       organizationUpdates: organizationUpdates ?? this.organizationUpdates,
       organizerFeedback: organizerFeedback ?? this.organizerFeedback,

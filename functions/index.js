@@ -983,7 +983,7 @@ exports.sendEventReminders = onDocumentCreated("Events/{eventId}", async (event)
 });
 
 /**
- * Send new event notifications to users within specified distance
+ * Send new event notifications to users within specified distance and group members
  * Triggered when a new event is created
  */
 exports.sendNewEventNotifications = onDocumentCreated("Events/{eventId}", async (event) => {
@@ -991,13 +991,24 @@ exports.sendNewEventNotifications = onDocumentCreated("Events/{eventId}", async 
     const eventData = event.data.data();
     const eventId = event.data.id;
     
-    if (!eventData || !eventData.eventLocation) {
+    if (!eventData) {
       return;
     }
 
     logger.info(`Sending new event notifications for event ${eventId}`);
 
     const db = admin.firestore();
+    
+    // Check if this is a group/organization event
+    if (eventData.organizationId) {
+      await notifyGroupMembersOfNewEvent(eventData.organizationId, eventId, eventData, db);
+    }
+    
+    // Continue with location-based notifications if location is provided
+    if (!eventData.eventLocation) {
+      return;
+    }
+    
     const eventLocation = eventData.eventLocation;
     
     // Get all users
@@ -1328,6 +1339,83 @@ async function checkUserHasTicket(userId, eventId, db) {
 }
 
 /**
+ * Helper function to notify group members of new event
+ */
+async function notifyGroupMembersOfNewEvent(organizationId, eventId, eventData, db) {
+  try {
+    logger.info(`Notifying group members about new event ${eventId} in organization ${organizationId}`);
+    
+    // Get all members of the organization
+    const membersSnapshot = await db.collection("Organizations")
+      .doc(organizationId)
+      .collection("Members")
+      .where("status", "==", "approved")
+      .get();
+    
+    if (membersSnapshot.empty) {
+      logger.info(`No approved members found for organization ${organizationId}`);
+      return;
+    }
+    
+    // Get organization details for better notification message
+    const orgDoc = await db.collection("Organizations").doc(organizationId).get();
+    const orgName = orgDoc.exists ? (orgDoc.data().name || "your group") : "your group";
+    
+    logger.info(`Found ${membersSnapshot.docs.length} members to notify`);
+    
+    // Notify each member (except the event creator)
+    for (const memberDoc of membersSnapshot.docs) {
+      const memberId = memberDoc.id;
+      
+      // Skip the event creator
+      if (memberId === eventData.customerUid || memberId === eventData.createdBy) {
+        continue;
+      }
+      
+      // Check user's notification settings
+      const settingsDoc = await db.collection("users")
+        .doc(memberId)
+        .collection("notificationSettings")
+        .doc("settings")
+        .get();
+      
+      let shouldSendGroupEventNotification = true;
+      
+      if (settingsDoc.exists) {
+        const settings = settingsDoc.data();
+        // Check if user has disabled new event notifications or organization updates
+        shouldSendGroupEventNotification = settings.newEvents !== false && settings.organizationUpdates !== false;
+      }
+      
+      if (!shouldSendGroupEventNotification) {
+        logger.info(`User ${memberId} has disabled group event notifications`);
+        continue;
+      }
+      
+      // Send notification
+      await sendNotificationToUser(memberId, {
+        type: "group_event",
+        title: "New Event in " + orgName,
+        body: `"${eventData.title || eventData.eventTitle || "New Event"}" has been created in ${orgName}`,
+        eventId: eventId,
+        eventTitle: eventData.title || eventData.eventTitle || "New Event",
+        data: {
+          organizationId: organizationId,
+          organizationName: orgName,
+        },
+      }, db);
+      
+      logger.info(`Notified member ${memberId} about new group event`);
+    }
+    
+    logger.info(`Completed notifying group members about event ${eventId}`);
+    
+  } catch (error) {
+    logger.error("Error notifying group members of new event:", error);
+  }
+}
+
+/**
  * Helper function to calculate distance between two points
  */
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -1346,10 +1434,27 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
  */
 async function sendNotificationToUser(userId, notificationData, db) {
   try {
+    // Always save to user's notifications collection first (even if no FCM token)
+    const notificationRef = await db.collection("users")
+      .doc(userId)
+      .collection("notifications")
+      .add({
+        title: notificationData.title,
+        body: notificationData.body,
+        type: notificationData.type,
+        eventId: notificationData.eventId || null,
+        eventTitle: notificationData.eventTitle || null,
+        createdAt: admin.firestore.Timestamp.now(),
+        isRead: false,
+        data: notificationData.data || {},
+      });
+    
+    logger.info(`Saved notification ${notificationRef.id} for user ${userId}`);
+
     // Get user's FCM token
     const userDoc = await db.collection("users").doc(userId).get();
     if (!userDoc.exists) {
-      logger.warn(`User ${userId} not found`);
+      logger.warn(`User ${userId} not found, notification saved but push not sent`);
       return;
     }
 
@@ -1357,7 +1462,7 @@ async function sendNotificationToUser(userId, notificationData, db) {
     const fcmToken = userData.fcmToken;
 
     if (!fcmToken) {
-      logger.warn(`No FCM token for user ${userId}`);
+      logger.warn(`No FCM token for user ${userId}, notification saved but push not sent`);
       return;
     }
 
@@ -1375,6 +1480,7 @@ async function sendNotificationToUser(userId, notificationData, db) {
         eventTitle: notificationData.eventTitle || "",
         conversationId: (notificationData.data && notificationData.data.conversationId) ? notificationData.data.conversationId : "",
         organizationId: (notificationData.data && notificationData.data.organizationId) ? notificationData.data.organizationId : "",
+        notificationId: notificationRef.id,
         click_action: "FLUTTER_NOTIFICATION_CLICK",
       },
       android: {
@@ -1396,22 +1502,7 @@ async function sendNotificationToUser(userId, notificationData, db) {
     };
 
     await messaging.send(message);
-    logger.info(`Sent notification to user ${userId}`);
-
-    // Save to user's notifications collection
-    await db.collection("users")
-      .doc(userId)
-      .collection("notifications")
-      .add({
-        title: notificationData.title,
-        body: notificationData.body,
-        type: notificationData.type,
-        eventId: notificationData.eventId,
-        eventTitle: notificationData.eventTitle,
-        createdAt: admin.firestore.Timestamp.now(),
-        isRead: false,
-        data: notificationData.data || {},
-      });
+    logger.info(`Sent push notification to user ${userId}`);
 
   } catch (error) {
     logger.error(`Error sending notification to user ${userId}:`, error);
@@ -1657,18 +1748,31 @@ exports.sendMessageNotifications = onDocumentCreated("Messages/{messageId}", asy
       return;
     }
 
-    // Check receiver's notification settings
-    const settingsDoc = await db.collection("users")
-      .doc(receiverId)
-      .collection("settings")
-      .doc("notifications")
-      .get();
-
+    // Check receiver's notification settings (new schema in notificationSettings/settings)
     let shouldSendMessageNotification = true;
-
-    if (settingsDoc.exists) {
-      const settings = settingsDoc.data();
-      shouldSendMessageNotification = settings.messageNotifications !== false;
+    try {
+      const settingsDocNew = await db.collection("users")
+        .doc(receiverId)
+        .collection("notificationSettings")
+        .doc("settings")
+        .get();
+      if (settingsDocNew.exists) {
+        const s = settingsDocNew.data();
+        if (s && s.messagesAll === false) {
+          shouldSendMessageNotification = false;
+        }
+      }
+    } catch (e) {
+      // Fallback to legacy settings location
+      const settingsDocLegacy = await db.collection("users")
+        .doc(receiverId)
+        .collection("settings")
+        .doc("notifications")
+        .get();
+      if (settingsDocLegacy.exists) {
+        const s = settingsDocLegacy.data();
+        shouldSendMessageNotification = s.messageNotifications !== false;
+      }
     }
 
     if (!shouldSendMessageNotification) {

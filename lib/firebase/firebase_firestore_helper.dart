@@ -13,6 +13,7 @@ import 'package:attendus/models/app_feedback_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:attendus/firebase/firebase_messaging_helper.dart';
 
 class FirebaseFirestoreHelper {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -333,22 +334,25 @@ class FirebaseFirestoreHelper {
       QuerySnapshot querySnapshot = await _firestore
           .collection(AttendanceModel.registerFirebaseKey)
           .where('eventId', isEqualTo: eventId)
-          .where('customerUid', isEqualTo: CustomerController.logeInCustomer!.uid)
+          .where(
+            'customerUid',
+            isEqualTo: CustomerController.logeInCustomer!.uid,
+          )
           .get();
-      
+
       if (querySnapshot.docs.isNotEmpty) {
         // Delete all registration records for this user and event
         for (var doc in querySnapshot.docs) {
           await doc.reference.delete();
         }
-        
+
         // Clear cache for this event's registration data
         _cache.remove('register_attendance_$eventId');
-        
+
         Logger.debug('Successfully unregistered user from event: $eventId');
         return true;
       }
-      
+
       Logger.debug('No registration found to remove for event: $eventId');
       return false;
     } catch (e) {
@@ -1237,16 +1241,19 @@ class FirebaseFirestoreHelper {
         'issuedTickets': 0,
         'ticketUpgradeEnabled': ticketUpgradeEnabled,
       };
-      
+
       if (ticketPrice != null) {
         updateData['ticketPrice'] = ticketPrice;
       }
-      
+
       if (ticketUpgradePrice != null) {
         updateData['ticketUpgradePrice'] = ticketUpgradePrice;
       }
-      
-      await _firestore.collection(EventModel.firebaseKey).doc(eventId).update(updateData);
+
+      await _firestore
+          .collection(EventModel.firebaseKey)
+          .doc(eventId)
+          .update(updateData);
     } catch (e) {
       Logger.debug('Error enabling tickets for event: $e');
       rethrow;
@@ -1369,6 +1376,16 @@ class FirebaseFirestoreHelper {
       });
 
       Logger.debug('Event ticket count updated');
+
+      // Create ticket notification
+      final messagingHelper = FirebaseMessagingHelper();
+      await messagingHelper.createLocalNotification(
+        title: 'Ticket Confirmed',
+        body: 'You\'ve successfully registered for "${eventModel.title}"',
+        type: 'ticket_update',
+        eventId: eventId,
+        eventTitle: eventModel.title,
+      );
 
       // AUTO-REGISTER USER FOR THE EVENT (combining pre-registration with ticketing)
       try {
@@ -1633,6 +1650,17 @@ class FirebaseFirestoreHelper {
           .add(feedbackData);
 
       Logger.debug('Feedback submitted successfully for event: $eventId');
+
+      // Create notification for user who submitted feedback (if not anonymous)
+      if (!isAnonymous && userId != null) {
+        final messagingHelper = FirebaseMessagingHelper();
+        await messagingHelper.createLocalNotification(
+          title: 'Thank You for Your Feedback!',
+          body: 'Your feedback has been submitted successfully',
+          type: 'event_feedback',
+          eventId: eventId,
+        );
+      }
     } catch (e) {
       Logger.debug('Error submitting feedback: $e');
       rethrow;

@@ -12,6 +12,8 @@ import 'package:attendus/screens/Groups/group_profile_screen_v2.dart';
 import 'package:attendus/screens/Events/event_feedback_management_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:attendus/firebase/sample_notification_generator.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -153,6 +155,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         systemOverlayStyle: SystemUiOverlayStyle.dark,
         title: const Text('Notifications'),
         actions: [
+          if (kDebugMode)
+            IconButton(
+              icon: const Icon(Icons.science),
+              tooltip: 'Generate test notifications',
+              onPressed: () async {
+                await SampleNotificationGenerator.generateSampleNotifications();
+                await _loadInitial();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Sample notifications generated'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.done_all),
             tooltip: 'Mark all read',
@@ -515,6 +532,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return Colors.teal;
       case 'new_event':
         return Colors.green;
+      case 'group_event':
+        return Colors.green.shade600;
       case 'ticket_update':
         return Colors.blue;
       case 'message_mention':
@@ -538,6 +557,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return Icons.my_location;
       case 'new_event':
         return Icons.add_circle;
+      case 'group_event':
+        return Icons.group_add;
       case 'ticket_update':
         return Icons.confirmation_number;
       case 'message_mention':
@@ -556,11 +577,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'event_reminder':
       case 'event_changes':
       case 'geofence_checkin':
+      case 'group_event':
         await _openEvent(notification.eventId);
         break;
       case 'new_event':
+        await _openEvent(notification.eventId);
         break;
       case 'ticket_update':
+        await _openEvent(notification.eventId);
         break;
       case 'message_mention':
         final conversationId = notification.data?['conversationId'] as String?;

@@ -48,8 +48,7 @@ class FirebaseMessagingHelper {
           connectivity.cast<ConnectivityResult>(),
         );
         isOnline =
-            list.isNotEmpty &&
-            !list.every((c) => c == ConnectivityResult.none);
+            list.isNotEmpty && !list.every((c) => c == ConnectivityResult.none);
       } catch (_) {
         // Assume online if check fails
         isOnline = true;
@@ -1120,6 +1119,50 @@ class FirebaseMessagingHelper {
     } catch (e) {
       if (kDebugMode) {
         Logger.error('❌ Error deleting notification: $e');
+      }
+    }
+  }
+
+  // Create notification in user's collection (client-side)
+  Future<void> createLocalNotification({
+    required String title,
+    required String body,
+    required String type,
+    String? eventId,
+    String? eventTitle,
+    Map<String, dynamic>? data,
+    String? userId, // Optional, defaults to current user
+  }) async {
+    try {
+      final targetUserId = userId ?? _auth.currentUser?.uid;
+      if (targetUserId == null) {
+        if (kDebugMode) {
+          Logger.error('❌ Cannot create notification: No user ID provided');
+        }
+        return;
+      }
+
+      await _firestore
+          .collection('users')
+          .doc(targetUserId)
+          .collection('notifications')
+          .add({
+            'title': title,
+            'body': body,
+            'type': type,
+            'eventId': eventId,
+            'eventTitle': eventTitle,
+            'data': data,
+            'createdAt': FieldValue.serverTimestamp(),
+            'isRead': false,
+          });
+
+      if (kDebugMode) {
+        Logger.error('✅ Created local notification: $title');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        Logger.error('❌ Error creating local notification: $e');
       }
     }
   }
