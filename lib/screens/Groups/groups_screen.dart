@@ -293,6 +293,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
                                         child: _pill(
                                           org['name'] ?? '',
                                           icon: Icons.apartment,
+                                          imageUrl: org['logoUrl'],
                                         ),
                                       );
                                     },
@@ -322,12 +323,18 @@ class _GroupsScreenState extends State<GroupsScreen> {
                           const SizedBox(height: 12),
                       itemBuilder: (context, i) {
                         final o = _discoverOrgs[i];
+                        final String logoUrl = (o['logoUrl'] ?? '').toString();
                         return Container(
                           decoration: _cardDeco(),
                           child: ListTile(
-                            leading: const CircleAvatar(
-                              child: Icon(Icons.apartment),
-                            ),
+                            leading: logoUrl.isNotEmpty
+                                ? CircleAvatar(
+                                    foregroundImage: NetworkImage(logoUrl),
+                                    onForegroundImageError: (_, __) {},
+                                  )
+                                : const CircleAvatar(
+                                    child: Icon(Icons.apartment),
+                                  ),
                             title: Text(o['name']?.toString() ?? ''),
                             subtitle: Text(
                               o['category']?.toString() ?? 'Other',
@@ -395,14 +402,25 @@ class _GroupsScreenState extends State<GroupsScreen> {
     ],
   );
 
-  Widget _pill(String text, {IconData? icon}) {
+  Widget _pill(String text, {IconData? icon, String? imageUrl}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: _cardDeco(),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (icon != null) ...[Icon(icon, size: 16), const SizedBox(width: 6)],
+          if (imageUrl != null && imageUrl.isNotEmpty) ...[
+            CircleAvatar(
+              radius: 10,
+              foregroundImage: NetworkImage(imageUrl),
+              onForegroundImageError: (_, __) {},
+              child: Icon(icon ?? Icons.apartment, size: 14),
+            ),
+            const SizedBox(width: 6),
+          ] else if (icon != null) ...[
+            Icon(icon, size: 16),
+            const SizedBox(width: 6),
+          ],
           Text(text),
         ],
       ),
