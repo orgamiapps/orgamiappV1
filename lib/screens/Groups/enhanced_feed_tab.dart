@@ -12,6 +12,7 @@ import 'package:attendus/Utils/cached_image.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/screens/Groups/widgets/event_card.dart';
+import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
 
 class EnhancedFeedTab extends StatefulWidget {
   final String organizationId;
@@ -377,7 +378,7 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                             final doc = item['doc'] as DocumentSnapshot;
                             final data = doc.data() as Map<String, dynamic>;
                             // Build event model (if needed by downstream widgets)
-                            final _ = EventModel.fromJson({
+                            final model = EventModel.fromJson({
                               ...data,
                               'id': doc.id,
                               'groupName':
@@ -388,12 +389,7 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                               'customerUid':
                                   data['customerUid'] ?? data['authorId'] ?? '',
                             });
-                            return EventCard(
-                              data: data,
-                              docId: doc.id,
-                              organizationId: widget.organizationId,
-                              isAdmin: isAdmin,
-                            );
+                            return SingleEventListViewItem(eventModel: model);
                           } else if (item['type'] == 'feed') {
                             final doc = item['doc'] as DocumentSnapshot;
                             final data = doc.data() as Map<String, dynamic>;
@@ -1312,14 +1308,11 @@ class _AnnouncementCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: isPinned
-              ? Border.all(color: const Color(0xFF667EEA), width: 2)
-              : null,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -1332,19 +1325,23 @@ class _AnnouncementCard extends StatelessWidget {
                   horizontal: 16,
                   vertical: 8,
                 ),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF667EEA),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.push_pin, color: Colors.white, size: 16),
-                    SizedBox(width: 4),
+                    Icon(Icons.push_pin, color: Colors.white, size: 18),
+                    SizedBox(width: 6),
                     Text(
                       'PINNED ANNOUNCEMENT',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 12,
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1632,14 +1629,11 @@ class _PollCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: isPinned
-              ? Border.all(color: const Color(0xFF667EEA), width: 2)
-              : null,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -1652,19 +1646,23 @@ class _PollCard extends StatelessWidget {
                   horizontal: 16,
                   vertical: 8,
                 ),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF667EEA),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.push_pin, color: Colors.white, size: 16),
-                    SizedBox(width: 4),
+                    Icon(Icons.push_pin, color: Colors.white, size: 18),
+                    SizedBox(width: 6),
                     Text(
                       'PINNED POLL',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 12,
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
