@@ -466,13 +466,15 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                         size: 20,
                       ),
                       const SizedBox(width: 8),
-                      const Text(
-                        'VIP Skip-the-Line Upgrades (Optional)',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A1A1A),
-                          fontFamily: 'Roboto',
+                      Expanded(
+                        child: const Text(
+                          'VIP Skip-the-Line Upgrades (Optional)',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1A1A1A),
+                            fontFamily: 'Roboto',
+                          ),
                         ),
                       ),
                     ],
