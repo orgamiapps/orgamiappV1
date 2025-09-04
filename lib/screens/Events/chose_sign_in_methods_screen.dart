@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:attendus/screens/Events/chose_location_in_map_screen.dart';
 import 'package:attendus/screens/Events/add_questions_prompt_screen.dart';
 import 'package:attendus/screens/Events/Widget/sign_in_methods_selector.dart';
 import 'package:attendus/Utils/router.dart';
@@ -211,9 +210,7 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
           ),
           const SizedBox(height: 12),
           Text(
-            _selectedSignInMethods.contains('geofence')
-                ? 'Since you selected geofence tracking, you\'ll need to choose a location and set the distance for automatic sign-in.'
-                : 'You can now proceed to add questions and fill out your event details.',
+            'You can now proceed to add questions and then fill out your event details, including picking the event\'s location.',
             style: TextStyle(
               color: Colors.grey[600],
               fontSize: 14,
@@ -251,35 +248,20 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () {
-            if (_selectedSignInMethods.contains('geofence')) {
-              // If geofence is selected, go to location selection
-              RouterClass.nextScreenNormal(
-                context,
-                ChoseLocationInMapScreen(
-                  selectedDateTime: widget.selectedDateTime,
-                  eventDurationHours: widget.eventDurationHours,
-                  selectedSignInMethods: _selectedSignInMethods,
-                  manualCode: _manualCode,
-                  preselectedOrganizationId: widget.preselectedOrganizationId,
-                  forceOrganizationEvent: widget.forceOrganizationEvent,
-                ),
-              );
-            } else {
-              // If no geofence, go to questions prompt with default location
-              RouterClass.nextScreenNormal(
-                context,
-                AddQuestionsPromptScreen(
-                  selectedDateTime: widget.selectedDateTime,
-                  eventDurationHours: widget.eventDurationHours,
-                  selectedLocation: const LatLng(0, 0), // Default location
-                  radios: 10.0, // Default radius
-                  selectedSignInMethods: _selectedSignInMethods,
-                  manualCode: _manualCode,
-                  preselectedOrganizationId: widget.preselectedOrganizationId,
-                  forceOrganizationEvent: widget.forceOrganizationEvent,
-                ),
-              );
-            }
+            // Proceed directly to questions prompt. Location will be picked on Event Details.
+            RouterClass.nextScreenNormal(
+              context,
+              AddQuestionsPromptScreen(
+                selectedDateTime: widget.selectedDateTime,
+                eventDurationHours: widget.eventDurationHours,
+                selectedLocation: const LatLng(0, 0), // Placeholder
+                radios: 10.0, // Default radius
+                selectedSignInMethods: _selectedSignInMethods,
+                manualCode: _manualCode,
+                preselectedOrganizationId: widget.preselectedOrganizationId,
+                forceOrganizationEvent: widget.forceOrganizationEvent,
+              ),
+            );
           },
           child: const Center(
             child: Text(

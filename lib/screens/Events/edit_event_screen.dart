@@ -12,13 +12,11 @@ import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/screens/Events/Widget/delete_event_dialogue.dart';
 
-import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/text_fields.dart';
 import 'package:attendus/Utils/toast.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 import 'package:attendus/screens/Events/Widget/sign_in_methods_selector.dart';
-import 'package:attendus/screens/Events/geofence_setup_screen.dart';
 import 'package:attendus/screens/Events/location_picker_screen.dart';
 import 'dart:io';
 
@@ -916,18 +914,6 @@ class _EditEventScreenState extends State<EditEventScreen>
         setState(() {
           _selectedSignInMethods = methods;
         });
-
-        // Check if geofence was just enabled
-        if (methods.contains('geofence') &&
-            !widget.eventModel.signInMethods.contains('geofence')) {
-          // Geofence was just enabled, navigate to setup screen
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            RouterClass.nextScreenNormal(
-              context,
-              GeofenceSetupScreen(eventModel: widget.eventModel),
-            );
-          });
-        }
       },
       manualCode: _manualCode,
       onManualCodeChanged: (code) {
