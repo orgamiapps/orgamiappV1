@@ -74,13 +74,28 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
         });
 
         if (ticket == null) {
-          ShowToast().showNormalToast(msg: 'Invalid ticket code');
+          _showScanResult(
+            success: false,
+            title: 'Invalid Ticket',
+            message: 'No ticket found for the scanned code.',
+          );
         } else if (ticket.eventId != widget.eventId) {
-          ShowToast().showNormalToast(
-            msg: 'This ticket is for a different event',
+          _showScanResult(
+            success: false,
+            title: 'Wrong Event',
+            message:
+                'This ticket belongs to "${ticket.eventTitle}" and is not valid for this event.',
           );
         } else if (ticket.isUsed) {
-          ShowToast().showNormalToast(msg: 'This ticket has already been used');
+          final usedDate = ticket.usedDateTime != null
+              ? DateFormat('MMM dd, yyyy – h:mm a').format(ticket.usedDateTime!)
+              : 'Unknown time';
+          _showScanResult(
+            success: false,
+            title: 'Already Used',
+            message:
+                'This ticket was already used${ticket.usedBy != null ? ' by ${ticket.usedBy}' : ''} on $usedDate.',
+          );
         } else {
           _showTicketValidationDialog(ticket);
         }
@@ -90,7 +105,11 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
         setState(() {
           isLoading = false;
         });
-        ShowToast().showNormalToast(msg: 'Error scanning ticket: $e');
+        _showScanResult(
+          success: false,
+          title: 'Scan Error',
+          message: 'Error scanning ticket. Please try again. ($e)',
+        );
       }
     }
   }
@@ -114,8 +133,10 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
         });
 
         if (ticket == null) {
-          ShowToast().showNormalToast(
-            msg: 'No active ticket for this event for this user',
+          _showScanResult(
+            success: false,
+            title: 'No Ticket Found',
+            message: 'This badge has no active ticket for this event.',
           );
         } else {
           _showTicketValidationDialog(ticket);
@@ -126,7 +147,11 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
         setState(() {
           isLoading = false;
         });
-        ShowToast().showNormalToast(msg: 'Error scanning badge: $e');
+        _showScanResult(
+          success: false,
+          title: 'Scan Error',
+          message: 'Error scanning badge. Please try again. ($e)',
+        );
       }
     }
   }
@@ -150,7 +175,10 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
             ),
             if (ticket.isSkipTheLine) ...[
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
@@ -167,11 +195,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.flash_on,
-                      color: Colors.white,
-                      size: 16,
-                    ),
+                    Icon(Icons.flash_on, color: Colors.white, size: 16),
                     SizedBox(width: 4),
                     Text(
                       'VIP',
@@ -313,6 +337,113 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
     );
   }
 
+  // Present a clear success/failure result after scanning/activation
+  void _showScanResult({
+    required bool success,
+    required String title,
+    String? message,
+  }) {
+    // Pause scanning so we don't immediately scan again under the sheet
+    if (mounted) {
+      setState(() {
+        isScanning = false;
+      });
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isDismissible: true,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color:
+                      (success
+                              ? const Color(0xFF10B981)
+                              : const Color(0xFFEF4444))
+                          .withAlpha(30),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  success ? Icons.check_circle : Icons.error_outline,
+                  color: success
+                      ? const Color(0xFF10B981)
+                      : const Color(0xFFEF4444),
+                  size: 36,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: success
+                      ? const Color(0xFF065F46)
+                      : const Color(0xFF991B1B),
+                  fontFamily: 'Roboto',
+                ),
+              ),
+              if (message != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF6B7280),
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    if (mounted) {
+                      setState(() {
+                        // Clear any previous ticket info and resume scanning
+                        scannedTicket = null;
+                        _ticketCodeController.clear();
+                        isScanning = true;
+                      });
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF667EEA),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Scan Next',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _validateTicket(TicketModel ticket) async {
     Navigator.pop(context); // Close dialog
 
@@ -353,26 +484,24 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
         setState(() {
           isLoading = false;
         });
-
-        final message = existingAttendance == null
-            ? 'Ticket validated and attendee signed in successfully!'
-            : 'Ticket validated successfully!';
-        ShowToast().showNormalToast(msg: message);
-
-        _ticketCodeController.clear();
-        setState(() {
-          scannedTicket = null;
-        });
-
-        // Return to previous screen with success result
-        Navigator.pop(context, true);
+        _showScanResult(
+          success: true,
+          title: 'Ticket Activated',
+          message: existingAttendance == null
+              ? 'Ticket validated and attendee signed in successfully.'
+              : 'Ticket validated successfully.',
+        );
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           isLoading = false;
         });
-        ShowToast().showNormalToast(msg: 'Failed to validate ticket: $e');
+        _showScanResult(
+          success: false,
+          title: 'Activation Failed',
+          message: 'Failed to validate ticket. Please try again. ($e)',
+        );
       }
     }
   }
