@@ -4,9 +4,11 @@ import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/models/ticket_model.dart';
 import 'package:attendus/models/attendance_model.dart';
 import 'package:attendus/Utils/toast.dart';
+import 'package:attendus/Utils/qr_debug_helper.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:attendus/models/badge_model.dart';
+import 'package:attendus/Permissions/permissions_helper.dart';
 
 class TicketScannerScreen extends StatefulWidget {
   final String eventId;
@@ -506,7 +508,21 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
     }
   }
 
-  void _toggleScanning() {
+  Future<void> _toggleScanning() async {
+    if (!isScanning) {
+      // Check camera permission before starting scanner
+      final hasPermission = await PermissionsHelperClass.checkCameraPermission(
+        context: context,
+      );
+      
+      if (!hasPermission) {
+        ShowToast().showNormalToast(
+          msg: 'Camera permission is required to scan QR codes',
+        );
+        return;
+      }
+    }
+    
     setState(() {
       isScanning = !isScanning;
     });
@@ -680,26 +696,58 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                     for (final barcode in barcodes) {
                       if (barcode.rawValue != null) {
                         final raw = barcode.rawValue!;
+                        
+                        // Use debug helper to log scan results
+                        QRDebugHelper.logQRScanResult(raw);
+                        
                         // Try ticket QR first
                         final qrData = TicketModel.parseQRCodeData(raw);
                         if (qrData != null) {
                           final ticketCode = qrData['ticketCode'];
                           if (ticketCode != null) {
+                            debugPrint('Processing ticket code: $ticketCode');
                             _processTicketCode(ticketCode);
                             return;
                           }
                         }
+                        
                         // Then try user badge QR
                         final userId = UserBadgeModel.parseBadgeQr(raw);
                         if (userId != null) {
+                          debugPrint('Processing user badge: $userId');
                           _processUserBadge(userId);
                           return;
                         }
+                        
+                        // Try event QR code format as fallback
+                        if (raw.contains('orgami_app_code_')) {
+                          final eventCode = raw.split('orgami_app_code_').last;
+                          if (eventCode == widget.eventId) {
+                            ShowToast().showNormalToast(
+                              msg: 'This is an event QR code, not a ticket QR code.',
+                            );
+                            return;
+                          }
+                        }
+                        
                         ShowToast().showNormalToast(
-                          msg: 'Invalid QR code format',
+                          msg: 'Invalid QR code format for ticket scanning',
                         );
                       }
                     }
+                  },
+                  onPermissionSet: (controller, granted) {
+                    if (!granted) {
+                      ShowToast().showNormalToast(
+                        msg: 'Camera permission is required to scan QR codes',
+                      );
+                      setState(() {
+                        isScanning = false;
+                      });
+                    }
+                  },
+                  onScannerStarted: (arguments) {
+                    debugPrint('Scanner started with arguments: $arguments');
                   },
                 ),
               ),

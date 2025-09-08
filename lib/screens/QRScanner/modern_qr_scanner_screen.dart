@@ -11,6 +11,7 @@ import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/dimensions.dart';
+import 'package:attendus/Utils/qr_debug_helper.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
@@ -80,14 +81,18 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
 
   Future<void> _checkPermissions() async {
     try {
-      await PermissionsHelperClass.checkCameraPermission(context: context);
-      // For emulator testing, we'll show a demo mode
+      final hasPermission = await PermissionsHelperClass.checkCameraPermission(context: context);
+      QRDebugHelper.logCameraPermissionStatus(hasPermission);
       setState(() {
-        _isCameraPermissionGranted = true;
+        _isCameraPermissionGranted = hasPermission;
       });
+      if (hasPermission) {
+        debugPrint('Camera permission granted for QR scanner');
+      }
     } catch (e) {
       // Handle permission denied or emulator scenario
       debugPrint('Camera permission check failed in QR scanner: $e');
+      QRDebugHelper.logScannerInitialization(false, e.toString());
       setState(() {
         _isCameraPermissionGranted = false;
       });
@@ -177,7 +182,16 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
                     ),
                     const SizedBox(height: 30),
                     ElevatedButton(
-                      onPressed: _checkPermissions,
+                      onPressed: () async {
+                        await _checkPermissions();
+                        // If still no permission, show manual entry option
+                        if (!_isCameraPermissionGranted) {
+                          setState(() {
+                            _isManualEntry = true;
+                          });
+                          _animationController.forward();
+                        }
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppThemeColor.darkBlueColor,
                         foregroundColor: AppThemeColor.pureWhiteColor,
@@ -190,6 +204,22 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
                         ),
                       ),
                       child: const Text('Grant Permission'),
+                    ),
+                    const SizedBox(height: 15),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _isManualEntry = true;
+                        });
+                        _animationController.forward();
+                      },
+                      child: Text(
+                        'Enter code manually instead',
+                        style: TextStyle(
+                          color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.8),
+                          fontSize: Dimensions.fontSizeDefault,
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 20),
                   ],
@@ -708,21 +738,55 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
     setState(() {
       this.controller = controller;
     });
+    
     controller.scannedDataStream.listen((scanData) async {
-      if (scanData.code != null &&
-          scanData.code!.contains('orgami_app_code_')) {
-        final eventCode = scanData.code!.split('orgami_app_code_').last;
-        _codeController.text = eventCode;
-        setState(() {
-          result = scanData;
-        });
+      if (scanData.code != null) {
+        final scannedCode = scanData.code!;
+        
+        // Use debug helper to log scan results
+        QRDebugHelper.logQRScanResult(scannedCode);
+        
+        // Handle different QR code formats
+        String? eventCode;
+        
+        // Check for event QR code format
+        if (scannedCode.contains('orgami_app_code_')) {
+          eventCode = scannedCode.split('orgami_app_code_').last;
+          debugPrint('Event QR detected, event code: $eventCode');
+        }
+        // Check for ticket QR code format
+        else if (scannedCode.startsWith('orgami_ticket_')) {
+          final parts = scannedCode.split('_');
+          if (parts.length >= 4) {
+            eventCode = parts[3]; // eventId from ticket QR
+            debugPrint('Ticket QR detected, extracted event code: $eventCode');
+          }
+        }
+        // Check for user badge QR code format
+        else if (scannedCode.startsWith('attendus_user_')) {
+          ShowToast().showNormalToast(
+            msg: 'This is a user badge QR code. Please scan an event QR code.',
+          );
+          return;
+        }
+        
+        if (eventCode != null) {
+          _codeController.text = eventCode;
+          setState(() {
+            result = scanData;
+          });
 
-        // Haptic feedback
-        HapticFeedback.lightImpact();
+          // Haptic feedback
+          HapticFeedback.lightImpact();
 
-        // Return the scanned code to the previous screen
-        if (!mounted) return;
-        Navigator.of(context).pop(eventCode);
+          // Return the scanned code to the previous screen
+          if (!mounted) return;
+          Navigator.of(context).pop(eventCode);
+        } else {
+          ShowToast().showNormalToast(
+            msg: 'Invalid QR code format. Please scan a valid event QR code.',
+          );
+        }
       }
     });
   }
