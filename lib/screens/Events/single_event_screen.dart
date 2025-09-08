@@ -51,6 +51,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:attendus/screens/Events/Widget/access_list_management_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:attendus/screens/Events/Widget/pre_registered_horizontal_list.dart';
+import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 
 class SingleEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -2521,7 +2522,8 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScaffoldWrapper(
+      selectedBottomNavIndex: 1, // Groups tab
       backgroundColor: _backgroundColor,
       floatingActionButton:
           eventModel.hasManagementPermissions(

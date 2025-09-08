@@ -12,6 +12,7 @@ import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 
 class EventAnalyticsScreen extends StatefulWidget {
   final String eventId;
@@ -262,7 +263,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
   @override
   Widget build(BuildContext context) {
     if (!_isAuthorized) {
-      return Scaffold(
+      return AppScaffoldWrapper(
         backgroundColor: AppThemeColor.backGroundColor,
         body: SafeArea(
           child: Center(
@@ -297,7 +298,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
       );
     }
 
-    return Scaffold(
+    return AppScaffoldWrapper(
       backgroundColor: AppThemeColor.backGroundColor,
       body: SafeArea(
         child: Column(

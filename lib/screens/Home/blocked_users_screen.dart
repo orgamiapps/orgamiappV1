@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 
 class BlockedUsersScreen extends StatefulWidget {
   const BlockedUsersScreen({super.key});
@@ -72,7 +73,8 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScaffoldWrapper(
+      selectedBottomNavIndex: 5, // Account tab
       appBar: AppBar(title: const Text('Blocked Users')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

@@ -22,6 +22,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 import 'package:attendus/screens/Groups/groups_screen.dart';
+import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 
 class NewMessageScreen extends StatefulWidget {
   const NewMessageScreen({super.key});
@@ -523,7 +524,8 @@ class _NewMessageScreenState extends State<NewMessageScreen>
     super.build(context);
     final theme = Theme.of(context);
 
-    final scaffold = Scaffold(
+    final scaffold = AppScaffoldWrapper(
+      selectedBottomNavIndex: 2, // Messages tab
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.white,
