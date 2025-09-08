@@ -5,6 +5,7 @@ import 'package:attendus/screens/QRScanner/qr_scanner_flow_screen.dart';
 import 'package:attendus/firebase/organization_helper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/Utils/router.dart';
+import 'package:attendus/Utils/images.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
@@ -142,6 +143,8 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
         children: [
+          Image.asset(Images.inAppLogo, width: 36, height: 36),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -269,7 +272,9 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: selected ? primary.withValues(alpha: 0.1) : Colors.transparent,
+            color: selected
+                ? primary.withValues(alpha: 0.1)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(

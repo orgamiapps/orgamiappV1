@@ -1,4 +1,5 @@
-import 'dart:math';
+import 'dart:math' as math;
+import 'dart:math' show Random;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/controller/customer_controller.dart';
@@ -14,6 +15,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:attendus/firebase/firebase_messaging_helper.dart';
+import 'package:attendus/Services/on_device_nlp_service.dart';
 
 class FirebaseFirestoreHelper {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -22,6 +24,160 @@ class FirebaseFirestoreHelper {
   // Cache for frequently accessed data
   static final Map<String, dynamic> _cache = {};
   static const Duration _cacheExpiry = Duration(minutes: 5);
+
+  // ===== On-Device AI Natural Language Event Search =====
+  Future<List<EventModel>> aiSearchEvents({
+    required String query,
+    double? latitude,
+    double? longitude,
+    int limit = 50,
+  }) async {
+    try {
+      // Use on-device NLP service instead of cloud function
+      final nlpService = OnDeviceNLPService.instance;
+      final intent = await nlpService.parseQuery(query);
+      
+      Logger.debug('Parsed query intent: $intent');
+      
+      // Build Firestore query based on parsed intent
+      return await _searchEventsWithIntent(intent, latitude, longitude, limit);
+    } catch (e) {
+      Logger.error('Error with on-device AI search', e);
+      // Fallback to simple text search
+      return await _fallbackTextSearch(query, limit);
+    }
+  }
+
+  /// Search events using parsed intent from on-device AI
+  Future<List<EventModel>> _searchEventsWithIntent(
+    Map<String, dynamic> intent,
+    double? latitude,
+    double? longitude,
+    int limit,
+  ) async {
+    final categories = intent['categories'] as List<String>? ?? [];
+    final keywords = intent['keywords'] as List<String>? ?? [];
+    final nearMe = intent['nearMe'] as bool? ?? false;
+    final radiusKm = intent['radiusKm'] as double? ?? 0.0;
+    final dateRange = intent['dateRange'] as Map<String, String>? ?? {};
+
+    // Build base timeframe
+    final now = DateTime.now();
+    final start = dateRange['start'] != null 
+        ? DateTime.parse(dateRange['start']!) 
+        : now.subtract(const Duration(hours: 3));
+    final end = dateRange['end'] != null 
+        ? DateTime.parse(dateRange['end']!) 
+        : now.add(const Duration(days: 60));
+
+    // Query public events within timeframe
+    Query query = _firestore
+        .collection(EventModel.firebaseKey)
+        .where('private', isEqualTo: false)
+        .where('selectedDateTime', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('selectedDateTime', isLessThanOrEqualTo: Timestamp.fromDate(end))
+        .orderBy('selectedDateTime')
+        .limit(limit * 2); // Get more for filtering
+
+    final snapshot = await query.get();
+    List<EventModel> events = snapshot.docs.map((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      data['id'] = data['id'] ?? doc.id;
+      return EventModel.fromJson(data);
+    }).toList();
+
+    // Apply category filtering
+    if (categories.isNotEmpty) {
+      events = events.where((event) {
+        final eventCategories = event.categories.map((c) => c.toLowerCase()).toList();
+        return categories.any((category) => 
+          eventCategories.any((ec) => ec.contains(category.toLowerCase()))
+        );
+      }).toList();
+    }
+
+    // Apply keyword filtering
+    if (keywords.isNotEmpty) {
+      events = events.where((event) {
+        final searchText = '${event.title} ${event.description} ${event.location}'.toLowerCase();
+        return keywords.any((keyword) => searchText.contains(keyword.toLowerCase()));
+      }).toList();
+    }
+
+    // Apply location filtering
+    if (nearMe && latitude != null && longitude != null && radiusKm > 0) {
+      events = events.where((event) {
+        if (event.latitude == 0.0 && event.longitude == 0.0) return false;
+        final distance = _calculateDistance(latitude, longitude, event.latitude, event.longitude);
+        return distance <= radiusKm;
+      }).toList();
+    }
+
+    // Sort: featured first, then by distance (if location search), then by date
+    events.sort((a, b) {
+      // Featured events first
+      if (a.isFeatured && !b.isFeatured) return -1;
+      if (!a.isFeatured && b.isFeatured) return 1;
+
+      // If location search, sort by distance
+      if (nearMe && latitude != null && longitude != null) {
+        final distA = _calculateDistance(latitude, longitude, a.latitude, a.longitude);
+        final distB = _calculateDistance(latitude, longitude, b.latitude, b.longitude);
+        final distComparison = distA.compareTo(distB);
+        if (distComparison != 0) return distComparison;
+      }
+
+      // Finally sort by date
+      return a.selectedDateTime.compareTo(b.selectedDateTime);
+    });
+
+    // Limit results
+    return events.take(limit).toList();
+  }
+
+  /// Calculate distance between two points in kilometers
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const double earthRadius = 6371; // km
+    final double dLat = _degreesToRadians(lat2 - lat1);
+    final double dLon = _degreesToRadians(lon2 - lon1);
+    final double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_degreesToRadians(lat1)) * math.cos(_degreesToRadians(lat2)) *
+        math.sin(dLon / 2) * math.sin(dLon / 2);
+    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return earthRadius * c;
+  }
+
+  double _degreesToRadians(double degrees) {
+    return degrees * (math.pi / 180);
+  }
+
+  /// Fallback text search when AI parsing fails
+  Future<List<EventModel>> _fallbackTextSearch(String query, int limit) async {
+    final queryLower = query.toLowerCase();
+    final now = DateTime.now();
+
+    Query firestoreQuery = _firestore
+        .collection(EventModel.firebaseKey)
+        .where('private', isEqualTo: false)
+        .where('selectedDateTime', isGreaterThan: now.subtract(const Duration(hours: 3)))
+        .orderBy('selectedDateTime')
+        .limit(limit);
+
+    final snapshot = await firestoreQuery.get();
+    List<EventModel> events = snapshot.docs.map((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      data['id'] = data['id'] ?? doc.id;
+      return EventModel.fromJson(data);
+    }).toList();
+
+    // Filter by text matching
+    events = events.where((event) {
+      final searchText = '${event.title} ${event.description} ${event.location}'.toLowerCase();
+      return searchText.contains(queryLower);
+    }).toList();
+
+    return events;
+  }
 
   /// UGC: Report content or user
   Future<void> submitUserReport({

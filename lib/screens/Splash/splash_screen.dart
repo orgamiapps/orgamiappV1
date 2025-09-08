@@ -41,7 +41,7 @@ class _SplashScreenState extends State<SplashScreen>
     });
 
     // Set a reasonable global timeout to prevent getting stuck
-    _timeoutTimer = Timer(const Duration(seconds: 10), () {
+    _timeoutTimer = Timer(const Duration(seconds: 5), () {
       if (mounted && !_hasNavigated) {
         debugPrint('⏰ Global timeout - forcing navigation');
         _navigateToSecondSplash();
@@ -104,8 +104,8 @@ class _SplashScreenState extends State<SplashScreen>
         if (mounted) _loadingAnimationController.repeat();
       });
 
-      // Give animations time to start and Firebase to be ready
-      await Future.delayed(const Duration(milliseconds: 800));
+      // Give animations a brief moment to start and Firebase to be ready
+      await Future.delayed(const Duration(milliseconds: 200));
 
       // Now get user - run in next frame to avoid blocking UI
       WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -143,7 +143,7 @@ class _SplashScreenState extends State<SplashScreen>
         final userData = await FirebaseFirestoreHelper()
             .getSingleCustomer(customerId: firebaseUser.uid)
             .timeout(
-              const Duration(seconds: 5), // Increased for better reliability
+              const Duration(seconds: 3),
               onTimeout: () {
                 debugPrint('⏰ Timeout getting user data');
                 return null;

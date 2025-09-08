@@ -2,12 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:attendus/firebase/organization_helper.dart';
 import 'package:attendus/screens/Groups/create_group_screen.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:attendus/screens/Groups/join_requests_screen.dart';
-import 'package:attendus/screens/Groups/role_permissions_screen.dart';
-import 'package:attendus/models/event_model.dart';
-import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
-import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/screens/Groups/group_profile_screen_v2.dart';
 
 class GroupsTab extends StatefulWidget {

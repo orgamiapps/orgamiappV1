@@ -31,6 +31,7 @@ import 'package:provider/provider.dart';
 import 'package:attendus/Utils/location_helper.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/screens/Events/chose_sign_in_methods_screen.dart';
+import 'package:attendus/Utils/images.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -197,10 +198,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     // Initialize animations with reduced durations for better performance
     _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 800), // Slightly increased for smoother animation
+      duration: const Duration(
+        milliseconds: 800,
+      ), // Slightly increased for smoother animation
       vsync: this,
     );
-    _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate( // Reduced animation range
+    _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
+      // Reduced animation range
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     // Defer animation start to reduce initial load
@@ -618,38 +622,51 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    const Text(
-                      'Discover',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w300,
-                        fontSize: 20,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                    ShaderMask(
-                      shaderCallback: (Rect bounds) {
-                        return const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFFFFFFFF), Color(0xFFDEE9FF)],
-                        ).createShader(
-                          Rect.fromLTWH(0, 0, bounds.width, bounds.height),
-                        );
-                      },
-                      blendMode: BlendMode.srcIn,
-                      child: const Text(
-                        'Amazing Events',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 26,
-                          fontFamily: 'Roboto',
-                          letterSpacing: 0.3,
-                        ),
+                    Image.asset(Images.inAppLogo, width: 36, height: 36),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Discover',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w300,
+                              fontSize: 20,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                          ShaderMask(
+                            shaderCallback: (Rect bounds) {
+                              return const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [Color(0xFFFFFFFF), Color(0xFFDEE9FF)],
+                              ).createShader(
+                                Rect.fromLTWH(
+                                  0,
+                                  0,
+                                  bounds.width,
+                                  bounds.height,
+                                ),
+                              );
+                            },
+                            blendMode: BlendMode.srcIn,
+                            child: const Text(
+                              'Amazing Events',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 26,
+                                fontFamily: 'Roboto',
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -1559,7 +1576,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // Load default events (all events, past and present)
   Future<void> _loadDefaultEvents() async {
     if (!mounted) return;
-    
+
     setState(() {
       _isLoadingDefaultEvents = true;
     });
@@ -1604,7 +1621,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // Load default users (ascending by name)
   Future<void> _loadDefaultUsers() async {
     if (!mounted) return;
-    
+
     setState(() {
       _isLoadingDefaultUsers = true;
     });

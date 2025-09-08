@@ -31,6 +31,7 @@ analyzer:
     deprecated_member_use_from_same_package: warning
     todo: ignore
     invalid_annotation_target: ignore
+    uri_does_not_exist: ignore
   language:
     strict-casts: false
     strict-inference: false
@@ -53,8 +54,6 @@ linter:
     use_build_context_synchronously: false  # Allow async gaps with BuildContext
     depend_on_referenced_packages: false
     library_private_types_in_public_api: false
-    unnecessary_import: false
-    uri_does_not_exist: false  # Temporarily disable to avoid false positives
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options

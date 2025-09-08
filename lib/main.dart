@@ -28,6 +28,7 @@ void main() async {
   ErrorHandler.initialize();
 
   Logger.info('Starting app initialization...');
+  final Stopwatch startupStopwatch = Stopwatch()..start();
 
   // Initialize Firebase first (critical for app functionality)
   try {
@@ -35,6 +36,9 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     Logger.success('Firebase core initialized');
+    Logger.info(
+      'T+${startupStopwatch.elapsed.inMilliseconds}ms: Firebase init done',
+    );
   } catch (e, st) {
     Logger.error('Firebase initialization failed', e, st);
   }
@@ -55,20 +59,34 @@ void main() async {
   );
 
   Logger.success('App initialization complete');
+  Logger.info('T+${startupStopwatch.elapsed.inMilliseconds}ms: runApp mounted');
 
   // Defer heavy initialization to after first frame
   WidgetsBinding.instance.addPostFrameCallback((_) async {
-    // Load theme preference and update if needed
+    // Load theme preference and update if needed using existing provider
     SharedPreferences.getInstance().then((prefs) {
       final isDarkMode = prefs.getBool('isDarkMode') ?? false;
-      if (isDarkMode) {
-        // Only update if not default
-        ThemeProvider().loadTheme(isDarkMode);
+      final context = appNavigatorKey.currentContext;
+      if (context != null) {
+        try {
+          final themeProvider = Provider.of<ThemeProvider>(
+            context,
+            listen: false,
+          );
+          if (isDarkMode != themeProvider.isDarkMode) {
+            themeProvider.setTheme(isDarkMode);
+          }
+        } catch (e) {
+          Logger.warning('Failed to apply saved theme: $e');
+        }
       }
     });
 
     // Defer heavy initialization to after the app starts
     _initializeBackgroundServices();
+    Logger.info(
+      'T+${startupStopwatch.elapsed.inMilliseconds}ms: Background init scheduled',
+    );
   });
 }
 
@@ -92,15 +110,14 @@ Future<void> _initializeBackgroundServices() async {
         .checkConnectivity()
         .then((connectivityResult) {
           bool isOffline = false;
-          if (connectivityResult is ConnectivityResult) {
-            isOffline = connectivityResult == ConnectivityResult.none;
-          } else {
-            // Handle newer API returning List<ConnectivityResult>
-            final list = List<ConnectivityResult>.from(
-              (connectivityResult as Iterable).cast<ConnectivityResult>(),
-            );
+          // Handle newer API returning List<ConnectivityResult>
+          if (connectivityResult is List<ConnectivityResult>) {
             isOffline =
-                list.isEmpty || list.every((c) => c == ConnectivityResult.none);
+                connectivityResult.isEmpty ||
+                connectivityResult.every((c) => c == ConnectivityResult.none);
+          } else if (connectivityResult is ConnectivityResult) {
+            // Handle older API returning single ConnectivityResult
+            isOffline = connectivityResult == ConnectivityResult.none;
           }
 
           final bool isReachable = !isOffline;

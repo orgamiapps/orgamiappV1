@@ -18,6 +18,7 @@ Run this script in your terminal to clear all caches:
 
 ## Manual Steps to Fix in Android Studio
 
+
 ### Step 1: Clear Android Studio Caches
 1. In Android Studio, go to **File → Invalidate Caches**
 2. Check all options:

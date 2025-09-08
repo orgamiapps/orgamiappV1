@@ -11,7 +11,6 @@ import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 import 'package:attendus/Utils/cached_image.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/controller/customer_controller.dart';
-import 'package:attendus/screens/Groups/widgets/event_card.dart';
 import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
 
 class EnhancedFeedTab extends StatefulWidget {

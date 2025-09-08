@@ -1992,6 +1992,233 @@ exports.createTicketPaymentIntent = onCall({ region: "us-central1" }, async (req
   }
 });
 
+// ============================================================================
+// AI-POWERED NATURAL LANGUAGE EVENT SEARCH (LLAMA 3 VIA HUGGING FACE)
+// ============================================================================
+
+/**
+ * Simple rule-based query parsing fallback for server-side processing
+ * Returns an object like:
+ * {
+ *   categories: string[],
+ *   keywords: string[],
+ *   nearMe: boolean,
+ *   radiusKm: number,
+ *   dateRange: { start?: string, end?: string }
+ * }
+ */
+function parseQuerySimple(query) {
+  const queryLower = (String(query) || '').toLowerCase();
+  
+  // Extract keywords (remove common words)
+  const commonWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'near', 'me', 'find', 'search', 'event', 'events']);
+  const keywords = queryLower
+    .split(/[^a-z0-9]+/)
+    .filter(word => word.length > 2 && !commonWords.has(word))
+    .slice(0, 5);
+
+  // Detect categories based on keywords
+  const categoryMap = {
+    'book': ['book club', 'reading'],
+    'read': ['book club', 'reading'],
+    'music': ['music', 'concert'],
+    'concert': ['music', 'concert'],
+    'sport': ['sports'],
+    'fitness': ['sports', 'fitness'],
+    'tech': ['tech', 'technology'],
+    'technology': ['tech', 'technology'],
+    'network': ['networking'],
+    'business': ['networking', 'business'],
+    'family': ['family'],
+    'kid': ['family'],
+    'art': ['art'],
+    'paint': ['art'],
+    'food': ['food'],
+    'cook': ['food'],
+    'game': ['gaming'],
+    'gaming': ['gaming'],
+    'education': ['education'],
+    'learn': ['education'],
+    'workshop': ['education']
+  };
+
+  const categories = [];
+  keywords.forEach(keyword => {
+    if (categoryMap[keyword]) {
+      categories.push(...categoryMap[keyword]);
+    }
+  });
+
+  // Remove duplicates
+  const uniqueCategories = [...new Set(categories)];
+
+  // Detect location intent
+  const nearMe = /near\s+me|around\s+me|close\s+by|nearby|local/i.test(query);
+  
+  // Extract radius if mentioned
+  let radiusKm = nearMe ? 25 : 0;
+  const radiusMatch = query.match(/(\d+)\s*(km|kilometers?|miles?)/i);
+  if (radiusMatch) {
+    const value = parseInt(radiusMatch[1]);
+    radiusKm = radiusMatch[2].toLowerCase().startsWith('m') ? value * 1.6 : value; // Convert miles to km
+  }
+
+  // Basic date parsing
+  const dateRange = {};
+  const now = new Date();
+  
+  if (/today/i.test(query)) {
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    dateRange.start = today.toISOString();
+    dateRange.end = new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString();
+  } else if (/tomorrow/i.test(query)) {
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    dateRange.start = tomorrow.toISOString();
+    dateRange.end = new Date(tomorrow.getTime() + 24 * 60 * 60 * 1000).toISOString();
+  } else if (/this\s+week/i.test(query)) {
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek.getTime() + 7 * 24 * 60 * 60 * 1000);
+    dateRange.start = startOfWeek.toISOString();
+    dateRange.end = endOfWeek.toISOString();
+  } else if (/weekend/i.test(query)) {
+    const daysUntilSaturday = 6 - now.getDay();
+    const saturday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysUntilSaturday);
+    saturday.setHours(0, 0, 0, 0);
+    const sunday = new Date(saturday.getTime() + 2 * 24 * 60 * 60 * 1000);
+    dateRange.start = saturday.toISOString();
+    dateRange.end = sunday.toISOString();
+  }
+
+  return {
+    categories: uniqueCategories,
+    keywords,
+    nearMe,
+    radiusKm,
+    dateRange,
+  };
+}
+
+function kmDistance(lat1, lon1, lat2, lon2) {
+  const toRad = (v) => v * Math.PI / 180;
+  const R = 6371; // km
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
+ * Callable function: aiSearchEvents
+ * Input: { query: string, lat?: number, lng?: number, limit?: number }
+ * Output: { events: Event[], intent: {...} }
+ */
+exports.aiSearchEvents = onCall({ region: 'us-central1', timeoutSeconds: 20, memory: '512MiB' }, async (req) => {
+  const uid = req.auth?.uid || null;
+  const { query, lat, lng, limit } = req.data || {};
+  if (!query || typeof query !== 'string') {
+    throw new Error("INVALID_ARGUMENT: 'query' is required");
+  }
+
+  const db = admin.firestore();
+  const intent = parseQuerySimple(query);
+
+  // Build base timeframe: from now-3h to +60 days unless intent.dateRange provided
+  const now = new Date();
+  const start = intent.dateRange?.start ? new Date(intent.dateRange.start) : new Date(now.getTime() - 3 * 60 * 60 * 1000);
+  const end = intent.dateRange?.end ? new Date(intent.dateRange.end) : new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
+
+  // Fetch a reasonable pool of upcoming public events, then filter in memory
+  let q = db.collection('Events')
+    .where('private', '==', false)
+    .where('selectedDateTime', '>=', start)
+    .where('selectedDateTime', '<=', end)
+    .orderBy('selectedDateTime')
+    .limit(Math.min(Number(limit) || 200, 400));
+
+  const snap = await q.get();
+  let events = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  // Category filter
+  const categories = (intent.categories || []).map(c => String(c).toLowerCase());
+  if (categories.length > 0) {
+    events = events.filter(ev => {
+      const evCats = Array.isArray(ev.categories) ? ev.categories.map(c => String(c).toLowerCase()) : [];
+      return evCats.some(c => categories.includes(c));
+    });
+  }
+
+  // Keyword filter (title/description/location)
+  const keywords = (intent.keywords || []).map(k => String(k).toLowerCase());
+  if (keywords.length > 0) {
+    events = events.filter(ev => {
+      const t = String(ev.title || '').toLowerCase();
+      const d = String(ev.description || '').toLowerCase();
+      const l = String(ev.location || '').toLowerCase();
+      return keywords.some(k => t.includes(k) || d.includes(k) || l.includes(k));
+    });
+  }
+
+  // Location filter
+  const useNearMe = intent.nearMe === true && typeof lat === 'number' && typeof lng === 'number';
+  const radiusKm = useNearMe ? (intent.radiusKm || 25) : 0;
+  if (useNearMe && radiusKm > 0) {
+    events = events
+      .map(ev => {
+        const evLat = typeof ev.latitude === 'number' ? ev.latitude : null;
+        const evLng = typeof ev.longitude === 'number' ? ev.longitude : null;
+        const dist = (evLat != null && evLng != null) ? kmDistance(lat, lng, evLat, evLng) : Infinity;
+        return { ...ev, _distanceKm: dist };
+      })
+      .filter(ev => ev._distanceKm <= radiusKm);
+  }
+
+  // Sort: featured first, then by (distance if applicable), then soonest date
+  events.sort((a, b) => {
+    const aFeat = a.isFeatured ? 1 : 0;
+    const bFeat = b.isFeatured ? 1 : 0;
+    if (aFeat !== bFeat) return bFeat - aFeat;
+    if (useNearMe) {
+      const ad = a._distanceKm ?? Infinity;
+      const bd = b._distanceKm ?? Infinity;
+      if (ad !== bd) return ad - bd;
+    }
+    const at = a.selectedDateTime && a.selectedDateTime.toDate ? a.selectedDateTime.toDate().getTime() : new Date(a.selectedDateTime).getTime();
+    const bt = b.selectedDateTime && b.selectedDateTime.toDate ? b.selectedDateTime.toDate().getTime() : new Date(b.selectedDateTime).getTime();
+    return at - bt;
+  });
+
+  // Trim and remove temp fields
+  const maxOut = Math.min(events.length, Number(limit) || 100);
+  const out = events.slice(0, maxOut).map(e => {
+    const clone = { ...e };
+    delete clone._distanceKm;
+    // Normalize Firestore Timestamp fields to ISO strings for client compatibility
+    const normalizeTs = (v) => {
+      try {
+        if (!v) return v;
+        if (v.toDate && typeof v.toDate === 'function') return v.toDate().toISOString();
+        const d = new Date(v);
+        if (!isNaN(d.getTime())) return d.toISOString();
+        if (v._seconds != null) {
+          return new Date(v._seconds * 1000 + Math.floor((v._nanoseconds || 0) / 1e6)).toISOString();
+        }
+      } catch (_) {}
+      return v;
+    };
+    clone.selectedDateTime = normalizeTs(clone.selectedDateTime);
+    clone.eventGenerateTime = normalizeTs(clone.eventGenerateTime);
+    clone.featureEndDate = normalizeTs(clone.featureEndDate);
+    return clone;
+  });
+
+  return { events: out, intent };
+});
+
 /**
  * Confirm ticket payment and issue the ticket
  */
