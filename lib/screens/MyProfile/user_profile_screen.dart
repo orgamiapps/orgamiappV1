@@ -6,6 +6,7 @@ import 'package:attendus/models/event_model.dart';
 import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/dimensions.dart';
 import 'package:attendus/Utils/cached_image.dart';
+import 'package:attendus/Utils/responsive_helper.dart';
 import 'package:attendus/firebase/firebase_storage_helper.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
@@ -211,13 +212,22 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   Widget _buildProfileHeaderUser() {
+    final responsivePadding = ResponsiveHelper.getResponsivePadding(context);
+    final buttonSize = ResponsiveHelper.getResponsiveIconSize(context, phone: 36, tablet: 44, desktop: 48);
+    final iconSize = ResponsiveHelper.getResponsiveIconSize(context, phone: 18, tablet: 22, desktop: 24);
+    
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1)),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      padding: EdgeInsets.fromLTRB(
+        responsivePadding.left, 
+        ResponsiveHelper.getResponsiveSpacing(context, phone: 8, tablet: 12, desktop: 16), 
+        responsivePadding.right, 
+        ResponsiveHelper.getResponsiveSpacing(context, phone: 12, tablet: 16, desktop: 20)
+      ),
       child: Stack(
         children: [
           Column(
@@ -228,16 +238,16 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   GestureDetector(
                     onTap: () => Navigator.of(context).maybePop(),
                     child: Container(
-                      width: 36,
-                      height: 36,
+                      width: buttonSize,
+                      height: buttonSize,
                       decoration: BoxDecoration(
                         color: const Color(0xFFF3F4F6),
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(buttonSize / 2),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.arrow_back,
                         color: Colors.black87,
-                        size: 18,
+                        size: iconSize,
                       ),
                     ),
                   ),
@@ -246,44 +256,44 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                     GestureDetector(
                       onTap: _showEditProfileModal,
                       child: Container(
-                        width: 36,
-                        height: 36,
+                        width: buttonSize,
+                        height: buttonSize,
                         decoration: BoxDecoration(
                           color: const Color(0xFFF3F4F6),
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(buttonSize / 2),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.edit,
                           color: Colors.black87,
-                          size: 18,
+                          size: iconSize,
                         ),
                       ),
                     )
                   else ...[
                     Container(
-                      width: 36,
-                      height: 36,
+                      width: buttonSize,
+                      height: buttonSize,
                       decoration: BoxDecoration(
                         color: const Color(0xFFF3F4F6),
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(buttonSize / 2),
                       ),
                       child: IconButton(
-                        icon: const Icon(CupertinoIcons.share, size: 18),
+                        icon: Icon(CupertinoIcons.share, size: iconSize),
                         color: Colors.black87,
                         onPressed: _shareProfile,
                         padding: EdgeInsets.zero,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: ResponsiveHelper.getResponsiveSpacing(context, phone: 8, tablet: 12, desktop: 16)),
                     Container(
-                      width: 36,
-                      height: 36,
+                      width: buttonSize,
+                      height: buttonSize,
                       decoration: BoxDecoration(
                         color: const Color(0xFFF3F4F6),
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(buttonSize / 2),
                       ),
                       child: IconButton(
-                        icon: const Icon(Icons.more_vert, size: 18),
+                        icon: Icon(Icons.more_vert, size: iconSize),
                         color: Colors.black87,
                         onPressed: () => _showProfileOptions(context),
                         padding: EdgeInsets.zero,
@@ -292,117 +302,133 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   ],
                 ],
               ),
-              const SizedBox(height: 8),
-              // Compact profile row
-              Row(
-                children: [
-                  // Avatar
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xFFE5E7EB),
-                        width: 1,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.06),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: ClipOval(
-                      child:
-                          (widget.user.profilePictureUrl != null &&
-                              widget.user.profilePictureUrl!.isNotEmpty)
-                          ? SafeNetworkImage(
-                              imageUrl: widget.user.profilePictureUrl!,
-                              fit: BoxFit.cover,
-                              errorWidget: const Icon(
-                                Icons.person,
-                                color: Color(0xFF64748B),
-                              ),
-                            )
-                          : const Icon(Icons.person, color: Color(0xFF64748B)),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  // Name + username + tagline
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.user.name,
-                          style: const TextStyle(
-                            color: Color(0xFF1A1A1A),
-                            fontSize: 22,
-                            fontWeight: FontWeight.w600,
-                            fontFamily: 'Roboto',
-                          ),
-                        ),
-                        if (widget.user.username != null &&
-                            widget.user.username!.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF3F4F6),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFFE5E7EB),
-                                width: 1,
-                              ),
-                            ),
-                            child: Text(
-                              '@${widget.user.username}',
-                              style: const TextStyle(
-                                color: Color(0xFF1F2937),
-                                fontWeight: FontWeight.w500,
-                                fontSize: 16,
-                                fontFamily: 'Roboto',
-                              ),
-                            ),
-                          ),
-                        ],
-                        if (widget.user.bio != null &&
-                            widget.user.bio!.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            widget.user.bio!,
-                            style: const TextStyle(
-                              color: Color(0xFF6B7280),
-                              fontWeight: FontWeight.w400,
-                              fontSize: 14,
-                              fontFamily: 'Roboto',
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+              SizedBox(height: ResponsiveHelper.getResponsiveSpacing(context, phone: 8, tablet: 12, desktop: 16)),
+              // Responsive profile row
+              _buildResponsiveProfileRow(),
               // Add Follow and Message buttons for other users' profiles
               if (!widget.isOwnProfile &&
                   CustomerController.logeInCustomer != null &&
                   widget.user.uid !=
                       CustomerController.logeInCustomer!.uid) ...[
-                const SizedBox(height: 12),
+                SizedBox(height: ResponsiveHelper.getResponsiveSpacing(context, phone: 12, tablet: 16, desktop: 20)),
                 _buildActionButtons(),
               ],
             ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildResponsiveProfileRow() {
+    final avatarSize = ResponsiveHelper.getResponsiveAvatarSize(context, phone: 60, tablet: 80, desktop: 100);
+    final nameSize = ResponsiveHelper.getResponsiveFontSize(context, phone: 22, tablet: 26, desktop: 30);
+    final usernameSize = ResponsiveHelper.getResponsiveFontSize(context, phone: 16, tablet: 18, desktop: 20);
+    final bioSize = ResponsiveHelper.getResponsiveFontSize(context, phone: 14, tablet: 16, desktop: 18);
+    final spacing = ResponsiveHelper.getResponsiveSpacing(context, phone: 16, tablet: 20, desktop: 24);
+    
+    return Row(
+      children: [
+        // Avatar
+        Container(
+          width: avatarSize,
+          height: avatarSize,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: const Color(0xFFE5E7EB),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: ClipOval(
+            child: (widget.user.profilePictureUrl != null &&
+                    widget.user.profilePictureUrl!.isNotEmpty)
+                ? SafeNetworkImage(
+                    imageUrl: widget.user.profilePictureUrl!,
+                    fit: BoxFit.cover,
+                    errorWidget: Icon(
+                      Icons.person,
+                      color: const Color(0xFF64748B),
+                      size: avatarSize * 0.5,
+                    ),
+                  )
+                : Icon(
+                    Icons.person, 
+                    color: const Color(0xFF64748B),
+                    size: avatarSize * 0.5,
+                  ),
+          ),
+        ),
+        SizedBox(width: spacing),
+        // Name + username + tagline
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.user.name,
+                style: TextStyle(
+                  color: const Color(0xFF1A1A1A),
+                  fontSize: nameSize,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+              if (widget.user.username != null &&
+                  widget.user.username!.isNotEmpty) ...[
+                SizedBox(height: ResponsiveHelper.getResponsiveSpacing(context, phone: 4, tablet: 6, desktop: 8)),
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: ResponsiveHelper.getResponsiveSpacing(context, phone: 8, tablet: 10, desktop: 12),
+                    vertical: ResponsiveHelper.getResponsiveSpacing(context, phone: 4, tablet: 6, desktop: 8),
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(
+                      ResponsiveHelper.getResponsiveBorderRadius(context, phone: 12, tablet: 14, desktop: 16)
+                    ),
+                    border: Border.all(
+                      color: const Color(0xFFE5E7EB),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    '@${widget.user.username}',
+                    style: TextStyle(
+                      color: const Color(0xFF1F2937),
+                      fontWeight: FontWeight.w500,
+                      fontSize: usernameSize,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                ),
+              ],
+              if (widget.user.bio != null &&
+                  widget.user.bio!.isNotEmpty) ...[
+                SizedBox(height: ResponsiveHelper.getResponsiveSpacing(context, phone: 2, tablet: 4, desktop: 6)),
+                Text(
+                  widget.user.bio!,
+                  style: TextStyle(
+                    color: const Color(0xFF6B7280),
+                    fontWeight: FontWeight.w400,
+                    fontSize: bioSize,
+                    fontFamily: 'Roboto',
+                  ),
+                  maxLines: context.isPhone ? 2 : 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -428,68 +454,205 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   Widget _buildActionButtons() {
+    final buttonHeight = ResponsiveHelper.getResponsiveButtonHeight(context, phone: 36, tablet: 44, desktop: 48);
+    final fontSize = ResponsiveHelper.getResponsiveFontSize(context, phone: 14, tablet: 16, desktop: 18);
+    final borderRadius = ResponsiveHelper.getResponsiveBorderRadius(context, phone: 18, tablet: 22, desktop: 24);
+    final horizontalPadding = ResponsiveHelper.getResponsivePadding(context).horizontal;
+    final spacing = ResponsiveHelper.getResponsiveSpacing(context, phone: 8, tablet: 12, desktop: 16);
+    
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          // Follow/Following button
-          Expanded(
-            child: GestureDetector(
-              onTap: _toggleFollow,
-              child: Container(
-                height: 36,
-                decoration: BoxDecoration(
-                  color: _isFollowing
-                      ? AppThemeColor.pureWhiteColor
-                      : AppThemeColor.darkBlueColor,
-                  borderRadius: BorderRadius.circular(18),
-                  border: _isFollowing
-                      ? Border.all(color: AppThemeColor.darkBlueColor, width: 1)
-                      : null,
-                ),
-                child: Center(
-                  child: Text(
-                    _isFollowing ? 'Following' : 'Follow',
-                    style: TextStyle(
-                      color: _isFollowing
-                          ? AppThemeColor.darkBlueColor
-                          : AppThemeColor.pureWhiteColor,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Roboto',
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+      child: ResponsiveHelper.buildResponsiveLayout(
+        context: context,
+        phone: Row(
+          children: [
+            // Follow/Following button
+            Expanded(
+              child: GestureDetector(
+                onTap: _toggleFollow,
+                child: Container(
+                  height: buttonHeight,
+                  decoration: BoxDecoration(
+                    color: _isFollowing
+                        ? AppThemeColor.pureWhiteColor
+                        : AppThemeColor.darkBlueColor,
+                    borderRadius: BorderRadius.circular(borderRadius),
+                    border: _isFollowing
+                        ? Border.all(color: AppThemeColor.darkBlueColor, width: 1)
+                        : null,
+                  ),
+                  child: Center(
+                    child: Text(
+                      _isFollowing ? 'Following' : 'Follow',
+                      style: TextStyle(
+                        color: _isFollowing
+                            ? AppThemeColor.darkBlueColor
+                            : AppThemeColor.pureWhiteColor,
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Roboto',
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          // Message button
-          Expanded(
-            child: GestureDetector(
-              onTap: _sendMessage,
-              child: Container(
-                height: 36,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
-                ),
-                child: const Center(
-                  child: Text(
-                    'Message',
-                    style: TextStyle(
-                      color: Color(0xFF1F2937),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Roboto',
+            SizedBox(width: spacing),
+            // Message button
+            Expanded(
+              child: GestureDetector(
+                onTap: _sendMessage,
+                child: Container(
+                  height: buttonHeight,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(borderRadius),
+                    border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Message',
+                      style: TextStyle(
+                        color: const Color(0xFF1F2937),
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Roboto',
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
+        tablet: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Follow/Following button
+            SizedBox(
+              width: ResponsiveHelper.getResponsiveWidth(context, tabletPercent: 0.3),
+              child: GestureDetector(
+                onTap: _toggleFollow,
+                child: Container(
+                  height: buttonHeight,
+                  decoration: BoxDecoration(
+                    color: _isFollowing
+                        ? AppThemeColor.pureWhiteColor
+                        : AppThemeColor.darkBlueColor,
+                    borderRadius: BorderRadius.circular(borderRadius),
+                    border: _isFollowing
+                        ? Border.all(color: AppThemeColor.darkBlueColor, width: 1)
+                        : null,
+                  ),
+                  child: Center(
+                    child: Text(
+                      _isFollowing ? 'Following' : 'Follow',
+                      style: TextStyle(
+                        color: _isFollowing
+                            ? AppThemeColor.darkBlueColor
+                            : AppThemeColor.pureWhiteColor,
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(width: spacing),
+            // Message button
+            SizedBox(
+              width: ResponsiveHelper.getResponsiveWidth(context, tabletPercent: 0.3),
+              child: GestureDetector(
+                onTap: _sendMessage,
+                child: Container(
+                  height: buttonHeight,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(borderRadius),
+                    border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Message',
+                      style: TextStyle(
+                        color: const Color(0xFF1F2937),
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        desktop: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Follow/Following button
+            SizedBox(
+              width: ResponsiveHelper.getResponsiveWidth(context, desktopPercent: 0.2),
+              child: GestureDetector(
+                onTap: _toggleFollow,
+                child: Container(
+                  height: buttonHeight,
+                  decoration: BoxDecoration(
+                    color: _isFollowing
+                        ? AppThemeColor.pureWhiteColor
+                        : AppThemeColor.darkBlueColor,
+                    borderRadius: BorderRadius.circular(borderRadius),
+                    border: _isFollowing
+                        ? Border.all(color: AppThemeColor.darkBlueColor, width: 1)
+                        : null,
+                  ),
+                  child: Center(
+                    child: Text(
+                      _isFollowing ? 'Following' : 'Follow',
+                      style: TextStyle(
+                        color: _isFollowing
+                            ? AppThemeColor.darkBlueColor
+                            : AppThemeColor.pureWhiteColor,
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(width: spacing),
+            // Message button
+            SizedBox(
+              width: ResponsiveHelper.getResponsiveWidth(context, desktopPercent: 0.2),
+              child: GestureDetector(
+                onTap: _sendMessage,
+                child: Container(
+                  height: buttonHeight,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(borderRadius),
+                    border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Message',
+                      style: TextStyle(
+                        color: const Color(0xFF1F2937),
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -609,16 +772,26 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   Widget _buildStatsSection() {
+    final margin = ResponsiveHelper.getResponsiveMargin(context, phone: 24, tablet: 32, desktop: 48);
+    final padding = ResponsiveHelper.getResponsivePadding(context, phone: 16, tablet: 20, desktop: 24);
+    final borderRadius = ResponsiveHelper.getResponsiveBorderRadius(context);
+    final numberFontSize = ResponsiveHelper.getResponsiveFontSize(context, phone: 16, tablet: 20, desktop: 24);
+    final labelFontSize = ResponsiveHelper.getResponsiveFontSize(context, phone: 11, tablet: 13, desktop: 15);
+    final dividerHeight = ResponsiveHelper.getResponsiveSpacing(context, phone: 30, tablet: 35, desktop: 40);
+    
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      constraints: BoxConstraints(
+        maxWidth: ResponsiveHelper.getMaxContentWidth(context),
+      ),
+      margin: EdgeInsets.symmetric(horizontal: margin.horizontal, vertical: margin.vertical),
+      padding: EdgeInsets.symmetric(horizontal: padding.horizontal, vertical: padding.vertical),
       decoration: BoxDecoration(
         color: AppThemeColor.pureWhiteColor,
-        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
+            blurRadius: ResponsiveHelper.getResponsiveElevation(context, phone: 10, tablet: 12, desktop: 16),
             offset: const Offset(0, 2),
           ),
         ],
@@ -632,18 +805,18 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                 children: [
                   Text(
                     '$_followersCount',
-                    style: const TextStyle(
-                      fontSize: 16,
+                    style: TextStyle(
+                      fontSize: numberFontSize,
                       fontWeight: FontWeight.bold,
                       color: AppThemeColor.darkBlueColor,
                       fontFamily: 'Roboto',
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  SizedBox(height: ResponsiveHelper.getResponsiveSpacing(context, phone: 2, tablet: 4, desktop: 6)),
                   Text(
                     'Followers',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: labelFontSize,
                       color: AppThemeColor.dullFontColor,
                       fontFamily: 'Roboto',
                     ),
@@ -652,7 +825,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               ),
             ),
           ),
-          Container(width: 1, height: 30, color: AppThemeColor.borderColor),
+          Container(width: 1, height: dividerHeight, color: AppThemeColor.borderColor),
           Expanded(
             child: GestureDetector(
               onTap: () => _showFollowersFollowing('following'),
@@ -660,18 +833,18 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                 children: [
                   Text(
                     '$_followingCount',
-                    style: const TextStyle(
-                      fontSize: 16,
+                    style: TextStyle(
+                      fontSize: numberFontSize,
                       fontWeight: FontWeight.bold,
                       color: AppThemeColor.darkBlueColor,
                       fontFamily: 'Roboto',
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  SizedBox(height: ResponsiveHelper.getResponsiveSpacing(context, phone: 2, tablet: 4, desktop: 6)),
                   Text(
                     'Following',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: labelFontSize,
                       color: AppThemeColor.dullFontColor,
                       fontFamily: 'Roboto',
                     ),
@@ -680,45 +853,85 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               ),
             ),
           ),
-          // Removed duplicate Message icon to avoid redundancy with top action button
         ],
       ),
     );
   }
 
   Widget _buildTabBar() {
+    final margin = ResponsiveHelper.getResponsiveMargin(context, phone: 24, tablet: 32, desktop: 48);
+    final borderRadius = ResponsiveHelper.getResponsiveBorderRadius(context);
+    final dividerHeight = ResponsiveHelper.getResponsiveSpacing(context, phone: 40, tablet: 48, desktop: 56);
+    
     return Container(
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+      constraints: BoxConstraints(
+        maxWidth: ResponsiveHelper.getMaxContentWidth(context),
+      ),
+      margin: EdgeInsets.fromLTRB(margin.horizontal, 0, margin.horizontal, margin.vertical),
       decoration: BoxDecoration(
         color: AppThemeColor.pureWhiteColor,
-        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
+            blurRadius: ResponsiveHelper.getResponsiveElevation(context, phone: 10, tablet: 12, desktop: 16),
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Row(
-        children: [
-          _buildTabButton(
-            label: 'Created Events (${_createdEvents.length})',
-            index: 0,
-          ),
-          Container(width: 1, height: 40, color: AppThemeColor.borderColor),
-          _buildTabButton(
-            label: 'Attended (${_attendedEvents.length})',
-            index: 1,
-          ),
-        ],
+      child: ResponsiveHelper.buildResponsiveLayout(
+        context: context,
+        phone: Row(
+          children: [
+            _buildTabButton(
+              label: 'Created (${_createdEvents.length})',
+              index: 0,
+            ),
+            Container(width: 1, height: dividerHeight, color: AppThemeColor.borderColor),
+            _buildTabButton(
+              label: 'Attended (${_attendedEvents.length})',
+              index: 1,
+            ),
+          ],
+        ),
+        tablet: Row(
+          children: [
+            _buildTabButton(
+              label: 'Created Events (${_createdEvents.length})',
+              index: 0,
+            ),
+            Container(width: 1, height: dividerHeight, color: AppThemeColor.borderColor),
+            _buildTabButton(
+              label: 'Attended Events (${_attendedEvents.length})',
+              index: 1,
+            ),
+          ],
+        ),
+        desktop: Row(
+          children: [
+            _buildTabButton(
+              label: 'Created Events (${_createdEvents.length})',
+              index: 0,
+            ),
+            Container(width: 1, height: dividerHeight, color: AppThemeColor.borderColor),
+            _buildTabButton(
+              label: 'Attended Events (${_attendedEvents.length})',
+              index: 1,
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildTabContent() {
+    final margin = ResponsiveHelper.getResponsiveMargin(context, phone: 24, tablet: 32, desktop: 48);
+    
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
+      constraints: BoxConstraints(
+        maxWidth: ResponsiveHelper.getMaxContentWidth(context),
+      ),
+      margin: EdgeInsets.symmetric(horizontal: margin.horizontal),
       child: _tabController.index == 0
           ? _buildCreatedEventsTab()
           : _buildAttendedEventsTab(),
@@ -727,6 +940,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   Widget _buildTabButton({required String label, required int index}) {
     final isSelected = _tabController.index == index;
+    final fontSize = ResponsiveHelper.getResponsiveFontSize(context, phone: 14, tablet: 16, desktop: 18);
+    final verticalPadding = ResponsiveHelper.getResponsiveSpacing(context, phone: 12, tablet: 16, desktop: 20);
+    final borderRadius = ResponsiveHelper.getResponsiveBorderRadius(context);
+    
     return Expanded(
       child: GestureDetector(
         onTap: () {
@@ -738,12 +955,12 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: EdgeInsets.symmetric(vertical: verticalPadding),
           decoration: BoxDecoration(
             color: isSelected
                 ? AppThemeColor.darkBlueColor
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+            borderRadius: BorderRadius.circular(borderRadius),
           ),
           child: Text(
             label,
@@ -751,7 +968,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               color: isSelected
                   ? AppThemeColor.pureWhiteColor
                   : AppThemeColor.dullFontColor,
-              fontSize: 14,
+              fontSize: fontSize,
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
               fontFamily: 'Roboto',
             ),
@@ -775,17 +992,48 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       );
     }
 
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _createdEvents.length,
-      itemBuilder: (context, index) {
-        final event = _createdEvents[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: SingleEventListViewItem(eventModel: event),
-        );
-      },
+    final spacing = ResponsiveHelper.getResponsiveSpacing(context, phone: 12, tablet: 16, desktop: 20);
+    
+    return ResponsiveHelper.buildResponsiveLayout(
+      context: context,
+      phone: ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: _createdEvents.length,
+        itemBuilder: (context, index) {
+          final event = _createdEvents[index];
+          return Container(
+            margin: EdgeInsets.only(bottom: spacing),
+            child: SingleEventListViewItem(eventModel: event),
+          );
+        },
+      ),
+      tablet: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: ResponsiveHelper.getResponsiveGridDelegate(
+          context,
+          childAspectRatio: 1.2,
+        ),
+        itemCount: _createdEvents.length,
+        itemBuilder: (context, index) {
+          final event = _createdEvents[index];
+          return SingleEventListViewItem(eventModel: event);
+        },
+      ),
+      desktop: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: ResponsiveHelper.getResponsiveGridDelegate(
+          context,
+          childAspectRatio: 1.1,
+        ),
+        itemCount: _createdEvents.length,
+        itemBuilder: (context, index) {
+          final event = _createdEvents[index];
+          return SingleEventListViewItem(eventModel: event);
+        },
+      ),
     );
   }
 
@@ -802,30 +1050,68 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       );
     }
 
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _attendedEvents.length,
-      itemBuilder: (context, index) {
-        final event = _attendedEvents[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: SingleEventListViewItem(eventModel: event),
-        );
-      },
+    final spacing = ResponsiveHelper.getResponsiveSpacing(context, phone: 12, tablet: 16, desktop: 20);
+    
+    return ResponsiveHelper.buildResponsiveLayout(
+      context: context,
+      phone: ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: _attendedEvents.length,
+        itemBuilder: (context, index) {
+          final event = _attendedEvents[index];
+          return Container(
+            margin: EdgeInsets.only(bottom: spacing),
+            child: SingleEventListViewItem(eventModel: event),
+          );
+        },
+      ),
+      tablet: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: ResponsiveHelper.getResponsiveGridDelegate(
+          context,
+          childAspectRatio: 1.2,
+        ),
+        itemCount: _attendedEvents.length,
+        itemBuilder: (context, index) {
+          final event = _attendedEvents[index];
+          return SingleEventListViewItem(eventModel: event);
+        },
+      ),
+      desktop: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: ResponsiveHelper.getResponsiveGridDelegate(
+          context,
+          childAspectRatio: 1.1,
+        ),
+        itemCount: _attendedEvents.length,
+        itemBuilder: (context, index) {
+          final event = _attendedEvents[index];
+          return SingleEventListViewItem(eventModel: event);
+        },
+      ),
     );
   }
 
   Widget _buildEmptyState(String title, String message, IconData icon) {
+    final padding = ResponsiveHelper.getResponsivePadding(context, phone: 40, tablet: 48, desktop: 56);
+    final borderRadius = ResponsiveHelper.getResponsiveBorderRadius(context);
+    final iconSize = ResponsiveHelper.getResponsiveIconSize(context, phone: 64, tablet: 80, desktop: 96);
+    final titleSize = ResponsiveHelper.getResponsiveFontSize(context, phone: 16, tablet: 20, desktop: 24);
+    final messageSize = ResponsiveHelper.getResponsiveFontSize(context, phone: 14, tablet: 16, desktop: 18);
+    final spacing = ResponsiveHelper.getResponsiveSpacing(context, phone: 24, tablet: 32, desktop: 40);
+    
     return Container(
-      padding: const EdgeInsets.all(40),
+      padding: EdgeInsets.all(padding.left),
       decoration: BoxDecoration(
         color: AppThemeColor.pureWhiteColor,
-        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
+            blurRadius: ResponsiveHelper.getResponsiveElevation(context, phone: 10, tablet: 12, desktop: 16),
             offset: const Offset(0, 2),
           ),
         ],
@@ -833,24 +1119,24 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 64, color: AppThemeColor.dullIconColor),
-          const SizedBox(height: 24),
+          Icon(icon, size: iconSize, color: AppThemeColor.dullIconColor),
+          SizedBox(height: spacing),
           Text(
             title,
-            style: const TextStyle(
-              fontSize: Dimensions.fontSizeLarge,
+            style: TextStyle(
+              fontSize: titleSize,
               fontWeight: FontWeight.bold,
               color: AppThemeColor.darkBlueColor,
               fontFamily: 'Roboto',
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: ResponsiveHelper.getResponsiveSpacing(context, phone: 8, tablet: 12, desktop: 16)),
           Text(
             message,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: Dimensions.fontSizeDefault,
+              fontSize: messageSize,
               color: AppThemeColor.dullFontColor,
               fontFamily: 'Roboto',
             ),
@@ -1023,6 +1309,17 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     );
     final bioController = TextEditingController(text: widget.user.bio ?? '');
 
+    if (context.isDesktop) {
+      _showEditProfileDialog(nameController, usernameController, bioController);
+    } else {
+      _showEditProfileBottomSheet(nameController, usernameController, bioController);
+    }
+  }
+
+  void _showEditProfileBottomSheet(TextEditingController nameController, TextEditingController usernameController, TextEditingController bioController) {
+    final borderRadius = ResponsiveHelper.getResponsiveBorderRadius(context);
+    final padding = ResponsiveHelper.getResponsivePadding(context);
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1030,148 +1327,206 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       builder: (context) {
         return DraggableScrollableSheet(
           expand: false,
-          initialChildSize: 0.85,
+          initialChildSize: context.isTablet ? 0.75 : 0.85,
           minChildSize: 0.5,
           maxChildSize: 0.95,
           builder: (context, scrollCtlr) {
             return Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: AppThemeColor.pureWhiteColor,
                 borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(Dimensions.radiusLarge),
-                  topRight: Radius.circular(Dimensions.radiusLarge),
+                  topLeft: Radius.circular(borderRadius),
+                  topRight: Radius.circular(borderRadius),
                 ),
               ),
               child: SingleChildScrollView(
                 controller: scrollCtlr,
                 padding: EdgeInsets.only(
-                  left: 24,
-                  right: 24,
-                  top: 16,
-                  bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+                  left: padding.left,
+                  right: padding.right,
+                  top: padding.top,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + padding.bottom,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const Text(
-                      'Edit Profile',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: AppThemeColor.darkBlueColor,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Modern media section with live previews
-                    _EditMediaSection(
-                      bannerUrl: widget.user.bannerUrl,
-                      avatarUrl: widget.user.profilePictureUrl,
-                      onChangeBanner: _pickAndUploadBanner,
-                      onChangeAvatar: _pickAndUploadAvatar,
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: nameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Full Name',
-                        prefixIcon: Icon(Icons.person_outline),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: usernameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Username',
-                        prefixIcon: Icon(Icons.alternate_email),
-                        hintText: 'yourname',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: bioController,
-                      maxLines: 4,
-                      decoration: const InputDecoration(
-                        labelText: 'Bio',
-                        alignLabelWithHint: true,
-                        prefixIcon: Icon(Icons.info_outline),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          final current = CustomerController.logeInCustomer;
-                          if (current == null) {
-                            Navigator.pop(context);
-                            return;
-                          }
-
-                          // Save name and bio immediately
-                          await FirebaseFirestoreHelper().updateCustomerProfile(
-                            customerId: current.uid,
-                            name: nameController.text.trim(),
-                            bio: bioController.text.trim(),
-                          );
-
-                          // Save username if changed and not empty
-                          final newUsername = usernameController.text.trim();
-                          if (newUsername.isNotEmpty &&
-                              newUsername != (widget.user.username ?? '')) {
-                            await FirebaseFirestoreHelper().updateUsername(
-                              userId: current.uid,
-                              newUsername: newUsername,
-                            );
-                          }
-
-                          // Update local model so UI reflects immediately
-                          setState(() {
-                            widget.user.name = nameController.text.trim();
-                            widget.user.bio = bioController.text.trim();
-                            widget.user.username = newUsername.isEmpty
-                                ? null
-                                : newUsername;
-                          });
-
-                          if (mounted) {
-                            Navigator.pop(context);
-                            ShowToast().showNormalToast(
-                              msg: 'Profile updated successfully',
-                            );
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppThemeColor.darkBlueColor,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              Dimensions.radiusLarge,
-                            ),
-                          ),
-                        ),
-                        child: const Text('Save Changes'),
-                      ),
-                    ),
-                  ],
-                ),
+                child: _buildEditProfileContent(nameController, usernameController, bioController),
               ),
             );
           },
         );
       },
     );
+  }
+
+  void _showEditProfileDialog(TextEditingController nameController, TextEditingController usernameController, TextEditingController bioController) {
+    final dialogWidth = ResponsiveHelper.getResponsiveDialogWidth(context);
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(
+              ResponsiveHelper.getResponsiveBorderRadius(context)
+            ),
+          ),
+          child: Container(
+            width: dialogWidth,
+            constraints: const BoxConstraints(maxHeight: 700),
+            padding: ResponsiveHelper.getResponsivePadding(context),
+            child: SingleChildScrollView(
+              child: _buildEditProfileContent(nameController, usernameController, bioController),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEditProfileContent(TextEditingController nameController, TextEditingController usernameController, TextEditingController bioController) {
+    final titleSize = ResponsiveHelper.getResponsiveFontSize(context, phone: 20, tablet: 24, desktop: 28);
+    final spacing = ResponsiveHelper.getResponsiveSpacing(context, phone: 16, tablet: 20, desktop: 24);
+    final buttonHeight = ResponsiveHelper.getResponsiveButtonHeight(context, phone: 48, tablet: 52, desktop: 56);
+    final borderRadius = ResponsiveHelper.getResponsiveBorderRadius(context);
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!context.isDesktop) Center(
+          child: Container(
+            width: 40,
+            height: 4,
+            margin: EdgeInsets.only(bottom: spacing),
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+        Text(
+          'Edit Profile',
+          style: TextStyle(
+            fontSize: titleSize,
+            fontWeight: FontWeight.w700,
+            color: AppThemeColor.darkBlueColor,
+          ),
+        ),
+        SizedBox(height: spacing),
+        // Modern media section with live previews
+        _EditMediaSection(
+          bannerUrl: widget.user.bannerUrl,
+          avatarUrl: widget.user.profilePictureUrl,
+          onChangeBanner: _pickAndUploadBanner,
+          onChangeAvatar: _pickAndUploadAvatar,
+        ),
+        SizedBox(height: spacing),
+        TextField(
+          controller: nameController,
+          style: TextStyle(
+            fontSize: ResponsiveHelper.getResponsiveFontSize(context, phone: 16, tablet: 18, desktop: 20),
+          ),
+          decoration: InputDecoration(
+            labelText: 'Full Name',
+            prefixIcon: Icon(
+              Icons.person_outline,
+              size: ResponsiveHelper.getResponsiveIconSize(context, phone: 24, tablet: 28, desktop: 32),
+            ),
+          ),
+        ),
+        SizedBox(height: ResponsiveHelper.getResponsiveSpacing(context, phone: 12, tablet: 16, desktop: 20)),
+        TextField(
+          controller: usernameController,
+          style: TextStyle(
+            fontSize: ResponsiveHelper.getResponsiveFontSize(context, phone: 16, tablet: 18, desktop: 20),
+          ),
+          decoration: InputDecoration(
+            labelText: 'Username',
+            prefixIcon: Icon(
+              Icons.alternate_email,
+              size: ResponsiveHelper.getResponsiveIconSize(context, phone: 24, tablet: 28, desktop: 32),
+            ),
+            hintText: 'yourname',
+          ),
+        ),
+        SizedBox(height: ResponsiveHelper.getResponsiveSpacing(context, phone: 12, tablet: 16, desktop: 20)),
+        TextField(
+          controller: bioController,
+          maxLines: context.isPhone ? 4 : 5,
+          style: TextStyle(
+            fontSize: ResponsiveHelper.getResponsiveFontSize(context, phone: 16, tablet: 18, desktop: 20),
+          ),
+          decoration: InputDecoration(
+            labelText: 'Bio',
+            alignLabelWithHint: true,
+            prefixIcon: Icon(
+              Icons.info_outline,
+              size: ResponsiveHelper.getResponsiveIconSize(context, phone: 24, tablet: 28, desktop: 32),
+            ),
+          ),
+        ),
+        SizedBox(height: spacing * 1.5),
+        SizedBox(
+          width: double.infinity,
+          height: buttonHeight,
+          child: ElevatedButton(
+            onPressed: () => _saveProfileChanges(nameController, usernameController, bioController),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppThemeColor.darkBlueColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(borderRadius),
+              ),
+            ),
+            child: Text(
+              'Save Changes',
+              style: TextStyle(
+                fontSize: ResponsiveHelper.getResponsiveFontSize(context, phone: 16, tablet: 18, desktop: 20),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _saveProfileChanges(TextEditingController nameController, TextEditingController usernameController, TextEditingController bioController) async {
+    final current = CustomerController.logeInCustomer;
+    if (current == null) {
+      Navigator.pop(context);
+      return;
+    }
+
+    // Save name and bio immediately
+    await FirebaseFirestoreHelper().updateCustomerProfile(
+      customerId: current.uid,
+      name: nameController.text.trim(),
+      bio: bioController.text.trim(),
+    );
+
+    // Save username if changed and not empty
+    final newUsername = usernameController.text.trim();
+    if (newUsername.isNotEmpty &&
+        newUsername != (widget.user.username ?? '')) {
+      await FirebaseFirestoreHelper().updateUsername(
+        userId: current.uid,
+        newUsername: newUsername,
+      );
+    }
+
+    // Update local model so UI reflects immediately
+    setState(() {
+      widget.user.name = nameController.text.trim();
+      widget.user.bio = bioController.text.trim();
+      widget.user.username = newUsername.isEmpty
+          ? null
+          : newUsername;
+    });
+
+    if (mounted) {
+      Navigator.pop(context);
+      ShowToast().showNormalToast(
+        msg: 'Profile updated successfully',
+      );
+    }
   }
 }
 
@@ -1190,6 +1545,14 @@ class _EditMediaSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bannerHeight = ResponsiveHelper.getResponsiveHeight(context, phonePercent: 0.15, tabletPercent: 0.18, desktopPercent: 0.2);
+    final borderRadius = ResponsiveHelper.getResponsiveBorderRadius(context);
+    final avatarRadius = ResponsiveHelper.getResponsiveAvatarSize(context, phone: 32, tablet: 40, desktop: 48);
+    final iconSize = ResponsiveHelper.getResponsiveIconSize(context, phone: 16, tablet: 20, desktop: 24);
+    final buttonPadding = ResponsiveHelper.getResponsivePadding(context, phone: 12, tablet: 16, desktop: 20);
+    final spacing = ResponsiveHelper.getResponsiveSpacing(context, phone: 12, tablet: 16, desktop: 20);
+    final fontSize = ResponsiveHelper.getResponsiveFontSize(context, phone: 14, tablet: 16, desktop: 18);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1197,10 +1560,10 @@ class _EditMediaSection extends StatelessWidget {
         Stack(
           children: [
             Container(
-              height: 120,
+              height: bannerHeight.clamp(120.0, 200.0),
               decoration: BoxDecoration(
                 color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(borderRadius),
                 image: (bannerUrl != null && bannerUrl!.isNotEmpty)
                     ? DecorationImage(
                         image: NetworkImage(bannerUrl!),
@@ -1213,43 +1576,54 @@ class _EditMediaSection extends StatelessWidget {
                     : null,
               ),
               child: (bannerUrl == null || bannerUrl!.isEmpty)
-                  ? const Center(
-                      child: Icon(Icons.wallpaper, color: Color(0xFF94A3B8)),
+                  ? Center(
+                      child: Icon(
+                        Icons.wallpaper, 
+                        color: const Color(0xFF94A3B8),
+                        size: ResponsiveHelper.getResponsiveIconSize(context, phone: 32, tablet: 40, desktop: 48),
+                      ),
                     )
                   : null,
             ),
             Positioned(
-              right: 8,
-              bottom: 8,
+              right: ResponsiveHelper.getResponsiveSpacing(context, phone: 8, tablet: 12, desktop: 16),
+              bottom: ResponsiveHelper.getResponsiveSpacing(context, phone: 8, tablet: 12, desktop: 16),
               child: FilledButton.icon(
                 onPressed: onChangeBanner,
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF667EEA),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: buttonPadding.horizontal,
+                    vertical: buttonPadding.vertical,
                   ),
                 ),
-                icon: const Icon(Icons.edit, size: 16),
-                label: const Text('Change banner'),
+                icon: Icon(Icons.edit, size: iconSize),
+                label: Text(
+                  context.isPhone ? 'Change' : 'Change banner',
+                  style: TextStyle(fontSize: fontSize),
+                ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: spacing),
         Row(
           children: [
             // Avatar preview
             Stack(
               children: [
                 CircleAvatar(
-                  radius: 32,
+                  radius: avatarRadius,
                   backgroundColor: const Color(0xFFE5E7EB),
                   backgroundImage: (avatarUrl != null && avatarUrl!.isNotEmpty)
                       ? NetworkImage(avatarUrl!)
                       : null,
                   child: (avatarUrl == null || avatarUrl!.isEmpty)
-                      ? const Icon(Icons.person, color: Color(0xFF64748B))
+                      ? Icon(
+                          Icons.person, 
+                          color: const Color(0xFF64748B),
+                          size: avatarRadius * 1.2,
+                        )
                       : null,
                 ),
                 Positioned(
@@ -1260,7 +1634,7 @@ class _EditMediaSection extends StatelessWidget {
                     child: Container(
                       decoration: BoxDecoration(
                         color: const Color(0xFF667EEA),
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(avatarRadius / 2),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.1),
@@ -1269,10 +1643,10 @@ class _EditMediaSection extends StatelessWidget {
                           ),
                         ],
                       ),
-                      padding: const EdgeInsets.all(6),
-                      child: const Icon(
+                      padding: EdgeInsets.all(ResponsiveHelper.getResponsiveSpacing(context, phone: 6, tablet: 8, desktop: 10)),
+                      child: Icon(
                         Icons.camera_alt,
-                        size: 14,
+                        size: ResponsiveHelper.getResponsiveIconSize(context, phone: 14, tablet: 16, desktop: 18),
                         color: Colors.white,
                       ),
                     ),
@@ -1280,10 +1654,13 @@ class _EditMediaSection extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: spacing),
             TextButton(
               onPressed: onChangeAvatar,
-              child: const Text('Change profile photo'),
+              child: Text(
+                'Change profile photo',
+                style: TextStyle(fontSize: fontSize),
+              ),
             ),
           ],
         ),
