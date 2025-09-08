@@ -14,6 +14,7 @@ import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart'
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/screens/MyProfile/followers_following_screen.dart';
 import 'package:attendus/screens/Messaging/new_message_screen.dart';
+import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final CustomerModel user;
@@ -155,7 +156,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     debugPrint('Building UserProfileScreen - isLoading: $_isLoading');
 
     if (_isLoading) {
-      return Scaffold(
+      return AppScaffoldWrapper(
+        selectedBottomNavIndex: 3, // Profile tab
         backgroundColor: AppThemeColor.backGroundColor,
         body: SafeArea(
           child: Container(
@@ -182,7 +184,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       );
     }
 
-    return Scaffold(
+    return AppScaffoldWrapper(
+      selectedBottomNavIndex: 3, // Profile tab
       backgroundColor: const Color(0xFFFAFBFC),
       body: SafeArea(
         child: RefreshIndicator(

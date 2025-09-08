@@ -22,6 +22,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 import 'package:attendus/screens/Groups/groups_screen.dart';
+import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 
 class NewMessageScreen extends StatefulWidget {
   const NewMessageScreen({super.key});
@@ -523,7 +524,8 @@ class _NewMessageScreenState extends State<NewMessageScreen>
     super.build(context);
     final theme = Theme.of(context);
 
-    final scaffold = Scaffold(
+    final scaffold = AppScaffoldWrapper(
+      selectedBottomNavIndex: 2, // Messages tab
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -560,7 +562,6 @@ class _NewMessageScreenState extends State<NewMessageScreen>
           child: Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
         ),
       ),
-      bottomNavigationBar: _buildCreateGroupBar(),
       body: Column(
         children: [
           _buildModeToggle(),
@@ -1516,79 +1517,6 @@ class _NewMessageScreenState extends State<NewMessageScreen>
             ),
           );
         },
-      ),
-    );
-  }
-
-  Widget? _buildCreateGroupBar() {
-    if (!_groupMode) return null;
-    final onUsersTab = _groupTabIndex == 0;
-    final canCreateFromUsers = onUsersTab && _selectedUserIds.length >= 2;
-    final canCreateFromOrg =
-        !onUsersTab && _selectedOrgId != null && _selectedOrgId!.isNotEmpty;
-    if (!canCreateFromUsers && !canCreateFromOrg) return null;
-    return SafeArea(
-      child: Semantics(
-        label: onUsersTab ? _t('createWithSelected') : _t('createFromOrg'),
-        button: true,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 8,
-                offset: const Offset(0, -2),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              if (onUsersTab) ...[
-                CircleAvatar(
-                  radius: 14,
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.15),
-                  child: Text(
-                    '${_selectedUserIds.length}',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(child: Text(_t('createWithSelected'))),
-                FilledButton(
-                  onPressed: _createGroupAndOpenChat,
-                  child: Text(_t('createGroup')),
-                ),
-              ] else ...[
-                const Icon(Icons.group_outlined),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    _selectedOrgName == null || _selectedOrgName!.isEmpty
-                        ? _t('createFromOrg')
-                        : 'Create group from "${_selectedOrgName!}"',
-                  ),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    if (_selectedOrgId != null && _selectedOrgId!.isNotEmpty) {
-                      _createGroupFromOrganization(
-                        _selectedOrgId!,
-                        _selectedOrgName ?? 'Group',
-                      );
-                    }
-                  },
-                  child: Text(_t('createGroup')),
-                ),
-              ],
-            ],
-          ),
-        ),
       ),
     );
   }

@@ -9,6 +9,7 @@ import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/firebase/firebase_messaging_helper.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -503,7 +504,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScaffoldWrapper(
+      selectedBottomNavIndex: 2, // Messages tab
       appBar: AppBar(
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,

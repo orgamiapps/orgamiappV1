@@ -9,6 +9,7 @@ import 'package:attendus/screens/Events/chose_sign_in_methods_screen.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/widgets/month_year_picker.dart';
+import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 import 'dart:async';
 
 class CalendarScreen extends StatefulWidget {
@@ -346,7 +347,8 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScaffoldWrapper(
+      selectedBottomNavIndex: 0, // Home tab
       backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
         child: Stack(

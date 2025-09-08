@@ -12,7 +12,7 @@ import 'package:firebase_messaging/firebase_messaging.dart' as fcm;
 // import 'package:firebase_app_check/firebase_app_check.dart'; // Commented out until App Check API is enabled
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart'
-    show kIsWeb, defaultTargetPlatform, TargetPlatform;
+    show kIsWeb, kDebugMode, defaultTargetPlatform, TargetPlatform;
 import 'package:attendus/Services/notification_service.dart';
 import 'package:attendus/firebase/firebase_messaging_helper.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -21,89 +21,89 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize global error handling
   ErrorHandler.initialize();
 
-  Logger.info('Starting app initialization...');
-  final Stopwatch startupStopwatch = Stopwatch()..start();
-
-  // Initialize Firebase first (critical for app functionality)
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    Logger.success('Firebase core initialized');
-    Logger.info(
-      'T+${startupStopwatch.elapsed.inMilliseconds}ms: Firebase init done',
-    );
-  } catch (e, st) {
-    Logger.error('Firebase initialization failed', e, st);
+  if (kDebugMode) {
+    Logger.info('Starting app initialization...');
   }
 
-  // Initialize Stripe
-  // TODO: Replace with your actual Stripe publishable key
-  // For testing, you can use Stripe's test publishable key
-  Stripe.publishableKey = 'pk_test_YOUR_PUBLISHABLE_KEY';
-  Logger.info('Stripe initialized');
-
-  // Run the app with minimal initialization
+  // Run the app immediately with minimal setup
   runApp(
     ChangeNotifierProvider(
-      create: (context) =>
-          ThemeProvider()..loadTheme(false), // Use default theme initially
+      create: (context) => ThemeProvider(), // Don't load theme yet
       child: const MyApp(),
     ),
   );
 
-  Logger.success('App initialization complete');
-  Logger.info('T+${startupStopwatch.elapsed.inMilliseconds}ms: runApp mounted');
-
-  // Defer heavy initialization to after first frame
+  // Initialize Firebase and other services after the app has started rendering
   WidgetsBinding.instance.addPostFrameCallback((_) async {
-    // Load theme preference and update if needed using existing provider
-    SharedPreferences.getInstance().then((prefs) {
-      final isDarkMode = prefs.getBool('isDarkMode') ?? false;
-      final context = appNavigatorKey.currentContext;
-      if (context != null) {
-        try {
-          final themeProvider = Provider.of<ThemeProvider>(
-            context,
-            listen: false,
-          );
-          if (isDarkMode != themeProvider.isDarkMode) {
-            themeProvider.setTheme(isDarkMode);
-          }
-        } catch (e) {
-          Logger.warning('Failed to apply saved theme: $e');
-        }
-      }
-    });
+    final Stopwatch startupStopwatch = Stopwatch()..start();
 
-    // Defer heavy initialization to after the app starts
-    _initializeBackgroundServices();
-    Logger.info(
-      'T+${startupStopwatch.elapsed.inMilliseconds}ms: Background init scheduled',
-    );
+    // Initialize Firebase in background
+    Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)
+        .then((_) {
+          if (kDebugMode) {
+            Logger.success('Firebase core initialized');
+            Logger.info(
+              'T+${startupStopwatch.elapsed.inMilliseconds}ms: Firebase init done',
+            );
+          }
+
+          // Initialize Stripe after Firebase
+          Stripe.publishableKey = 'pk_test_YOUR_PUBLISHABLE_KEY';
+          if (kDebugMode) {
+            Logger.info('Stripe initialized');
+          }
+
+          // Load theme preference after app is running
+          SharedPreferences.getInstance().then((prefs) {
+            final isDarkMode = prefs.getBool('isDarkMode') ?? false;
+            final context = appNavigatorKey.currentContext;
+            if (context != null) {
+              try {
+                final themeProvider = Provider.of<ThemeProvider>(
+                  context,
+                  listen: false,
+                );
+                themeProvider.loadTheme(isDarkMode);
+              } catch (e) {
+                if (kDebugMode) {
+                  Logger.warning('Failed to apply saved theme: $e');
+                }
+              }
+            }
+          });
+
+          // Initialize background services
+          _initializeBackgroundServices();
+
+          if (kDebugMode) {
+            Logger.success('App initialization complete');
+            Logger.info(
+              'T+${startupStopwatch.elapsed.inMilliseconds}ms: All services initialized',
+            );
+          }
+        })
+        .catchError((e, st) {
+          if (kDebugMode) {
+            Logger.error('Firebase initialization failed', e, st);
+          }
+        });
   });
 }
 
 /// Initialize background services after app startup
 Future<void> _initializeBackgroundServices() async {
   try {
-    // Defer Firestore settings configuration
-    Future.delayed(const Duration(seconds: 1), () {
-      try {
-        FirebaseFirestore.instance.settings = const Settings(
-          persistenceEnabled: true,
-          cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-        );
-      } catch (e) {
-        Logger.warning('Configuring Firestore settings failed: $e');
-      }
-    });
+    // Configure Firestore settings immediately but don't wait
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    );
 
     // Quick connectivity check without blocking
     Connectivity()

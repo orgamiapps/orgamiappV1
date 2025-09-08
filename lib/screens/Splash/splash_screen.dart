@@ -40,8 +40,8 @@ class _SplashScreenState extends State<SplashScreen>
       _startLoadingSequence();
     });
 
-    // Set a reasonable global timeout to prevent getting stuck
-    _timeoutTimer = Timer(const Duration(seconds: 5), () {
+    // Set a shorter global timeout to prevent getting stuck
+    _timeoutTimer = Timer(const Duration(seconds: 2), () {
       if (mounted && !_hasNavigated) {
         debugPrint('⏰ Global timeout - forcing navigation');
         _navigateToSecondSplash();
@@ -52,7 +52,7 @@ class _SplashScreenState extends State<SplashScreen>
   void _initializeAnimations() {
     // Logo scale and opacity animation - simplified for better performance
     _logoAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 800), // Reduced from 1200ms
+      duration: const Duration(milliseconds: 400), // Further reduced for faster startup
       vsync: this,
     );
 
@@ -72,7 +72,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Fade animation for text
     _fadeAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 500), // Reduced from 800ms
+      duration: const Duration(milliseconds: 300), // Further reduced for faster startup
       vsync: this,
     );
 
@@ -82,7 +82,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Loading animation
     _loadingAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 1000), // Reduced from 1500ms
+      duration: const Duration(milliseconds: 600), // Further reduced for faster startup
       vsync: this,
     );
 
@@ -104,9 +104,7 @@ class _SplashScreenState extends State<SplashScreen>
         if (mounted) _loadingAnimationController.repeat();
       });
 
-      // Give animations a brief moment to start and Firebase to be ready
-      await Future.delayed(const Duration(milliseconds: 200));
-
+      // Skip delay and get user immediately
       // Now get user - run in next frame to avoid blocking UI
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (mounted && !_hasNavigated) {
@@ -143,7 +141,7 @@ class _SplashScreenState extends State<SplashScreen>
         final userData = await FirebaseFirestoreHelper()
             .getSingleCustomer(customerId: firebaseUser.uid)
             .timeout(
-              const Duration(seconds: 3),
+              const Duration(seconds: 1), // Reduced timeout for faster failure detection
               onTimeout: () {
                 debugPrint('⏰ Timeout getting user data');
                 return null;
