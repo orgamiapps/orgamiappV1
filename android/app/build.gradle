@@ -6,7 +6,7 @@ plugins {
     id "com.google.gms.google-services"
 }
 
-def kotlin_version = '1.9.22'
+def kotlin_version = '2.1.0'
 
 android {
     namespace = "com.stormdeve.orgami"
@@ -66,7 +66,7 @@ dependencies {
     // ONNX Runtime Mobile (smaller, faster startup)
     implementation 'com.microsoft.onnxruntime:onnxruntime-mobile:1.16.3'
     // Coroutines for async operations
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
 }
 
 flutter {
