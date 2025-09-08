@@ -116,52 +116,78 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
               .doc(event.id)
               .get();
 
+          int attendees = 0;
+          int repeatAttendees = 0;
+
           if (analyticsDoc.exists) {
             final eventData = analyticsDoc.data() as Map<String, dynamic>;
-            final attendees = eventData['totalAttendees'] ?? 0;
-            final repeatAttendees = eventData['repeatAttendees'] ?? 0;
+            attendees = eventData['totalAttendees'] ?? 0;
+            repeatAttendees = eventData['repeatAttendees'] ?? 0;
+          } else {
+            // If no analytics document exists, create placeholder data
+            // This ensures the UI shows some data even for new events
+            attendees = 0;
+            repeatAttendees = 0;
+          }
 
-            analytics['totalAttendees'] += attendees;
-            analytics['repeatAttendees'] += repeatAttendees;
-            analytics['attendanceByEvent'][event.title] = attendees;
+          analytics['totalAttendees'] += attendees;
+          analytics['repeatAttendees'] += repeatAttendees;
+          analytics['attendanceByEvent'][event.title] = attendees;
 
-            // Track event categories
-            final category = event.categories.isNotEmpty
-                ? event.categories.first
-                : 'Other';
-            analytics['eventCategories'][category] =
-                (analytics['eventCategories'][category] ?? 0) + 1;
+          // Track event categories
+          final category = event.categories.isNotEmpty
+              ? event.categories.first
+              : 'Other';
+          analytics['eventCategories'][category] =
+              (analytics['eventCategories'][category] ?? 0) + 1;
 
-            // Track monthly trends
-            final monthKey = DateFormat(
-              'yyyy-MM',
-            ).format(event.selectedDateTime);
-            analytics['monthlyTrends'][monthKey] =
-                (analytics['monthlyTrends'][monthKey] ?? 0) + attendees;
+          // Track monthly trends
+          final monthKey = DateFormat(
+            'yyyy-MM',
+          ).format(event.selectedDateTime);
+          analytics['monthlyTrends'][monthKey] =
+              (analytics['monthlyTrends'][monthKey] ?? 0) + attendees;
 
-            // Find top performing event
-            if (analytics['topPerformingEvent'] == null ||
-                attendees >
-                    (analytics['topPerformingEvent']['attendees'] ?? 0)) {
-              analytics['topPerformingEvent'] = {
-                'title': event.title,
-                'attendees': attendees,
-                'date': event.selectedDateTime,
-                'id': event.id,
-              };
-            }
+          // Find top performing event (include events with 0 attendees)
+          if (analytics['topPerformingEvent'] == null ||
+              attendees >
+                  (analytics['topPerformingEvent']['attendees'] ?? 0)) {
+            analytics['topPerformingEvent'] = {
+              'title': event.title,
+              'attendees': attendees,
+              'date': event.selectedDateTime,
+              'id': event.id,
+            };
           }
         } catch (e) {
           if (kDebugMode) {
             debugPrint('Error loading analytics for event ${event.id}: $e');
+          }
+          // Still process the event even if analytics loading fails
+          final category = event.categories.isNotEmpty
+              ? event.categories.first
+              : 'Other';
+          analytics['eventCategories'][category] =
+              (analytics['eventCategories'][category] ?? 0) + 1;
+          
+          analytics['attendanceByEvent'][event.title] = 0;
+          
+          if (analytics['topPerformingEvent'] == null) {
+            analytics['topPerformingEvent'] = {
+              'title': event.title,
+              'attendees': 0,
+              'date': event.selectedDateTime,
+              'id': event.id,
+            };
           }
         }
       }
 
       // Calculate averages and rates
       if (analytics['totalEvents'] > 0) {
-        analytics['averageAttendance'] =
-            analytics['totalAttendees'] / analytics['totalEvents'];
+        analytics['averageAttendance'] = analytics['totalEvents'] > 0
+            ? (analytics['totalAttendees'] as int) / (analytics['totalEvents'] as int)
+            : 0.0;
 
         if (analytics['totalAttendees'] > 0) {
           analytics['dropoutRate'] =
@@ -172,7 +198,14 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
           analytics['engagementScore'] =
               (analytics['repeatAttendees'] / analytics['totalAttendees']) *
               100;
+        } else {
+          analytics['dropoutRate'] = 0.0;
+          analytics['engagementScore'] = 0.0;
         }
+      }
+
+      if (kDebugMode) {
+        debugPrint('Aggregated Analytics: $analytics');
       }
 
       setState(() {
@@ -182,6 +215,36 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
       if (kDebugMode) {
         debugPrint('Error loading aggregated analytics: $e');
       }
+      // Provide fallback analytics data
+      setState(() {
+        _aggregatedAnalytics = {
+          'totalEvents': _userEvents.length,
+          'totalAttendees': 0,
+          'totalRevenue': 0.0,
+          'averageAttendance': 0.0,
+          'topPerformingEvent': _userEvents.isNotEmpty ? {
+            'title': _userEvents.first.title,
+            'attendees': 0,
+            'date': _userEvents.first.selectedDateTime,
+            'id': _userEvents.first.id,
+          } : null,
+          'eventCategories': _userEvents.fold<Map<String, int>>({}, (map, event) {
+            final category = event.categories.isNotEmpty
+                ? event.categories.first
+                : 'Other';
+            map[category] = (map[category] ?? 0) + 1;
+            return map;
+          }),
+          'monthlyTrends': <String, int>{},
+          'attendanceByEvent': _userEvents.fold<Map<String, int>>({}, (map, event) {
+            map[event.title] = 0;
+            return map;
+          }),
+          'repeatAttendees': 0,
+          'dropoutRate': 0.0,
+          'engagementScore': 0.0,
+        };
+      });
     }
   }
 
@@ -246,7 +309,8 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     }
 
     if (!_hasEvents) {
-      return Scaffold(
+      return AppScaffoldWrapper(
+        selectedBottomNavIndex: 5, // Account tab
         backgroundColor: AppThemeColor.backGroundColor,
         body: SafeArea(
           child: Center(
@@ -256,71 +320,98 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+                    padding: const EdgeInsets.all(Dimensions.paddingSizeLarge * 2),
                     decoration: BoxDecoration(
-                      color: AppThemeColor.lightBlueColor,
-                      borderRadius: BorderRadius.circular(
-                        Dimensions.radiusLarge,
+                      gradient: LinearGradient(
+                        colors: [
+                          AppThemeColor.lightBlueColor,
+                          AppThemeColor.lightBlueColor.withValues(alpha: 0.7),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
+                      borderRadius: BorderRadius.circular(
+                        Dimensions.radiusExtraLarge,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
                     ),
                     child: Icon(
                       Icons.analytics_outlined,
-                      size: 64,
-                      color: AppThemeColor.dullIconColor,
+                      size: 80,
+                      color: AppThemeColor.darkBlueColor,
                     ),
                   ),
-                  const SizedBox(height: Dimensions.spaceSizedLarge),
+                  const SizedBox(height: Dimensions.spaceSizedLarge * 2),
                   Text(
                     'No Events Found',
                     style: TextStyle(
-                      fontSize: Dimensions.fontSizeExtraLarge,
-                      fontWeight: FontWeight.w600,
+                      fontSize: Dimensions.fontSizeOverLarge,
+                      fontWeight: FontWeight.bold,
                       color: AppThemeColor.darkBlueColor,
                     ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: Dimensions.spaceSizeSmall),
                   Text(
-                    'Create your first event to start gathering analytics and insights',
+                    'Create your first event to start gathering\nanalytics and insights',
                     style: TextStyle(
-                      fontSize: Dimensions.fontSizeDefault,
+                      fontSize: Dimensions.fontSizeLarge,
                       color: AppThemeColor.dullFontColor,
-                      height: 1.4,
+                      height: 1.5,
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: Dimensions.spaceSizedLarge),
+                  const SizedBox(height: Dimensions.spaceSizedLarge * 2),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(
-                      Dimensions.paddingSizeDefault,
+                      Dimensions.paddingSizeLarge,
                     ),
                     decoration: BoxDecoration(
-                      color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                      gradient: LinearGradient(
+                        colors: [
+                          AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                          AppThemeColor.lightBlueColor,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                       borderRadius: BorderRadius.circular(
-                        Dimensions.radiusDefault,
+                        Dimensions.radiusLarge,
                       ),
                       border: Border.all(
-                        color: AppThemeColor.darkBlueColor.withValues(
-                          alpha: 0.2,
-                        ),
+                        color: AppThemeColor.darkBlueColor.withValues(alpha: 0.2),
+                        width: 2,
                       ),
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.info_outline,
-                          size: 20,
-                          color: AppThemeColor.darkBlueColor,
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppThemeColor.darkBlueColor,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.lightbulb_outline,
+                            size: 20,
+                            color: AppThemeColor.pureWhiteColor,
+                          ),
                         ),
                         const SizedBox(width: Dimensions.spaceSizeSmall),
                         Expanded(
                           child: Text(
                             'Navigate to My Events to create your first event',
                             style: TextStyle(
-                              fontSize: Dimensions.fontSizeSmall,
+                              fontSize: Dimensions.fontSizeDefault,
                               color: AppThemeColor.darkBlueColor,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: FontWeight.w600,
                             ),
                             textAlign: TextAlign.left,
                           ),
@@ -328,26 +419,55 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                       ],
                     ),
                   ),
-                  const SizedBox(height: Dimensions.spaceSizedLarge),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      ShowToast().showNormalToast(
-                        msg: 'Navigate to My Events to create your first event',
-                      );
-                    },
-                    icon: const Icon(Icons.add),
-                    label: const Text('Create Your First Event'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppThemeColor.darkBlueColor,
-                      foregroundColor: AppThemeColor.pureWhiteColor,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: Dimensions.paddingSizeLarge,
-                        vertical: Dimensions.paddingSizeDefault,
+                  const SizedBox(height: Dimensions.spaceSizedLarge * 2),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [
+                          AppThemeColor.darkBlueColor,
+                          AppThemeColor.dullBlueColor,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                          Dimensions.radiusDefault,
+                      borderRadius: BorderRadius.circular(
+                        Dimensions.radiusLarge,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
+                          blurRadius: 15,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        ShowToast().showNormalToast(
+                          msg: 'Navigate to My Events to create your first event',
+                        );
+                      },
+                      icon: const Icon(Icons.add_rounded, size: 22),
+                      label: const Text(
+                        'Create Your First Event',
+                        style: TextStyle(
+                          fontSize: Dimensions.fontSizeLarge,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        foregroundColor: AppThemeColor.pureWhiteColor,
+                        shadowColor: Colors.transparent,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: Dimensions.paddingSizeLarge * 2,
+                          vertical: Dimensions.paddingSizeLarge,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            Dimensions.radiusLarge,
+                          ),
                         ),
                       ),
                     ),
@@ -363,73 +483,53 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     return AppScaffoldWrapper(
       selectedBottomNavIndex: 5, // Account tab
       backgroundColor: AppThemeColor.backGroundColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Enhanced App Bar with better spacing
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: Dimensions.paddingSizeLarge,
-                vertical: Dimensions.paddingSizeLarge,
-              ),
-              decoration: BoxDecoration(
-                color: AppThemeColor.pureWhiteColor,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 15,
-                    offset: const Offset(0, 3),
+      body: DefaultTabController(
+        length: 4,
+        child: NestedScrollView(
+          headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
+            return <Widget>[
+              SliverAppBar(
+                expandedHeight: 180.0,
+                floating: false,
+                pinned: false,
+                snap: false,
+                backgroundColor: AppThemeColor.backGroundColor,
+                elevation: 0,
+                leading: Container(
+                  margin: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppThemeColor.lightBlueColor,
+                    borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
                   ),
-                ],
-              ),
-              child: Row(
-                children: [
+                  child: IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new,
+                      color: AppThemeColor.darkBlueColor,
+                      size: 20,
+                    ),
+                  ),
+                ),
+                actions: [
                   Container(
+                    margin: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: AppThemeColor.lightBlueColor,
-                      borderRadius: BorderRadius.circular(
-                        Dimensions.radiusDefault,
+                      gradient: const LinearGradient(
+                        colors: [
+                          AppThemeColor.darkBlueColor,
+                          AppThemeColor.dullBlueColor,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                    ),
-                    child: IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new,
-                        color: AppThemeColor.darkBlueColor,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: Dimensions.spaceSizedLarge),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Analytics Dashboard',
-                          style: TextStyle(
-                            fontSize: Dimensions.fontSizeExtraLarge,
-                            fontWeight: FontWeight.bold,
-                            color: AppThemeColor.darkBlueColor,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Comprehensive insights across all events',
-                          style: TextStyle(
-                            fontSize: Dimensions.fontSizeSmall,
-                            color: AppThemeColor.dullFontColor,
-                          ),
+                      borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
                         ),
                       ],
-                    ),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppThemeColor.darkBlueColor,
-                      borderRadius: BorderRadius.circular(
-                        Dimensions.radiusDefault,
-                      ),
                     ),
                     child: IconButton(
                       onPressed: _exportData,
@@ -442,117 +542,213 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                     ),
                   ),
                 ],
-              ),
-            ),
-
-            // Enhanced Date Filter Chips with better spacing
-            Container(
-              margin: const EdgeInsets.symmetric(
-                horizontal: Dimensions.paddingSizeLarge,
-                vertical: Dimensions.paddingSizeLarge,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Time Period',
-                    style: TextStyle(
-                      fontSize: Dimensions.fontSizeDefault,
-                      fontWeight: FontWeight.w600,
-                      color: AppThemeColor.darkBlueColor,
-                    ),
-                  ),
-                  const SizedBox(height: Dimensions.spaceSizeSmall),
-                  Wrap(
-                    spacing: Dimensions.spaceSizeSmall,
-                    runSpacing: Dimensions.spaceSizeSmall,
-                    children: [
-                      _buildFilterChip('All Time', 'all'),
-                      _buildFilterChip('Last Week', 'week'),
-                      _buildFilterChip('Last Month', 'month'),
-                      _buildFilterChip('Last Year', 'year'),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // Enhanced Tab Bar with better spacing and design
-            Container(
-              margin: const EdgeInsets.symmetric(
-                horizontal: Dimensions.paddingSizeLarge,
-                vertical: Dimensions.paddingSizeDefault,
-              ),
-              decoration: BoxDecoration(
-                color: AppThemeColor.lightBlueColor,
-                borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(6.0),
-                child: TabBar(
-                  controller: _tabController,
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  labelPadding: const EdgeInsets.symmetric(vertical: 8),
-                  indicator: BoxDecoration(
-                    borderRadius: BorderRadius.circular(
-                      Dimensions.radiusDefault,
-                    ),
-                    color: AppThemeColor.darkBlueColor,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppThemeColor.darkBlueColor.withValues(
-                          alpha: 0.3,
-                        ),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppThemeColor.backGroundColor,
+                          AppThemeColor.lightBlueColor.withValues(alpha: 0.3),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
                       ),
-                    ],
+                    ),
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          Dimensions.paddingSizeLarge,
+                          Dimensions.paddingSizeLarge * 3,
+                          Dimensions.paddingSizeLarge,
+                          Dimensions.paddingSizeDefault,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Analytics Dashboard',
+                              style: TextStyle(
+                                fontSize: Dimensions.fontSizeOverLarge + 4,
+                                fontWeight: FontWeight.bold,
+                                color: AppThemeColor.darkBlueColor,
+                                height: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Comprehensive insights across all your events',
+                              style: TextStyle(
+                                fontSize: Dimensions.fontSizeLarge,
+                                color: AppThemeColor.dullFontColor,
+                                height: 1.4,
+                              ),
+                            ),
+                            const SizedBox(height: Dimensions.spaceSizedLarge),
+                            // Time Period Filters
+                            Text(
+                              'Time Period',
+                              style: TextStyle(
+                                fontSize: Dimensions.fontSizeDefault,
+                                fontWeight: FontWeight.w600,
+                                color: AppThemeColor.darkBlueColor,
+                              ),
+                            ),
+                            const SizedBox(height: Dimensions.spaceSizeSmall),
+                            Wrap(
+                              spacing: Dimensions.spaceSizeSmall,
+                              runSpacing: Dimensions.spaceSizeSmall,
+                              children: [
+                                _buildModernFilterChip('All Time', 'all'),
+                                _buildModernFilterChip('Last Week', 'week'),
+                                _buildModernFilterChip('Last Month', 'month'),
+                                _buildModernFilterChip('Last Year', 'year'),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                  labelColor: AppThemeColor.pureWhiteColor,
-                  unselectedLabelColor: AppThemeColor.darkBlueColor,
-                  labelStyle: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: Dimensions.fontSizeDefault,
-                  ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    fontSize: Dimensions.fontSizeDefault,
-                  ),
-                  tabs: [
-                    Tab(child: _buildTabText('Overview')),
-                    Tab(child: _buildAITabText()),
-                    Tab(child: _buildTabText('Trends')),
-                    Tab(child: _buildTabText('Events')),
-                  ],
                 ),
               ),
-            ),
+              SliverPersistentHeader(
+                delegate: _SliverAppBarDelegate(
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(
+                      Dimensions.paddingSizeLarge,
+                      0,
+                      Dimensions.paddingSizeLarge,
+                      Dimensions.spaceSizeSmall,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppThemeColor.pureWhiteColor,
+                      borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 15,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(6.0),
+                      child: TabBar(
+                        controller: _tabController,
+                        indicatorSize: TabBarIndicatorSize.tab,
+                        labelPadding: const EdgeInsets.symmetric(vertical: 12),
+                        indicator: BoxDecoration(
+                          borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                          gradient: const LinearGradient(
+                            colors: [
+                              AppThemeColor.darkBlueColor,
+                              AppThemeColor.dullBlueColor,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        labelColor: AppThemeColor.pureWhiteColor,
+                        unselectedLabelColor: AppThemeColor.darkBlueColor,
+                        labelStyle: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: Dimensions.fontSizeDefault,
+                        ),
+                        unselectedLabelStyle: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: Dimensions.fontSizeDefault,
+                        ),
+                        tabs: [
+                          Tab(child: _buildTabText('Overview')),
+                          Tab(child: _buildAITabText()),
+                          Tab(child: _buildTabText('Trends')),
+                          Tab(child: _buildTabText('Events')),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                pinned: true,
+              ),
+            ];
+          },
+          body: TabBarView(
+            controller: _tabController,
+            children: [
+              _overviewTab(),
+              _aiInsightsTab(),
+              _trendsTab(),
+              _eventsTab(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-            // Enhanced Tab Bar View with better spacing
-            Expanded(
-              child: Container(
-                margin: const EdgeInsets.symmetric(
-                  horizontal: Dimensions.paddingSizeLarge,
-                ),
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _overviewTab(),
-                    _aiInsightsTab(),
-                    _trendsTab(),
-                    _eventsTab(),
+  Widget _buildModernFilterChip(String label, String value) {
+    final isSelected = _selectedDateFilter == value;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedDateFilter = value;
+        });
+        // Reload analytics when filter changes
+        if (_userEvents.isNotEmpty) {
+          _loadAggregatedAnalytics();
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(
+          horizontal: Dimensions.paddingSizeDefault,
+          vertical: Dimensions.paddingSizeSmall,
+        ),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? const LinearGradient(
+                  colors: [
+                    AppThemeColor.darkBlueColor,
+                    AppThemeColor.dullBlueColor,
                   ],
-                ),
-              ),
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: isSelected ? null : AppThemeColor.pureWhiteColor,
+          borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+          border: Border.all(
+            color: isSelected
+                ? Colors.transparent
+                : AppThemeColor.borderColor,
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isSelected
+                  ? AppThemeColor.darkBlueColor.withValues(alpha: 0.3)
+                  : Colors.black.withValues(alpha: 0.05),
+              blurRadius: isSelected ? 10 : 5,
+              offset: const Offset(0, 3),
             ),
           ],
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected
+                ? AppThemeColor.pureWhiteColor
+                : AppThemeColor.darkBlueColor,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            fontSize: Dimensions.fontSizeSmall,
+          ),
         ),
       ),
     );
@@ -639,76 +835,267 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     return SingleChildScrollView(
       padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Modern Analytics Cards Grid
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            crossAxisSpacing: Dimensions.spaceSizeSmall,
-            mainAxisSpacing: Dimensions.spaceSizeSmall,
-            childAspectRatio: 1.4,
-            children: [
-              _buildModernAnalyticsCard(
-                title: 'Total Events',
-                value: '${_aggregatedAnalytics['totalEvents'] ?? 0}',
-                icon: Icons.event_rounded,
-                color: AppThemeColor.darkBlueColor,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF2C5A96), Color(0xFF4A90E2)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+          // Loading state for analytics data
+          if (_aggregatedAnalytics.isEmpty && _userEvents.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(Dimensions.paddingSizeLarge * 2),
+              decoration: BoxDecoration(
+                color: AppThemeColor.lightBlueColor,
+                borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              _buildModernAnalyticsCard(
-                title: 'Total Attendees',
-                value: '${_aggregatedAnalytics['totalAttendees'] ?? 0}',
-                icon: Icons.people_rounded,
-                color: AppThemeColor.dullBlueColor,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF73ABE4), Color(0xFF9BC2F0)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+              child: Column(
+                children: [
+                  const CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppThemeColor.darkBlueColor,
+                    ),
+                  ),
+                  const SizedBox(height: Dimensions.spaceSizedLarge),
+                  Text(
+                    'Loading analytics data...',
+                    style: TextStyle(
+                      fontSize: Dimensions.fontSizeDefault,
+                      color: AppThemeColor.darkBlueColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
-              _buildModernAnalyticsCard(
-                title: 'Avg Attendance',
-                value:
-                    '${(_aggregatedAnalytics['averageAttendance'] ?? 0).toStringAsFixed(1)}',
-                icon: Icons.trending_up_rounded,
-                color: AppThemeColor.grayColor,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF60676C), Color(0xFF8A8A8A)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+            ),
+
+          // Analytics Header
+          if (_aggregatedAnalytics.isNotEmpty) ...[
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [
+                        AppThemeColor.darkBlueColor,
+                        AppThemeColor.dullBlueColor,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                  ),
+                  child: const Icon(
+                    Icons.insights_rounded,
+                    color: AppThemeColor.pureWhiteColor,
+                    size: 20,
+                  ),
                 ),
-              ),
-              _buildModernAnalyticsCard(
-                title: 'Engagement Score',
-                value:
-                    '${(_aggregatedAnalytics['engagementScore'] ?? 0).toStringAsFixed(0)}%',
-                icon: Icons.insights_rounded,
-                color: AppThemeColor.darkBlueColor,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF2C5A96), Color(0xFF5B7BC0)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                const SizedBox(width: Dimensions.spaceSizeSmall),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Key Metrics',
+                        style: TextStyle(
+                          fontSize: Dimensions.fontSizeLarge,
+                          fontWeight: FontWeight.bold,
+                          color: AppThemeColor.darkBlueColor,
+                        ),
+                      ),
+                      Text(
+                        'Overview of your event performance',
+                        style: TextStyle(
+                          fontSize: Dimensions.fontSizeSmall,
+                          color: AppThemeColor.dullFontColor,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
 
-          const SizedBox(height: Dimensions.spaceSizedLarge),
+            const SizedBox(height: Dimensions.spaceSizedLarge),
 
-          // Top Performing Event Card
-          if (_aggregatedAnalytics['topPerformingEvent'] != null)
-            _buildTopPerformingEventCard(),
+            // Modern Analytics Cards Grid
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              crossAxisSpacing: Dimensions.spaceSizeDefault,
+              mainAxisSpacing: Dimensions.spaceSizeDefault,
+              childAspectRatio: 1.3,
+              children: [
+                _buildUltraModernAnalyticsCard(
+                  title: 'Total Events',
+                  value: '${_aggregatedAnalytics['totalEvents'] ?? 0}',
+                  icon: Icons.event_rounded,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  change: '+0', // You can calculate this based on previous period
+                ),
+                _buildUltraModernAnalyticsCard(
+                  title: 'Total Attendees',
+                  value: '${_aggregatedAnalytics['totalAttendees'] ?? 0}',
+                  icon: Icons.people_rounded,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF73ABE4), Color(0xFF4FC3F7)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  change: '+0',
+                ),
+                _buildUltraModernAnalyticsCard(
+                  title: 'Avg Attendance',
+                  value: (_aggregatedAnalytics['averageAttendance'] ?? 0) > 0
+                      ? '${(_aggregatedAnalytics['averageAttendance'] ?? 0).toStringAsFixed(1)}'
+                      : '0.0',
+                  icon: Icons.trending_up_rounded,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF11998E), Color(0xFF38EF7D)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  change: '+0',
+                ),
+                _buildUltraModernAnalyticsCard(
+                  title: 'Engagement Score',
+                  value: (_aggregatedAnalytics['engagementScore'] ?? 0) > 0
+                      ? '${(_aggregatedAnalytics['engagementScore'] ?? 0).toStringAsFixed(0)}%'
+                      : '0%',
+                  icon: Icons.psychology_rounded,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFF6B6B), Color(0xFFFFE66D)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  change: '+0',
+                ),
+              ],
+            ),
 
-          const SizedBox(height: Dimensions.spaceSizedLarge),
+            const SizedBox(height: Dimensions.spaceSizedLarge * 2),
 
-          // Event Categories Chart
-          _buildEventCategoriesCard(),
+            // Top Performing Event Card
+            if (_aggregatedAnalytics['topPerformingEvent'] != null)
+              _buildEnhancedTopPerformingEventCard(),
+
+            const SizedBox(height: Dimensions.spaceSizedLarge),
+
+            // Event Categories Chart
+            _buildModernEventCategoriesCard(),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildUltraModernAnalyticsCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Gradient gradient,
+    String? change,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+          gradient: LinearGradient(
+            colors: [
+              Colors.white.withValues(alpha: 0.1),
+              Colors.white.withValues(alpha: 0.05),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: AppThemeColor.pureWhiteColor,
+                    size: 20,
+                  ),
+                ),
+                if (change != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      change,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: AppThemeColor.pureWhiteColor,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: Dimensions.spaceSizeSmall),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: Dimensions.fontSizeOverLarge,
+                fontWeight: FontWeight.bold,
+                color: AppThemeColor.pureWhiteColor,
+                height: 1.0,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: Dimensions.fontSizeSmall,
+                fontWeight: FontWeight.w500,
+                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.9),
+                height: 1.2,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -770,6 +1157,136 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                 textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
                 maxLines: 2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEnhancedTopPerformingEventCard() {
+    final topEvent =
+        _aggregatedAnalytics['topPerformingEvent'] as Map<String, dynamic>?;
+    if (topEvent == null) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppThemeColor.pureWhiteColor,
+            AppThemeColor.lightBlueColor.withValues(alpha: 0.3),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFFFFD700),
+                        Color(0xFFFFA500),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFFD700).withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.emoji_events_rounded,
+                    color: AppThemeColor.pureWhiteColor,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: Dimensions.spaceSizeDefault),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Top Performing Event',
+                        style: TextStyle(
+                          fontSize: Dimensions.fontSizeSmall,
+                          fontWeight: FontWeight.w500,
+                          color: AppThemeColor.dullFontColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        topEvent['title'] ?? 'Unknown Event',
+                        style: TextStyle(
+                          fontSize: Dimensions.fontSizeLarge,
+                          fontWeight: FontWeight.bold,
+                          color: AppThemeColor.darkBlueColor,
+                          height: 1.2,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Dimensions.spaceSizedLarge),
+            Container(
+              padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+              decoration: BoxDecoration(
+                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                border: Border.all(
+                  color: AppThemeColor.borderColor.withValues(alpha: 0.5),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildEnhancedStatItem(
+                      'Attendees',
+                      '${topEvent['attendees'] ?? 0}',
+                      Icons.people_rounded,
+                      const Color(0xFF667EEA),
+                    ),
+                  ),
+                  Container(
+                    width: 1,
+                    height: 40,
+                    color: AppThemeColor.borderColor,
+                  ),
+                  Expanded(
+                    child: _buildEnhancedStatItem(
+                      'Date',
+                      DateFormat('MMM dd').format(topEvent['date']),
+                      Icons.calendar_today_rounded,
+                      const Color(0xFF11998E),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -866,6 +1383,39 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     );
   }
 
+  Widget _buildEnhancedStatItem(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 18),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: Dimensions.fontSizeLarge,
+            fontWeight: FontWeight.bold,
+            color: AppThemeColor.darkBlueColor,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: Dimensions.fontSizeSmall,
+            color: AppThemeColor.dullFontColor,
+            fontWeight: FontWeight.w500,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
   Widget _buildStatItem(
     String label,
     String value,
@@ -900,6 +1450,111 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
             textAlign: TextAlign.center,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildModernEventCategoriesCard() {
+    final categories =
+        _aggregatedAnalytics['eventCategories'] as Map<String, int>? ?? {};
+    if (categories.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppThemeColor.pureWhiteColor,
+            AppThemeColor.lightBlueColor.withValues(alpha: 0.2),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFF667EEA),
+                        Color(0xFF764BA2),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.donut_large_rounded,
+                    color: AppThemeColor.pureWhiteColor,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: Dimensions.spaceSizeDefault),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Event Categories',
+                        style: TextStyle(
+                          fontSize: Dimensions.fontSizeLarge,
+                          fontWeight: FontWeight.bold,
+                          color: AppThemeColor.darkBlueColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Distribution of your events by category',
+                        style: TextStyle(
+                          fontSize: Dimensions.fontSizeSmall,
+                          color: AppThemeColor.dullFontColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Dimensions.spaceSizedLarge),
+            Container(
+              height: 220,
+              decoration: BoxDecoration(
+                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                border: Border.all(
+                  color: AppThemeColor.borderColor.withValues(alpha: 0.5),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+                child: _buildCategoriesPieChart(categories),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1002,136 +1657,362 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
 
   Widget _aiInsightsTab() {
     if (_isLoadingAI) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+        child: Container(
+          padding: const EdgeInsets.all(Dimensions.paddingSizeLarge * 2),
+          decoration: BoxDecoration(
+            color: AppThemeColor.lightBlueColor,
+            borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF667EEA),
+                      Color(0xFF764BA2),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(50),
+                ),
+                child: const Icon(
+                  Icons.psychology_rounded,
+                  color: AppThemeColor.pureWhiteColor,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(height: Dimensions.spaceSizedLarge),
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  AppThemeColor.darkBlueColor,
+                ),
+              ),
+              const SizedBox(height: Dimensions.spaceSizedLarge),
+              Text(
+                'Generating AI Insights...',
+                style: TextStyle(
+                  fontSize: Dimensions.fontSizeLarge,
+                  color: AppThemeColor.darkBlueColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: Dimensions.spaceSizeSmall),
+              Text(
+                'Our AI is analyzing your event data',
+                style: TextStyle(
+                  fontSize: Dimensions.fontSizeDefault,
+                  color: AppThemeColor.dullFontColor,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     if (_globalAIInsights == null) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.psychology, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'No AI insights available',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[600],
-                fontFamily: 'Roboto',
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'AI insights will be generated once sufficient data is available',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[500],
-                fontFamily: 'Roboto',
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: _loadGlobalAIInsights,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Generate Insights'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppThemeColor.darkBlueColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
+        child: Padding(
+          padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(Dimensions.paddingSizeLarge * 2),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppThemeColor.lightBlueColor,
+                      AppThemeColor.lightBlueColor.withValues(alpha: 0.7),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(
+                    Dimensions.radiusExtraLarge,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.psychology_rounded,
+                  size: 80,
+                  color: AppThemeColor.darkBlueColor,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: Dimensions.spaceSizedLarge * 2),
+              Text(
+                'No AI Insights Available',
+                style: TextStyle(
+                  fontSize: Dimensions.fontSizeOverLarge,
+                  fontWeight: FontWeight.bold,
+                  color: AppThemeColor.darkBlueColor,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: Dimensions.spaceSizeSmall),
+              Text(
+                'AI insights will be generated once\nsufficient data is available',
+                style: TextStyle(
+                  fontSize: Dimensions.fontSizeLarge,
+                  color: AppThemeColor.dullFontColor,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: Dimensions.spaceSizedLarge * 2),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF667EEA),
+                      Color(0xFF764BA2),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(
+                    Dimensions.radiusLarge,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+                      blurRadius: 15,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton.icon(
+                  onPressed: _loadGlobalAIInsights,
+                  icon: const Icon(Icons.auto_awesome_rounded, size: 22),
+                  label: const Text(
+                    'Generate AI Insights',
+                    style: TextStyle(
+                      fontSize: Dimensions.fontSizeLarge,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: AppThemeColor.pureWhiteColor,
+                    shadowColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: Dimensions.paddingSizeLarge * 2,
+                      vertical: Dimensions.paddingSizeLarge,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        Dimensions.radiusLarge,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
       child: Column(
         children: [
-          // Global Performance Analysis
-          _aiInsightCard(
-            title: 'Global Performance Analysis',
-            icon: Icons.analytics_rounded,
-            color: AppThemeColor.darkBlueColor,
-            content: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // AI Header
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF667EEA),
+                  Color(0xFF764BA2),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
               children: [
-                Text(
-                  'Overall Performance Score: ${_globalAIInsights!.globalPerformanceAnalysis?['performanceScore']?.toStringAsFixed(1) ?? 'N/A'}%',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Growth Rate: ${_globalAIInsights!.globalPerformanceAnalysis?['growthRate']?.toStringAsFixed(1) ?? 'N/A'}%',
-                  style: const TextStyle(fontSize: 14),
-                ),
-                const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
                   ),
-                  child: Text(
-                    _globalAIInsights!
-                            .globalPerformanceAnalysis?['recommendation'] ??
-                        'No recommendation available',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontStyle: FontStyle.italic,
-                    ),
+                  child: const Icon(
+                    Icons.auto_awesome_rounded,
+                    color: AppThemeColor.pureWhiteColor,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: Dimensions.spaceSizeDefault),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'AI-Powered Insights',
+                        style: TextStyle(
+                          fontSize: Dimensions.fontSizeLarge,
+                          fontWeight: FontWeight.bold,
+                          color: AppThemeColor.pureWhiteColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Smart recommendations based on your event data',
+                        style: TextStyle(
+                          fontSize: Dimensions.fontSizeDefault,
+                          color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.9),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: Dimensions.spaceSizedLarge),
+
+          // Global Performance Analysis
+          _modernAiInsightCard(
+            title: 'Global Performance Analysis',
+            icon: Icons.analytics_rounded,
+            gradient: const LinearGradient(
+              colors: [Color(0xFF11998E), Color(0xFF38EF7D)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            content: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildMetricRow(
+                  'Performance Score',
+                  '${_globalAIInsights!.globalPerformanceAnalysis?['performanceScore']?.toStringAsFixed(1) ?? 'N/A'}%',
+                  Icons.speed_rounded,
+                ),
+                const SizedBox(height: Dimensions.spaceSizeDefault),
+                _buildMetricRow(
+                  'Growth Rate',
+                  '${_globalAIInsights!.globalPerformanceAnalysis?['growthRate']?.toStringAsFixed(1) ?? 'N/A'}%',
+                  Icons.trending_up_rounded,
+                ),
+                const SizedBox(height: Dimensions.spaceSizedLarge),
+                Container(
+                  padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF11998E).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                    border: Border.all(
+                      color: const Color(0xFF11998E).withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.lightbulb_outline_rounded,
+                        color: const Color(0xFF11998E),
+                        size: 20,
+                      ),
+                      const SizedBox(width: Dimensions.spaceSizeSmall),
+                      Expanded(
+                        child: Text(
+                          _globalAIInsights!
+                                  .globalPerformanceAnalysis?['recommendation'] ??
+                              'No recommendation available',
+                          style: TextStyle(
+                            fontSize: Dimensions.fontSizeDefault,
+                            color: AppThemeColor.darkBlueColor,
+                            fontStyle: FontStyle.italic,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: Dimensions.spaceSizedLarge),
 
           // Event Strategy Recommendations
-          _aiInsightCard(
-            title: 'Event Strategy Recommendations',
-            icon: Icons.lightbulb_rounded,
-            color: AppThemeColor.dullBlueColor,
+          _modernAiInsightCard(
+            title: 'Strategy Recommendations',
+            icon: Icons.psychology_rounded,
+            gradient: const LinearGradient(
+              colors: [Color(0xFFFF6B6B), Color(0xFFFFE66D)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
             content: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ...(_globalAIInsights!.strategyRecommendations ?? []).map(
                   (recommendation) => Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: Dimensions.spaceSizeDefault),
+                    padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[300]!),
-                      borderRadius: BorderRadius.circular(8),
+                      color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                      border: Border.all(
+                        color: AppThemeColor.borderColor.withValues(alpha: 0.5),
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Icon(
-                              _getStrategyIcon(recommendation['type'] ?? ''),
-                              color: _getStrategyColor(
-                                recommendation['type'] ?? '',
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: _getStrategyColor(recommendation['type'] ?? ''),
+                                borderRadius: BorderRadius.circular(6),
                               ),
-                              size: 20,
+                              child: Icon(
+                                _getStrategyIcon(recommendation['type'] ?? ''),
+                                color: AppThemeColor.pureWhiteColor,
+                                size: 16,
+                              ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: Dimensions.spaceSizeSmall),
                             Expanded(
                               child: Text(
                                 recommendation['title'] ?? 'Unknown',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                                style: TextStyle(
+                                  fontSize: Dimensions.fontSizeDefault,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppThemeColor.darkBlueColor,
                                 ),
                               ),
                             ),
@@ -1157,19 +2038,34 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: Dimensions.spaceSizeSmall),
                         Text(
                           recommendation['description'] ??
                               'No description available',
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Confidence: ${((recommendation['confidence'] ?? 0) * 100).toStringAsFixed(1)}%',
                           style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
+                            fontSize: Dimensions.fontSizeSmall,
+                            color: AppThemeColor.dullFontColor,
+                            height: 1.4,
                           ),
+                        ),
+                        const SizedBox(height: Dimensions.spaceSizeSmall),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.psychology_outlined,
+                              size: 14,
+                              color: AppThemeColor.dullIconColor,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Confidence: ${((recommendation['confidence'] ?? 0) * 100).toStringAsFixed(1)}%',
+                              style: TextStyle(
+                                fontSize: Dimensions.fontSizeSmall,
+                                color: AppThemeColor.dullIconColor,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -1180,6 +2076,133 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _modernAiInsightCard({
+    required String title,
+    required IconData icon,
+    required Gradient gradient,
+    required Widget content,
+  }) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppThemeColor.pureWhiteColor,
+            AppThemeColor.lightBlueColor.withValues(alpha: 0.2),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: gradient,
+                    borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    icon,
+                    color: AppThemeColor.pureWhiteColor,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: Dimensions.spaceSizeDefault),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: Dimensions.fontSizeLarge,
+                      fontWeight: FontWeight.bold,
+                      color: AppThemeColor.darkBlueColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Dimensions.spaceSizedLarge),
+            Container(
+              padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+              decoration: BoxDecoration(
+                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                border: Border.all(
+                  color: AppThemeColor.borderColor.withValues(alpha: 0.5),
+                ),
+              ),
+              child: content,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetricRow(String label, String value, IconData icon) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: AppThemeColor.darkBlueColor,
+          ),
+        ),
+        const SizedBox(width: Dimensions.spaceSizeDefault),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: Dimensions.fontSizeSmall,
+                  color: AppThemeColor.dullFontColor,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: Dimensions.fontSizeLarge,
+                  fontWeight: FontWeight.bold,
+                  color: AppThemeColor.darkBlueColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -1613,5 +2636,31 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
       if (!mounted) return;
       ShowToast().showSnackBar('Error exporting data: $e', context);
     }
+  }
+}
+
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+
+  _SliverAppBarDelegate(this.child);
+
+  @override
+  double get minExtent => 80.0;
+
+  @override
+  double get maxExtent => 80.0;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return child;
+  }
+
+  @override
+  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) {
+    return false;
   }
 }
