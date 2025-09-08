@@ -13,7 +13,8 @@ import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/screens/MyProfile/followers_following_screen.dart';
-import 'package:attendus/screens/Messaging/new_message_screen.dart';
+import 'package:attendus/screens/Messaging/chat_screen.dart';
+import 'package:attendus/firebase/firebase_messaging_helper.dart';
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 
 class UserProfileScreen extends StatefulWidget {
@@ -36,7 +37,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   List<EventModel> _createdEvents = [];
   List<EventModel> _attendedEvents = [];
   bool _isLoading = true;
-  // Follow state removed from header; we won't track it here to avoid unused field.
+  bool _isFollowing = false;
   int _followersCount = 0;
   int _followingCount = 0;
 
@@ -133,6 +134,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           _attendedEvents = attendedEvents;
           _followersCount = followersCount;
           _followingCount = followingCount;
+          _isFollowing = isFollowing;
           _isLoading = false;
         });
         debugPrint('User data loaded successfully');
@@ -389,6 +391,14 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   ),
                 ],
               ),
+              // Add Follow and Message buttons for other users' profiles
+              if (!widget.isOwnProfile &&
+                  CustomerController.logeInCustomer != null &&
+                  widget.user.uid !=
+                      CustomerController.logeInCustomer!.uid) ...[
+                const SizedBox(height: 12),
+                _buildActionButtons(),
+              ],
             ],
           ),
         ],
@@ -415,6 +425,166 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       });
       ShowToast().showNormalToast(msg: 'Banner updated');
     } catch (_) {}
+  }
+
+  Widget _buildActionButtons() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          // Follow/Following button
+          Expanded(
+            child: GestureDetector(
+              onTap: _toggleFollow,
+              child: Container(
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _isFollowing
+                      ? AppThemeColor.pureWhiteColor
+                      : AppThemeColor.darkBlueColor,
+                  borderRadius: BorderRadius.circular(18),
+                  border: _isFollowing
+                      ? Border.all(color: AppThemeColor.darkBlueColor, width: 1)
+                      : null,
+                ),
+                child: Center(
+                  child: Text(
+                    _isFollowing ? 'Following' : 'Follow',
+                    style: TextStyle(
+                      color: _isFollowing
+                          ? AppThemeColor.darkBlueColor
+                          : AppThemeColor.pureWhiteColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Message button
+          Expanded(
+            child: GestureDetector(
+              onTap: _sendMessage,
+              child: Container(
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+                ),
+                child: const Center(
+                  child: Text(
+                    'Message',
+                    style: TextStyle(
+                      color: Color(0xFF1F2937),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _toggleFollow() async {
+    if (CustomerController.logeInCustomer == null) {
+      ShowToast().showNormalToast(msg: 'Please log in to follow users');
+      return;
+    }
+
+    if (widget.user.uid == CustomerController.logeInCustomer!.uid) {
+      ShowToast().showNormalToast(msg: 'You cannot follow yourself');
+      return;
+    }
+
+    setState(() {
+      _isFollowing = !_isFollowing;
+      // Update followers count immediately for better UX
+      if (_isFollowing) {
+        _followersCount++;
+      } else {
+        _followersCount = _followersCount > 0 ? _followersCount - 1 : 0;
+      }
+    });
+
+    try {
+      if (_isFollowing) {
+        await FirebaseFirestoreHelper().followUser(
+          followerId: CustomerController.logeInCustomer!.uid,
+          followingId: widget.user.uid,
+        );
+        ShowToast().showNormalToast(msg: 'Following ${widget.user.name}');
+      } else {
+        await FirebaseFirestoreHelper().unfollowUser(
+          followerId: CustomerController.logeInCustomer!.uid,
+          followingId: widget.user.uid,
+        );
+        ShowToast().showNormalToast(msg: 'Unfollowed ${widget.user.name}');
+      }
+
+      // Reload data to get accurate counts
+      _loadUserData();
+    } catch (e) {
+      debugPrint('Error toggling follow status: $e');
+      // Revert the state change on error
+      setState(() {
+        _isFollowing = !_isFollowing;
+        if (_isFollowing) {
+          _followersCount++;
+        } else {
+          _followersCount = _followersCount > 0 ? _followersCount - 1 : 0;
+        }
+      });
+
+      if (e.toString().contains('permission-denied')) {
+        ShowToast().showNormalToast(
+          msg: 'Follow feature is not available yet. Coming soon!',
+        );
+      } else {
+        ShowToast().showNormalToast(
+          msg: 'Error updating follow status. Please try again.',
+        );
+      }
+    }
+  }
+
+  void _sendMessage() async {
+    if (CustomerController.logeInCustomer == null) {
+      ShowToast().showNormalToast(msg: 'Please log in to send messages');
+      return;
+    }
+
+    // Create conversation ID (sorted to ensure consistency)
+    final currentUserId = CustomerController.logeInCustomer!.uid;
+    final sortedIds = [currentUserId, widget.user.uid]..sort();
+    final conversationId = '${sortedIds[0]}_${sortedIds[1]}';
+
+    // Check if conversation already exists
+    final messagingHelper = FirebaseMessagingHelper();
+    final existingConversationId = await messagingHelper.getConversationId(
+      currentUserId,
+      widget.user.uid,
+    );
+
+    if (!mounted) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          conversationId: existingConversationId ?? conversationId,
+          otherParticipantInfo: widget.user,
+        ),
+      ),
+    );
   }
 
   // Avatar upload
@@ -510,37 +680,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               ),
             ),
           ),
-          if (!widget.isOwnProfile) ...[
-            Container(width: 1, height: 30, color: AppThemeColor.borderColor),
-            GestureDetector(
-              onTap: () => _startMessage(),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppThemeColor.darkBlueColor,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.message_outlined,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Message',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppThemeColor.dullFontColor,
-                      fontFamily: 'Roboto',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          // Removed duplicate Message icon to avoid redundancy with top action button
         ],
       ),
     );
@@ -724,12 +864,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   // Removed unused _showMessageDialog
 
-  void _startMessage() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => NewMessageScreen()),
-    );
-  }
+  // Removed _startMessage as the stats section message shortcut was removed
 
   void _showFollowersFollowing(String initialTab) {
     Navigator.push(
@@ -758,7 +893,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   void _shareProfile() {
     SharePlus.instance.share(
-      ShareParams(text: 'Check out ${widget.user.name}\'s profile on AttendUs!'),
+      ShareParams(
+        text: 'Check out ${widget.user.name}\'s profile on AttendUs!',
+      ),
     );
   }
 

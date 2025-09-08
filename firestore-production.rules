@@ -114,7 +114,21 @@ service cloud.firestore {
       // Allow write for the user themselves
       allow write: if isAuthenticated() && request.auth.uid == userId;
       
-      // Subcollections
+      // Followers subcollection - allow users to follow/unfollow
+      match /followers/{followerId} {
+        allow read: if isAuthenticated();
+        // Allow write if the authenticated user is the follower being added/removed
+        allow write: if isAuthenticated() && request.auth.uid == followerId;
+      }
+      
+      // Following subcollection - allow users to manage who they follow  
+      match /following/{followingId} {
+        allow read: if isAuthenticated();
+        // Allow write if the authenticated user is the one doing the following
+        allow write: if isAuthenticated() && request.auth.uid == userId;
+      }
+      
+      // Other subcollections (private data)
       match /{subcollection}/{document} {
         allow read: if isAuthenticated() && request.auth.uid == userId;
         allow write: if isAuthenticated() && request.auth.uid == userId;
