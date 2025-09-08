@@ -5,6 +5,7 @@ import 'package:attendus/Utils/dimensions.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 
 class AttendeeNotificationScreen extends StatefulWidget {
   const AttendeeNotificationScreen({super.key});
@@ -170,7 +171,8 @@ class _AttendeeNotificationScreenState extends State<AttendeeNotificationScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScaffoldWrapper(
+      selectedBottomNavIndex: 5, // Account tab
       backgroundColor: AppThemeColor.backGroundColor,
       body: SafeArea(
         child: Column(

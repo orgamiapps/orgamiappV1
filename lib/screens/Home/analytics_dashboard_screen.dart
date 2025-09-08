@@ -14,6 +14,7 @@ import 'package:attendus/Utils/toast.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
+import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 
 class AnalyticsDashboardScreen extends StatefulWidget {
   const AnalyticsDashboardScreen({super.key});
@@ -208,7 +209,8 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
+      return AppScaffoldWrapper(
+        selectedBottomNavIndex: 5, // Account tab
         backgroundColor: AppThemeColor.backGroundColor,
         body: SafeArea(
           child: Center(
@@ -358,7 +360,8 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
       );
     }
 
-    return Scaffold(
+    return AppScaffoldWrapper(
+      selectedBottomNavIndex: 5, // Account tab
       backgroundColor: AppThemeColor.backGroundColor,
       body: SafeArea(
         child: Column(

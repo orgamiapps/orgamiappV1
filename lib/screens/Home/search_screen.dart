@@ -8,6 +8,7 @@ import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart'
 import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 
 import 'package:attendus/firebase/engagement_predictor.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
@@ -66,7 +67,8 @@ class _SearchScreenState extends State<SearchScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScaffoldWrapper(
+      selectedBottomNavIndex: 0, // Home tab
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: _buildAppBar(),
       body: SafeArea(

@@ -6,6 +6,7 @@ import 'package:attendus/Utils/cached_image.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 
 class FollowersFollowingScreen extends StatefulWidget {
   final CustomerModel user;
@@ -174,7 +175,8 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScaffoldWrapper(
+      selectedBottomNavIndex: 3, // Profile tab
       backgroundColor: AppThemeColor.backGroundColor,
       body: SafeArea(
         child: Column(
