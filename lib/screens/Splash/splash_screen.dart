@@ -1,9 +1,7 @@
 import 'dart:async';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:attendus/controller/customer_controller.dart';
-import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/services/auth_service.dart';
 
 import 'package:attendus/Utils/images.dart';
 import 'package:attendus/Utils/router.dart';
@@ -41,9 +39,9 @@ class _SplashScreenState extends State<SplashScreen>
     });
 
     // Set a shorter global timeout to prevent getting stuck
-    _timeoutTimer = Timer(const Duration(seconds: 2), () {
+    _timeoutTimer = Timer(const Duration(seconds: 5), () {
       if (mounted && !_hasNavigated) {
-        debugPrint('⏰ Global timeout - forcing navigation');
+        debugPrint('⏰ Global timeout - forcing navigation to prevent hanging');
         _navigateToSecondSplash();
       }
     });
@@ -52,7 +50,9 @@ class _SplashScreenState extends State<SplashScreen>
   void _initializeAnimations() {
     // Logo scale and opacity animation - simplified for better performance
     _logoAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 400), // Further reduced for faster startup
+      duration: const Duration(
+        milliseconds: 400,
+      ), // Further reduced for faster startup
       vsync: this,
     );
 
@@ -72,7 +72,9 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Fade animation for text
     _fadeAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 300), // Further reduced for faster startup
+      duration: const Duration(
+        milliseconds: 300,
+      ), // Further reduced for faster startup
       vsync: this,
     );
 
@@ -82,7 +84,9 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Loading animation
     _loadingAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 600), // Further reduced for faster startup
+      duration: const Duration(
+        milliseconds: 600,
+      ), // Further reduced for faster startup
       vsync: this,
     );
 
@@ -128,54 +132,39 @@ class _SplashScreenState extends State<SplashScreen>
     });
 
     try {
-      User? firebaseUser = FirebaseAuth.instance.currentUser;
+      debugPrint('🔄 Initializing AuthService...');
+      
+      // Initialize AuthService with timeout to prevent hanging
+      await AuthService().initialize().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          debugPrint('⚠️ AuthService initialization timed out');
+          // Continue without auth service if it times out
+        },
+      );
+      
+      debugPrint('✅ AuthService initialized');
 
-      if (firebaseUser != null) {
-        debugPrint('🔍 User found: ${firebaseUser.uid}');
+      if (!mounted || _hasNavigated) return;
+
+      // Check if user is logged in through AuthService
+      if (AuthService().isLoggedIn) {
+        debugPrint('🔍 User found via AuthService');
 
         if (!mounted || _hasNavigated) return;
         setState(() {
-          _loadingText = "Loading your profile...";
+          _loadingText = "Welcome back!";
         });
 
-        final userData = await FirebaseFirestoreHelper()
-            .getSingleCustomer(customerId: firebaseUser.uid)
-            .timeout(
-              const Duration(seconds: 1), // Reduced timeout for faster failure detection
-              onTimeout: () {
-                debugPrint('⏰ Timeout getting user data');
-                return null;
-              },
-            );
+        debugPrint('✅ User session restored successfully');
+
+        // Brief pause to show welcome message
+        await Future.delayed(const Duration(milliseconds: 300));
 
         if (!mounted || _hasNavigated) return;
-
-        if (userData != null) {
-          setState(() {
-            CustomerController.logeInCustomer = userData;
-            _loadingText = "Welcome back!";
-          });
-
-          debugPrint('✅ User data loaded successfully');
-
-          // Brief pause to show welcome message
-          await Future.delayed(
-            const Duration(milliseconds: 300),
-          ); // Reduced from 800ms
-
-          if (!mounted || _hasNavigated) return;
-          _navigateToHome();
-        } else {
-          debugPrint('❌ User data is null - navigating to login');
-          // If we can't get user data, just go to login screen
-          if (mounted && !_hasNavigated) {
-            // Sign out to clear any invalid session
-            await FirebaseAuth.instance.signOut();
-            _navigateToSecondSplash();
-          }
-        }
+        _navigateToHome();
       } else {
-        debugPrint('🔍 No user found, navigating to second splash');
+        debugPrint('🔍 No user session found, navigating to second splash');
         if (!mounted || _hasNavigated) return;
 
         setState(() {

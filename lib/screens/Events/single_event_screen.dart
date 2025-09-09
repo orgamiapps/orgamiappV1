@@ -13,6 +13,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/Utils/location_helper.dart';
 import 'package:attendus/firebase/dwell_time_tracker.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/models/attendance_model.dart';
@@ -80,7 +81,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   // RSVP state
   bool _isRsvped = false;
   bool _isRsvpLoading = false;
-  bool _isRsvpStatusLoading = true; // Track if we're still checking initial RSVP status
+  bool _isRsvpStatusLoading =
+      true; // Track if we're still checking initial RSVP status
 
   // _isLoading removed - no longer needed after removing manual code input
 
@@ -206,7 +208,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     } catch (_) {
       if (mounted) {
         setState(() {
-          _isRsvpStatusLoading = false; // Mark status loading as complete even on error
+          _isRsvpStatusLoading =
+              false; // Mark status loading as complete even on error
         });
       }
     }
@@ -579,20 +582,31 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       );
     }
 
-    await Geolocator.getCurrentPosition().then((value) {
-      LatLng newLatLng = LatLng(value.latitude, value.longitude);
-      bool inRadius = isInInRadius(
-        eventModel.getLatLng(),
-        eventModel.radius,
-        newLatLng,
+    try {
+      final position = await LocationHelper.getCurrentLocation(
+        showErrorDialog: true,
+        context: context,
       );
-      if (inRadius) {
-        _showSignInDialog();
+
+      if (position != null) {
+        LatLng newLatLng = LatLng(position.latitude, position.longitude);
+        bool inRadius = isInInRadius(
+          eventModel.getLatLng(),
+          eventModel.radius,
+          newLatLng,
+        );
+        if (inRadius) {
+          _showSignInDialog();
+        }
+        Logger.debug(
+          'Current Location is $inRadius and radius is ${widget.eventModel.radius}',
+        );
+      } else {
+        Logger.warning('Could not get current location for radius check');
       }
-      Logger.debug(
-        'Current Location is  $inRadius and radius is ${widget.eventModel.radius}',
-      );
-    });
+    } catch (e) {
+      Logger.error('Error getting location for radius check: $e');
+    }
   }
 
   void _showSignInDialog() {
@@ -4440,10 +4454,13 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: _isRsvpStatusLoading
-              ? [const Color(0xFF9CA3AF), const Color(0xFF6B7280)] // Gray gradient while loading
+              ? [
+                  const Color(0xFF9CA3AF),
+                  const Color(0xFF6B7280),
+                ] // Gray gradient while loading
               : _isRsvped
-                  ? [const Color(0xFF10B981), const Color(0xFF059669)]
-                  : [const Color(0xFF667EEA), const Color(0xFF5B67CA)],
+              ? [const Color(0xFF10B981), const Color(0xFF059669)]
+              : [const Color(0xFF667EEA), const Color(0xFF5B67CA)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -4452,8 +4469,10 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
           BoxShadow(
             color: _isRsvpStatusLoading
                 ? const Color(0xFF9CA3AF).withOpacity(0.3)
-                : (_isRsvped ? const Color(0xFF10B981) : const Color(0xFF667EEA))
-                    .withOpacity(0.3),
+                : (_isRsvped
+                          ? const Color(0xFF10B981)
+                          : const Color(0xFF667EEA))
+                      .withOpacity(0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -4462,7 +4481,9 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: (_isRsvpLoading || _isRsvpStatusLoading) ? null : _rsvpForEvent,
+          onTap: (_isRsvpLoading || _isRsvpStatusLoading)
+              ? null
+              : _rsvpForEvent,
           borderRadius: BorderRadius.circular(16),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -4501,9 +4522,11 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _isRsvpStatusLoading 
+                              _isRsvpStatusLoading
                                   ? 'Loading...'
-                                  : _isRsvped ? 'Spot Reserved' : 'Reserve Your Spot',
+                                  : _isRsvped
+                                  ? 'Spot Reserved'
+                                  : 'Reserve Your Spot',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w700,

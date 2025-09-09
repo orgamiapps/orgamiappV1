@@ -2,8 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
-import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/services/auth_service.dart';
 
 class DeleteAccountScreen extends StatefulWidget {
   const DeleteAccountScreen({super.key});
@@ -26,11 +26,8 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
     try {
       await FirebaseFirestoreHelper().deleteAccountViaCloudFunction(user.uid);
 
-      await FirebaseAuth.instance.signOut();
+      await AuthService().signOut();
       if (!mounted) return;
-      setState(() {
-        CustomerController.logeInCustomer = null;
-      });
       RouterClass().appRest(context: context);
     } catch (e) {
       if (!mounted) return;

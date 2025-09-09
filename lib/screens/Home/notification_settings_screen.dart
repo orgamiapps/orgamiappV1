@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:attendus/firebase/firebase_messaging_helper.dart';
 import 'package:attendus/models/notification_model.dart';
 import 'package:attendus/Utils/toast.dart';

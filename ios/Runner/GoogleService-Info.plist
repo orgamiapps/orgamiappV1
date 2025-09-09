@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>951311475019-vrmcjm9inlpdi66qupst3op5c81e74el.apps.googleusercontent.com</string>
+	<string>951311475019-qib9ha5vjl17rhveej77tisuj1gahos1.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.951311475019-vrmcjm9inlpdi66qupst3op5c81e74el</string>
+	<string>com.googleusercontent.apps.951311475019-qib9ha5vjl17rhveej77tisuj1gahos1</string>
 	<key>ANDROID_CLIENT_ID</key>
-	<string>951311475019-qnu1aci25ca8k6jnkjbrps23vbakd97j.apps.googleusercontent.com</string>
+	<string>951311475019-aov09ce8p6047e7jb8ur8c9h7corprlu.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
 	<string>AIzaSyCD0XNVuDDTljnD9R7n8TCr_9Ze21PA0VU</string>
 	<key>GCM_SENDER_ID</key>
@@ -15,7 +15,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>q</string>
+	<string>com.stormdeve.orgami</string>
 	<key>PROJECT_ID</key>
 	<string>orgami-66nxok</string>
 	<key>STORAGE_BUCKET</key>
@@ -31,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:951311475019:ios:5adde68ce6b5846289c8ce</string>
+	<string>1:951311475019:ios:4b42c42f9ee9f67289c8ce</string>
 </dict>
 </plist>

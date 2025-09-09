@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:attendus/Utils/responsive_helper.dart';
 import 'package:attendus/Utils/colors.dart';
-import 'package:attendus/Utils/dimensions.dart';
 
 class ResponsiveTestHelper {
   static Widget buildTestCard(BuildContext context, String title, Widget content) {
@@ -15,7 +14,7 @@ class ResponsiveTestHelper {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: ResponsiveHelper.getResponsiveElevation(context),
             offset: const Offset(0, 2),
           ),
@@ -112,7 +111,7 @@ class ResponsiveTestHelper {
       height: avatarSize,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: AppThemeColor.darkBlueColor.withOpacity(0.1),
+        color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
         border: Border.all(
           color: AppThemeColor.darkBlueColor,
           width: 2,
@@ -135,7 +134,7 @@ class ResponsiveTestHelper {
         itemBuilder: (context, index) {
           return Container(
             decoration: BoxDecoration(
-              color: AppThemeColor.darkBlueColor.withOpacity(0.1),
+              color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(
                 ResponsiveHelper.getResponsiveBorderRadius(context),
               ),

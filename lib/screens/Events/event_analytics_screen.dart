@@ -12,6 +12,7 @@ import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:intl/intl.dart';
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 
 class EventAnalyticsScreen extends StatefulWidget {
@@ -135,7 +136,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
     try {
       if (_eventHostUid == null || _attendeesList.isEmpty) return;
 
-      // Fetch all events created by this host
+      // 1. Fetch all events created by this host.
       final eventsQuery = await FirebaseFirestore.instance
           .collection('Events')
           .where('customerUid', isEqualTo: _eventHostUid)
@@ -143,63 +144,78 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
 
       if (eventsQuery.docs.isEmpty) return;
 
-      final Map<String, Map<String, dynamic>> hostEventIdToData = {};
-      for (final doc in eventsQuery.docs) {
-        hostEventIdToData[doc.id] = doc.data();
-      }
-      final hostEventIds = hostEventIdToData.keys.toList();
-
-      // Build set of unique attendee customerUids for this event
-      final Set<String> uniqueCustomerUids = {
-        for (final a in _attendeesList)
-          if (a.customerUid.isNotEmpty && a.customerUid != 'manual')
-            a.customerUid,
+      final Map<String, Map<String, dynamic>> hostEventsById = {
+        for (var doc in eventsQuery.docs) doc.id: doc.data(),
       };
+      final hostEventIds = hostEventsById.keys.toList();
 
-      // For each attendee, query Attendance across host's events in chunks of 10 ids (Firestore 'in' limit)
+      // Get the set of customerUids for the *current* event's attendees
+      final currentEventAttendeeUids = _attendeesList
+          .map((a) => a.customerUid)
+          .toSet();
+
+      if (hostEventIds.isEmpty || currentEventAttendeeUids.isEmpty) return;
+
+      // This map will store all attendance records for all of host's events,
+      // grouped by customerUid
+      final Map<String, List<DocumentSnapshot>> allAttendanceByCustomerUid = {};
+
+      // 2. Batch query for attendance across all host events.
+      final hostEventIdBatches = _chunkList(hostEventIds, 30);
+
+      for (final batch in hostEventIdBatches) {
+        if (batch.isEmpty) continue;
+
+        final attendanceQuery = await FirebaseFirestore.instance
+            .collectionGroup('Attendance')
+            .where('eventId', whereIn: batch)
+            .get();
+
+        for (final doc in attendanceQuery.docs) {
+          final customerUid = doc.data()['customerUid'] as String?;
+          // Filter for attendees of the CURRENT event
+          if (customerUid != null &&
+              currentEventAttendeeUids.contains(customerUid)) {
+            (allAttendanceByCustomerUid[customerUid] ??= []).add(doc);
+          }
+        }
+      }
+
       final Map<String, _AttendeeHostHistory> computed = {};
-      for (final uid in uniqueCustomerUids) {
-        final Set<String> attendedEventIdsByHost = {};
-        for (final chunk in _chunkList(hostEventIds, 10)) {
-          final snap = await FirebaseFirestore.instance
-              .collection('Attendance')
-              .where('customerUid', isEqualTo: uid)
-              .where('eventId', whereIn: chunk)
-              .get();
-          for (final doc in snap.docs) {
-            final data = doc.data();
-            final eventId = data['eventId'] as String?;
-            if (eventId != null && eventId.isNotEmpty) {
-              attendedEventIdsByHost.add(eventId);
-            }
+
+      // 3. Process the results in memory.
+      allAttendanceByCustomerUid.forEach((customerUid, attendanceDocs) {
+        final Set<String> attendedEventIds = {};
+        final List<_EventSummary> eventSummaries = [];
+
+        for (final doc in attendanceDocs) {
+          final eventId = doc['eventId'] as String;
+          if (attendedEventIds.contains(eventId)) continue;
+
+          final eventData = hostEventsById[eventId];
+          if (eventData != null) {
+            attendedEventIds.add(eventId);
+            eventSummaries.add(
+              _EventSummary(
+                eventId: eventId,
+                title: eventData['title'] as String,
+                when: (eventData['selectedDateTime'] as Timestamp?)?.toDate(),
+              ),
+            );
           }
         }
 
-        // Build event summaries
-        final List<_EventSummary> summaries =
-            attendedEventIdsByHost.map((eventId) {
-              final map = hostEventIdToData[eventId] ?? {};
-              final title = (map['title'] ?? 'Untitled').toString();
-              final ts = map['selectedDateTime'];
-              DateTime? when;
-              if (ts is Timestamp) when = ts.toDate();
-              return _EventSummary(eventId: eventId, title: title, when: when);
-            }).toList()..sort((a, b) {
-              final aTime = a.when ?? DateTime.fromMillisecondsSinceEpoch(0);
-              final bTime = b.when ?? DateTime.fromMillisecondsSinceEpoch(0);
-              return bTime.compareTo(aTime);
-            });
-
-        computed[uid] = _AttendeeHostHistory(
-          totalEventsByHost: attendedEventIdsByHost.length,
-          attendedEventIdsByHost: attendedEventIdsByHost,
-          eventSummaries: summaries,
-        );
-      }
+        if (attendedEventIds.isNotEmpty) {
+          computed[customerUid] = _AttendeeHostHistory(
+            totalEventsByHost: attendedEventIds.length,
+            attendedEventIdsByHost: attendedEventIds,
+            eventSummaries: eventSummaries,
+          );
+        }
+      });
 
       if (mounted) {
         setState(() {
-          _attendeeHistoryByUid.clear();
           _attendeeHistoryByUid.addAll(computed);
         });
       }
@@ -245,7 +261,11 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
     if (attendee.isAnonymous) {
       return 'Anonymous';
     }
-    return attendee.userName == 'Manual' ? 'Anonymous' : attendee.userName;
+    final String name = attendee.userName.trim();
+    if (name.isEmpty || name.toLowerCase() == 'manual') {
+      return 'Anonymous';
+    }
+    return name;
   }
 
   DateTime? _getFilterDate() {
@@ -271,25 +291,78 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
-                  decoration: BoxDecoration(
-                    color: AppThemeColor.lightBlueColor,
-                    borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+                  padding: const EdgeInsets.all(
+                    Dimensions.paddingSizeLarge * 2,
                   ),
-                  child: const CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AppThemeColor.darkBlueColor,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppThemeColor.lightBlueColor,
+                        AppThemeColor.lightBlueColor.withValues(alpha: 0.7),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
+                    borderRadius: BorderRadius.circular(
+                      Dimensions.radiusExtraLarge,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppThemeColor.darkBlueColor.withValues(
+                          alpha: 0.1,
+                        ),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [
+                              AppThemeColor.darkBlueColor,
+                              AppThemeColor.dullBlueColor,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(50),
+                        ),
+                        child: const Icon(
+                          Icons.security_rounded,
+                          color: AppThemeColor.pureWhiteColor,
+                          size: 32,
+                        ),
+                      ),
+                      const SizedBox(height: Dimensions.spaceSizedLarge),
+                      const CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppThemeColor.darkBlueColor,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: Dimensions.spaceSizedLarge),
+                const SizedBox(height: Dimensions.spaceSizedLarge * 2),
                 Text(
-                  'Checking authorization...',
+                  'Verifying Access',
+                  style: TextStyle(
+                    fontSize: Dimensions.fontSizeOverLarge,
+                    fontWeight: FontWeight.bold,
+                    color: AppThemeColor.darkBlueColor,
+                  ),
+                ),
+                const SizedBox(height: Dimensions.spaceSizeSmall),
+                Text(
+                  'Checking authorization for event analytics...',
                   style: TextStyle(
                     fontSize: Dimensions.fontSizeLarge,
-                    color: AppThemeColor.darkBlueColor,
-                    fontWeight: FontWeight.w500,
+                    color: AppThemeColor.dullFontColor,
                   ),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
@@ -300,73 +373,59 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
 
     return AppScaffoldWrapper(
       backgroundColor: AppThemeColor.backGroundColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Enhanced App Bar with better spacing
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: Dimensions.paddingSizeLarge,
-                vertical: Dimensions.paddingSizeLarge,
-              ),
-              decoration: BoxDecoration(
-                color: AppThemeColor.pureWhiteColor,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 15,
-                    offset: const Offset(0, 3),
+      body: DefaultTabController(
+        length: 4,
+        child: NestedScrollView(
+          headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
+            return <Widget>[
+              SliverAppBar(
+                expandedHeight: 200.0,
+                floating: false,
+                pinned: false,
+                snap: false,
+                backgroundColor: AppThemeColor.backGroundColor,
+                elevation: 0,
+                leading: Container(
+                  margin: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppThemeColor.lightBlueColor,
+                    borderRadius: BorderRadius.circular(
+                      Dimensions.radiusDefault,
+                    ),
                   ),
-                ],
-              ),
-              child: Row(
-                children: [
+                  child: IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new,
+                      color: AppThemeColor.darkBlueColor,
+                      size: 20,
+                    ),
+                  ),
+                ),
+                actions: [
                   Container(
+                    margin: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: AppThemeColor.lightBlueColor,
+                      gradient: const LinearGradient(
+                        colors: [
+                          AppThemeColor.darkBlueColor,
+                          AppThemeColor.dullBlueColor,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                       borderRadius: BorderRadius.circular(
                         Dimensions.radiusDefault,
                       ),
-                    ),
-                    child: IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new,
-                        color: AppThemeColor.darkBlueColor,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: Dimensions.spaceSizedLarge),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Event Analytics',
-                          style: TextStyle(
-                            fontSize: Dimensions.fontSizeExtraLarge,
-                            fontWeight: FontWeight.bold,
-                            color: AppThemeColor.darkBlueColor,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppThemeColor.darkBlueColor.withValues(
+                            alpha: 0.3,
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Comprehensive insights & AI analysis',
-                          style: TextStyle(
-                            fontSize: Dimensions.fontSizeSmall,
-                            color: AppThemeColor.dullFontColor,
-                          ),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
                         ),
                       ],
-                    ),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppThemeColor.darkBlueColor,
-                      borderRadius: BorderRadius.circular(
-                        Dimensions.radiusDefault,
-                      ),
                     ),
                     child: IconButton(
                       onPressed: _exportData,
@@ -379,219 +438,260 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                     ),
                   ),
                 ],
-              ),
-            ),
-
-            // Enhanced Date Filter Chips with better spacing
-            Container(
-              margin: const EdgeInsets.symmetric(
-                horizontal: Dimensions.paddingSizeLarge,
-                vertical: Dimensions.paddingSizeLarge,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Time Period',
-                    style: TextStyle(
-                      fontSize: Dimensions.fontSizeDefault,
-                      fontWeight: FontWeight.w600,
-                      color: AppThemeColor.darkBlueColor,
-                    ),
-                  ),
-                  const SizedBox(height: Dimensions.spaceSizeSmall),
-                  Wrap(
-                    spacing: Dimensions.spaceSizeSmall,
-                    runSpacing: Dimensions.spaceSizeSmall,
-                    children: [
-                      _buildFilterChip('All Time', 'all'),
-                      _buildFilterChip('Last Week', 'week'),
-                      _buildFilterChip('Last Month', 'month'),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // Modern Tab Bar
-            // Enhanced Tab Bar with better spacing and design
-            Container(
-              margin: const EdgeInsets.symmetric(
-                horizontal: Dimensions.paddingSizeLarge,
-                vertical: Dimensions.paddingSizeDefault,
-              ),
-              decoration: BoxDecoration(
-                color: AppThemeColor.lightBlueColor,
-                borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(6.0),
-                child: TabBar(
-                  controller: _tabController,
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  indicator: BoxDecoration(
-                    borderRadius: BorderRadius.circular(
-                      Dimensions.radiusDefault,
-                    ),
-                    color: AppThemeColor.darkBlueColor,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppThemeColor.darkBlueColor.withValues(
-                          alpha: 0.3,
-                        ),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  labelColor: AppThemeColor.pureWhiteColor,
-                  unselectedLabelColor: AppThemeColor.darkBlueColor,
-                  labelStyle: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: Dimensions.fontSizeDefault,
-                  ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    fontSize: Dimensions.fontSizeDefault,
-                  ),
-                  tabs: [
-                    Tab(child: _buildTabText('Overview')),
-                    Tab(child: _buildAITabText()),
-                    Tab(child: _buildTabText('Trends')),
-                    Tab(child: _buildTabText('Users')),
-                  ],
-                ),
-              ),
-            ),
-
-            // Enhanced Tab Bar View with better spacing
-            Expanded(
-              child: Container(
-                margin: const EdgeInsets.symmetric(
-                  horizontal: Dimensions.paddingSizeLarge,
-                ),
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _overviewTab(),
-                    _aiInsightsTab(),
-                    _trendsTab(),
-                    _usersTab(),
-                  ],
-                ),
-              ),
-            ),
-
-            // Enhanced Compliance Notice with better spacing
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
-              margin: const EdgeInsets.all(Dimensions.paddingSizeLarge),
-              decoration: BoxDecoration(
-                color: AppThemeColor.lightBlueColor,
-                borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-                border: Border.all(color: AppThemeColor.borderColor),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Container(
                     decoration: BoxDecoration(
-                      color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(
-                        Dimensions.radiusDefault,
+                      gradient: LinearGradient(
+                        colors: [
+                          AppThemeColor.backGroundColor,
+                          AppThemeColor.lightBlueColor.withValues(alpha: 0.3),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
                       ),
                     ),
-                    child: Icon(
-                      Icons.security_rounded,
-                      size: 18,
-                      color: AppThemeColor.darkBlueColor,
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          Dimensions.paddingSizeLarge,
+                          Dimensions.paddingSizeLarge * 3,
+                          Dimensions.paddingSizeLarge,
+                          Dimensions.paddingSizeDefault,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        Color(0xFF667EEA),
+                                        Color(0xFF764BA2),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(
+                                      Dimensions.radiusDefault,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(
+                                          0xFF667EEA,
+                                        ).withValues(alpha: 0.3),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.analytics_rounded,
+                                    color: AppThemeColor.pureWhiteColor,
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(
+                                  width: Dimensions.spaceSizedDefault,
+                                ),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Event Analytics',
+                                        style: TextStyle(
+                                          fontSize:
+                                              Dimensions.fontSizeOverLarge + 2,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppThemeColor.darkBlueColor,
+                                          height: 1.2,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Deep insights & AI-powered analysis',
+                                        style: TextStyle(
+                                          fontSize: Dimensions.fontSizeLarge,
+                                          color: AppThemeColor.dullFontColor,
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: Dimensions.spaceSizedLarge),
+                            // Time Period Filters
+                            Text(
+                              'Time Period',
+                              style: TextStyle(
+                                fontSize: Dimensions.fontSizeDefault,
+                                fontWeight: FontWeight.w600,
+                                color: AppThemeColor.darkBlueColor,
+                              ),
+                            ),
+                            const SizedBox(height: Dimensions.spaceSizeSmall),
+                            Wrap(
+                              spacing: Dimensions.spaceSizeSmall,
+                              runSpacing: Dimensions.spaceSizeSmall,
+                              children: [
+                                _buildModernFilterChip('All Time', 'all'),
+                                _buildModernFilterChip('Last Week', 'week'),
+                                _buildModernFilterChip('Last Month', 'month'),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: Dimensions.spaceSizedDefault),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Privacy & Compliance',
-                          style: TextStyle(
-                            fontSize: Dimensions.fontSizeDefault,
-                            fontWeight: FontWeight.w600,
-                            color: AppThemeColor.darkBlueColor,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Data is aggregated without personal identifiers. Analytics are anonymized for privacy compliance.',
-                          style: TextStyle(
-                            fontSize: Dimensions.fontSizeSmall,
-                            color: AppThemeColor.dullFontColor,
-                            height: 1.4,
-                          ),
+                ),
+              ),
+              SliverPersistentHeader(
+                delegate: _EventSliverAppBarDelegate(
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(
+                      Dimensions.paddingSizeLarge,
+                      0,
+                      Dimensions.paddingSizeLarge,
+                      Dimensions.spaceSizeSmall,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppThemeColor.pureWhiteColor,
+                      borderRadius: BorderRadius.circular(
+                        Dimensions.radiusLarge,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 15,
+                          offset: const Offset(0, 5),
                         ),
                       ],
                     ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(6.0),
+                      child: TabBar(
+                        controller: _tabController,
+                        isScrollable: true,
+                        indicatorSize: TabBarIndicatorSize.tab,
+                        labelPadding: const EdgeInsets.symmetric(vertical: 12),
+                        indicator: BoxDecoration(
+                          borderRadius: BorderRadius.circular(
+                            Dimensions.radiusDefault,
+                          ),
+                          gradient: const LinearGradient(
+                            colors: [
+                              AppThemeColor.darkBlueColor,
+                              AppThemeColor.dullBlueColor,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppThemeColor.darkBlueColor.withValues(
+                                alpha: 0.3,
+                              ),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        labelColor: AppThemeColor.pureWhiteColor,
+                        unselectedLabelColor: AppThemeColor.darkBlueColor,
+                        labelStyle: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: Dimensions.fontSizeDefault,
+                        ),
+                        unselectedLabelStyle: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: Dimensions.fontSizeDefault,
+                        ),
+                        tabs: [
+                          Tab(child: _buildTabText('Overview')),
+                          Tab(child: _buildAITabText()),
+                          Tab(child: _buildTabText('Trends')),
+                          Tab(child: _buildTabText('Users')),
+                        ],
+                      ),
+                    ),
                   ),
-                ],
+                ),
+                pinned: true,
               ),
-            ),
-          ],
+            ];
+          },
+          body: TabBarView(
+            controller: _tabController,
+            children: [
+              _overviewTab(),
+              _aiInsightsTab(),
+              _trendsTab(),
+              _usersTab(),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildFilterChip(String label, String value) {
+  Widget _buildModernFilterChip(String label, String value) {
     final isSelected = _selectedDateFilter == value;
-    return FilterChip(
-      label: Text(
-        label,
-        style: TextStyle(
-          color: isSelected
-              ? AppThemeColor.pureWhiteColor
-              : AppThemeColor.darkBlueColor,
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-          fontSize: Dimensions.fontSizeSmall,
-        ),
-      ),
-      selected: isSelected,
-      onSelected: (selected) {
+    return GestureDetector(
+      onTap: () {
         setState(() {
           _selectedDateFilter = value;
         });
       },
-      selectedColor: AppThemeColor.darkBlueColor,
-      checkmarkColor: AppThemeColor.pureWhiteColor,
-      backgroundColor: AppThemeColor.lightBlueColor,
-      side: BorderSide(
-        color: isSelected
-            ? AppThemeColor.darkBlueColor
-            : AppThemeColor.borderColor,
-        width: 1.5,
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-      ),
-      elevation: isSelected ? 6 : 1,
-      pressElevation: 8,
-      padding: const EdgeInsets.symmetric(
-        horizontal: Dimensions.paddingSizeDefault,
-        vertical: Dimensions.paddingSizeSmall,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(
+          horizontal: Dimensions.paddingSizeDefault,
+          vertical: Dimensions.paddingSizeSmall,
+        ),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? const LinearGradient(
+                  colors: [
+                    AppThemeColor.darkBlueColor,
+                    AppThemeColor.dullBlueColor,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: isSelected ? null : AppThemeColor.pureWhiteColor,
+          borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+          border: Border.all(
+            color: isSelected ? Colors.transparent : AppThemeColor.borderColor,
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isSelected
+                  ? AppThemeColor.darkBlueColor.withValues(alpha: 0.3)
+                  : Colors.black.withValues(alpha: 0.05),
+              blurRadius: isSelected ? 10 : 5,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected
+                ? AppThemeColor.pureWhiteColor
+                : AppThemeColor.darkBlueColor,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            fontSize: Dimensions.fontSizeSmall,
+          ),
+        ),
       ),
     );
   }
@@ -701,73 +801,102 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+                    padding: const EdgeInsets.all(
+                      Dimensions.paddingSizeLarge * 2,
+                    ),
                     decoration: BoxDecoration(
-                      color: AppThemeColor.lightBlueColor,
-                      borderRadius: BorderRadius.circular(
-                        Dimensions.radiusLarge,
+                      gradient: LinearGradient(
+                        colors: [
+                          AppThemeColor.lightBlueColor,
+                          AppThemeColor.lightBlueColor.withValues(alpha: 0.7),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
+                      borderRadius: BorderRadius.circular(
+                        Dimensions.radiusExtraLarge,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppThemeColor.darkBlueColor.withValues(
+                            alpha: 0.1,
+                          ),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
                     ),
                     child: Icon(
-                      Icons.analytics_outlined,
-                      size: 64,
-                      color: AppThemeColor.dullIconColor,
+                      Icons.insights_rounded,
+                      size: 80,
+                      color: AppThemeColor.darkBlueColor,
                     ),
                   ),
-                  const SizedBox(height: Dimensions.spaceSizedLarge),
+                  const SizedBox(height: Dimensions.spaceSizedLarge * 2),
                   Text(
-                    'No Analytics Data Available',
+                    'No Analytics Data Yet',
                     style: TextStyle(
-                      fontSize: Dimensions.fontSizeExtraLarge,
-                      fontWeight: FontWeight.w600,
+                      fontSize: Dimensions.fontSizeOverLarge,
+                      fontWeight: FontWeight.bold,
                       color: AppThemeColor.darkBlueColor,
-                      fontFamily: 'Roboto',
                     ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: Dimensions.spaceSizeSmall),
                   Text(
-                    'Analytics will appear once attendees start signing in to your event',
+                    'Analytics will appear once attendees\nstart signing in to your event',
                     style: TextStyle(
-                      fontSize: Dimensions.fontSizeDefault,
+                      fontSize: Dimensions.fontSizeLarge,
                       color: AppThemeColor.dullFontColor,
-                      fontFamily: 'Roboto',
-                      height: 1.4,
+                      height: 1.5,
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: Dimensions.spaceSizedLarge),
+                  const SizedBox(height: Dimensions.spaceSizedLarge * 2),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(
-                      Dimensions.paddingSizeDefault,
-                    ),
+                    padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
                     decoration: BoxDecoration(
-                      color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                      gradient: LinearGradient(
+                        colors: [
+                          AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                          AppThemeColor.lightBlueColor,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                       borderRadius: BorderRadius.circular(
-                        Dimensions.radiusDefault,
+                        Dimensions.radiusLarge,
                       ),
                       border: Border.all(
                         color: AppThemeColor.darkBlueColor.withValues(
                           alpha: 0.2,
                         ),
+                        width: 2,
                       ),
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.info_outline,
-                          size: 20,
-                          color: AppThemeColor.darkBlueColor,
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppThemeColor.darkBlueColor,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.qr_code_rounded,
+                            size: 20,
+                            color: AppThemeColor.pureWhiteColor,
+                          ),
                         ),
                         const SizedBox(width: Dimensions.spaceSizeSmall),
                         Expanded(
                           child: Text(
-                            'Share your event QR code to start collecting data',
+                            'Share your event QR code to start collecting analytics data',
                             style: TextStyle(
-                              fontSize: Dimensions.fontSizeSmall,
+                              fontSize: Dimensions.fontSizeDefault,
                               color: AppThemeColor.darkBlueColor,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: FontWeight.w600,
                             ),
                             textAlign: TextAlign.left,
                           ),
@@ -812,58 +941,53 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
         return SingleChildScrollView(
           padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Modern Analytics Cards Grid
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                crossAxisSpacing: Dimensions.spaceSizeSmall,
-                mainAxisSpacing: Dimensions.spaceSizeSmall,
-                childAspectRatio: 1.2,
+              // Analytics Header
+              Row(
                 children: [
-                  _buildModernAnalyticsCard(
-                    title: 'Total Attendees',
-                    value: '${data['totalAttendees'] ?? 0}',
-                    icon: Icons.people_rounded,
-                    color: AppThemeColor.darkBlueColor,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF2C5A96), Color(0xFF4A90E2)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [
+                          AppThemeColor.darkBlueColor,
+                          AppThemeColor.dullBlueColor,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(
+                        Dimensions.radiusDefault,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.insights_rounded,
+                      color: AppThemeColor.pureWhiteColor,
+                      size: 20,
                     ),
                   ),
-                  _buildModernAnalyticsCard(
-                    title: 'Repeat Attendees',
-                    value: '${data['repeatAttendees'] ?? 0}',
-                    icon: Icons.repeat_rounded,
-                    color: AppThemeColor.dullBlueColor,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF73ABE4), Color(0xFF9BC2F0)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  _buildModernAnalyticsCard(
-                    title: 'Dropout Rate',
-                    value: '${(data['dropoutRate'] ?? 0).toStringAsFixed(1)}%',
-                    icon: Icons.trending_down_rounded,
-                    color: AppThemeColor.grayColor,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF60676C), Color(0xFF8A8A8A)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  _buildModernAnalyticsCard(
-                    title: 'Engagement Score',
-                    value: _calculateEngagementScore(data).toStringAsFixed(0),
-                    icon: Icons.insights_rounded,
-                    color: AppThemeColor.darkBlueColor,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF2C5A96), Color(0xFF5B7BC0)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                  const SizedBox(width: Dimensions.spaceSizeSmall),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Key Metrics',
+                          style: TextStyle(
+                            fontSize: Dimensions.fontSizeLarge,
+                            fontWeight: FontWeight.bold,
+                            color: AppThemeColor.darkBlueColor,
+                          ),
+                        ),
+                        Text(
+                          'Real-time event performance data',
+                          style: TextStyle(
+                            fontSize: Dimensions.fontSizeSmall,
+                            color: AppThemeColor.dullFontColor,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -871,8 +995,88 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
 
               const SizedBox(height: Dimensions.spaceSizedLarge),
 
-              // Last Updated Card
-              _buildLastUpdatedCard(data),
+              // Ultra-Modern Analytics Cards Grid (responsive)
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final double width = constraints.maxWidth;
+                  final int crossAxisCount = width < 360 ? 1 : 2;
+                  final double childAspectRatio = width < 360 ? 2.2 : 1.3;
+                  return GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: Dimensions.spaceSizedDefault,
+                    mainAxisSpacing: Dimensions.spaceSizedDefault,
+                    childAspectRatio: childAspectRatio,
+                    children: [
+                      _buildUltraModernAnalyticsCard(
+                        title: 'Total Attendees',
+                        value: '${data['totalAttendees'] ?? 0}',
+                        icon: Icons.people_rounded,
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        change: '+0',
+                      ),
+                      _buildUltraModernAnalyticsCard(
+                        title: 'Repeat Attendees',
+                        value: '${data['repeatAttendees'] ?? 0}',
+                        icon: Icons.repeat_rounded,
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF73ABE4), Color(0xFF4FC3F7)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        change: '+0',
+                      ),
+                      _buildUltraModernAnalyticsCard(
+                        title: 'Dropout Rate',
+                        value:
+                            '${(data['dropoutRate'] ?? 0).toStringAsFixed(1)}%',
+                        icon: Icons.trending_down_rounded,
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFF6B6B), Color(0xFFFFE66D)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        change: '+0',
+                      ),
+                      _buildUltraModernAnalyticsCard(
+                        title: 'Engagement Score',
+                        value:
+                            '${_calculateEngagementScore(data).toStringAsFixed(0)}%',
+                        icon: Icons.psychology_rounded,
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF11998E), Color(0xFF38EF7D)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        change: '+0',
+                      ),
+                    ],
+                  );
+                },
+              ),
+
+              const SizedBox(height: Dimensions.spaceSizedLarge * 2),
+
+              // Enhanced Last Updated Card
+              _buildEnhancedLastUpdatedCard(data),
+
+              const SizedBox(height: Dimensions.spaceSizedLarge),
+
+              // Modern Privacy Notice
+              _buildModernPrivacyNotice(),
+
+              const SizedBox(height: Dimensions.spaceSizedLarge),
+
+              _buildTopPerformingEventCard(),
+
+              const SizedBox(height: Dimensions.spaceSizedLarge),
+
+              _buildModernEventCategoriesCard(),
             ],
           ),
         );
@@ -880,12 +1084,12 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
     );
   }
 
-  Widget _buildModernAnalyticsCard({
+  Widget _buildUltraModernAnalyticsCard({
     required String title,
     required String value,
     required IconData icon,
-    required Color color,
     required Gradient gradient,
+    String? change,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -893,24 +1097,64 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
         borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: 0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+      child: Container(
+        padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+          gradient: LinearGradient(
+            colors: [
+              Colors.white.withValues(alpha: 0.1),
+              Colors.white.withValues(alpha: 0.05),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Container(
-              padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-              decoration: BoxDecoration(
-                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-              ),
-              child: Icon(icon, color: AppThemeColor.pureWhiteColor, size: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: AppThemeColor.pureWhiteColor,
+                    size: 20,
+                  ),
+                ),
+                if (change != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      change,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: AppThemeColor.pureWhiteColor,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: Dimensions.spaceSizeSmall),
             Text(
@@ -919,17 +1163,20 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                 fontSize: Dimensions.fontSizeOverLarge,
                 fontWeight: FontWeight.bold,
                 color: AppThemeColor.pureWhiteColor,
+                height: 1.0,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: Dimensions.fontSizeSmall,
                 fontWeight: FontWeight.w500,
-                color: AppThemeColor.pureWhiteColor,
+                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.9),
+                height: 1.2,
               ),
-              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -937,56 +1184,187 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
     );
   }
 
-  Widget _buildLastUpdatedCard(Map<String, dynamic> data) {
+  Widget _buildEnhancedLastUpdatedCard(Map<String, dynamic> data) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppThemeColor.pureWhiteColor,
+            AppThemeColor.lightBlueColor.withValues(alpha: 0.3),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF11998E), Color(0xFF38EF7D)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF11998E).withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.schedule_rounded,
+                color: AppThemeColor.pureWhiteColor,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: Dimensions.spaceSizedDefault),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Last Updated',
+                    style: TextStyle(
+                      fontSize: Dimensions.fontSizeSmall,
+                      color: AppThemeColor.dullFontColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    data['lastUpdated'] != null
+                        ? _formatTimestamp(data['lastUpdated'])
+                        : 'Never updated',
+                    style: TextStyle(
+                      fontSize: Dimensions.fontSizeLarge,
+                      fontWeight: FontWeight.bold,
+                      color: AppThemeColor.darkBlueColor,
+                      height: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF11998E).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF11998E).withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF11998E),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Live',
+                    style: TextStyle(
+                      fontSize: Dimensions.fontSizeSmall,
+                      color: const Color(0xFF11998E),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernPrivacyNotice() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
       decoration: BoxDecoration(
-        color: AppThemeColor.pureWhiteColor,
+        gradient: LinearGradient(
+          colors: [
+            AppThemeColor.lightBlueColor,
+            AppThemeColor.lightBlueColor.withValues(alpha: 0.7),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        border: Border.all(
+          color: AppThemeColor.borderColor.withValues(alpha: 0.5),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppThemeColor.lightBlueColor,
-              borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-            ),
-            child: Icon(
-              Icons.update_rounded,
               color: AppThemeColor.darkBlueColor,
+              borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+              boxShadow: [
+                BoxShadow(
+                  color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.verified_user_rounded,
               size: 20,
+              color: AppThemeColor.pureWhiteColor,
             ),
           ),
-          const SizedBox(width: Dimensions.spaceSizeSmall),
+          const SizedBox(width: Dimensions.spaceSizedDefault),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Last Updated',
+                  'Privacy & Compliance',
                   style: TextStyle(
                     fontSize: Dimensions.fontSizeDefault,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                     color: AppThemeColor.darkBlueColor,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
-                  data['lastUpdated'] != null
-                      ? _formatTimestamp(data['lastUpdated'])
-                      : 'Never',
+                  'All data is aggregated and anonymized. Personal identifiers are protected in compliance with privacy regulations.',
                   style: TextStyle(
                     fontSize: Dimensions.fontSizeSmall,
                     color: AppThemeColor.dullFontColor,
+                    height: 1.4,
                   ),
                 ),
               ],
@@ -1554,103 +1932,309 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
     if (timestamp is Timestamp) {
       final date = timestamp.toDate();
       return '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    } else if (timestamp is DateTime) {
+      final date = timestamp;
+      return '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
     }
     return 'Unknown';
   }
 
   Widget _aiInsightsTab() {
     if (_isLoadingAI) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+        child: Container(
+          padding: const EdgeInsets.all(Dimensions.paddingSizeLarge * 2),
+          decoration: BoxDecoration(
+            color: AppThemeColor.lightBlueColor,
+            borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(50),
+                ),
+                child: const Icon(
+                  Icons.psychology_rounded,
+                  color: AppThemeColor.pureWhiteColor,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(height: Dimensions.spaceSizedLarge),
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  AppThemeColor.darkBlueColor,
+                ),
+              ),
+              const SizedBox(height: Dimensions.spaceSizedLarge),
+              Text(
+                'Generating AI Insights...',
+                style: TextStyle(
+                  fontSize: Dimensions.fontSizeLarge,
+                  color: AppThemeColor.darkBlueColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: Dimensions.spaceSizeSmall),
+              Text(
+                'Our AI is analyzing your event data',
+                style: TextStyle(
+                  fontSize: Dimensions.fontSizeDefault,
+                  color: AppThemeColor.dullFontColor,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     if (_aiInsights == null) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.psychology, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'No AI insights available',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[600],
-                fontFamily: 'Roboto',
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'AI insights will be generated once sufficient data is available',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[500],
-                fontFamily: 'Roboto',
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: _loadAIInsights,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Generate Insights'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppThemeColor.darkBlueColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
+        child: Padding(
+          padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(Dimensions.paddingSizeLarge * 2),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppThemeColor.lightBlueColor,
+                      AppThemeColor.lightBlueColor.withValues(alpha: 0.7),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(
+                    Dimensions.radiusExtraLarge,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.psychology_rounded,
+                  size: 80,
+                  color: AppThemeColor.darkBlueColor,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: Dimensions.spaceSizedLarge * 2),
+              Text(
+                'No AI Insights Available',
+                style: TextStyle(
+                  fontSize: Dimensions.fontSizeOverLarge,
+                  fontWeight: FontWeight.bold,
+                  color: AppThemeColor.darkBlueColor,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: Dimensions.spaceSizeSmall),
+              Text(
+                'AI insights will be generated once\nsufficient data is available',
+                style: TextStyle(
+                  fontSize: Dimensions.fontSizeLarge,
+                  color: AppThemeColor.dullFontColor,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: Dimensions.spaceSizedLarge * 2),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+                      blurRadius: 15,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton.icon(
+                  onPressed: _loadAIInsights,
+                  icon: const Icon(Icons.auto_awesome_rounded, size: 22),
+                  label: const Text(
+                    'Generate AI Insights',
+                    style: TextStyle(
+                      fontSize: Dimensions.fontSizeLarge,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: AppThemeColor.pureWhiteColor,
+                    shadowColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: Dimensions.paddingSizeLarge * 2,
+                      vertical: Dimensions.paddingSizeLarge,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        Dimensions.radiusLarge,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
       child: Column(
         children: [
-          // Peak Hours Analysis
-          _aiInsightCard(
-            title: 'Peak Hours Analysis',
-            icon: Icons.access_time,
-            color: AppThemeColor.darkBlueColor,
-            content: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // AI Header
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
               children: [
-                Text(
-                  'Peak Hour: ${_aiInsights!.peakHoursAnalysis['peakHour'] ?? 'N/A'}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Peak Count: ${_aiInsights!.peakHoursAnalysis['peakCount'] ?? 0}',
-                  style: const TextStyle(fontSize: 14),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Confidence: ${((_aiInsights!.peakHoursAnalysis['confidence'] ?? 0) * 100).toStringAsFixed(1)}%',
-                  style: const TextStyle(fontSize: 14),
-                ),
-                const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    _aiInsights!.peakHoursAnalysis['recommendation'] ??
-                        'No recommendation available',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontStyle: FontStyle.italic,
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(
+                      Dimensions.radiusDefault,
                     ),
+                  ),
+                  child: const Icon(
+                    Icons.auto_awesome_rounded,
+                    color: AppThemeColor.pureWhiteColor,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: Dimensions.spaceSizedDefault),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'AI-Powered Insights',
+                        style: TextStyle(
+                          fontSize: Dimensions.fontSizeLarge,
+                          fontWeight: FontWeight.bold,
+                          color: AppThemeColor.pureWhiteColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Smart recommendations for your event',
+                        style: TextStyle(
+                          fontSize: Dimensions.fontSizeDefault,
+                          color: AppThemeColor.pureWhiteColor.withValues(
+                            alpha: 0.9,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: Dimensions.spaceSizedLarge),
+
+          // Peak Hours Analysis
+          _modernAiInsightCard(
+            title: 'Peak Hours Analysis',
+            icon: Icons.access_time_rounded,
+            gradient: const LinearGradient(
+              colors: [Color(0xFF11998E), Color(0xFF38EF7D)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            content: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildMetricRow(
+                  'Peak Hour',
+                  _aiInsights!.peakHoursAnalysis['peakHour'] ?? 'N/A',
+                  Icons.schedule_rounded,
+                ),
+                const SizedBox(height: Dimensions.spaceSizedDefault),
+                _buildMetricRow(
+                  'Peak Count',
+                  '${_aiInsights!.peakHoursAnalysis['peakCount'] ?? 0}',
+                  Icons.trending_up_rounded,
+                ),
+                const SizedBox(height: Dimensions.spaceSizedLarge),
+                Container(
+                  padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF11998E).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(
+                      Dimensions.radiusDefault,
+                    ),
+                    border: Border.all(
+                      color: const Color(0xFF11998E).withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.lightbulb_outline_rounded,
+                        color: const Color(0xFF11998E),
+                        size: 20,
+                      ),
+                      const SizedBox(width: Dimensions.spaceSizeSmall),
+                      Expanded(
+                        child: Text(
+                          _aiInsights!.peakHoursAnalysis['recommendation'] ??
+                              'No recommendation available',
+                          style: TextStyle(
+                            fontSize: Dimensions.fontSizeDefault,
+                            color: AppThemeColor.darkBlueColor,
+                            fontStyle: FontStyle.italic,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -1933,6 +2517,131 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _modernAiInsightCard({
+    required String title,
+    required IconData icon,
+    required Gradient gradient,
+    required Widget content,
+  }) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppThemeColor.pureWhiteColor,
+            AppThemeColor.lightBlueColor.withValues(alpha: 0.2),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: gradient,
+                    borderRadius: BorderRadius.circular(
+                      Dimensions.radiusDefault,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    icon,
+                    color: AppThemeColor.pureWhiteColor,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: Dimensions.spaceSizedDefault),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: Dimensions.fontSizeLarge,
+                      fontWeight: FontWeight.bold,
+                      color: AppThemeColor.darkBlueColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Dimensions.spaceSizedLarge),
+            Container(
+              padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+              decoration: BoxDecoration(
+                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                border: Border.all(
+                  color: AppThemeColor.borderColor.withValues(alpha: 0.5),
+                ),
+              ),
+              child: content,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetricRow(String label, String value, IconData icon) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 18, color: AppThemeColor.darkBlueColor),
+        ),
+        const SizedBox(width: Dimensions.spaceSizedDefault),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: Dimensions.fontSizeSmall,
+                  color: AppThemeColor.dullFontColor,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: Dimensions.fontSizeLarge,
+                  fontWeight: FontWeight.bold,
+                  color: AppThemeColor.darkBlueColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -2220,6 +2929,355 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
       if (!mounted) return;
       ShowToast().showSnackBar('Error exporting data: $e', context);
     }
+  }
+
+  Widget _buildTopPerformingEventCard() {
+    final topEvent = _getTopPerformingEvent();
+    if (topEvent == null) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppThemeColor.pureWhiteColor,
+            AppThemeColor.lightBlueColor.withValues(alpha: 0.3),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(
+                      Dimensions.radiusDefault,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFFD700).withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.emoji_events_rounded,
+                    color: AppThemeColor.pureWhiteColor,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: Dimensions.spaceSizedDefault),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Top Performing Event',
+                        style: TextStyle(
+                          fontSize: Dimensions.fontSizeSmall,
+                          fontWeight: FontWeight.w500,
+                          color: AppThemeColor.dullFontColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        topEvent['title'] ?? 'Unknown Event',
+                        style: TextStyle(
+                          fontSize: Dimensions.fontSizeLarge,
+                          fontWeight: FontWeight.bold,
+                          color: AppThemeColor.darkBlueColor,
+                          height: 1.2,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Dimensions.spaceSizedLarge),
+            Container(
+              padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+              decoration: BoxDecoration(
+                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                border: Border.all(
+                  color: AppThemeColor.borderColor.withValues(alpha: 0.5),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildEnhancedStatItem(
+                      'Attendees',
+                      '${topEvent['attendees'] ?? 0}',
+                      Icons.people_rounded,
+                      const Color(0xFF667EEA),
+                    ),
+                  ),
+                  Container(
+                    width: 1,
+                    height: 40,
+                    color: AppThemeColor.borderColor,
+                  ),
+                  Expanded(
+                    child: _buildEnhancedStatItem(
+                      'Date',
+                      topEvent['date'] != null
+                          ? DateFormat('MMM dd').format(topEvent['date'])
+                          : 'N/A',
+                      Icons.calendar_today_rounded,
+                      const Color(0xFF11998E),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEnhancedStatItem(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 18),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: Dimensions.fontSizeLarge,
+            fontWeight: FontWeight.bold,
+            color: AppThemeColor.darkBlueColor,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: Dimensions.fontSizeSmall,
+            color: AppThemeColor.dullFontColor,
+            fontWeight: FontWeight.w500,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModernEventCategoriesCard() {
+    final categories = _getAnalyticsSummary()['eventCategories'] ?? {};
+    if (categories.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppThemeColor.pureWhiteColor,
+            AppThemeColor.lightBlueColor.withValues(alpha: 0.2),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(
+                      Dimensions.radiusDefault,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.donut_large_rounded,
+                    color: AppThemeColor.pureWhiteColor,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: Dimensions.spaceSizedDefault),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Event Categories',
+                        style: TextStyle(
+                          fontSize: Dimensions.fontSizeLarge,
+                          fontWeight: FontWeight.bold,
+                          color: AppThemeColor.darkBlueColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Distribution of your events by category',
+                        style: TextStyle(
+                          fontSize: Dimensions.fontSizeSmall,
+                          color: AppThemeColor.dullFontColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Dimensions.spaceSizedLarge),
+            Container(
+              height: 220,
+              decoration: BoxDecoration(
+                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                border: Border.all(
+                  color: AppThemeColor.borderColor.withValues(alpha: 0.5),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+                child: _buildCategoriesPieChart(categories),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Map<String, dynamic> _getAnalyticsSummary() {
+    // This is a placeholder. You'll need to implement the logic to
+    // calculate the summary based on your analytics data.
+    return {
+      'eventCategories': <String, int>{'Default': 1},
+    };
+  }
+
+  Map<String, dynamic>? _getTopPerformingEvent() {
+    // This is a placeholder. In a single-event analytics screen,
+    // this might not be applicable, or could return the current event's data.
+    return null;
+  }
+
+  Widget _buildCategoriesPieChart(Map<String, int> categories) {
+    if (categories.isEmpty) {
+      return Center(
+        child: Text(
+          'No category data available',
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[500],
+            fontFamily: 'Roboto',
+          ),
+        ),
+      );
+    }
+
+    final colors = [
+      AppThemeColor.darkBlueColor,
+      AppThemeColor.dullBlueColor,
+      AppThemeColor.grayColor,
+      AppThemeColor.dullIconColor,
+      AppThemeColor.darkGreenColor,
+    ];
+
+    final sections = categories.entries.map((entry) {
+      final index = categories.keys.toList().indexOf(entry.key);
+      return PieChartSectionData(
+        color: colors[index % colors.length],
+        value: entry.value.toDouble(),
+        title: '${entry.key}\n${entry.value}',
+        radius: 60,
+        titleStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+          fontFamily: 'Roboto',
+        ),
+      );
+    }).toList();
+
+    return PieChart(
+      PieChartData(sections: sections, centerSpaceRadius: 40, sectionsSpace: 2),
+    );
+  }
+}
+
+class _EventSliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+
+  _EventSliverAppBarDelegate(this.child);
+
+  @override
+  double get minExtent => 80.0;
+
+  @override
+  double get maxExtent => 80.0;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return child;
+  }
+
+  @override
+  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) {
+    return false;
   }
 }
 

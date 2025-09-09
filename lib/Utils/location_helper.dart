@@ -3,6 +3,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:attendus/Utils/logger.dart';
+import 'package:attendus/Utils/platform_helper.dart';
+import 'package:attendus/Utils/emulator_config.dart';
 
 /// Centralized location management to prevent permission conflicts
 class LocationHelper {
@@ -20,6 +22,21 @@ class LocationHelper {
     if (_isRequestingLocation) {
       Logger.debug('Location request already in progress');
       return _cachedPosition;
+    }
+    
+    // Add debug logging for location requests
+    Logger.debug('LocationHelper: Starting location request');
+    
+    // Check if running on emulator and return mock location if needed
+    final isEmulator = await PlatformHelper.isEmulator();
+    if (isEmulator) {
+      Logger.info('Running on emulator - using mock location');
+      final mockLocation = await EmulatorConfig.getEmulatorMockLocation();
+      if (mockLocation != null) {
+        _cachedPosition = mockLocation;
+        _lastLocationUpdate = DateTime.now();
+        return mockLocation;
+      }
     }
 
     // Return cached position if still valid
@@ -70,15 +87,46 @@ class LocationHelper {
         return null;
       }
 
-      // Get current position with timeout and reduced accuracy for better performance
+      // Get current position with timeout and adaptive accuracy for better performance
       Logger.debug('Getting current location...');
-      Position position = await Geolocator.getCurrentPosition(
-        // Use balanced accuracy to prevent excessive GPS usage that blocks the main thread
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium, // Changed from high to medium
-          timeLimit: Duration(seconds: 5), // Reduced timeout from 10 to 5 seconds
-        ),
-      );
+      Position? position;
+
+      try {
+        // First attempt with high accuracy and shorter timeout for emulators
+        position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 5),
+          ),
+        );
+        Logger.debug('High accuracy location obtained successfully');
+      } catch (timeoutError) {
+        // Fallback to medium accuracy with shorter timeout if high accuracy fails
+        Logger.warning(
+          'High accuracy location timed out, trying medium accuracy: $timeoutError',
+        );
+        try {
+          position = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.medium,
+              timeLimit: Duration(seconds: 3),
+            ),
+          );
+          Logger.debug('Medium accuracy location obtained as fallback');
+        } catch (fallbackError) {
+          // Final fallback to low accuracy with very short timeout
+          Logger.warning(
+            'Medium accuracy also failed, trying low accuracy: $fallbackError',
+          );
+          position = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.low,
+              timeLimit: Duration(seconds: 2),
+            ),
+          );
+          Logger.debug('Low accuracy location obtained as final fallback');
+        }
+      }
 
       // Cache the position
       _cachedPosition = position;
@@ -89,9 +137,21 @@ class LocationHelper {
       );
       return position;
     } catch (e) {
-      Logger.error('Error getting location: $e');
+      String errorType = 'Unknown error';
+      if (e.toString().contains('TimeoutException')) {
+        errorType =
+            'Location timeout - unable to get GPS fix within time limit';
+        Logger.error('Location timeout error: $e');
+      } else if (e.toString().contains('permission')) {
+        errorType = 'Permission error';
+        Logger.error('Location permission error: $e');
+      } else {
+        errorType = 'Location service error';
+        Logger.error('Location service error: $e');
+      }
+
       if (showErrorDialog && context != null && context.mounted) {
-        _showLocationErrorDialog(context, e.toString());
+        _showLocationErrorDialog(context, errorType);
       }
       return null;
     } finally {

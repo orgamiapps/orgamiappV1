@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:attendus/screens/Home/dashboard_screen.dart';
-import 'package:attendus/Utils/router.dart';
 
 class AppBottomNavigation extends StatefulWidget {
   final int? selectedIndex;
@@ -74,7 +73,7 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
             ),
             child: NavigationBar(
               height: 64,
-              selectedIndex: widget.selectedIndex ?? -1,
+              selectedIndex: widget.selectedIndex ?? 0,
               labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
               onDestinationSelected: _navigateToTab,
               destinations: const [

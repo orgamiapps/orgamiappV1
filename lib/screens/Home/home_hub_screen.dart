@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:attendus/screens/Home/home_screen.dart' as legacy;
 import 'package:attendus/screens/Home/search_screen.dart';
@@ -8,6 +9,7 @@ import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/images.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
+import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:attendus/screens/Events/chose_sign_in_methods_screen.dart';
 import 'package:attendus/screens/Home/calendar_screen.dart';
@@ -31,22 +33,97 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   @override
   void initState() {
     super.initState();
-    _loadOrgs();
+    Logger.debug('🏠 HomeHubScreen: initState started');
+    // Defer heavy operations to prevent blocking UI during navigation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Logger.debug('🏠 HomeHubScreen: Post-frame callback triggered');
+      if (mounted) {
+        Logger.debug('🏠 HomeHubScreen: Starting _loadOrgs...');
+        _loadOrgs();
+      }
+    });
+    Logger.debug('🏠 HomeHubScreen: initState finished');
   }
 
   Future<void> _loadOrgs() async {
-    final helper = OrganizationHelper();
-    final my = await helper.getUserOrganizationsLite();
-    setState(() => _myOrgs = my);
-    _discover();
+    if (!mounted) return;
+    Logger.debug('🏠 HomeHubScreen: _loadOrgs started');
+
+    try {
+      // Skip user orgs loading on initial login to prevent freeze
+      // This is a temporary optimization - load user orgs in background later
+      Logger.debug(
+        '🏠 HomeHubScreen: Skipping user orgs for faster initial load...',
+      );
+
+      if (mounted) {
+        setState(() => _myOrgs = []);
+        Logger.debug(
+          '🏠 HomeHubScreen: State updated with empty user orgs, starting discover...',
+        );
+
+        // Start discover immediately without delay for faster UI
+        if (mounted) {
+          Logger.debug('🏠 HomeHubScreen: Starting _discover...');
+          _discover();
+        }
+
+        // Load user orgs in background after UI is rendered
+        _loadUserOrgsInBackground();
+      }
+    } catch (e) {
+      Logger.error('Error in _loadOrgs', e);
+      if (mounted) {
+        setState(() => _myOrgs = []);
+        _discover();
+      }
+    }
+  }
+
+  /// Load user organizations in background after initial UI render
+  void _loadUserOrgsInBackground() {
+    Future.delayed(const Duration(seconds: 2), () async {
+      if (!mounted) return;
+
+      try {
+        Logger.debug('🏠 HomeHubScreen: Loading user orgs in background...');
+        final helper = OrganizationHelper();
+
+        final my = await helper.getUserOrganizationsLite().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () {
+            Logger.warning('⚠️ Background getUserOrganizationsLite timed out');
+            return <Map<String, String>>[];
+          },
+        );
+
+        Logger.debug(
+          '🏠 HomeHubScreen: Background load completed, got ${my.length} orgs',
+        );
+
+        if (mounted && my.isNotEmpty) {
+          setState(() => _myOrgs = my);
+          Logger.debug(
+            '🏠 HomeHubScreen: Background state updated with user orgs',
+          );
+        }
+      } catch (e) {
+        Logger.error('Error loading user orgs in background', e);
+      }
+    });
   }
 
   Future<void> _discover() async {
+    if (!mounted) return;
+    Logger.debug('🏠 HomeHubScreen: _discover started');
+
     setState(() => _searching = true);
     try {
+      Logger.debug('🏠 HomeHubScreen: Creating Firestore query...');
       Query query = FirebaseFirestore.instance
           .collection('Organizations')
-          .limit(25);
+          .limit(10); // Further reduced limit for fastest initial load
+
       final q = _searchCtlr.text.trim().toLowerCase();
       if (_selectedCategoryLower != null &&
           _selectedCategoryLower!.isNotEmpty) {
@@ -63,15 +140,43 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
       } else {
         query = query.orderBy('name_lowercase');
       }
-      final snap = await query.get();
+
+      Logger.debug('🏠 HomeHubScreen: Executing Firestore query...');
+      final snap = await query.get().timeout(
+        const Duration(seconds: 4),
+        onTimeout: () {
+          Logger.warning('⚠️ Organizations discovery timed out');
+          throw TimeoutException(
+            'Organizations query timed out',
+            const Duration(seconds: 4),
+          );
+        },
+      );
+
+      Logger.debug(
+        '🏠 HomeHubScreen: Query completed, got ${snap.docs.length} organizations',
+      );
+
       final list = snap.docs.map((d) {
         final data = d.data() as Map<String, dynamic>;
         data['id'] = d.id;
         return data;
       }).toList();
-      setState(() => _discoverOrgs = list);
+
+      if (mounted) {
+        setState(() => _discoverOrgs = list);
+        Logger.debug('🏠 HomeHubScreen: State updated with discovered orgs');
+      }
+    } catch (e) {
+      Logger.error('Error discovering organizations', e);
+      if (mounted) {
+        setState(() => _discoverOrgs = []);
+      }
     } finally {
-      setState(() => _searching = false);
+      if (mounted) {
+        setState(() => _searching = false);
+        Logger.debug('🏠 HomeHubScreen: _discover completed');
+      }
     }
   }
 

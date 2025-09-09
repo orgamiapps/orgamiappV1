@@ -9,7 +9,7 @@ The Flutter app is stuck in "Analyzing..." phase in Android Studio and won't run
 - Added exclusions for directories that don't need analysis (build, ios, android, etc.)
 - Disabled problematic lint rules that can cause false positives
 - Set error severity levels to warnings for non-critical issues
-
+                         
 ### 2. Created fix_analyzer_issue.sh Script
 Run this script in your terminal to clear all caches:
 ```bash

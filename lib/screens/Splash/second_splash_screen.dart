@@ -7,13 +7,13 @@ import 'package:attendus/Utils/images.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/screens/QRScanner/qr_scanner_flow_screen.dart';
 import 'package:attendus/firebase/firebase_google_auth_helper.dart';
-import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/app_constants.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:attendus/services/auth_service.dart';
 
 class SecondSplashScreen extends StatefulWidget {
   const SecondSplashScreen({super.key});
@@ -280,28 +280,9 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
 
   Future<void> _handleSuccessfulLogin(user) async {
     try {
-      // Check if user exists in Firestore
-      final userData = await FirebaseFirestoreHelper().getSingleCustomer(
-        customerId: user.uid,
-      );
-
-      if (userData != null) {
-        // Existing user
-        setState(() {
-          CustomerController.logeInCustomer = userData;
-        });
-        if (!mounted) return;
-        RouterClass().homeScreenRoute(context: context);
-      } else {
-        // New user - create profile
-        final newCustomerModel = CustomerModel(
-          uid: user.uid,
-          name: user.displayName ?? '',
-          email: user.email ?? '',
-          createdAt: DateTime.now(),
-        );
-        await _createNewUser(newCustomerModel);
-      }
+      await AuthService().handleSocialLoginSuccess(user);
+      if (!mounted) return;
+      RouterClass().homeScreenRoute(context: context);
     } catch (e) {
       ShowToast().showNormalToast(
         msg: 'Error loading user data: ${e.toString()}',
@@ -342,7 +323,7 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
             colors: [
               const Color(0xFFF5F7FB),
               const Color(0xFFFFFFFF),
-              const Color(0xFFF0F4F8).withOpacity(0.5),
+              const Color(0xFFF0F4F8).withValues(alpha: 0.5),
             ],
             stops: const [0.0, 0.5, 1.0],
           ),
@@ -363,12 +344,12 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
                         colors: [
-                          const Color(
-                            0xFF7B61FF,
-                          ).withOpacity(_shimmerOpacityAnimation.value * 0.1),
-                          const Color(
-                            0xFF00BCD4,
-                          ).withOpacity(_shimmerOpacityAnimation.value * 0.05),
+                          const Color(0xFF7B61FF).withValues(
+                            alpha: _shimmerOpacityAnimation.value * 0.1,
+                          ),
+                          const Color(0xFF00BCD4).withValues(
+                            alpha: _shimmerOpacityAnimation.value * 0.05,
+                          ),
                           Colors.transparent,
                         ],
                       ),
@@ -390,12 +371,12 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
                         colors: [
-                          const Color(
-                            0xFF00BCD4,
-                          ).withOpacity(_shimmerOpacityAnimation.value * 0.08),
-                          const Color(
-                            0xFF7B61FF,
-                          ).withOpacity(_shimmerOpacityAnimation.value * 0.04),
+                          const Color(0xFF00BCD4).withValues(
+                            alpha: _shimmerOpacityAnimation.value * 0.08,
+                          ),
+                          const Color(0xFF7B61FF).withValues(
+                            alpha: _shimmerOpacityAnimation.value * 0.04,
+                          ),
                           Colors.transparent,
                         ],
                       ),
@@ -508,13 +489,13 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF7B61FF).withOpacity(0.25),
+                      color: const Color(0xFF7B61FF).withValues(alpha: 0.25),
                       blurRadius: 24,
                       offset: const Offset(-8, 12),
                       spreadRadius: -2,
                     ),
                     BoxShadow(
-                      color: const Color(0xFF00BCD4).withOpacity(0.25),
+                      color: const Color(0xFF00BCD4).withValues(alpha: 0.25),
                       blurRadius: 24,
                       offset: const Offset(8, 12),
                       spreadRadius: -2,
@@ -614,7 +595,7 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
                 border: Border.all(color: Colors.grey[200]!, width: 1),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                     spreadRadius: 0,
@@ -636,7 +617,7 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF7B61FF).withOpacity(0.3),
+                          color: const Color(0xFF7B61FF).withValues(alpha: 0.3),
                           blurRadius: 12,
                           offset: const Offset(0, 6),
                         ),
@@ -721,7 +702,7 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF7B61FF).withOpacity(0.4),
+                        color: const Color(0xFF7B61FF).withValues(alpha: 0.4),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
@@ -754,7 +735,7 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
                     border: Border.all(color: Colors.grey[300]!, width: 1.5),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: Colors.black.withValues(alpha: 0.04),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -876,8 +857,8 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
           boxShadow: [
             BoxShadow(
               color: backgroundColor == Colors.white
-                  ? Colors.black.withOpacity(isLoading ? 0.02 : 0.08)
-                  : backgroundColor.withOpacity(isLoading ? 0.3 : 0.4),
+                  ? Colors.black.withValues(alpha: isLoading ? 0.02 : 0.08)
+                  : backgroundColor.withValues(alpha: isLoading ? 0.3 : 0.4),
               blurRadius: 12,
               offset: const Offset(0, 6),
               spreadRadius: 0,

@@ -6,6 +6,7 @@ import 'package:attendus/screens/Messaging/messaging_screen.dart';
 import 'package:attendus/screens/Groups/groups_screen.dart';
 import 'package:attendus/screens/Home/account_screen.dart';
 import 'package:attendus/widgets/app_bottom_navigation.dart';
+import 'package:attendus/Utils/logger.dart';
 
 class DashboardScreen extends StatefulWidget {
   final int initialIndex;
@@ -17,26 +18,44 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  late final double _screenWidth = MediaQuery.of(context).size.width;
-  late final double _screenHeight = MediaQuery.of(context).size.height;
-
   late int _selectedIndex;
   bool _hasScrolledContent = false;
 
   @override
   void initState() {
     super.initState();
+    Logger.debug('📱 DashboardScreen: initState started');
     _selectedIndex = widget.initialIndex;
+    Logger.debug('📱 DashboardScreen: initState finished - rendering immediately');
   }
 
-  final List<Widget> _dashBoardScreens = const [
-    HomeHubScreen(),
-    GroupsScreen(),
-    MessagingScreen(),
-    MyProfileScreen(showBackButton: false),
-    NotificationsScreen(),
-    AccountScreen(),
-  ];
+  // Lazy initialization of screens to prevent all screens from building at once
+  Widget _getScreen(int index) {
+    Logger.debug('📱 DashboardScreen: Building screen for index $index');
+    switch (index) {
+      case 0:
+        Logger.debug('📱 DashboardScreen: Creating HomeHubScreen');
+        return const HomeHubScreen();
+      case 1:
+        Logger.debug('📱 DashboardScreen: Creating GroupsScreen');
+        return const GroupsScreen();
+      case 2:
+        Logger.debug('📱 DashboardScreen: Creating MessagingScreen');
+        return const MessagingScreen();
+      case 3:
+        Logger.debug('📱 DashboardScreen: Creating MyProfileScreen');
+        return const MyProfileScreen(showBackButton: false);
+      case 4:
+        Logger.debug('📱 DashboardScreen: Creating NotificationsScreen');
+        return const NotificationsScreen();
+      case 5:
+        Logger.debug('📱 DashboardScreen: Creating AccountScreen');
+        return const AccountScreen();
+      default:
+        Logger.debug('📱 DashboardScreen: Creating default HomeHubScreen');
+        return const HomeHubScreen();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,11 +85,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _bodyView() {
+    final size = MediaQuery.of(context).size;
+    
+    // Always render the content immediately - no loading state
     return SizedBox(
-      height: _screenHeight,
-      width: _screenWidth,
+      height: size.height,
+      width: size.width,
       child: Column(
-        children: [Expanded(child: _dashBoardScreens[_selectedIndex])],
+        children: [Expanded(child: _getScreen(_selectedIndex))],
       ),
     );
   }

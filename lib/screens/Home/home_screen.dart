@@ -190,7 +190,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.initState();
     selectedCategories =
         []; // Start with no category filters to show all events
-    getCurrentLocation();
+    // Defer location lookup until after first frame to avoid jank on navigation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        getCurrentLocation();
+      }
+    });
 
     // Initialize scroll controller
     _scrollController = ScrollController();
@@ -420,9 +425,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           'Home screen location updated: ${position.latitude}, ${position.longitude}',
         );
       } else {
-        Logger.info(
-          'Getting error in current Location Fatching! User denied permissions to access the device\'s location.',
-        );
+        // Check if we have location permissions to provide accurate error message
+        bool hasPermission = await LocationHelper.hasLocationPermission();
+        if (!hasPermission) {
+          Logger.info(
+            'Location not available: User has not granted location permissions.',
+          );
+        } else {
+          Logger.info(
+            'Location not available: GPS may be disabled, poor signal, or location services timed out.',
+          );
+        }
       }
     } catch (e) {
       Logger.error('Error getting location in home screen: $e');

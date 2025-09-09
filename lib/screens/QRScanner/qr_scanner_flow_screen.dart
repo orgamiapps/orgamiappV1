@@ -10,7 +10,6 @@ import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/dimensions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
-import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 
 class QRScannerFlowScreen extends StatefulWidget {
   const QRScannerFlowScreen({super.key});
@@ -41,8 +40,7 @@ class _QRScannerFlowScreenState extends State<QRScannerFlowScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return AppScaffoldWrapper(
-      selectedBottomNavIndex: 0, // Home tab
+    return Scaffold(
       backgroundColor: AppThemeColor.pureBlackColor,
       body: SafeArea(
         child: Column(

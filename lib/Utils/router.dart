@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:attendus/screens/Home/dashboard_screen.dart';
+import 'package:attendus/main.dart' show appNavigatorKey;
 import 'package:attendus/screens/Splash/second_splash_screen.dart';
 
 class RouterClass {
@@ -31,12 +32,19 @@ class RouterClass {
         ),
       );
 
-  Future<T?> homeScreenRoute<T>({required BuildContext context}) =>
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (splashContext) => const DashboardScreen()),
-        (route) => false,
-      );
+  Future<T?> homeScreenRoute<T>({required BuildContext context}) {
+    final navigator =
+        appNavigatorKey.currentState ??
+        Navigator.of(context, rootNavigator: true);
+    return navigator.pushAndRemoveUntil(
+      PageRouteBuilder(
+        pageBuilder: (ctx, a, b) => const DashboardScreen(),
+        transitionDuration: const Duration(milliseconds: 0),
+        reverseTransitionDuration: const Duration(milliseconds: 0),
+      ),
+      (route) => false,
+    );
+  }
 
   static Future<T?> nextScreenNormal<T>(BuildContext context, Widget page) {
     return Navigator.push<T>(

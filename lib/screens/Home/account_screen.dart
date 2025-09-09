@@ -18,11 +18,13 @@ import 'package:attendus/Utils/web_view_page.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/screens/Home/delete_account_screen.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:attendus/services/auth_service.dart';
 
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 
 import 'package:attendus/screens/Home/attendee_notification_screen.dart';
 import 'package:attendus/screens/Home/blocked_users_screen.dart';
+import 'package:attendus/screens/Home/login_settings_screen.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -166,6 +168,16 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
           _buildDivider(),
           _buildSettingsItem(
+            icon: Icons.login,
+            title: 'Login Settings',
+            subtitle: 'Manage auto-login preferences',
+            onTap: () => RouterClass.nextScreenNormal(
+              context,
+              const LoginSettingsScreen(),
+            ),
+          ),
+          _buildDivider(),
+          _buildSettingsItem(
             icon: CupertinoIcons.info,
             title: 'About Us',
             subtitle: 'Learn more about our app',
@@ -242,12 +254,15 @@ class _AccountScreenState extends State<AccountScreen> {
             title: 'Logout',
             subtitle: 'Sign out of your account',
             onTap: () async {
-              await FirebaseAuth.instance.signOut();
-              if (mounted) {
-                setState(() {
-                  CustomerController.logeInCustomer = null;
-                });
-                RouterClass().appRest(context: context);
+              try {
+                await AuthService().signOut();
+                if (mounted) {
+                  RouterClass().appRest(context: context);
+                }
+              } catch (e) {
+                ShowToast().showNormalToast(
+                  msg: 'Error signing out. Please try again.',
+                );
               }
             },
             isDestructive: true,

@@ -1,6 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/screens/Authentication/forgot_password_screen.dart';
 import 'package:attendus/Utils/colors.dart';
@@ -11,6 +10,7 @@ import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Utils/app_constants.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 import 'package:attendus/firebase/firebase_google_auth_helper.dart';
+import 'package:attendus/services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -43,26 +43,25 @@ class _LoginScreenState extends State<LoginScreen>
       String email = _emailEdtController.text,
           password = _passwordEdtController.text;
 
-      await FirebaseAuth.instance
-          .signInWithEmailAndPassword(email: email, password: password)
-          .then((UserCredential signInCustomer) async {
-            final User? user = signInCustomer.user;
-            if (user != null) {
-              final fireStoreCustomer = await FirebaseFirestoreHelper()
-                  .getSingleCustomer(customerId: user.uid);
-              // Ensure user profile has all required fields
-              await FirebaseFirestoreHelper().ensureUserProfileCompleteness(
-                user.uid,
-              );
-
-              if (!mounted) return;
-              setState(() {
-                CustomerController.logeInCustomer = fireStoreCustomer;
-              });
-              RouterClass().homeScreenRoute(context: context);
-              _btnCtlr.success();
-            }
-          });
+      Logger.debug('🔐 Starting email/password login...');
+      final User? user = await AuthService().signInWithEmailAndPassword(email, password);
+      
+      if (user != null && mounted) {
+        Logger.debug('✅ Login successful, navigating to home...');
+        _btnCtlr.success();
+        
+        // Add small delay to let success animation show before navigation
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        if (mounted) {
+          Logger.debug('🏠 Navigating to dashboard...');
+          RouterClass().homeScreenRoute(context: context);
+        }
+      } else {
+        Logger.warning('❌ Login failed - no user returned');
+        _btnCtlr.reset();
+        ShowToast().showNormalToast(msg: 'Login failed. Please try again.');
+      }
     } on FirebaseAuthException catch (e) {
       Logger.warning('Firebase Auth Exception: ${e.code}');
       switch (e.code) {
