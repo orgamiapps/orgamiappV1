@@ -429,7 +429,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
           headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
             return <Widget>[
               SliverAppBar(
-                expandedHeight: 240.0,
+                expandedHeight: 250.0,
                 floating: false,
                 pinned: false,
                 snap: false,
@@ -502,9 +502,11 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                     ),
                     child: SafeArea(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(
+                        padding: EdgeInsets.fromLTRB(
                           Dimensions.paddingSizeLarge,
-                          Dimensions.paddingSizeLarge * 2,
+                          MediaQuery.of(context).padding.top +
+                              kToolbarHeight +
+                              Dimensions.spaceSizeSmall,
                           Dimensions.paddingSizeLarge,
                           Dimensions.paddingSizeDefault,
                         ),
@@ -565,9 +567,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        _eventDate == null
-                                            ? 'Deep insights & AI-powered analysis'
-                                            : 'Analytics for ${DateFormat('EEE, MMM d, yyyy').format(_eventDate!)}',
+                                        'Deep insights & AI-powered analysis',
                                         style: TextStyle(
                                           fontSize: Dimensions.fontSizeLarge,
                                           color: AppThemeColor.dullFontColor,
@@ -579,9 +579,11 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                                 ),
                               ],
                             ),
-                            const SizedBox(height: Dimensions.spaceSizedLarge),
+                            const SizedBox(height: Dimensions.spaceSizeSmall),
                             // Event quick facts (single-day event)
-                            Row(
+                            Wrap(
+                              spacing: Dimensions.spaceSizedDefault,
+                              runSpacing: Dimensions.spaceSizedDefault,
                               children: [
                                 _buildInfoChip(
                                   Icons.calendar_today_rounded,
@@ -591,15 +593,13 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                                           'EEE, MMM d, yyyy',
                                         ).format(_eventDate!),
                                 ),
-                                const SizedBox(
-                                  width: Dimensions.spaceSizeSmall,
-                                ),
                                 _buildInfoChip(
                                   Icons.flag_rounded,
                                   _getEventStatusLabel(),
                                 ),
                               ],
                             ),
+                            const SizedBox(height: Dimensions.spaceSizeSmall),
                           ],
                         ),
                       ),
@@ -612,9 +612,9 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                   Container(
                     margin: const EdgeInsets.fromLTRB(
                       Dimensions.paddingSizeLarge,
-                      0,
+                      Dimensions.spaceSizedDefault,
                       Dimensions.paddingSizeLarge,
-                      Dimensions.spaceSizeSmall,
+                      Dimensions.spaceSizedDefault,
                     ),
                     decoration: BoxDecoration(
                       color: AppThemeColor.pureWhiteColor,
@@ -630,12 +630,21 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                       ],
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(6.0),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6.0,
+                        vertical: 8.0,
+                      ),
                       child: TabBar(
                         controller: _tabController,
-                        isScrollable: true,
+                        isScrollable: false,
                         indicatorSize: TabBarIndicatorSize.tab,
-                        labelPadding: const EdgeInsets.symmetric(vertical: 12),
+                        labelPadding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 12,
+                        ),
+                        indicatorPadding: const EdgeInsets.symmetric(
+                          horizontal: 2,
+                        ),
                         indicator: BoxDecoration(
                           borderRadius: BorderRadius.circular(
                             Dimensions.radiusDefault,
@@ -669,7 +678,12 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                           fontSize: Dimensions.fontSizeDefault,
                         ),
                         tabs: [
-                          Tab(child: _buildTabText('Overview')),
+                          Tab(
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: _buildTabText('Overview'),
+                            ),
+                          ),
                           Tab(child: _buildAITabText()),
                           Tab(child: _buildTabText('Trends')),
                           Tab(child: _buildTabText('Users')),
@@ -706,7 +720,9 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
         fontSize: Dimensions.fontSizeDefault,
       ),
       textAlign: TextAlign.center,
-      overflow: TextOverflow.visible,
+      overflow: TextOverflow.ellipsis,
+      maxLines: 1,
+      softWrap: false,
     );
   }
 
@@ -722,7 +738,6 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
           ),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 2),
         Text(
           'Insights',
           style: const TextStyle(
@@ -3267,10 +3282,10 @@ class _EventSliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   _EventSliverAppBarDelegate(this.child);
 
   @override
-  double get minExtent => 80.0;
+  double get minExtent => 100.0;
 
   @override
-  double get maxExtent => 80.0;
+  double get maxExtent => 100.0;
 
   @override
   Widget build(
@@ -3278,7 +3293,9 @@ class _EventSliverAppBarDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return child;
+    // Ensure the sliver header's render height exactly matches the declared extents
+    // to avoid SliverGeometry layoutExtent/paintExtent mismatches.
+    return SizedBox(height: maxExtent, child: child);
   }
 
   @override

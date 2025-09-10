@@ -49,6 +49,7 @@ import 'package:attendus/screens/Events/edit_event_screen.dart';
 import 'package:attendus/screens/Events/event_location_view_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:attendus/screens/Events/Widget/qr_dialogue.dart';
 import 'package:attendus/screens/Events/Widget/access_list_management_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:attendus/screens/Events/Widget/pre_registered_horizontal_list.dart';
@@ -1714,6 +1715,22 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                     builder: (context) => AttendanceSheetScreen(
                                       eventModel: eventModel,
                                     ),
+                                  ),
+                                ).then((_) => _showEventManagementModal());
+                              },
+                            ),
+                            _buildManagementOption(
+                              icon: Icons.qr_code,
+                              title: 'Share Sign-In QR',
+                              subtitle:
+                                  'Share a QR code that links to this event\'s attendance',
+                              onTap: () {
+                                Navigator.pop(context);
+                                showDialog(
+                                  context: context,
+                                  barrierDismissible: true,
+                                  builder: (context) => ShareQRDialog(
+                                    singleEvent: eventModel,
                                   ),
                                 ).then((_) => _showEventManagementModal());
                               },

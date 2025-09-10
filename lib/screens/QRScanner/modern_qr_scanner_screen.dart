@@ -28,6 +28,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
   Barcode? result;
   QRViewController? controller;
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
+  Future<bool>? _cameraInitFuture;
 
   final TextEditingController _codeController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
@@ -47,7 +48,8 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
   void initState() {
     super.initState();
     _initializeAnimations();
-    _checkPermissions();
+    // Memoize camera initialization to avoid recreating the Future on rebuilds
+    _cameraInitFuture = _initializeCamera();
   }
 
   @override
@@ -125,7 +127,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
     return Container(
       color: AppThemeColor.pureBlackColor,
       child: FutureBuilder<bool>(
-        future: _initializeCamera(),
+        future: _cameraInitFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(
@@ -184,8 +186,13 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
                     ElevatedButton(
                       onPressed: () async {
                         await _checkPermissions();
-                        // If still no permission, show manual entry option
-                        if (!_isCameraPermissionGranted) {
+                        if (_isCameraPermissionGranted) {
+                          setState(() {
+                            // Re-run camera initialization now that permission is granted
+                            _cameraInitFuture = _initializeCamera();
+                          });
+                        } else {
+                          // If still no permission, show manual entry option
                           setState(() {
                             _isManualEntry = true;
                           });
