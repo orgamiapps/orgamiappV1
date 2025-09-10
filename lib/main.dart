@@ -42,25 +42,20 @@ void main() async {
   // Configure for emulator if needed (prevents Geolocator hanging)
   await EmulatorConfig.configureForEmulator();
 
-  // Run the app immediately with minimal setup
+  // Build the app immediately to keep UI responsive
   runApp(
     ChangeNotifierProvider(
-      create: (context) => ThemeProvider(), // Don't load theme yet
+      create: (context) => ThemeProvider(),
       child: const MyApp(),
     ),
   );
 
-  // Initialize Firebase and other services after the app has started rendering
+  // Initialize Firebase and services after first frame to avoid ANR
   WidgetsBinding.instance.addPostFrameCallback((_) async {
     final Stopwatch startupStopwatch = Stopwatch()..start();
-
-    // Add timeout for Firebase initialization to prevent hanging
     Logger.info('Starting Firebase initialization with timeout...');
-
-    // Check if running on emulator for adjusted timeouts
     await PlatformHelper.isEmulator();
 
-    // Initialize Firebase with timeout to prevent hanging
     Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)
         .timeout(
           PlatformHelper.getFirebaseTimeout(),
@@ -79,36 +74,37 @@ void main() async {
             );
           }
 
-          // Activate Firebase App Check ASAP to avoid placeholder tokens and 403s
+          // Activate Firebase App Check deterministically
           try {
-            final bool isEmulator = await PlatformHelper.isEmulator();
-            final AndroidProvider androidProvider = (kDebugMode || isEmulator)
+            final AndroidProvider androidProvider = kDebugMode
                 ? AndroidProvider.debug
                 : AndroidProvider.playIntegrity;
-            final AppleProvider appleProvider = (kDebugMode || isEmulator)
+            final AppleProvider appleProvider = kDebugMode
                 ? AppleProvider.debug
                 : AppleProvider.deviceCheck;
-            FirebaseAppCheck.instance.activate(
+
+            await FirebaseAppCheck.instance.activate(
               androidProvider: androidProvider,
               appleProvider: appleProvider,
               webProvider: kDebugMode
                   ? ReCaptchaV3Provider('recaptcha-v3-site-key')
                   : ReCaptchaV3Provider('recaptcha-v3-site-key'),
             );
-            if (kDebugMode) {
-              Logger.info('Firebase App Check activated early');
-            }
+
+            Logger.info(
+              'Firebase App Check activated (${kDebugMode ? 'debug' : 'playIntegrity'})',
+            );
           } catch (e) {
-            Logger.warning('Early App Check activation failed: $e');
+            Logger.warning('App Check activation failed: $e');
           }
 
-          // Initialize Stripe after Firebase
+          // Initialize Stripe
           Stripe.publishableKey = 'pk_test_YOUR_PUBLISHABLE_KEY';
           if (kDebugMode) {
             Logger.info('Stripe initialized');
           }
 
-          // Load theme preference after app is running
+          // Load theme preference
           SharedPreferences.getInstance().then((prefs) {
             final isDarkMode = prefs.getBool('isDarkMode') ?? false;
             final context = appNavigatorKey.currentContext;
@@ -147,23 +143,7 @@ void main() async {
               Logger.error('Firebase initialization failed', e, st);
             }
           }
-          // Add additional error context for debugging crashes
           Logger.error('Stack trace context: ${st.toString()}');
-
-          // Try to recover gracefully from Firebase initialization failure
-          try {
-            // Ensure error doesn't propagate and crash the app
-            if (appNavigatorKey.currentContext != null) {
-              // App is still running, continue without full Firebase functionality
-              Logger.info(
-                'Continuing app execution without full Firebase features',
-              );
-            }
-          } catch (recoveryError) {
-            Logger.error(
-              'Recovery from Firebase init failure also failed: $recoveryError',
-            );
-          }
         });
   });
 }
@@ -191,29 +171,7 @@ Future<void> _initializeBackgroundServices() async {
 
           final bool isReachable = !isOffline;
 
-          // Initialize App Check in debug mode for development
-          if (isReachable) {
-            try {
-              FirebaseAppCheck.instance.activate(
-                // Use debug providers for development - these don't require API to be enabled
-                androidProvider: kDebugMode
-                    ? AndroidProvider.debug
-                    : AndroidProvider.playIntegrity,
-                appleProvider: kDebugMode
-                    ? AppleProvider.debug
-                    : AppleProvider.deviceCheck,
-                webProvider: kDebugMode
-                    ? ReCaptchaV3Provider('recaptcha-v3-site-key')
-                    : ReCaptchaV3Provider('recaptcha-v3-site-key'),
-              );
-              Logger.success(
-                'App Check activated in ${kDebugMode ? 'debug' : 'production'} mode',
-              );
-            } catch (e) {
-              Logger.warning('App Check activation failed: $e');
-              // Continue without App Check - not critical for app functionality
-            }
-          }
+          // App Check is already activated above; avoid duplicate activation here
 
           // Configure Firestore network based on connectivity
           if (!isReachable) {

@@ -42,6 +42,47 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     _loadUserEvents();
   }
 
+  // ignore: unused_element
+  Widget _buildFilterChip(String label, String value) {
+    final isSelected = _selectedDateFilter == value;
+    return FilterChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          color: isSelected
+              ? AppThemeColor.pureWhiteColor
+              : AppThemeColor.darkBlueColor,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+          fontSize: Dimensions.fontSizeSmall,
+        ),
+      ),
+      selected: isSelected,
+      onSelected: (selected) {
+        setState(() {
+          _selectedDateFilter = value;
+        });
+      },
+      selectedColor: AppThemeColor.darkBlueColor,
+      checkmarkColor: AppThemeColor.pureWhiteColor,
+      backgroundColor: AppThemeColor.lightBlueColor,
+      side: BorderSide(
+        color: isSelected
+            ? AppThemeColor.darkBlueColor
+            : AppThemeColor.borderColor,
+        width: 1.5,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+      ),
+      elevation: isSelected ? 6 : 1,
+      pressElevation: 8,
+      padding: const EdgeInsets.symmetric(
+        horizontal: Dimensions.paddingSizeDefault,
+        vertical: Dimensions.paddingSizeSmall,
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -502,7 +543,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
           headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
             return <Widget>[
               SliverAppBar(
-                expandedHeight: 180.0,
+                expandedHeight: 240.0,
                 floating: false,
                 pinned: false,
                 snap: false,
@@ -577,7 +618,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(
                           Dimensions.paddingSizeLarge,
-                          Dimensions.paddingSizeLarge * 3,
+                          Dimensions.paddingSizeLarge * 2,
                           Dimensions.paddingSizeLarge,
                           Dimensions.paddingSizeDefault,
                         ),
@@ -603,7 +644,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                               ),
                             ),
                             const SizedBox(height: Dimensions.spaceSizedLarge),
-                            // Time Period Filters
+                            // Time Period Filters (restored to flexible space)
                             Text(
                               'Time Period',
                               style: TextStyle(
@@ -613,15 +654,26 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                               ),
                             ),
                             const SizedBox(height: Dimensions.spaceSizeSmall),
-                            Wrap(
-                              spacing: Dimensions.spaceSizeSmall,
-                              runSpacing: Dimensions.spaceSizeSmall,
-                              children: [
-                                _buildModernFilterChip('All Time', 'all'),
-                                _buildModernFilterChip('Last Week', 'week'),
-                                _buildModernFilterChip('Last Month', 'month'),
-                                _buildModernFilterChip('Last Year', 'year'),
-                              ],
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              physics: const BouncingScrollPhysics(),
+                              child: Row(
+                                children: [
+                                  _buildModernFilterChip('All Time', 'all'),
+                                  const SizedBox(
+                                    width: Dimensions.spaceSizeSmall,
+                                  ),
+                                  _buildModernFilterChip('Week', 'week'),
+                                  const SizedBox(
+                                    width: Dimensions.spaceSizeSmall,
+                                  ),
+                                  _buildModernFilterChip('Month', 'month'),
+                                  const SizedBox(
+                                    width: Dimensions.spaceSizeSmall,
+                                  ),
+                                  _buildModernFilterChip('Year', 'year'),
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -777,46 +829,6 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     );
   }
 
-  Widget _buildFilterChip(String label, String value) {
-    final isSelected = _selectedDateFilter == value;
-    return FilterChip(
-      label: Text(
-        label,
-        style: TextStyle(
-          color: isSelected
-              ? AppThemeColor.pureWhiteColor
-              : AppThemeColor.darkBlueColor,
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-          fontSize: Dimensions.fontSizeSmall,
-        ),
-      ),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() {
-          _selectedDateFilter = value;
-        });
-      },
-      selectedColor: AppThemeColor.darkBlueColor,
-      checkmarkColor: AppThemeColor.pureWhiteColor,
-      backgroundColor: AppThemeColor.lightBlueColor,
-      side: BorderSide(
-        color: isSelected
-            ? AppThemeColor.darkBlueColor
-            : AppThemeColor.borderColor,
-        width: 1.5,
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-      ),
-      elevation: isSelected ? 6 : 1,
-      pressElevation: 8,
-      padding: const EdgeInsets.symmetric(
-        horizontal: Dimensions.paddingSizeDefault,
-        vertical: Dimensions.paddingSizeSmall,
-      ),
-    );
-  }
-
   Widget _buildTabText(String text) {
     return Text(
       text,
@@ -956,7 +968,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
               crossAxisCount: 2,
               crossAxisSpacing: Dimensions.spaceSizedDefault,
               mainAxisSpacing: Dimensions.spaceSizedDefault,
-              childAspectRatio: 1.3,
+              childAspectRatio: 1.2,
               children: [
                 _buildUltraModernAnalyticsCard(
                   title: 'Total Events',
@@ -967,8 +979,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  change:
-                      '+0', // You can calculate this based on previous period
+                  change: '+0',
                 ),
                 _buildUltraModernAnalyticsCard(
                   title: 'Total Attendees',
@@ -1126,71 +1137,6 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     );
   }
 
-  Widget _buildModernAnalyticsCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color color,
-    required Gradient gradient,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: gradient,
-        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-              decoration: BoxDecoration(
-                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-              ),
-              child: Icon(icon, color: AppThemeColor.pureWhiteColor, size: 20),
-            ),
-            const SizedBox(height: Dimensions.spaceSizeSmall),
-            Flexible(
-              child: Text(
-                value,
-                style: const TextStyle(
-                  fontSize: Dimensions.fontSizeLarge,
-                  fontWeight: FontWeight.bold,
-                  color: AppThemeColor.pureWhiteColor,
-                ),
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Flexible(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontSize: Dimensions.fontSizeSmall,
-                  fontWeight: FontWeight.w500,
-                  color: AppThemeColor.pureWhiteColor,
-                ),
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 2,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildEnhancedTopPerformingEventCard() {
     final topEvent =
         _aggregatedAnalytics['topPerformingEvent'] as Map<String, dynamic>?;
@@ -1320,6 +1266,73 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     );
   }
 
+  // ignore: unused_element
+  Widget _buildModernAnalyticsCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+    required Gradient gradient,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
+              decoration: BoxDecoration(
+                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+              ),
+              child: Icon(icon, color: AppThemeColor.pureWhiteColor, size: 20),
+            ),
+            const SizedBox(height: Dimensions.spaceSizeSmall),
+            Flexible(
+              child: Text(
+                value,
+                style: const TextStyle(
+                  fontSize: Dimensions.fontSizeLarge,
+                  fontWeight: FontWeight.bold,
+                  color: AppThemeColor.pureWhiteColor,
+                ),
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Flexible(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: Dimensions.fontSizeSmall,
+                  fontWeight: FontWeight.w500,
+                  color: AppThemeColor.pureWhiteColor,
+                ),
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ignore: unused_element
   Widget _buildTopPerformingEventCard() {
     final topEvent =
         _aggregatedAnalytics['topPerformingEvent'] as Map<String, dynamic>?;
@@ -1386,7 +1399,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
           Row(
             children: [
               Expanded(
-                child: _buildStatItem(
+                child: _buildLegacyStatItem(
                   'Attendees',
                   '${topEvent['attendees'] ?? 0}',
                   Icons.people,
@@ -1394,7 +1407,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                 ),
               ),
               Expanded(
-                child: _buildStatItem(
+                child: _buildLegacyStatItem(
                   'Date',
                   DateFormat('MMM dd, yyyy').format(topEvent['date']),
                   Icons.calendar_today,
@@ -1403,6 +1416,100 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  // ignore: unused_element
+  Widget _buildLegacyStatItem(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: Dimensions.fontSizeDefault,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: Dimensions.fontSizeSmall,
+              color: AppThemeColor.dullFontColor,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ignore: unused_element
+  Widget _buildEventCategoriesCard() {
+    final categories =
+        _aggregatedAnalytics['eventCategories'] as Map<String, int>? ?? {};
+    if (categories.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+      decoration: BoxDecoration(
+        color: AppThemeColor.pureWhiteColor,
+        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
+                decoration: BoxDecoration(
+                  color: AppThemeColor.lightBlueColor,
+                  borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                ),
+                child: Icon(
+                  Icons.category_rounded,
+                  color: AppThemeColor.darkBlueColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: Dimensions.spaceSizeSmall),
+              Text(
+                'Event Categories',
+                style: TextStyle(
+                  fontSize: Dimensions.fontSizeDefault,
+                  fontWeight: FontWeight.w600,
+                  color: AppThemeColor.darkBlueColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: Dimensions.spaceSizeSmall),
+          SizedBox(height: 200, child: _buildCategoriesPieChart(categories)),
         ],
       ),
     );
@@ -1438,44 +1545,6 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
           textAlign: TextAlign.center,
         ),
       ],
-    );
-  }
-
-  Widget _buildStatItem(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 16),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: Dimensions.fontSizeDefault,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: Dimensions.fontSizeSmall,
-              color: AppThemeColor.dullFontColor,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
     );
   }
 
@@ -1579,60 +1648,6 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildEventCategoriesCard() {
-    final categories =
-        _aggregatedAnalytics['eventCategories'] as Map<String, int>? ?? {};
-    if (categories.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
-      decoration: BoxDecoration(
-        color: AppThemeColor.pureWhiteColor,
-        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-                decoration: BoxDecoration(
-                  color: AppThemeColor.lightBlueColor,
-                  borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-                ),
-                child: Icon(
-                  Icons.category_rounded,
-                  color: AppThemeColor.darkBlueColor,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: Dimensions.spaceSizeSmall),
-              Text(
-                'Event Categories',
-                style: TextStyle(
-                  fontSize: Dimensions.fontSizeDefault,
-                  fontWeight: FontWeight.w600,
-                  color: AppThemeColor.darkBlueColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: Dimensions.spaceSizeSmall),
-          SizedBox(height: 200, child: _buildCategoriesPieChart(categories)),
-        ],
       ),
     );
   }
@@ -2233,54 +2248,6 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     );
   }
 
-  Widget _aiInsightCard({
-    required String title,
-    required IconData icon,
-    required Color color,
-    required Widget content,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
-            spreadRadius: 1,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 24),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppThemeColor.darkBlueColor,
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          content,
-        ],
-      ),
-    );
-  }
-
   IconData _getStrategyIcon(String type) {
     switch (type) {
       case 'timing':
@@ -2481,6 +2448,55 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
             return FlLine(color: Colors.grey[300]!, strokeWidth: 1);
           },
         ),
+      ),
+    );
+  }
+
+  // ignore: unused_element
+  Widget _aiInsightCard({
+    required String title,
+    required IconData icon,
+    required Color color,
+    required Widget content,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.1),
+            spreadRadius: 1,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 24),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppThemeColor.darkBlueColor,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          content,
+        ],
       ),
     );
   }

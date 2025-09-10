@@ -27,9 +27,11 @@ class EventAnalyticsScreen extends StatefulWidget {
 class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  String _selectedDateFilter = 'all'; // 'all', 'week', 'month'
+  // Deprecated: time filtering not used for single-day event view
   bool _isAuthorized = false;
   String? _eventHostUid;
+  DateTime? _eventDate;
+  String? _eventTitle;
   List<AttendanceModel> _attendeesList = [];
   bool _isLoadingAttendees = false;
   AIInsights? _aiInsights;
@@ -44,6 +46,56 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
     _checkAuthorization();
+  }
+
+  String _getEventStatusLabel() {
+    if (_eventDate == null) return 'Status: Unknown';
+    final now = DateTime.now();
+    final eventDay = DateTime(
+      _eventDate!.year,
+      _eventDate!.month,
+      _eventDate!.day,
+    );
+    final today = DateTime(now.year, now.month, now.day);
+    if (eventDay.isAfter(today)) return 'Upcoming';
+    if (eventDay.isAtSameMomentAs(today)) return 'Today';
+    return 'Completed';
+  }
+
+  Widget _buildInfoChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: Dimensions.paddingSizeDefault,
+        vertical: Dimensions.paddingSizeSmall,
+      ),
+      decoration: BoxDecoration(
+        color: AppThemeColor.pureWhiteColor,
+        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        border: Border.all(color: AppThemeColor.borderColor, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: AppThemeColor.darkBlueColor),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: Dimensions.fontSizeSmall,
+              color: AppThemeColor.darkBlueColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -77,10 +129,15 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
 
       final eventData = eventDoc.data() as Map<String, dynamic>;
       final eventHostUid = eventData['customerUid'];
+      final DateTime? eventDate = (eventData['selectedDateTime'] as Timestamp?)
+          ?.toDate();
+      final String? eventTitle = eventData['title'] as String?;
 
       setState(() {
         _isAuthorized = currentUser.uid == eventHostUid;
         _eventHostUid = eventHostUid;
+        _eventDate = eventDate;
+        _eventTitle = eventTitle;
       });
 
       if (!_isAuthorized) {
@@ -269,15 +326,8 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
   }
 
   DateTime? _getFilterDate() {
-    final now = DateTime.now();
-    switch (_selectedDateFilter) {
-      case 'week':
-        return now.subtract(const Duration(days: 7));
-      case 'month':
-        return DateTime(now.year, now.month - 1, now.day);
-      default:
-        return null; // 'all' - no filter
-    }
+    // For single-day event analytics, no time-window filtering is required.
+    return null;
   }
 
   @override
@@ -379,7 +429,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
           headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
             return <Widget>[
               SliverAppBar(
-                expandedHeight: 200.0,
+                expandedHeight: 240.0,
                 floating: false,
                 pinned: false,
                 snap: false,
@@ -454,7 +504,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(
                           Dimensions.paddingSizeLarge,
-                          Dimensions.paddingSizeLarge * 3,
+                          Dimensions.paddingSizeLarge * 2,
                           Dimensions.paddingSizeLarge,
                           Dimensions.paddingSizeDefault,
                         ),
@@ -502,7 +552,9 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Event Analytics',
+                                        _eventTitle == null
+                                            ? 'Event Analytics'
+                                            : _eventTitle!,
                                         style: TextStyle(
                                           fontSize:
                                               Dimensions.fontSizeOverLarge + 2,
@@ -513,7 +565,9 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        'Deep insights & AI-powered analysis',
+                                        _eventDate == null
+                                            ? 'Deep insights & AI-powered analysis'
+                                            : 'Analytics for ${DateFormat('EEE, MMM d, yyyy').format(_eventDate!)}',
                                         style: TextStyle(
                                           fontSize: Dimensions.fontSizeLarge,
                                           color: AppThemeColor.dullFontColor,
@@ -526,23 +580,24 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                               ],
                             ),
                             const SizedBox(height: Dimensions.spaceSizedLarge),
-                            // Time Period Filters
-                            Text(
-                              'Time Period',
-                              style: TextStyle(
-                                fontSize: Dimensions.fontSizeDefault,
-                                fontWeight: FontWeight.w600,
-                                color: AppThemeColor.darkBlueColor,
-                              ),
-                            ),
-                            const SizedBox(height: Dimensions.spaceSizeSmall),
-                            Wrap(
-                              spacing: Dimensions.spaceSizeSmall,
-                              runSpacing: Dimensions.spaceSizeSmall,
+                            // Event quick facts (single-day event)
+                            Row(
                               children: [
-                                _buildModernFilterChip('All Time', 'all'),
-                                _buildModernFilterChip('Last Week', 'week'),
-                                _buildModernFilterChip('Last Month', 'month'),
+                                _buildInfoChip(
+                                  Icons.calendar_today_rounded,
+                                  _eventDate == null
+                                      ? 'Date: Unknown'
+                                      : DateFormat(
+                                          'EEE, MMM d, yyyy',
+                                        ).format(_eventDate!),
+                                ),
+                                const SizedBox(
+                                  width: Dimensions.spaceSizeSmall,
+                                ),
+                                _buildInfoChip(
+                                  Icons.flag_rounded,
+                                  _getEventStatusLabel(),
+                                ),
                               ],
                             ),
                           ],
@@ -641,60 +696,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
     );
   }
 
-  Widget _buildModernFilterChip(String label, String value) {
-    final isSelected = _selectedDateFilter == value;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedDateFilter = value;
-        });
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(
-          horizontal: Dimensions.paddingSizeDefault,
-          vertical: Dimensions.paddingSizeSmall,
-        ),
-        decoration: BoxDecoration(
-          gradient: isSelected
-              ? const LinearGradient(
-                  colors: [
-                    AppThemeColor.darkBlueColor,
-                    AppThemeColor.dullBlueColor,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          color: isSelected ? null : AppThemeColor.pureWhiteColor,
-          borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-          border: Border.all(
-            color: isSelected ? Colors.transparent : AppThemeColor.borderColor,
-            width: 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: isSelected
-                  ? AppThemeColor.darkBlueColor.withValues(alpha: 0.3)
-                  : Colors.black.withValues(alpha: 0.05),
-              blurRadius: isSelected ? 10 : 5,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected
-                ? AppThemeColor.pureWhiteColor
-                : AppThemeColor.darkBlueColor,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-            fontSize: Dimensions.fontSizeSmall,
-          ),
-        ),
-      ),
-    );
-  }
+  // Time period chips removed for single-day event view
 
   Widget _buildTabText(String text) {
     return Text(
@@ -981,7 +983,11 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                           ),
                         ),
                         Text(
-                          'Real-time event performance data',
+                          _eventDate == null
+                              ? 'Real-time event performance data'
+                              : DateFormat(
+                                  'EEE, MMM d, yyyy',
+                                ).format(_eventDate!),
                           style: TextStyle(
                             fontSize: Dimensions.fontSizeSmall,
                             color: AppThemeColor.dullFontColor,
@@ -1000,7 +1006,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                 builder: (context, constraints) {
                   final double width = constraints.maxWidth;
                   final int crossAxisCount = width < 360 ? 1 : 2;
-                  final double childAspectRatio = width < 360 ? 2.2 : 1.3;
+                  final double childAspectRatio = width < 360 ? 2.0 : 1.2;
                   return GridView.count(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),

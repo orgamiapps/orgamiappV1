@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:attendus/services/auth_service.dart';
+import 'package:attendus/Services/firebase_initializer.dart';
 
 import 'package:attendus/Utils/images.dart';
 import 'package:attendus/Utils/router.dart';
@@ -38,8 +39,8 @@ class _SplashScreenState extends State<SplashScreen>
       _startLoadingSequence();
     });
 
-    // Set a shorter global timeout to prevent getting stuck
-    _timeoutTimer = Timer(const Duration(seconds: 5), () {
+    // Fail-safe: navigate if we haven't moved within 3 seconds
+    _timeoutTimer = Timer(const Duration(seconds: 3), () {
       if (mounted && !_hasNavigated) {
         debugPrint('⏰ Global timeout - forcing navigation to prevent hanging');
         _navigateToSecondSplash();
@@ -108,12 +109,19 @@ class _SplashScreenState extends State<SplashScreen>
         if (mounted) _loadingAnimationController.repeat();
       });
 
-      // Skip delay and get user immediately
-      // Now get user - run in next frame to avoid blocking UI
+      // Ensure Firebase is ready before auth logic to avoid races
+      // Kick both tasks; whichever completes first decides navigation
       WidgetsBinding.instance.addPostFrameCallback((_) async {
-        if (mounted && !_hasNavigated) {
+        if (!mounted || _hasNavigated) return;
+        final initFuture = FirebaseInitializer.initializeOnce()
+            .timeout(const Duration(seconds: 6))
+            .catchError((_) {});
+        // Don't block on init; start auth check with slight delay
+        Future.delayed(const Duration(milliseconds: 150), () async {
+          if (!mounted || _hasNavigated) return;
           await _getUser();
-        }
+        });
+        await initFuture;
       });
     } catch (e) {
       debugPrint('❌ Error in loading sequence: $e');
@@ -133,7 +141,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     try {
       debugPrint('🔄 Initializing AuthService...');
-      
+
       // Initialize AuthService with timeout to prevent hanging
       await AuthService().initialize().timeout(
         const Duration(seconds: 3),
@@ -142,7 +150,7 @@ class _SplashScreenState extends State<SplashScreen>
           // Continue without auth service if it times out
         },
       );
-      
+
       debugPrint('✅ AuthService initialized');
 
       if (!mounted || _hasNavigated) return;

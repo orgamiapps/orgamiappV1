@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,7 +7,7 @@ import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/Utils/logger.dart';
-import 'package:attendus/firebase_options.dart';
+import 'package:attendus/Services/firebase_initializer.dart';
 
 /// Authentication service that handles persistent login functionality
 /// using Firebase Auth and secure storage for enhanced security
@@ -43,11 +42,8 @@ class AuthService extends ChangeNotifier {
   /// Ensure Firebase is initialized before any auth operations
   Future<void> _ensureFirebaseInitialized() async {
     try {
-      if (Firebase.apps.isNotEmpty) return;
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      ).timeout(const Duration(seconds: 5));
-      Logger.info('Firebase initialized in AuthService');
+      await FirebaseInitializer.initializeOnce();
+      Logger.info('Firebase initialized via FirebaseInitializer (AuthService)');
     } catch (e) {
       Logger.warning(
         'Proceeding without confirmed Firebase init (AuthService): $e',
