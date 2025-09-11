@@ -1065,10 +1065,10 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                         change: '+0',
                       ),
                       _buildUltraModernAnalyticsCard(
-                        title: 'Engagement Score',
+                        title: 'Retention Rate',
                         value:
-                            '${_calculateEngagementScore(data).toStringAsFixed(0)}%',
-                        icon: Icons.psychology_rounded,
+                            '${_calculateRetentionRate(data).toStringAsFixed(1)}%',
+                        icon: Icons.loyalty_rounded,
                         gradient: const LinearGradient(
                           colors: [Color(0xFF11998E), Color(0xFF38EF7D)],
                           begin: Alignment.topLeft,
@@ -1090,6 +1090,19 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
 
               // Modern Privacy Notice
               _buildModernPrivacyNotice(),
+
+              const SizedBox(height: Dimensions.spaceSizedLarge),
+
+              // Add comprehensive retention analysis
+              FutureBuilder<Map<String, dynamic>>(
+                future: _calculateOverallRetentionStats(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const SizedBox();
+                  }
+                  return _buildRetentionAnalysisSection(snapshot.data!);
+                },
+              ),
 
               const SizedBox(height: Dimensions.spaceSizedLarge),
 
@@ -1396,19 +1409,128 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
     );
   }
 
-  double _calculateEngagementScore(Map<String, dynamic> data) {
+  double _calculateRetentionRate(Map<String, dynamic> data) {
     final totalAttendees = data['totalAttendees'] ?? 0;
     final repeatAttendees = data['repeatAttendees'] ?? 0;
-    final dropoutRate = data['dropoutRate'] ?? 0.0;
 
     if (totalAttendees == 0) return 0;
 
-    // Calculate engagement score based on multiple factors
-    final repeatRate = (repeatAttendees / totalAttendees) * 100;
-    final retentionScore = (100 - dropoutRate) * 0.4; // 40% weight
-    final repeatScore = repeatRate * 0.6; // 60% weight
+    // Calculate retention rate as percentage of returning attendees
+    return (repeatAttendees / totalAttendees) * 100;
+  }
 
-    return retentionScore + repeatScore;
+  Future<Map<String, dynamic>> _calculateOverallRetentionStats() async {
+    try {
+      if (_eventHostUid == null) {
+        return {
+          'retentionRate': 0.0,
+          'totalReturnees': 0,
+          'totalNewAttendees': 0,
+          'totalUniqueAttendees': 0,
+          'averageEventsPerAttendee': 0.0,
+          'loyaltyDistribution': <String, int>{},
+        };
+      }
+
+      // Get all events by this host
+      final eventsQuery = await FirebaseFirestore.instance
+          .collection('Events')
+          .where('customerUid', isEqualTo: _eventHostUid)
+          .get();
+
+      if (eventsQuery.docs.isEmpty) {
+        return {
+          'retentionRate': 0.0,
+          'totalReturnees': 0,
+          'totalNewAttendees': 0,
+          'totalUniqueAttendees': 0,
+          'averageEventsPerAttendee': 0.0,
+          'loyaltyDistribution': <String, int>{},
+        };
+      }
+
+      // Track unique attendees and their event counts
+      final Map<String, Set<String>> attendeeEventHistory = {};
+      int totalAttendances = 0;
+
+      // Get attendance data for all events
+      for (final eventDoc in eventsQuery.docs) {
+        final eventId = eventDoc.id;
+        final attendanceQuery = await FirebaseFirestore.instance
+            .collection('Attendance')
+            .where('eventId', isEqualTo: eventId)
+            .get();
+
+        for (final attendanceDoc in attendanceQuery.docs) {
+          final customerUid = attendanceDoc.data()['customerUid'] as String?;
+          if (customerUid != null && customerUid != 'manual') {
+            attendeeEventHistory.putIfAbsent(customerUid, () => {});
+            attendeeEventHistory[customerUid]!.add(eventId);
+            totalAttendances++;
+          }
+        }
+      }
+
+      // Calculate statistics
+      int totalReturnees = 0;
+      int totalNewAttendees = 0;
+      final Map<String, int> loyaltyDistribution = {
+        'Once': 0,
+        '2-3 times': 0,
+        '4-5 times': 0,
+        '6+ times': 0,
+      };
+
+      for (final entry in attendeeEventHistory.entries) {
+        final eventCount = entry.value.length;
+        if (eventCount > 1) {
+          totalReturnees++;
+        } else {
+          totalNewAttendees++;
+        }
+
+        // Categorize loyalty
+        if (eventCount == 1) {
+          loyaltyDistribution['Once'] = (loyaltyDistribution['Once'] ?? 0) + 1;
+        } else if (eventCount <= 3) {
+          loyaltyDistribution['2-3 times'] =
+              (loyaltyDistribution['2-3 times'] ?? 0) + 1;
+        } else if (eventCount <= 5) {
+          loyaltyDistribution['4-5 times'] =
+              (loyaltyDistribution['4-5 times'] ?? 0) + 1;
+        } else {
+          loyaltyDistribution['6+ times'] =
+              (loyaltyDistribution['6+ times'] ?? 0) + 1;
+        }
+      }
+
+      final totalUniqueAttendees = attendeeEventHistory.length;
+      final retentionRate = totalUniqueAttendees > 0
+          ? (totalReturnees / totalUniqueAttendees) * 100
+          : 0.0;
+      final averageEventsPerAttendee = totalUniqueAttendees > 0
+          ? totalAttendances / totalUniqueAttendees
+          : 0.0;
+
+      return {
+        'retentionRate': retentionRate,
+        'totalReturnees': totalReturnees,
+        'totalNewAttendees': totalNewAttendees,
+        'totalUniqueAttendees': totalUniqueAttendees,
+        'averageEventsPerAttendee': averageEventsPerAttendee,
+        'loyaltyDistribution': loyaltyDistribution,
+      };
+    } catch (e) {
+      Logger.error('Error calculating overall retention stats: $e');
+      return {
+        'retentionRate': 0.0,
+        'totalReturnees': 0,
+        'totalNewAttendees': 0,
+        'totalUniqueAttendees': 0,
+        'averageEventsPerAttendee': 0.0,
+        'loyaltyDistribution': <String, int>{},
+      };
+    }
   }
 
   Widget _trendsTab() {
@@ -3230,6 +3352,499 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
     // This is a placeholder. In a single-event analytics screen,
     // this might not be applicable, or could return the current event's data.
     return null;
+  }
+
+  Widget _buildRetentionAnalysisSection(Map<String, dynamic> stats) {
+    final retentionRate = stats['retentionRate'] ?? 0.0;
+    final totalReturnees = stats['totalReturnees'] ?? 0;
+    final totalNewAttendees = stats['totalNewAttendees'] ?? 0;
+    final totalUniqueAttendees = stats['totalUniqueAttendees'] ?? 0;
+    final averageEventsPerAttendee = stats['averageEventsPerAttendee'] ?? 0.0;
+    final loyaltyDistribution =
+        stats['loyaltyDistribution'] as Map<String, int>? ?? {};
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppThemeColor.pureWhiteColor, const Color(0xFFF5F7FA)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with professional styling
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(
+                      Dimensions.radiusDefault,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF6A11CB).withValues(alpha: 0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.analytics_rounded,
+                    color: AppThemeColor.pureWhiteColor,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: Dimensions.spaceSizedDefault),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Attendee Retention Analysis',
+                        style: TextStyle(
+                          fontSize: Dimensions.fontSizeLarge,
+                          fontWeight: FontWeight.bold,
+                          color: AppThemeColor.darkBlueColor,
+                        ),
+                      ),
+                      Text(
+                        'Across all your events',
+                        style: TextStyle(
+                          fontSize: Dimensions.fontSizeSmall,
+                          color: AppThemeColor.dullFontColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: Dimensions.spaceSizedLarge),
+
+            // Key Retention Metrics
+            Container(
+              padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF667EEA).withValues(alpha: 0.1),
+                    const Color(0xFF764BA2).withValues(alpha: 0.1),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                border: Border.all(
+                  color: const Color(0xFF667EEA).withValues(alpha: 0.2),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildRetentionMetric(
+                    'Overall Retention',
+                    '${retentionRate.toStringAsFixed(1)}%',
+                    Icons.trending_up_rounded,
+                    const Color(0xFF11998E),
+                  ),
+                  Container(
+                    width: 1,
+                    height: 60,
+                    color: AppThemeColor.borderColor,
+                  ),
+                  _buildRetentionMetric(
+                    'Avg Events/User',
+                    averageEventsPerAttendee.toStringAsFixed(1),
+                    Icons.event_repeat_rounded,
+                    const Color(0xFF667EEA),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: Dimensions.spaceSizedLarge),
+
+            // Returning vs New Attendees Visualization
+            Text(
+              'Attendee Composition',
+              style: TextStyle(
+                fontSize: Dimensions.fontSizeDefault,
+                fontWeight: FontWeight.w600,
+                color: AppThemeColor.darkBlueColor,
+              ),
+            ),
+            const SizedBox(height: Dimensions.spaceSizeSmall),
+
+            Container(
+              height: 250,
+              child: Row(
+                children: [
+                  // Donut chart
+                  Expanded(
+                    flex: 3,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        PieChart(
+                          PieChartData(
+                            startDegreeOffset: -90,
+                            centerSpaceRadius: 60,
+                            sections: [
+                              PieChartSectionData(
+                                value: totalReturnees.toDouble(),
+                                title: '',
+                                color: const Color(0xFF11998E),
+                                radius: 35,
+                              ),
+                              PieChartSectionData(
+                                value: totalNewAttendees.toDouble(),
+                                title: '',
+                                color: const Color(0xFF73ABE4),
+                                radius: 35,
+                              ),
+                            ],
+                            sectionsSpace: 2,
+                          ),
+                        ),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '$totalUniqueAttendees',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: AppThemeColor.darkBlueColor,
+                              ),
+                            ),
+                            Text(
+                              'Total Unique',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppThemeColor.dullFontColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Legend and stats
+                  Expanded(
+                    flex: 2,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 20),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildLegendItem(
+                            'Returning',
+                            totalReturnees,
+                            const Color(0xFF11998E),
+                            totalUniqueAttendees > 0
+                                ? (totalReturnees / totalUniqueAttendees * 100)
+                                : 0,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildLegendItem(
+                            'New',
+                            totalNewAttendees,
+                            const Color(0xFF73ABE4),
+                            totalUniqueAttendees > 0
+                                ? (totalNewAttendees /
+                                      totalUniqueAttendees *
+                                      100)
+                                : 0,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: Dimensions.spaceSizedLarge),
+
+            // Loyalty Distribution
+            Text(
+              'Attendee Loyalty Distribution',
+              style: TextStyle(
+                fontSize: Dimensions.fontSizeDefault,
+                fontWeight: FontWeight.w600,
+                color: AppThemeColor.darkBlueColor,
+              ),
+            ),
+            const SizedBox(height: Dimensions.spaceSizeSmall),
+
+            Container(
+              height: 200,
+              child: BarChart(
+                BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  maxY: loyaltyDistribution.values.isEmpty
+                      ? 10
+                      : loyaltyDistribution.values
+                                .reduce((a, b) => a > b ? a : b)
+                                .toDouble() *
+                            1.2,
+                  barTouchData: BarTouchData(
+                    enabled: true,
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        final category = loyaltyDistribution.keys
+                            .toList()[groupIndex];
+                        final count = rod.toY.toInt();
+                        return BarTooltipItem(
+                          '$category\\n$count attendees',
+                          TextStyle(
+                            color: AppThemeColor.pureWhiteColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, meta) {
+                          final categories = loyaltyDistribution.keys.toList();
+                          if (value.toInt() >= 0 &&
+                              value.toInt() < categories.length) {
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                categories[value.toInt()],
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppThemeColor.dullFontColor,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            );
+                          }
+                          return const SizedBox();
+                        },
+                        reservedSize: 30,
+                      ),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, meta) {
+                          return Text(
+                            value.toInt().toString(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: AppThemeColor.dullFontColor,
+                            ),
+                          );
+                        },
+                        reservedSize: 30,
+                      ),
+                    ),
+                  ),
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: 5,
+                    getDrawingHorizontalLine: (value) {
+                      return FlLine(
+                        color: AppThemeColor.borderColor.withValues(alpha: 0.3),
+                        strokeWidth: 1,
+                      );
+                    },
+                  ),
+                  borderData: FlBorderData(show: false),
+                  barGroups: loyaltyDistribution.entries.map((entry) {
+                    final index = loyaltyDistribution.keys.toList().indexOf(
+                      entry.key,
+                    );
+                    return BarChartGroupData(
+                      x: index,
+                      barRods: [
+                        BarChartRodData(
+                          toY: entry.value.toDouble(),
+                          gradient: LinearGradient(
+                            colors: _getBarGradient(index),
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                          ),
+                          width: 30,
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(6),
+                            topRight: Radius.circular(6),
+                          ),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: Dimensions.spaceSizeSmall),
+
+            // Statistical Insights
+            Container(
+              padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F7FA),
+                borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.lightbulb_outline_rounded,
+                    size: 20,
+                    color: AppThemeColor.dullBlueColor,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _getRetentionInsight(retentionRate),
+                      style: TextStyle(
+                        fontSize: Dimensions.fontSizeSmall,
+                        color: AppThemeColor.dullFontColor,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRetentionMetric(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 24),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: AppThemeColor.darkBlueColor,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: AppThemeColor.dullFontColor,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLegendItem(
+    String label,
+    int value,
+    Color color,
+    double percentage,
+  ) {
+    return Row(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppThemeColor.dullFontColor,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                '$value (${percentage.toStringAsFixed(1)}%)',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppThemeColor.darkBlueColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<Color> _getBarGradient(int index) {
+    const gradients = [
+      [Color(0xFF73ABE4), Color(0xFF4FC3F7)], // Once
+      [Color(0xFF667EEA), Color(0xFF764BA2)], // 2-3 times
+      [Color(0xFF11998E), Color(0xFF38EF7D)], // 4-5 times
+      [Color(0xFFFF6B6B), Color(0xFFFFE66D)], // 6+ times
+    ];
+    return gradients[index % gradients.length];
+  }
+
+  String _getRetentionInsight(double retentionRate) {
+    if (retentionRate >= 70) {
+      return 'Excellent retention! Your events have built a strong loyal community.';
+    } else if (retentionRate >= 50) {
+      return 'Good retention rate. Consider engagement strategies to convert more one-time attendees.';
+    } else if (retentionRate >= 30) {
+      return 'Average retention. Focus on creating memorable experiences to encourage repeat attendance.';
+    } else {
+      return 'Growth opportunity: Implement follow-up strategies and loyalty programs to boost retention.';
+    }
   }
 
   Widget _buildCategoriesPieChart(Map<String, int> categories) {

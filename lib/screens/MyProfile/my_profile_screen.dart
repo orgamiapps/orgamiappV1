@@ -284,15 +284,15 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                         padding: const EdgeInsets.symmetric(vertical: 18),
                         elevation: 8,
                       ),
-                      child: Row(
+                      child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.account_balance_wallet_outlined,
                             size: 24,
                           ),
-                          const SizedBox(width: 12),
-                          const Text(
+                          SizedBox(width: 12),
+                          Text(
                             'Save to Wallet',
                             style: TextStyle(
                               fontSize: 18,
@@ -317,7 +317,18 @@ class _MyProfileScreenState extends State<MyProfileScreen>
 
   Future<void> _saveToWallet(BuildContext context) async {
     try {
-      // Determine platform hint
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
+          ),
+        ),
+      );
+
+      // Determine platform for backend processing
       final platform = Theme.of(context).platform;
       final isApple =
           platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
@@ -331,19 +342,64 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         'platform': isApple ? 'apple' : 'google',
       });
 
-      final url = Uri.parse(result.data['url'] as String);
+      final urlString = result.data['url'] as String;
+      
+      // Dismiss loading indicator
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+
+      if (urlString.startsWith('data:text/plain,')) {
+        // Handle error messages
+        final message = urlString.substring('data:text/plain,'.length);
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(Uri.decodeComponent(message)),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final url = Uri.parse(urlString);
+      
       if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
+        await launchUrl(
+          url, 
+          mode: urlString.startsWith('data:') 
+            ? LaunchMode.inAppWebView 
+            : LaunchMode.externalApplication
+        );
+        
         if (!context.mounted) return;
         Navigator.pop(context);
-        ShowToast().showNormalToast(msg: 'Badge saved to wallet!');
+        
+        // Show success message
+        const successMessage = 'Badge generated successfully! You can now add it to your wallet.';
+          
+        ShowToast().showNormalToast(msg: successMessage);
+      } else {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to open wallet pass. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (error) {
+      // Dismiss loading indicator if still showing
+      if (context.mounted && ModalRoute.of(context)?.isCurrent == false) {
+        Navigator.pop(context);
+      }
+      
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unable to add to wallet at this time.'),
+        SnackBar(
+          content: Text('Unable to add to wallet: ${error.toString()}'),
           backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
         ),
       );
     }
@@ -1091,7 +1147,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                   });
                   _updateDiscoverability(value);
                 },
-                activeColor: const Color(0xFF667EEA),
+                activeThumbColor: const Color(0xFF667EEA),
                 activeTrackColor: const Color(
                   0xFF667EEA,
                 ).withValues(alpha: 0.3),
