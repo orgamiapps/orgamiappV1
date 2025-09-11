@@ -174,7 +174,9 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                             setState(() => _submitting = false);
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Failed to create group'),
+                                content: Text(
+                                  'Failed to create group (name may be taken)',
+                                ),
                               ),
                             );
                           }

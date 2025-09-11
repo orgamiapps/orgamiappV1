@@ -26,7 +26,6 @@ final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   // Initialize global error handling with better crash reporting
   ErrorHandler.initialize();
 

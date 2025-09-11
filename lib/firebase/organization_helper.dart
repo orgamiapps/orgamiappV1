@@ -193,23 +193,42 @@ class OrganizationHelper {
     if (user == null) return null;
 
     try {
+      final String normalizedName = name.trim().toLowerCase();
       final orgRef = _firestore.collection('Organizations').doc();
-      final organization = OrganizationModel(
-        id: orgRef.id,
-        name: name,
-        description: description ?? '',
-        category: category ?? 'Other',
-        logoUrl: logoUrl,
-        bannerUrl: bannerUrl,
-        defaultEventVisibility: defaultEventVisibility,
-        createdBy: user.uid,
-        createdAt: DateTime.now(),
-      );
-      // Write org document including lowercase fields in a single set
-      final data = organization.toJson();
-      data['name_lowercase'] = name.toLowerCase();
-      data['category_lowercase'] = (category ?? 'other').toLowerCase();
-      await orgRef.set(data);
+      final nameRef = _firestore
+          .collection('OrganizationNames')
+          .doc(normalizedName);
+
+      // Run a transaction to atomically reserve the name and create the org
+      await _firestore.runTransaction((tx) async {
+        final existing = await tx.get(nameRef);
+        if (existing.exists) {
+          // Name already taken
+          throw Exception('Group name already exists');
+        }
+
+        final organization = OrganizationModel(
+          id: orgRef.id,
+          name: name,
+          description: description ?? '',
+          category: category ?? 'Other',
+          logoUrl: logoUrl,
+          bannerUrl: bannerUrl,
+          defaultEventVisibility: defaultEventVisibility,
+          createdBy: user.uid,
+          createdAt: DateTime.now(),
+        );
+
+        final data = organization.toJson();
+        data['name_lowercase'] = normalizedName;
+        data['category_lowercase'] = (category ?? 'other').toLowerCase();
+
+        tx.set(orgRef, data);
+        tx.set(nameRef, {
+          'organizationId': orgRef.id,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      });
 
       final memberRef = orgRef.collection('Members').doc(user.uid);
       final membership = OrganizationMembership(
@@ -372,6 +391,69 @@ class OrganizationHelper {
       final List<dynamic>? perms = data['permissions'] as List<dynamic>?;
       return perms?.contains(permission) ?? false;
     } catch (_) {
+      return false;
+    }
+  }
+
+  /// Update organization details while ensuring the name is unique across all organizations.
+  /// If the name changes, this will reserve the new name and release the old one atomically.
+  Future<bool> updateOrganizationDetailsUnique(
+    String organizationId,
+    Map<String, dynamic> updateData,
+  ) async {
+    try {
+      final orgRef = _firestore.collection('Organizations').doc(organizationId);
+      await _firestore.runTransaction((tx) async {
+        final orgSnap = await tx.get(orgRef);
+        if (!orgSnap.exists) {
+          throw Exception('Organization not found');
+        }
+
+        final Map<String, dynamic> current =
+            orgSnap.data() as Map<String, dynamic>;
+        final String? currentNameLower = (current['name_lowercase'] as String?)
+            ?.trim();
+        final String? nextNameLower = (updateData['name_lowercase'] as String?)
+            ?.trim();
+
+        // If name is changing, enforce uniqueness using reservation docs
+        if (nextNameLower != null &&
+            nextNameLower.isNotEmpty &&
+            nextNameLower != currentNameLower) {
+          final newNameRef = _firestore
+              .collection('OrganizationNames')
+              .doc(nextNameLower);
+          final oldNameRef =
+              currentNameLower != null && currentNameLower.isNotEmpty
+              ? _firestore.collection('OrganizationNames').doc(currentNameLower)
+              : null;
+
+          final newNameSnap = await tx.get(newNameRef);
+          if (newNameSnap.exists) {
+            final data = newNameSnap.data() as Map<String, dynamic>;
+            final String? existingOrgId = data['organizationId']?.toString();
+            if (existingOrgId != organizationId) {
+              throw Exception('Group name already exists');
+            }
+          }
+
+          // Reserve new name and update org
+          tx.set(newNameRef, {
+            'organizationId': organizationId,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+
+          // Release old name if present and different
+          if (oldNameRef != null) {
+            tx.delete(oldNameRef);
+          }
+        }
+
+        tx.set(orgRef, updateData, SetOptions(merge: true));
+      });
+      return true;
+    } catch (e) {
+      Logger.error('updateOrganizationDetailsUnique failed: $e');
       return false;
     }
   }

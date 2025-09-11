@@ -57,6 +57,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   double radiusInMiles = 0;
+  // Slider control value in range 0..1 for non-linear distance mapping
+  double _distanceSlider = 1.0; // 1.0 => Global
   List<String> selectedCategories = [];
   bool isLoading = true;
   bool isRefreshing = false;
@@ -107,6 +109,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   ];
 
   LatLng? currentLocation;
+
+  // Maps slider position (0..1) to miles per requested behavior:
+  // - First half (0..0.5) maps linearly 0..50 miles
+  // - Second half (0.5..1.0) maps linearly 50..1000 miles
+  double _mapSliderToMiles(double sliderValue) {
+    if (sliderValue <= 0.5) {
+      return (sliderValue / 0.5) * 50.0; // 0..50
+    }
+    // Map 0.5..1.0 to 50..1000
+    final double t = (sliderValue - 0.5) / 0.5; // 0..1
+    return 50.0 + t * (1000.0 - 50.0);
+  }
+
+  // Maps miles back to slider position 0..1 to keep UI consistent on init/reset
+  double _mapMilesToSlider(double miles) {
+    if (miles <= 50.0) {
+      return (miles / 50.0) * 0.5;
+    }
+    final double t = (miles - 50.0) / (1000.0 - 50.0);
+    return 0.5 + t * 0.5;
+  }
 
   // Show filter/sort modal
   void _showFilterSortModal() {
@@ -812,9 +835,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      radiusInMiles > 0
-                          ? '${radiusInMiles.toStringAsFixed(0)} mi'
-                          : 'Global',
+                      // Show Global when slider is at maximum
+                      _distanceSlider >= 0.999
+                          ? 'Global'
+                          : '${radiusInMiles.toStringAsFixed(0)} mi',
                       style: const TextStyle(
                         color: Color(0xFF667EEA),
                         fontWeight: FontWeight.w600,
@@ -877,12 +901,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
             ),
             child: Slider(
-              min: 0,
-              max: 1000,
-              value: radiusInMiles,
+              min: 0.0,
+              max: 1.0,
+              value: _distanceSlider,
               onChanged: (value) {
                 setState(() {
-                  radiusInMiles = value;
+                  _distanceSlider = value;
+                  radiusInMiles = _mapSliderToMiles(value);
                 });
               },
             ),
@@ -1321,6 +1346,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 setState(() {
                   selectedCategories = ['Featured'];
                   radiusInMiles = 0;
+                  _distanceSlider = _mapMilesToSlider(0);
                   currentSortOption = SortOption.none;
                 });
               },

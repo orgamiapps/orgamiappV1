@@ -1017,66 +1017,83 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
               const SizedBox(height: Dimensions.spaceSizedLarge),
 
               // Ultra-Modern Analytics Cards Grid (responsive)
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final double width = constraints.maxWidth;
-                  final int crossAxisCount = width < 360 ? 1 : 2;
-                  final double childAspectRatio = width < 360 ? 2.0 : 1.2;
-                  return GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: Dimensions.spaceSizedDefault,
-                    mainAxisSpacing: Dimensions.spaceSizedDefault,
-                    childAspectRatio: childAspectRatio,
-                    children: [
-                      _buildUltraModernAnalyticsCard(
-                        title: 'Total Attendees',
-                        value: '${data['totalAttendees'] ?? 0}',
-                        icon: Icons.people_rounded,
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        change: '+0',
-                      ),
-                      _buildUltraModernAnalyticsCard(
-                        title: 'Repeat Attendees',
-                        value: '${data['repeatAttendees'] ?? 0}',
-                        icon: Icons.repeat_rounded,
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF73ABE4), Color(0xFF4FC3F7)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        change: '+0',
-                      ),
-                      _buildUltraModernAnalyticsCard(
-                        title: 'Dropout Rate',
-                        value:
-                            '${(data['dropoutRate'] ?? 0).toStringAsFixed(1)}%',
-                        icon: Icons.trending_down_rounded,
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFFF6B6B), Color(0xFFFFE66D)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        change: '+0',
-                      ),
-                      _buildUltraModernAnalyticsCard(
-                        title: 'Retention Rate',
-                        value:
-                            '${_calculateRetentionRate(data).toStringAsFixed(1)}%',
-                        icon: Icons.loyalty_rounded,
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF11998E), Color(0xFF38EF7D)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        change: '+0',
-                      ),
-                    ],
+              // Analytics Cards Grid with Overall Retention
+              FutureBuilder<Map<String, dynamic>>(
+                future: _calculateOverallRetentionStats(),
+                builder: (context, retentionSnapshot) {
+                  final overallRetention =
+                      retentionSnapshot.data?['retentionRate'] ?? 0.0;
+                  final totalUniqueAcrossEvents =
+                      retentionSnapshot.data?['totalUniqueAttendees'] ?? 0;
+
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      final double width = constraints.maxWidth;
+                      final int crossAxisCount = width < 360 ? 1 : 2;
+                      final double childAspectRatio = width < 360 ? 2.0 : 1.2;
+                      return GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: crossAxisCount,
+                        crossAxisSpacing: Dimensions.spaceSizedDefault,
+                        mainAxisSpacing: Dimensions.spaceSizedDefault,
+                        childAspectRatio: childAspectRatio,
+                        children: [
+                          _buildUltraModernAnalyticsCard(
+                            title: 'Total Attendees',
+                            value: '${data['totalAttendees'] ?? 0}',
+                            icon: Icons.people_rounded,
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            change: '+0',
+                          ),
+                          _buildUltraModernAnalyticsCard(
+                            title: 'Repeat Attendees',
+                            value: '${data['repeatAttendees'] ?? 0}',
+                            icon: Icons.repeat_rounded,
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF73ABE4), Color(0xFF4FC3F7)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            change: '+0',
+                          ),
+                          _buildUltraModernAnalyticsCard(
+                            title: 'Dropout Rate',
+                            value:
+                                '${(data['dropoutRate'] ?? 0).toStringAsFixed(1)}%',
+                            icon: Icons.trending_down_rounded,
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFF6B6B), Color(0xFFFFE66D)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            change: '+0',
+                          ),
+                          _buildUltraModernAnalyticsCard(
+                            title: 'Overall Retention',
+                            value: retentionSnapshot.hasData
+                                ? '${overallRetention.toStringAsFixed(1)}%'
+                                : 'Loading...',
+                            icon: Icons.loyalty_rounded,
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF11998E), Color(0xFF38EF7D)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            change: retentionSnapshot.hasData
+                                ? 'All Events'
+                                : '+0',
+                            subtitle: retentionSnapshot.hasData
+                                ? '$totalUniqueAcrossEvents unique attendees'
+                                : null,
+                          ),
+                        ],
+                      );
+                    },
                   );
                 },
               ),
@@ -1124,6 +1141,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
     required IconData icon,
     required Gradient gradient,
     String? change,
+    String? subtitle,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -1212,6 +1230,19 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.7),
+                  fontWeight: FontWeight.w400,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ],
         ),
       ),
@@ -1409,15 +1440,8 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
     );
   }
 
-  double _calculateRetentionRate(Map<String, dynamic> data) {
-    final totalAttendees = data['totalAttendees'] ?? 0;
-    final repeatAttendees = data['repeatAttendees'] ?? 0;
-
-    if (totalAttendees == 0) return 0;
-
-    // Calculate retention rate as percentage of returning attendees
-    return (repeatAttendees / totalAttendees) * 100;
-  }
+  // Deprecated: event-level retention replaced by overall retention metric
+  // Keeping method removed to avoid unused warnings.
 
   Future<Map<String, dynamic>> _calculateOverallRetentionStats() async {
     try {
@@ -3363,6 +3387,17 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
     final loyaltyDistribution =
         stats['loyaltyDistribution'] as Map<String, int>? ?? {};
 
+    // Calculate statistical metrics
+    final newToReturningRatio = totalReturnees > 0
+        ? (totalNewAttendees / totalReturnees).toStringAsFixed(2)
+        : 'N/A';
+    final churnRate = totalUniqueAttendees > 0
+        ? (100 - retentionRate).toStringAsFixed(1)
+        : '0';
+    final lifetimeValue = averageEventsPerAttendee > 0
+        ? (averageEventsPerAttendee * 100 / 100).toStringAsFixed(1)
+        : '0';
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -3419,7 +3454,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Attendee Retention Analysis',
+                        'Attendee Cohort Analysis',
                         style: TextStyle(
                           fontSize: Dimensions.fontSizeLarge,
                           fontWeight: FontWeight.bold,
@@ -3427,7 +3462,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                         ),
                       ),
                       Text(
-                        'Across all your events',
+                        'Statistical breakdown across all your events',
                         style: TextStyle(
                           fontSize: Dimensions.fontSizeSmall,
                           color: AppThemeColor.dullFontColor,
@@ -3441,66 +3476,87 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
 
             const SizedBox(height: Dimensions.spaceSizedLarge),
 
-            // Key Retention Metrics
-            Container(
-              padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF667EEA).withValues(alpha: 0.1),
-                    const Color(0xFF764BA2).withValues(alpha: 0.1),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+            // Key Statistical Metrics Grid
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 3,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 1.3,
+              children: [
+                _buildStatCard(
+                  'Retention Rate',
+                  '${retentionRate.toStringAsFixed(1)}%',
+                  Icons.trending_up_rounded,
+                  const Color(0xFF11998E),
+                  subtitle: 'Overall',
                 ),
-                borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-                border: Border.all(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.2),
-                  width: 1,
+                _buildStatCard(
+                  'Churn Rate',
+                  '$churnRate%',
+                  Icons.trending_down_rounded,
+                  const Color(0xFFFF6B6B),
+                  subtitle: 'One-time',
                 ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildRetentionMetric(
-                    'Overall Retention',
-                    '${retentionRate.toStringAsFixed(1)}%',
-                    Icons.trending_up_rounded,
-                    const Color(0xFF11998E),
-                  ),
-                  Container(
-                    width: 1,
-                    height: 60,
-                    color: AppThemeColor.borderColor,
-                  ),
-                  _buildRetentionMetric(
-                    'Avg Events/User',
-                    averageEventsPerAttendee.toStringAsFixed(1),
-                    Icons.event_repeat_rounded,
-                    const Color(0xFF667EEA),
-                  ),
-                ],
-              ),
+                _buildStatCard(
+                  'Avg Frequency',
+                  averageEventsPerAttendee.toStringAsFixed(1),
+                  Icons.event_repeat_rounded,
+                  const Color(0xFF667EEA),
+                  subtitle: 'Events/User',
+                ),
+                _buildStatCard(
+                  'Total Unique',
+                  '$totalUniqueAttendees',
+                  Icons.people_rounded,
+                  const Color(0xFF764BA2),
+                  subtitle: 'Attendees',
+                ),
+                _buildStatCard(
+                  'New:Return',
+                  newToReturningRatio,
+                  Icons.compare_arrows_rounded,
+                  const Color(0xFFFF9800),
+                  subtitle: 'Ratio',
+                ),
+                _buildStatCard(
+                  'LTV Score',
+                  lifetimeValue,
+                  Icons.star_rounded,
+                  const Color(0xFFE91E63),
+                  subtitle: 'Index',
+                ),
+              ],
             ),
 
             const SizedBox(height: Dimensions.spaceSizedLarge),
 
-            // Returning vs New Attendees Visualization
+            // Enhanced Cohort Distribution Visualization
             Text(
-              'Attendee Composition',
+              'Cohort Distribution Analysis',
               style: TextStyle(
                 fontSize: Dimensions.fontSizeDefault,
                 fontWeight: FontWeight.w600,
                 color: AppThemeColor.darkBlueColor,
               ),
             ),
-            const SizedBox(height: Dimensions.spaceSizeSmall),
+            const SizedBox(height: 4),
+            Text(
+              'Behavioral segmentation of your attendee base',
+              style: TextStyle(
+                fontSize: Dimensions.fontSizeSmall,
+                color: AppThemeColor.dullFontColor,
+              ),
+            ),
+            const SizedBox(height: Dimensions.spaceSizedDefault),
 
+            // Advanced Donut Chart with Statistics
             Container(
-              height: 250,
+              height: 280,
               child: Row(
                 children: [
-                  // Donut chart
+                  // Enhanced Donut chart
                   Expanded(
                     flex: 3,
                     child: Stack(
@@ -3509,22 +3565,82 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                         PieChart(
                           PieChartData(
                             startDegreeOffset: -90,
-                            centerSpaceRadius: 60,
+                            centerSpaceRadius: 65,
                             sections: [
                               PieChartSectionData(
                                 value: totalReturnees.toDouble(),
-                                title: '',
+                                title: totalUniqueAttendees > 0
+                                    ? '${(totalReturnees / totalUniqueAttendees * 100).toStringAsFixed(0)}%'
+                                    : '0%',
                                 color: const Color(0xFF11998E),
-                                radius: 35,
+                                radius: 45,
+                                titleStyle: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                                badgeWidget: totalReturnees > 0
+                                    ? Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withValues(
+                                                alpha: 0.1,
+                                              ),
+                                              blurRadius: 4,
+                                            ),
+                                          ],
+                                        ),
+                                        child: const Icon(
+                                          Icons.repeat,
+                                          size: 14,
+                                          color: Color(0xFF11998E),
+                                        ),
+                                      )
+                                    : null,
+                                badgePositionPercentageOffset: 1.2,
                               ),
                               PieChartSectionData(
                                 value: totalNewAttendees.toDouble(),
-                                title: '',
+                                title: totalUniqueAttendees > 0
+                                    ? '${(totalNewAttendees / totalUniqueAttendees * 100).toStringAsFixed(0)}%'
+                                    : '0%',
                                 color: const Color(0xFF73ABE4),
-                                radius: 35,
+                                radius: 45,
+                                titleStyle: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                                badgeWidget: totalNewAttendees > 0
+                                    ? Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withValues(
+                                                alpha: 0.1,
+                                              ),
+                                              blurRadius: 4,
+                                            ),
+                                          ],
+                                        ),
+                                        child: const Icon(
+                                          Icons.person_add,
+                                          size: 14,
+                                          color: Color(0xFF73ABE4),
+                                        ),
+                                      )
+                                    : null,
+                                badgePositionPercentageOffset: 1.2,
                               ),
                             ],
-                            sectionsSpace: 2,
+                            sectionsSpace: 3,
                           ),
                         ),
                         Column(
@@ -3533,16 +3649,17 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                             Text(
                               '$totalUniqueAttendees',
                               style: TextStyle(
-                                fontSize: 24,
+                                fontSize: 28,
                                 fontWeight: FontWeight.bold,
                                 color: AppThemeColor.darkBlueColor,
                               ),
                             ),
                             Text(
-                              'Total Unique',
+                              'Total Cohort',
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 12,
                                 color: AppThemeColor.dullFontColor,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
@@ -3550,7 +3667,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                       ],
                     ),
                   ),
-                  // Legend and stats
+                  // Enhanced Legend with detailed stats
                   Expanded(
                     flex: 2,
                     child: Padding(
@@ -3559,17 +3676,18 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLegendItem(
-                            'Returning',
+                          _buildEnhancedLegendItem(
+                            'Returning Cohort',
                             totalReturnees,
                             const Color(0xFF11998E),
                             totalUniqueAttendees > 0
                                 ? (totalReturnees / totalUniqueAttendees * 100)
                                 : 0,
+                            icon: Icons.repeat,
                           ),
-                          const SizedBox(height: 16),
-                          _buildLegendItem(
-                            'New',
+                          const SizedBox(height: 20),
+                          _buildEnhancedLegendItem(
+                            'New Cohort',
                             totalNewAttendees,
                             const Color(0xFF73ABE4),
                             totalUniqueAttendees > 0
@@ -3577,6 +3695,45 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                                       totalUniqueAttendees *
                                       100)
                                 : 0,
+                            icon: Icons.person_add,
+                          ),
+                          const SizedBox(height: 20),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppThemeColor.lightBlueColor.withValues(
+                                alpha: 0.1,
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: AppThemeColor.borderColor.withValues(
+                                  alpha: 0.3,
+                                ),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.insights,
+                                  size: 14,
+                                  color: AppThemeColor.darkBlueColor.withValues(
+                                    alpha: 0.7,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    _getRetentionInsightShort(retentionRate),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: AppThemeColor.darkBlueColor
+                                          .withValues(alpha: 0.7),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -3751,78 +3908,159 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
     );
   }
 
-  Widget _buildRetentionMetric(
-    String label,
+  // Retention metric card replaced by generic _buildStatCard
+
+  // Legacy legend item replaced by enhanced legend
+
+  Widget _buildStatCard(
+    String title,
     String value,
     IconData icon,
-    Color color,
-  ) {
-    return Column(
-      children: [
-        Icon(icon, color: color, size: 24),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: AppThemeColor.darkBlueColor,
+    Color color, {
+    String? subtitle,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppThemeColor.pureWhiteColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            color: AppThemeColor.dullFontColor,
-            fontWeight: FontWeight.w500,
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppThemeColor.darkBlueColor,
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 2),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 10,
+              color: AppThemeColor.dullFontColor,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 9,
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
-  Widget _buildLegendItem(
+  Widget _buildEnhancedLegendItem(
     String label,
     int value,
     Color color,
-    double percentage,
-  ) {
-    return Row(
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(3),
+    double percentage, {
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 14, color: color),
           ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppThemeColor.dullFontColor,
-                  fontWeight: FontWeight.w500,
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppThemeColor.dullFontColor,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              Text(
-                '$value (${percentage.toStringAsFixed(1)}%)',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppThemeColor.darkBlueColor,
-                  fontWeight: FontWeight.w600,
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Text(
+                      '$value',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '${percentage.toStringAsFixed(0)}%',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: color,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
+  }
+
+  String _getRetentionInsightShort(double retentionRate) {
+    if (retentionRate >= 70) {
+      return 'Excellent retention';
+    } else if (retentionRate >= 50) {
+      return 'Good retention';
+    } else if (retentionRate >= 30) {
+      return 'Average retention';
+    } else {
+      return 'Room for growth';
+    }
   }
 
   List<Color> _getBarGradient(int index) {

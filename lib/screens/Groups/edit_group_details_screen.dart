@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/models/organization_model.dart';
+import 'package:attendus/firebase/organization_helper.dart';
 import 'package:attendus/firebase/firebase_storage_helper.dart';
 import 'dart:io';
 
@@ -38,6 +39,8 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
   File? _bannerFile;
   String? _currentLogoUrl;
   String? _currentBannerUrl;
+
+  final OrganizationHelper _orgHelper = OrganizationHelper();
 
   final List<String> _categories = [
     'Business',
@@ -188,10 +191,11 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
         updateData['bannerUrl'] = bannerUrl;
       }
 
-      await FirebaseFirestore.instance
-          .collection('Organizations')
-          .doc(widget.organizationId)
-          .update(updateData);
+      final ok = await _orgHelper.updateOrganizationDetailsUnique(
+        widget.organizationId,
+        updateData,
+      );
+      if (!ok) throw Exception('Failed to save changes (name may be taken)');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
