@@ -53,17 +53,17 @@ class _AccountScreenState extends State<AccountScreen> {
 
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor, width: 1)),
       ),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
         children: [
-          const Text(
+          Text(
             'Account',
             style: TextStyle(
-              color: Color(0xFF1A1A1A),
+              color: Theme.of(context).textTheme.titleLarge?.color,
               fontSize: 22,
               fontWeight: FontWeight.w600,
               fontFamily: 'Roboto',
@@ -85,10 +85,10 @@ class _AccountScreenState extends State<AccountScreen> {
               height: 44,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: Color(0xFFE5E7EB), width: 1),
+                border: Border.all(color: Theme.of(context).dividerColor, width: 1),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
+                    color: Theme.of(context).shadowColor.withValues(alpha: 0.06),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
@@ -114,8 +114,12 @@ class _AccountScreenState extends State<AccountScreen> {
 
   Widget _buildDefaultProfilePicture() {
     return Container(
-      color: const Color(0xFFE1E5E9),
-      child: const Icon(Icons.person, size: 25, color: Color(0xFF9CA3AF)),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: Icon(
+        Icons.person, 
+        size: 25, 
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
     );
   }
 
@@ -127,7 +131,7 @@ class _AccountScreenState extends State<AccountScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Theme.of(context).shadowColor.withValues(alpha: 0.05),
             spreadRadius: 0,
             blurRadius: 20,
             offset: const Offset(0, 4),
@@ -286,15 +290,15 @@ class _AccountScreenState extends State<AccountScreen> {
         height: 40,
         decoration: BoxDecoration(
           color: isDestructive
-              ? const Color(0xFFEF4444).withValues(alpha: 0.1)
-              : const Color(0xFF667EEA).withValues(alpha: 0.1),
+              ? Theme.of(context).colorScheme.error.withValues(alpha: 0.1)
+              : Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
           icon,
           color: isDestructive
-              ? const Color(0xFFEF4444)
-              : const Color(0xFF667EEA),
+              ? Theme.of(context).colorScheme.error
+              : Theme.of(context).colorScheme.primary,
           size: 20,
         ),
       ),
@@ -302,9 +306,8 @@ class _AccountScreenState extends State<AccountScreen> {
         title,
         style: TextStyle(
           color: isDestructive
-              ? const Color(0xFFEF4444)
-              : Theme.of(context).textTheme.titleMedium?.color ??
-                    const Color(0xFF1A1A1A),
+              ? Theme.of(context).colorScheme.error
+              : Theme.of(context).textTheme.titleMedium?.color,
           fontWeight: FontWeight.w600,
           fontSize: 16,
           fontFamily: 'Roboto',
@@ -313,16 +316,14 @@ class _AccountScreenState extends State<AccountScreen> {
       subtitle: Text(
         subtitle,
         style: TextStyle(
-          color:
-              Theme.of(context).textTheme.bodyMedium?.color ??
-              const Color(0xFF9CA3AF),
+          color: Theme.of(context).textTheme.bodyMedium?.color,
           fontSize: 14,
           fontFamily: 'Roboto',
         ),
       ),
       trailing: Icon(
         Icons.arrow_forward_ios,
-        color: const Color(0xFF9CA3AF),
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
         size: 16,
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -333,7 +334,7 @@ class _AccountScreenState extends State<AccountScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       height: 1,
-      color: const Color(0xFFE1E5E9),
+      color: Theme.of(context).dividerColor,
     );
   }
 
@@ -345,21 +346,19 @@ class _AccountScreenState extends State<AccountScreen> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               _getThemeIcon(themeProvider.isDarkMode),
-              color: const Color(0xFF667EEA),
+              color: Theme.of(context).colorScheme.primary,
               size: 20,
             ),
           ),
           title: Text(
             'Theme',
             style: TextStyle(
-              color:
-                  Theme.of(context).textTheme.titleMedium?.color ??
-                  const Color(0xFF1A1A1A),
+              color: Theme.of(context).textTheme.titleMedium?.color,
               fontWeight: FontWeight.w600,
               fontSize: 16,
               fontFamily: 'Roboto',

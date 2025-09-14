@@ -379,8 +379,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       decoration: BoxDecoration(
                         color: isMe
-                            ? const Color(0xFF0B93F6)
-                            : const Color(0xFFE5E5EA),
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.only(
                           topLeft: const Radius.circular(18),
                           topRight: const Radius.circular(18),
@@ -391,7 +391,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: Text(
                         message.content,
                         style: TextStyle(
-                          color: isMe ? Colors.white : Colors.black,
+                          color: isMe 
+                              ? Theme.of(context).colorScheme.onPrimary 
+                              : Theme.of(context).colorScheme.onSurface,
                           fontSize: 16,
                         ),
                       ),
@@ -406,7 +408,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 padding: const EdgeInsets.only(right: 12, top: 2),
                 child: Text(
                   'Delivered',
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  style: TextStyle(
+                    fontSize: 11, 
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
           ],
@@ -421,10 +426,13 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     if (_messages.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'No messages yet. Start a conversation!',
-          style: TextStyle(fontSize: 16, color: Colors.grey),
+          style: TextStyle(
+            fontSize: 16, 
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       );
     }
@@ -443,10 +451,10 @@ class _ChatScreenState extends State<ChatScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.3),
+            color: Theme.of(context).shadowColor.withValues(alpha: 0.3),
             blurRadius: 5,
             offset: const Offset(0, -2),
           ),
