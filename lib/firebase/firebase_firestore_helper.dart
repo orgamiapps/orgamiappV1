@@ -36,9 +36,9 @@ class FirebaseFirestoreHelper {
       // Use on-device NLP service instead of cloud function
       final nlpService = OnDeviceNLPService.instance;
       final intent = await nlpService.parseQuery(query);
-      
+
       Logger.debug('Parsed query intent: $intent');
-      
+
       // Build Firestore query based on parsed intent
       return await _searchEventsWithIntent(intent, latitude, longitude, limit);
     } catch (e) {
@@ -63,18 +63,21 @@ class FirebaseFirestoreHelper {
 
     // Build base timeframe
     final now = DateTime.now();
-    final start = dateRange['start'] != null 
-        ? DateTime.parse(dateRange['start']!) 
+    final start = dateRange['start'] != null
+        ? DateTime.parse(dateRange['start']!)
         : now.subtract(const Duration(hours: 3));
-    final end = dateRange['end'] != null 
-        ? DateTime.parse(dateRange['end']!) 
+    final end = dateRange['end'] != null
+        ? DateTime.parse(dateRange['end']!)
         : now.add(const Duration(days: 60));
 
     // Query public events within timeframe
     Query query = _firestore
         .collection(EventModel.firebaseKey)
         .where('private', isEqualTo: false)
-        .where('selectedDateTime', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where(
+          'selectedDateTime',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(start),
+        )
         .where('selectedDateTime', isLessThanOrEqualTo: Timestamp.fromDate(end))
         .orderBy('selectedDateTime')
         .limit(limit * 2); // Get more for filtering
@@ -89,9 +92,12 @@ class FirebaseFirestoreHelper {
     // Apply category filtering
     if (categories.isNotEmpty) {
       events = events.where((event) {
-        final eventCategories = event.categories.map((c) => c.toLowerCase()).toList();
-        return categories.any((category) => 
-          eventCategories.any((ec) => ec.contains(category.toLowerCase()))
+        final eventCategories = event.categories
+            .map((c) => c.toLowerCase())
+            .toList();
+        return categories.any(
+          (category) =>
+              eventCategories.any((ec) => ec.contains(category.toLowerCase())),
         );
       }).toList();
     }
@@ -99,8 +105,12 @@ class FirebaseFirestoreHelper {
     // Apply keyword filtering
     if (keywords.isNotEmpty) {
       events = events.where((event) {
-        final searchText = '${event.title} ${event.description} ${event.location}'.toLowerCase();
-        return keywords.any((keyword) => searchText.contains(keyword.toLowerCase()));
+        final searchText =
+            '${event.title} ${event.description} ${event.location}'
+                .toLowerCase();
+        return keywords.any(
+          (keyword) => searchText.contains(keyword.toLowerCase()),
+        );
       }).toList();
     }
 
@@ -108,7 +118,12 @@ class FirebaseFirestoreHelper {
     if (nearMe && latitude != null && longitude != null && radiusKm > 0) {
       events = events.where((event) {
         if (event.latitude == 0.0 && event.longitude == 0.0) return false;
-        final distance = _calculateDistance(latitude, longitude, event.latitude, event.longitude);
+        final distance = _calculateDistance(
+          latitude,
+          longitude,
+          event.latitude,
+          event.longitude,
+        );
         return distance <= radiusKm;
       }).toList();
     }
@@ -121,8 +136,18 @@ class FirebaseFirestoreHelper {
 
       // If location search, sort by distance
       if (nearMe && latitude != null && longitude != null) {
-        final distA = _calculateDistance(latitude, longitude, a.latitude, a.longitude);
-        final distB = _calculateDistance(latitude, longitude, b.latitude, b.longitude);
+        final distA = _calculateDistance(
+          latitude,
+          longitude,
+          a.latitude,
+          a.longitude,
+        );
+        final distB = _calculateDistance(
+          latitude,
+          longitude,
+          b.latitude,
+          b.longitude,
+        );
         final distComparison = distA.compareTo(distB);
         if (distComparison != 0) return distComparison;
       }
@@ -136,13 +161,21 @@ class FirebaseFirestoreHelper {
   }
 
   /// Calculate distance between two points in kilometers
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
     const double earthRadius = 6371; // km
     final double dLat = _degreesToRadians(lat2 - lat1);
     final double dLon = _degreesToRadians(lon2 - lon1);
-    final double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(_degreesToRadians(lat1)) * math.cos(_degreesToRadians(lat2)) *
-        math.sin(dLon / 2) * math.sin(dLon / 2);
+    final double a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_degreesToRadians(lat1)) *
+            math.cos(_degreesToRadians(lat2)) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
     final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     return earthRadius * c;
   }
@@ -159,7 +192,10 @@ class FirebaseFirestoreHelper {
     Query firestoreQuery = _firestore
         .collection(EventModel.firebaseKey)
         .where('private', isEqualTo: false)
-        .where('selectedDateTime', isGreaterThan: now.subtract(const Duration(hours: 3)))
+        .where(
+          'selectedDateTime',
+          isGreaterThan: now.subtract(const Duration(hours: 3)),
+        )
         .orderBy('selectedDateTime')
         .limit(limit);
 
@@ -172,7 +208,8 @@ class FirebaseFirestoreHelper {
 
     // Filter by text matching
     events = events.where((event) {
-      final searchText = '${event.title} ${event.description} ${event.location}'.toLowerCase();
+      final searchText = '${event.title} ${event.description} ${event.location}'
+          .toLowerCase();
       return searchText.contains(queryLower);
     }).toList();
 
@@ -278,7 +315,7 @@ class FirebaseFirestoreHelper {
     }
 
     try {
-      // Get from Firestore
+      // Get from Firestore (primary collection)
       final doc = await _firestore
           .collection('Customers')
           .doc(customerId)
@@ -291,10 +328,43 @@ class FirebaseFirestoreHelper {
         _cache[cacheKey] = {'data': customer, 'timestamp': DateTime.now()};
 
         return customer;
-      } else {
-        Logger.warning('Permission denied for customer: $customerId');
-        return null;
       }
+
+      // Fallback: legacy collection name support ('Customer')
+      try {
+        final legacyDoc = await _firestore
+            .collection('Customer')
+            .doc(customerId)
+            .get();
+
+        if (legacyDoc.exists) {
+          final legacyCustomer = CustomerModel.fromFirestore(legacyDoc);
+
+          // Migrate to current collection name for consistency
+          await _firestore
+              .collection('Customers')
+              .doc(customerId)
+              .set(
+                CustomerModel.getMap(legacyCustomer),
+                SetOptions(merge: true),
+              );
+
+          // Cache and return
+          _cache[cacheKey] = {
+            'data': legacyCustomer,
+            'timestamp': DateTime.now(),
+          };
+          Logger.debug(
+            'Migrated legacy user document to \'Customers\' for: $customerId',
+          );
+          return legacyCustomer;
+        }
+      } catch (e) {
+        Logger.debug('Legacy collection lookup failed for $customerId: $e');
+      }
+
+      Logger.warning('Customer document not found: $customerId');
+      return null;
     } catch (e) {
       Logger.error('Error getting customer data', e);
       return null;
@@ -341,7 +411,9 @@ class FirebaseFirestoreHelper {
       await _firestore.collection('Customers').doc(customerId).update(data);
 
       // Clear cache for this customer
-      _cache.remove(customerId);
+      try {
+        _cache.remove('customer_$customerId');
+      } catch (_) {}
     } catch (e) {
       Logger.error('Error updating customer data', e);
       rethrow;

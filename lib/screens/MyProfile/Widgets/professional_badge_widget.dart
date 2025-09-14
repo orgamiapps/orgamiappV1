@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../../models/badge_model.dart';
 import '../../../Utils/colors.dart';
+import 'package:attendus/Utils/cached_image.dart';
+import 'package:attendus/controller/customer_controller.dart';
 
 class ProfessionalBadgeWidget extends StatefulWidget {
   final UserBadgeModel badge;
@@ -306,6 +307,23 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
     final scale = _uiScale(context);
     final avatarSize = 45.0 * scale;
     final spacing = 4.0 * scale;
+    // Prefer the badge's own data, but fall back to the logged-in user's
+    // profile if the badge document is missing these fields. This guarantees
+    // the badge shows the user's name/photo on their profile screen.
+    final currentUser = CustomerController.logeInCustomer;
+    final isCurrentUsersBadge = currentUser?.uid == widget.badge.uid;
+    final fallbackName = isCurrentUsersBadge ? (currentUser?.name ?? '') : '';
+    final fallbackPhoto = isCurrentUsersBadge
+        ? (currentUser?.profilePictureUrl ?? '')
+        : '';
+    final displayName = (widget.badge.userName.isNotEmpty)
+        ? widget.badge.userName
+        : fallbackName;
+    final displayPhotoUrl =
+        (widget.badge.profileImageUrl != null &&
+            widget.badge.profileImageUrl!.isNotEmpty)
+        ? widget.badge.profileImageUrl!
+        : fallbackPhoto;
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 70, maxWidth: 100),
       child: Column(
@@ -327,15 +345,15 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
               ],
             ),
             child: ClipOval(
-              child: widget.badge.profileImageUrl != null
-                  ? CachedNetworkImage(
-                      imageUrl: widget.badge.profileImageUrl!,
+              child: (displayPhotoUrl.isNotEmpty)
+                  ? SafeNetworkImage(
+                      imageUrl: displayPhotoUrl,
                       fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(
+                      placeholder: Container(
                         color: Colors.grey[300],
                         child: const Icon(Icons.person, color: Colors.grey),
                       ),
-                      errorWidget: (context, url, error) => Container(
+                      errorWidget: Container(
                         color: Colors.grey[300],
                         child: const Icon(Icons.person, color: Colors.grey),
                       ),
@@ -348,7 +366,7 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
           ),
           SizedBox(height: spacing),
           Text(
-            widget.badge.userName,
+            displayName.isNotEmpty ? displayName : 'Member',
             style: const TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.bold,

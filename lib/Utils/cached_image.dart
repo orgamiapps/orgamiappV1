@@ -28,6 +28,14 @@ class SafeNetworkImage extends StatelessWidget {
       return _buildErrorWidget();
     }
 
+    // Guard against non-direct or redirecting links (e.g., images.app.goo.gl)
+    if (!_isLikelyDirectImageUrl(imageUrl)) {
+      if (kDebugMode) {
+        debugPrint('Skipping non-direct image URL: $imageUrl');
+      }
+      return _buildErrorWidget();
+    }
+
     Widget imageWidget = CachedNetworkImage(
       imageUrl: imageUrl,
       width: width,
@@ -64,6 +72,37 @@ class SafeNetworkImage extends StatelessWidget {
       ),
       child: const Icon(Icons.image_not_supported, color: Colors.grey),
     );
+  }
+
+  bool _isLikelyDirectImageUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return false;
+    final scheme = uri.scheme.toLowerCase();
+    if (scheme != 'http' && scheme != 'https') return false;
+
+    final host = uri.host.toLowerCase();
+    const blockedHosts = {'images.app.goo.gl', 'photos.app.goo.gl', 'goo.gl'};
+    if (blockedHosts.contains(host) || host.endsWith('.app.goo.gl')) {
+      return false;
+    }
+
+    final path = uri.path.toLowerCase();
+    const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+    final hasImageExtension = imageExts.any((ext) => path.endsWith(ext));
+    if (hasImageExtension) return true;
+
+    // Allow Firebase Storage direct download links
+    if (host.contains('firebasestorage.googleapis.com') &&
+        (uri.queryParameters['alt'] == 'media')) {
+      return true;
+    }
+
+    // Allow Googleusercontent direct CDN images (often used by Google Photos exports)
+    if (host.contains('googleusercontent.com')) {
+      return true;
+    }
+
+    return false;
   }
 }
 

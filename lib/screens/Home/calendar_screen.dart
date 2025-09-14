@@ -31,9 +31,7 @@ class _CalendarScreenState extends State<CalendarScreen>
   List<EventModel> _allEvents = [];
   List<EventModel> _filteredEvents = [];
 
-  // Search
-  final TextEditingController _searchController = TextEditingController();
-  bool _isSearching = false;
+  // Search removed per request
 
   // Animation controllers
   late AnimationController _monthAnimationController;
@@ -129,14 +127,12 @@ class _CalendarScreenState extends State<CalendarScreen>
         return;
       }
 
-
       // Load ALL events without filters to avoid permission issues
       try {
         // Try simplest query first - no ordering, no filters
         final eventsSnapshot = await FirebaseFirestore.instance
             .collection('Events')
             .get();
-
 
         _allEvents = [];
         for (var doc in eventsSnapshot.docs) {
@@ -153,7 +149,6 @@ class _CalendarScreenState extends State<CalendarScreen>
         _allEvents.sort(
           (a, b) => a.selectedDateTime.compareTo(b.selectedDateTime),
         );
-
       } catch (e) {
         // Try to load user's own events at least
         try {
@@ -161,7 +156,6 @@ class _CalendarScreenState extends State<CalendarScreen>
               .collection('Events')
               .where('customerUid', isEqualTo: user.uid)
               .get();
-
 
           _allEvents = userEventsSnapshot.docs
               .map((doc) {
@@ -208,19 +202,6 @@ class _CalendarScreenState extends State<CalendarScreen>
 
     setState(() {
       _filteredEvents = List.from(_allEvents);
-
-      // Apply search filter
-      if (_searchController.text.isNotEmpty) {
-        final query = _searchController.text.toLowerCase();
-        _filteredEvents = _filteredEvents
-            .where(
-              (e) =>
-                  e.title.toLowerCase().contains(query) ||
-                  e.description.toLowerCase().contains(query) ||
-                  e.location.toLowerCase().contains(query),
-            )
-            .toList();
-      }
     });
   }
 
@@ -339,7 +320,6 @@ class _CalendarScreenState extends State<CalendarScreen>
     _dayViewAnimationController.dispose();
     _timeUpdateTimer?.cancel();
     _dataRefreshTimer?.cancel();
-    _searchController.dispose();
     _dayViewScrollController.dispose();
     _monthPageController.dispose();
     super.dispose();
@@ -410,7 +390,6 @@ class _CalendarScreenState extends State<CalendarScreen>
           ],
         ),
       ),
-      floatingActionButton: _buildFAB(),
     );
   }
 
@@ -469,41 +448,12 @@ class _CalendarScreenState extends State<CalendarScreen>
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.search, size: 24),
-                onPressed: () => setState(() => _isSearching = !_isSearching),
+                icon: const Icon(Icons.add, size: 28),
+                onPressed: _createEvent,
                 color: const Color(0xFF667EEA),
               ),
             ],
           ),
-          if (_isSearching)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search events...',
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.clear, size: 20),
-                    onPressed: () {
-                      _searchController.clear();
-                      _applyFilter();
-                    },
-                  ),
-                  filled: true,
-                  fillColor: const Color(0xFFF3F4F6),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                ),
-                onChanged: (_) => _applyFilter(),
-              ),
-            ),
         ],
       ),
     );
@@ -632,9 +582,9 @@ class _CalendarScreenState extends State<CalendarScreen>
                   ),
                 ),
                 // Event indicator section with proper spacing
-                if (events.isNotEmpty) 
+                if (events.isNotEmpty)
                   Container(
-                    height: 16,  // Fixed height for consistency
+                    height: 16, // Fixed height for consistency
                     alignment: Alignment.center,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -653,17 +603,21 @@ class _CalendarScreenState extends State<CalendarScreen>
                                 ? const Color(0xFFEF4444)
                                 : const Color(0xFF667EEA),
                             shape: BoxShape.circle,
-                            boxShadow: !isSelected ? [
-                              BoxShadow(
-                                color: (events.any((e) => e.ticketsEnabled)
-                                    ? const Color(0xFF10B981)
-                                    : events.any((e) => e.private)
-                                    ? const Color(0xFFEF4444)
-                                    : const Color(0xFF667EEA)).withValues(alpha: 0.3),
-                                blurRadius: 2,
-                                spreadRadius: 0,
-                              ),
-                            ] : null,
+                            boxShadow: !isSelected
+                                ? [
+                                    BoxShadow(
+                                      color:
+                                          (events.any((e) => e.ticketsEnabled)
+                                                  ? const Color(0xFF10B981)
+                                                  : events.any((e) => e.private)
+                                                  ? const Color(0xFFEF4444)
+                                                  : const Color(0xFF667EEA))
+                                              .withValues(alpha: 0.3),
+                                      blurRadius: 2,
+                                      spreadRadius: 0,
+                                    ),
+                                  ]
+                                : null,
                           ),
                         ),
                         // Event count badge for multiple events
@@ -678,12 +632,16 @@ class _CalendarScreenState extends State<CalendarScreen>
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? Colors.white.withValues(alpha: 0.25)
-                                  : const Color(0xFF6B7280).withValues(alpha: 0.12),
+                                  : const Color(
+                                      0xFF6B7280,
+                                    ).withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
                                 color: isSelected
                                     ? Colors.white.withValues(alpha: 0.3)
-                                    : const Color(0xFF6B7280).withValues(alpha: 0.15),
+                                    : const Color(
+                                        0xFF6B7280,
+                                      ).withValues(alpha: 0.15),
                                 width: 0.5,
                               ),
                             ),
@@ -706,7 +664,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                     ),
                   )
                 else
-                  const SizedBox(height: 16),  // Maintain consistent spacing
+                  const SizedBox(height: 16), // Maintain consistent spacing
               ],
             ),
           ),
@@ -895,8 +853,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                             }),
                           ),
                           // Events overlay
-                          ...events
-                              .map((event) => _buildEventBlock(event)),
+                          ...events.map((event) => _buildEventBlock(event)),
                           // Current time indicator (only if today)
                           if (isToday)
                             Positioned(
@@ -1141,13 +1098,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     );
   }
 
-  Widget _buildFAB() {
-    return FloatingActionButton(
-      onPressed: () => _createEvent(),
-      backgroundColor: const Color(0xFF667EEA),
-      child: const Icon(Icons.add, color: Colors.white),
-    );
-  }
+  // FAB removed; action moved to header
 
   void _openEvent(EventModel event) {
     HapticFeedback.lightImpact();

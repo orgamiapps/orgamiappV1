@@ -113,7 +113,7 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
               const SizedBox(width: 16),
               const Expanded(
                 child: Text(
-                  'Sign-In Methods',
+                  'Create Event',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 24,

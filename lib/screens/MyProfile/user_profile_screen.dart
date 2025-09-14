@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:attendus/models/customer_model.dart';
@@ -196,7 +197,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           color: AppThemeColor.darkBlueColor,
           child: CustomScrollView(
             slivers: [
-              // Profile Header (styled like MyProfileScreen)
+              // Profile header removed – show compact info row directly
               SliverToBoxAdapter(child: _buildProfileHeaderUser()),
               // Stats Section
               SliverToBoxAdapter(child: _buildStatsSection()),
@@ -224,6 +225,12 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       phone: 18,
       tablet: 22,
       desktop: 24,
+    );
+    final sectionSpacing = ResponsiveHelper.getResponsiveSpacing(
+      context,
+      phone: 12,
+      tablet: 16,
+      desktop: 20,
     );
 
     return Container(
@@ -337,6 +344,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   desktop: 16,
                 ),
               ),
+              // Banner removed
+              SizedBox(height: sectionSpacing),
               // Responsive profile row
               _buildResponsiveProfileRow(),
               // Add Follow and Message buttons for other users' profiles
@@ -360,6 +369,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       ),
     );
   }
+
+  // Profile banner removed entirely
 
   Widget _buildResponsiveProfileRow() {
     final avatarSize = ResponsiveHelper.getResponsiveAvatarSize(
@@ -524,26 +535,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     );
   }
 
-  // Banner upload
-  Future<void> _pickAndUploadBanner() async {
-    try {
-      final file = await FirebaseStorageHelper.pickImageFromGallery();
-      if (file == null) return;
-      final url = await FirebaseStorageHelper.uploadUserBanner(
-        userId: widget.user.uid,
-        imageFile: file,
-      );
-      if (url == null) return;
-      await FirebaseFirestoreHelper().updateCustomerProfile(
-        customerId: widget.user.uid,
-        bannerUrl: url,
-      );
-      setState(() {
-        widget.user.bannerUrl = url;
-      });
-      ShowToast().showNormalToast(msg: 'Banner updated');
-    } catch (_) {}
-  }
+  // Removed immediate banner upload; handled via staged save flow
 
   Widget _buildActionButtons() {
     final buttonHeight = ResponsiveHelper.getResponsiveButtonHeight(
@@ -894,58 +886,32 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     );
   }
 
-  // Avatar upload
-  Future<void> _pickAndUploadAvatar() async {
-    try {
-      final file = await FirebaseStorageHelper.pickImageFromGallery();
-      if (file == null) return;
-      final url = await FirebaseStorageHelper.uploadProfilePicture(
-        widget.user.uid,
-        file,
-      );
-      if (url == null) return;
-      await FirebaseFirestoreHelper().updateCustomerProfile(
-        customerId: widget.user.uid,
-        profilePictureUrl: url,
-      );
-      setState(() {
-        widget.user.profilePictureUrl = url;
-      });
-      ShowToast().showNormalToast(msg: 'Profile photo updated');
-    } catch (_) {}
-  }
+  // Removed immediate avatar upload; handled via staged save flow
 
   Widget _buildStatsSection() {
     final margin = ResponsiveHelper.getResponsiveMargin(
       context,
-      phone: 24,
-      tablet: 32,
-      desktop: 48,
+      phone: 12,
+      tablet: 14,
+      desktop: 16,
     );
-    final padding = ResponsiveHelper.getResponsivePadding(
+    final valueSize = ResponsiveHelper.getResponsiveFontSize(
       context,
-      phone: 16,
-      tablet: 20,
-      desktop: 24,
+      phone: 14,
+      tablet: 15,
+      desktop: 16,
     );
-    final borderRadius = ResponsiveHelper.getResponsiveBorderRadius(context);
-    final numberFontSize = ResponsiveHelper.getResponsiveFontSize(
+    final labelSize = ResponsiveHelper.getResponsiveFontSize(
       context,
-      phone: 16,
-      tablet: 20,
-      desktop: 24,
-    );
-    final labelFontSize = ResponsiveHelper.getResponsiveFontSize(
-      context,
-      phone: 11,
-      tablet: 13,
+      phone: 13,
+      tablet: 14,
       desktop: 15,
     );
-    final dividerHeight = ResponsiveHelper.getResponsiveSpacing(
+    final gap = ResponsiveHelper.getResponsiveSpacing(
       context,
-      phone: 30,
-      tablet: 35,
-      desktop: 40,
+      phone: 12,
+      tablet: 14,
+      desktop: 16,
     );
 
     return Container(
@@ -956,98 +922,76 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         horizontal: margin.horizontal,
         vertical: margin.vertical,
       ),
-      padding: EdgeInsets.symmetric(
-        horizontal: padding.horizontal,
-        vertical: padding.vertical,
-      ),
-      decoration: BoxDecoration(
-        color: AppThemeColor.pureWhiteColor,
-        borderRadius: BorderRadius.circular(borderRadius),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: ResponsiveHelper.getResponsiveElevation(
-              context,
-              phone: 10,
-              tablet: 12,
-              desktop: 16,
-            ),
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _showFollowersFollowing('followers'),
-              child: Column(
-                children: [
-                  Text(
-                    '$_followersCount',
-                    style: TextStyle(
-                      fontSize: numberFontSize,
-                      fontWeight: FontWeight.bold,
-                      color: AppThemeColor.darkBlueColor,
-                      fontFamily: 'Roboto',
+          InkWell(
+            onTap: () => _showFollowersFollowing('followers'),
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+              child: RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '$_followersCount',
+                      style: TextStyle(
+                        color: AppThemeColor.darkBlueColor,
+                        fontSize: valueSize,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Roboto',
+                      ),
                     ),
-                  ),
-                  SizedBox(
-                    height: ResponsiveHelper.getResponsiveSpacing(
-                      context,
-                      phone: 2,
-                      tablet: 4,
-                      desktop: 6,
+                    TextSpan(
+                      text: ' Followers',
+                      style: TextStyle(
+                        color: AppThemeColor.dullFontColor,
+                        fontSize: labelSize,
+                        fontFamily: 'Roboto',
+                      ),
                     ),
-                  ),
-                  Text(
-                    'Followers',
-                    style: TextStyle(
-                      fontSize: labelFontSize,
-                      color: AppThemeColor.dullFontColor,
-                      fontFamily: 'Roboto',
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
+          SizedBox(width: gap),
           Container(
-            width: 1,
-            height: dividerHeight,
-            color: AppThemeColor.borderColor,
+            width: 4,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppThemeColor.borderColor,
+              shape: BoxShape.circle,
+            ),
           ),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _showFollowersFollowing('following'),
-              child: Column(
-                children: [
-                  Text(
-                    '$_followingCount',
-                    style: TextStyle(
-                      fontSize: numberFontSize,
-                      fontWeight: FontWeight.bold,
-                      color: AppThemeColor.darkBlueColor,
-                      fontFamily: 'Roboto',
+          SizedBox(width: gap),
+          InkWell(
+            onTap: () => _showFollowersFollowing('following'),
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+              child: RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '$_followingCount',
+                      style: TextStyle(
+                        color: AppThemeColor.darkBlueColor,
+                        fontSize: valueSize,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Roboto',
+                      ),
                     ),
-                  ),
-                  SizedBox(
-                    height: ResponsiveHelper.getResponsiveSpacing(
-                      context,
-                      phone: 2,
-                      tablet: 4,
-                      desktop: 6,
+                    TextSpan(
+                      text: ' Following',
+                      style: TextStyle(
+                        color: AppThemeColor.dullFontColor,
+                        fontSize: labelSize,
+                        fontFamily: 'Roboto',
+                      ),
                     ),
-                  ),
-                  Text(
-                    'Following',
-                    style: TextStyle(
-                      fontSize: labelFontSize,
-                      color: AppThemeColor.dullFontColor,
-                      fontFamily: 'Roboto',
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -1625,6 +1569,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
+        // Local staged files for live preview inside the sheet
+        File? sheetBannerFile;
+        File? sheetAvatarFile;
+
         return DraggableScrollableSheet(
           expand: false,
           initialChildSize: context.isTablet ? 0.75 : 0.85,
@@ -1639,20 +1587,52 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   topRight: Radius.circular(borderRadius),
                 ),
               ),
-              child: SingleChildScrollView(
-                controller: scrollCtlr,
-                padding: EdgeInsets.only(
-                  left: padding.left,
-                  right: padding.right,
-                  top: padding.top,
-                  bottom:
-                      MediaQuery.of(context).viewInsets.bottom + padding.bottom,
-                ),
-                child: _buildEditProfileContent(
-                  nameController,
-                  usernameController,
-                  bioController,
-                ),
+              child: StatefulBuilder(
+                builder: (context, setModalState) {
+                  return SingleChildScrollView(
+                    controller: scrollCtlr,
+                    padding: EdgeInsets.only(
+                      left: padding.left,
+                      right: padding.right,
+                      top: padding.top,
+                      bottom:
+                          MediaQuery.of(context).viewInsets.bottom +
+                          padding.bottom,
+                    ),
+                    child: _buildEditProfileContent(
+                      nameController,
+                      usernameController,
+                      bioController,
+                      stagedBannerFile: sheetBannerFile,
+                      stagedAvatarFile: sheetAvatarFile,
+                      onChangeBanner: () async {
+                        final f =
+                            await FirebaseStorageHelper.pickImageFromGallery();
+                        if (f != null) {
+                          setModalState(() {
+                            sheetBannerFile = f;
+                          });
+                        }
+                      },
+                      onChangeAvatar: () async {
+                        final f =
+                            await FirebaseStorageHelper.pickImageFromGallery();
+                        if (f != null) {
+                          setModalState(() {
+                            sheetAvatarFile = f;
+                          });
+                        }
+                      },
+                      onSave: () => _saveProfileChanges(
+                        nameController,
+                        usernameController,
+                        bioController,
+                        stagedAvatarFile: sheetAvatarFile,
+                        stagedBannerFile: sheetBannerFile,
+                      ),
+                    ),
+                  );
+                },
               ),
             );
           },
@@ -1671,6 +1651,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     showDialog(
       context: context,
       builder: (context) {
+        // Local staged files for live preview inside the dialog
+        File? dialogBannerFile;
+        File? dialogAvatarFile;
+
         return Dialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(
@@ -1681,12 +1665,43 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             width: dialogWidth,
             constraints: const BoxConstraints(maxHeight: 700),
             padding: ResponsiveHelper.getResponsivePadding(context),
-            child: SingleChildScrollView(
-              child: _buildEditProfileContent(
-                nameController,
-                usernameController,
-                bioController,
-              ),
+            child: StatefulBuilder(
+              builder: (context, setDialogState) {
+                return SingleChildScrollView(
+                  child: _buildEditProfileContent(
+                    nameController,
+                    usernameController,
+                    bioController,
+                    stagedBannerFile: dialogBannerFile,
+                    stagedAvatarFile: dialogAvatarFile,
+                    onChangeBanner: () async {
+                      final f =
+                          await FirebaseStorageHelper.pickImageFromGallery();
+                      if (f != null) {
+                        setDialogState(() {
+                          dialogBannerFile = f;
+                        });
+                      }
+                    },
+                    onChangeAvatar: () async {
+                      final f =
+                          await FirebaseStorageHelper.pickImageFromGallery();
+                      if (f != null) {
+                        setDialogState(() {
+                          dialogAvatarFile = f;
+                        });
+                      }
+                    },
+                    onSave: () => _saveProfileChanges(
+                      nameController,
+                      usernameController,
+                      bioController,
+                      stagedAvatarFile: dialogAvatarFile,
+                      stagedBannerFile: dialogBannerFile,
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         );
@@ -1697,8 +1712,13 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   Widget _buildEditProfileContent(
     TextEditingController nameController,
     TextEditingController usernameController,
-    TextEditingController bioController,
-  ) {
+    TextEditingController bioController, {
+    File? stagedBannerFile,
+    File? stagedAvatarFile,
+    required VoidCallback onChangeBanner,
+    required VoidCallback onChangeAvatar,
+    required VoidCallback onSave,
+  }) {
     final titleSize = ResponsiveHelper.getResponsiveFontSize(
       context,
       phone: 20,
@@ -1745,10 +1765,12 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         SizedBox(height: spacing),
         // Modern media section with live previews
         _EditMediaSection(
-          bannerUrl: widget.user.bannerUrl,
+          bannerUrl: null,
           avatarUrl: widget.user.profilePictureUrl,
-          onChangeBanner: _pickAndUploadBanner,
-          onChangeAvatar: _pickAndUploadAvatar,
+          bannerFile: null,
+          avatarFile: stagedAvatarFile,
+          onChangeBanner: () {},
+          onChangeAvatar: onChangeAvatar,
         ),
         SizedBox(height: spacing),
         TextField(
@@ -1844,11 +1866,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           width: double.infinity,
           height: buttonHeight,
           child: ElevatedButton(
-            onPressed: () => _saveProfileChanges(
-              nameController,
-              usernameController,
-              bioController,
-            ),
+            onPressed: onSave,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppThemeColor.darkBlueColor,
               foregroundColor: Colors.white,
@@ -1877,19 +1895,37 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   Future<void> _saveProfileChanges(
     TextEditingController nameController,
     TextEditingController usernameController,
-    TextEditingController bioController,
-  ) async {
+    TextEditingController bioController, {
+    File? stagedAvatarFile,
+    File? stagedBannerFile,
+  }) async {
     final current = CustomerController.logeInCustomer;
     if (current == null) {
       Navigator.pop(context);
       return;
     }
 
-    // Save name and bio immediately
+    // If there are staged images, upload them first so URLs are ready
+    String? uploadedAvatarUrl;
+
+    if (stagedAvatarFile != null) {
+      try {
+        uploadedAvatarUrl = await FirebaseStorageHelper.uploadProfilePicture(
+          current.uid,
+          stagedAvatarFile,
+        );
+      } catch (_) {}
+    }
+
+    // Banner support removed
+
+    // Save name, bio, and any uploaded image URLs
     await FirebaseFirestoreHelper().updateCustomerProfile(
       customerId: current.uid,
       name: nameController.text.trim(),
       bio: bioController.text.trim(),
+      profilePictureUrl: uploadedAvatarUrl,
+      bannerUrl: null,
     );
 
     // Save username if changed and not empty
@@ -1906,6 +1942,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       widget.user.name = nameController.text.trim();
       widget.user.bio = bioController.text.trim();
       widget.user.username = newUsername.isEmpty ? null : newUsername;
+      if (uploadedAvatarUrl != null && uploadedAvatarUrl.isNotEmpty) {
+        widget.user.profilePictureUrl = uploadedAvatarUrl;
+      }
+      // Do not set bannerUrl; feature removed
     });
 
     if (mounted) {
@@ -1918,42 +1958,27 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 class _EditMediaSection extends StatelessWidget {
   final String? bannerUrl;
   final String? avatarUrl;
+  final File? bannerFile;
+  final File? avatarFile;
   final VoidCallback onChangeBanner;
   final VoidCallback onChangeAvatar;
 
   const _EditMediaSection({
     required this.bannerUrl,
     required this.avatarUrl,
+    required this.bannerFile,
+    required this.avatarFile,
     required this.onChangeBanner,
     required this.onChangeAvatar,
   });
 
   @override
   Widget build(BuildContext context) {
-    final bannerHeight = ResponsiveHelper.getResponsiveHeight(
-      context,
-      phonePercent: 0.15,
-      tabletPercent: 0.18,
-      desktopPercent: 0.2,
-    );
-    final borderRadius = ResponsiveHelper.getResponsiveBorderRadius(context);
     final avatarRadius = ResponsiveHelper.getResponsiveAvatarSize(
       context,
       phone: 32,
       tablet: 40,
       desktop: 48,
-    );
-    final iconSize = ResponsiveHelper.getResponsiveIconSize(
-      context,
-      phone: 16,
-      tablet: 20,
-      desktop: 24,
-    );
-    final buttonPadding = ResponsiveHelper.getResponsivePadding(
-      context,
-      phone: 12,
-      tablet: 16,
-      desktop: 20,
     );
     final spacing = ResponsiveHelper.getResponsiveSpacing(
       context,
@@ -1971,72 +1996,7 @@ class _EditMediaSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Banner preview
-        Stack(
-          children: [
-            Container(
-              height: bannerHeight.clamp(120.0, 200.0),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(borderRadius),
-                image: (bannerUrl != null && bannerUrl!.isNotEmpty)
-                    ? DecorationImage(
-                        image: NetworkImage(bannerUrl!),
-                        fit: BoxFit.cover,
-                        colorFilter: ColorFilter.mode(
-                          Colors.black.withValues(alpha: 0.15),
-                          BlendMode.darken,
-                        ),
-                      )
-                    : null,
-              ),
-              child: (bannerUrl == null || bannerUrl!.isEmpty)
-                  ? Center(
-                      child: Icon(
-                        Icons.wallpaper,
-                        color: const Color(0xFF94A3B8),
-                        size: ResponsiveHelper.getResponsiveIconSize(
-                          context,
-                          phone: 32,
-                          tablet: 40,
-                          desktop: 48,
-                        ),
-                      ),
-                    )
-                  : null,
-            ),
-            Positioned(
-              right: ResponsiveHelper.getResponsiveSpacing(
-                context,
-                phone: 8,
-                tablet: 12,
-                desktop: 16,
-              ),
-              bottom: ResponsiveHelper.getResponsiveSpacing(
-                context,
-                phone: 8,
-                tablet: 12,
-                desktop: 16,
-              ),
-              child: FilledButton.icon(
-                onPressed: onChangeBanner,
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF667EEA),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: buttonPadding.horizontal,
-                    vertical: buttonPadding.vertical,
-                  ),
-                ),
-                icon: Icon(Icons.edit, size: iconSize),
-                label: Text(
-                  context.isPhone ? 'Change' : 'Change banner',
-                  style: TextStyle(fontSize: fontSize),
-                ),
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: spacing),
+        // Banner removed – only avatar editing remains
         Row(
           children: [
             // Avatar preview
@@ -2045,10 +2005,14 @@ class _EditMediaSection extends StatelessWidget {
                 CircleAvatar(
                   radius: avatarRadius,
                   backgroundColor: const Color(0xFFE5E7EB),
-                  backgroundImage: (avatarUrl != null && avatarUrl!.isNotEmpty)
+                  backgroundImage: avatarFile != null
+                      ? FileImage(avatarFile!)
+                      : (avatarUrl != null && avatarUrl!.isNotEmpty)
                       ? NetworkImage(avatarUrl!)
                       : null,
-                  child: (avatarUrl == null || avatarUrl!.isEmpty)
+                  child:
+                      (avatarFile == null &&
+                          (avatarUrl == null || avatarUrl!.isEmpty))
                       ? Icon(
                           Icons.person,
                           color: const Color(0xFF64748B),

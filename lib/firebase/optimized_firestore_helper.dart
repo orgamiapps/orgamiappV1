@@ -48,7 +48,7 @@ class OptimizedFirestoreHelper {
 
     try {
       final docSnapshot = await _firestore
-          .collection('Customer')
+          .collection('Customers')
           .doc(userId)
           .get()
           .timeout(const Duration(seconds: 5));
@@ -134,7 +134,7 @@ class OptimizedFirestoreHelper {
     try {
       // Search by username first (more efficient)
       final snapshot = await _firestore
-          .collection('Customer')
+          .collection('Customers')
           .where('isDiscoverable', isEqualTo: true)
           .limit(30)
           .get()

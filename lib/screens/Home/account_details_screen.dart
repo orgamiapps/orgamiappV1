@@ -11,6 +11,7 @@ import 'dart:convert';
 import 'package:attendus/firebase/firebase_storage_helper.dart';
 import 'package:attendus/screens/Authentication/forgot_password_screen.dart';
 import 'package:attendus/Utils/full_screen_image_viewer.dart';
+import 'package:attendus/Utils/cached_image.dart';
 
 class AccountDetailsScreen extends StatefulWidget {
   const AccountDetailsScreen({super.key});
@@ -412,8 +413,8 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
                               child:
                                   (user?.profilePictureUrl != null &&
                                       (user!.profilePictureUrl!.isNotEmpty))
-                                  ? Image.network(
-                                      user.profilePictureUrl!,
+                                  ? SafeNetworkImage(
+                                      imageUrl: user.profilePictureUrl!,
                                       fit: BoxFit.cover,
                                     )
                                   : Container(
@@ -824,11 +825,12 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: _selectedGender,
+          initialValue: _selectedGender,
           decoration: InputDecoration(
             hintText: 'Select your gender (optional)',
             prefixIcon: const Icon(Icons.person_outline),
           ),
+          isExpanded: true,
           items: _genderOptions.map((String gender) {
             return DropdownMenuItem<String>(value: gender, child: Text(gender));
           }).toList(),
@@ -1106,11 +1108,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
               ],
             ),
           ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: Theme.of(context).colorScheme.primary,
-          ),
+          Switch(value: value, onChanged: onChanged),
         ],
       ),
     );

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:attendus/firebase_options.dart';
+import 'firebase_options.dart';
 import 'package:attendus/screens/Splash/splash_screen.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Utils/theme_provider.dart';
@@ -42,12 +42,11 @@ void main() async {
   await EmulatorConfig.configureForEmulator();
 
   // Build the app immediately to keep UI responsive
-  runApp(
-    ChangeNotifierProvider(
-      create: (context) => ThemeProvider(),
-      child: const MyApp(),
-    ),
+  final Widget appWidget = ChangeNotifierProvider(
+    create: (context) => ThemeProvider(),
+    child: const MyApp(),
   );
+  runApp(appWidget);
 
   // Initialize Firebase and services after first frame to avoid ANR
   WidgetsBinding.instance.addPostFrameCallback((_) async {

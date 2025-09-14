@@ -1,0 +1,33 @@
+# Android Studio VM Options for Optimal Flutter Development Performance
+# Copy this file to:
+# macOS: ~/Library/Application Support/Google/AndroidStudio*/studio.vmoptions
+# Windows: %USERPROFILE%\.AndroidStudio*\config\studio.vmoptions
+# Linux: ~/.config/Google/AndroidStudio*/studio.vmoptions
+
+# Memory allocation
+-Xms2048m
+-Xmx4096m
+-XX:ReservedCodeCacheSize=512m
+
+# Garbage collection optimization
+-XX:+UseG1GC
+-XX:MaxGCPauseMillis=200
+-XX:+HeapDumpOnOutOfMemoryError
+
+# Performance improvements
+-XX:+UseStringDeduplication
+-XX:SoftRefLRUPolicyMSPerMB=50
+-XX:CICompilerCount=2
+
+# File encoding
+-Dfile.encoding=UTF-8
+
+# Disable file indexing for certain patterns (additional to IDE settings)
+-Didea.max.intellisense.filesize=2500
+
+# Increase file watcher limits
+-Didea.filewatcher.disabled=false
+-Didea.max.content.load.filesize=20000
+
+# Disable some inspections for better performance
+-Didea.is.internal=false
