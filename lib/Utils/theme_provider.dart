@@ -222,212 +222,212 @@ class ThemeProvider extends ChangeNotifier {
     ),
   );
 
-  // Modern Material 3 Dark Theme
+  // Modern Material 3 Dark Theme with enhanced aesthetics
   ThemeData get darkTheme => ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
     colorScheme: const ColorScheme.dark(
       brightness: Brightness.dark,
-      primary: Color(0xFF7B8EF0),
-      onPrimary: Color(0xFF001D34),
-      primaryContainer: Color(0xFF002D4C),
-      onPrimaryContainer: Color(0xFFB8D0FF),
-      secondary: Color(0xFF9A7FB8),
-      onSecondary: Color(0xFF332640),
-      secondaryContainer: Color(0xFF493C56),
-      onSecondaryContainer: Color(0xFFD6BEF3),
-      tertiary: Color(0xFFE4BAD0),
-      onTertiary: Color(0xFF472532),
-      tertiaryContainer: Color(0xFF603B48),
-      onTertiaryContainer: Color(0xFFFFD8E4),
-      error: Color(0xFFFFB4AB),
-      onError: Color(0xFF690005),
-      errorContainer: Color(0xFF93000A),
-      onErrorContainer: Color(0xFFFFDAD6),
-      surface: Color(0xFF0F0F0F),
-      onSurface: Color(0xFFE6E1E5),
-      surfaceContainerHighest: Color(0xFF1A1A1A),
-      onSurfaceVariant: Color(0xFFCAC4D0),
-      outline: Color(0xFF938F99),
-      outlineVariant: Color(0xFF49454F),
+      primary: Color(0xFF8B9EFF), // Brighter, more vibrant primary
+      onPrimary: Color(0xFF001122),
+      primaryContainer: Color(0xFF1A2B5C),
+      onPrimaryContainer: Color(0xFFD4E1FF),
+      secondary: Color(0xFFB39DDB), // More purple secondary
+      onSecondary: Color(0xFF2A1F3D),
+      secondaryContainer: Color(0xFF413A56),
+      onSecondaryContainer: Color(0xFFE0CFFF),
+      tertiary: Color(0xFFFFB3D1),
+      onTertiary: Color(0xFF4A1E35),
+      tertiaryContainer: Color(0xFF653049),
+      onTertiaryContainer: Color(0xFFFFD9E7),
+      error: Color(0xFFFF8A80),
+      onError: Color(0xFF5F0016),
+      errorContainer: Color(0xFF8B0000),
+      onErrorContainer: Color(0xFFFFDAD4),
+      surface: Color(0xFF0A0A0A), // Deeper black for better contrast
+      onSurface: Color(0xFFECECEC), // Slightly brighter text
+      surfaceContainerHighest: Color(0xFF1E1E1E), // Better card background
+      onSurfaceVariant: Color(0xFFBDBDBD),
+      outline: Color(0xFF757575),
+      outlineVariant: Color(0xFF424242),
       shadow: Color(0xFF000000),
       scrim: Color(0xFF000000),
-      inverseSurface: Color(0xFFE6E1E5),
-      onInverseSurface: Color(0xFF313033),
+      inverseSurface: Color(0xFFECECEC),
+      onInverseSurface: Color(0xFF1A1A1A),
       inversePrimary: Color(0xFF667EEA),
-      surfaceTint: Color(0xFF7B8EF0),
+      surfaceTint: Color(0xFF8B9EFF),
     ),
-    scaffoldBackgroundColor: const Color(0xFF0F0F0F),
+    scaffoldBackgroundColor: const Color(0xFF0A0A0A),
     cardTheme: CardThemeData(
-      color: const Color(0xFF1A1A1A),
-      surfaceTintColor: const Color(0xFF7B8EF0),
-      shadowColor: Colors.black.withValues(alpha: 0.4),
-      elevation: 2,
+      color: const Color(0xFF1E1E1E),
+      surfaceTintColor: const Color(0xFF8B9EFF),
+      shadowColor: Colors.black.withValues(alpha: 0.5),
+      elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),
     appBarTheme: const AppBarTheme(
-      backgroundColor: Color(0xFF1A1A1A),
-      foregroundColor: Color(0xFFE6E1E5),
+      backgroundColor: Color(0xFF1E1E1E),
+      foregroundColor: Color(0xFFECECEC),
       elevation: 0,
       centerTitle: false,
       titleTextStyle: TextStyle(
-        color: Color(0xFFE6E1E5),
+        color: Color(0xFFECECEC),
         fontSize: 22,
         fontWeight: FontWeight.w600,
         fontFamily: 'Roboto',
       ),
-      iconTheme: IconThemeData(color: Color(0xFFE6E1E5), size: 24),
+      iconTheme: IconThemeData(color: Color(0xFFECECEC), size: 24),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF7B8EF0),
-        foregroundColor: const Color(0xFF001D34),
-        elevation: 2,
-        shadowColor: Colors.black.withValues(alpha: 0.4),
+        backgroundColor: const Color(0xFF8B9EFF),
+        foregroundColor: const Color(0xFF001122),
+        elevation: 3,
+        shadowColor: Colors.black.withValues(alpha: 0.5),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: const Color(0xFF7B8EF0),
+        foregroundColor: const Color(0xFF8B9EFF),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: const Color(0xFF7B8EF0),
-        side: const BorderSide(color: Color(0xFF7B8EF0), width: 1),
+        foregroundColor: const Color(0xFF8B9EFF),
+        side: const BorderSide(color: Color(0xFF8B9EFF), width: 1),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: const Color(0xFF1A1A1A),
+      fillColor: const Color(0xFF1E1E1E),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF49454F)),
+        borderSide: const BorderSide(color: Color(0xFF424242)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF49454F)),
+        borderSide: const BorderSide(color: Color(0xFF424242)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF7B8EF0), width: 2),
+        borderSide: const BorderSide(color: Color(0xFF8B9EFF), width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFFFB4AB), width: 1),
+        borderSide: const BorderSide(color: Color(0xFFFF8A80), width: 1),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFFFB4AB), width: 2),
+        borderSide: const BorderSide(color: Color(0xFFFF8A80), width: 2),
       ),
-      labelStyle: const TextStyle(color: Color(0xFFCAC4D0)),
+      labelStyle: const TextStyle(color: Color(0xFFBDBDBD)),
       hintStyle: TextStyle(
-        color: const Color(0xFFCAC4D0).withValues(alpha: 0.6),
+        color: const Color(0xFFBDBDBD).withValues(alpha: 0.6),
       ),
     ),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-      backgroundColor: Color(0xFF1A1A1A),
-      selectedItemColor: Color(0xFF7B8EF0),
-      unselectedItemColor: Color(0xFF938F99),
+      backgroundColor: Color(0xFF1E1E1E),
+      selectedItemColor: Color(0xFF8B9EFF),
+      unselectedItemColor: Color(0xFF757575),
       type: BottomNavigationBarType.fixed,
       elevation: 8,
     ),
     dividerTheme: const DividerThemeData(
-      color: Color(0xFF49454F),
+      color: Color(0xFF424242),
       thickness: 1,
       space: 1,
     ),
     textTheme: const TextTheme(
       displayLarge: TextStyle(
-        color: Color(0xFFE6E1E5),
+        color: Color(0xFFECECEC),
         fontSize: 57,
         fontWeight: FontWeight.w400,
         fontFamily: 'Roboto',
       ),
       displayMedium: TextStyle(
-        color: Color(0xFFE6E1E5),
+        color: Color(0xFFECECEC),
         fontSize: 45,
         fontWeight: FontWeight.w400,
         fontFamily: 'Roboto',
       ),
       displaySmall: TextStyle(
-        color: Color(0xFFE6E1E5),
+        color: Color(0xFFECECEC),
         fontSize: 36,
         fontWeight: FontWeight.w400,
         fontFamily: 'Roboto',
       ),
       headlineLarge: TextStyle(
-        color: Color(0xFFE6E1E5),
+        color: Color(0xFFECECEC),
         fontSize: 32,
         fontWeight: FontWeight.w600,
         fontFamily: 'Roboto',
       ),
       headlineMedium: TextStyle(
-        color: Color(0xFFE6E1E5),
+        color: Color(0xFFECECEC),
         fontSize: 28,
         fontWeight: FontWeight.w600,
         fontFamily: 'Roboto',
       ),
       headlineSmall: TextStyle(
-        color: Color(0xFFE6E1E5),
+        color: Color(0xFFECECEC),
         fontSize: 24,
         fontWeight: FontWeight.w600,
         fontFamily: 'Roboto',
       ),
       titleLarge: TextStyle(
-        color: Color(0xFFE6E1E5),
+        color: Color(0xFFECECEC),
         fontSize: 22,
         fontWeight: FontWeight.w600,
         fontFamily: 'Roboto',
       ),
       titleMedium: TextStyle(
-        color: Color(0xFFE6E1E5),
+        color: Color(0xFFECECEC),
         fontSize: 16,
         fontWeight: FontWeight.w500,
         fontFamily: 'Roboto',
       ),
       titleSmall: TextStyle(
-        color: Color(0xFFE6E1E5),
+        color: Color(0xFFECECEC),
         fontSize: 14,
         fontWeight: FontWeight.w500,
         fontFamily: 'Roboto',
       ),
       bodyLarge: TextStyle(
-        color: Color(0xFFE6E1E5),
+        color: Color(0xFFECECEC),
         fontSize: 16,
         fontWeight: FontWeight.w400,
         fontFamily: 'Roboto',
       ),
       bodyMedium: TextStyle(
-        color: Color(0xFFE6E1E5),
+        color: Color(0xFFECECEC),
         fontSize: 14,
         fontWeight: FontWeight.w400,
         fontFamily: 'Roboto',
       ),
       bodySmall: TextStyle(
-        color: Color(0xFFCAC4D0),
+        color: Color(0xFFBDBDBD),
         fontSize: 12,
         fontWeight: FontWeight.w400,
         fontFamily: 'Roboto',
       ),
       labelLarge: TextStyle(
-        color: Color(0xFFE6E1E5),
+        color: Color(0xFFECECEC),
         fontSize: 14,
         fontWeight: FontWeight.w500,
         fontFamily: 'Roboto',
       ),
       labelMedium: TextStyle(
-        color: Color(0xFFE6E1E5),
+        color: Color(0xFFECECEC),
         fontSize: 12,
         fontWeight: FontWeight.w500,
         fontFamily: 'Roboto',
       ),
       labelSmall: TextStyle(
-        color: Color(0xFFCAC4D0),
+        color: Color(0xFFBDBDBD),
         fontSize: 11,
         fontWeight: FontWeight.w500,
         fontFamily: 'Roboto',
@@ -495,10 +495,54 @@ class ThemeProvider extends ChangeNotifier {
   List<Color> getGradientColors(BuildContext context) {
     return _isDarkMode
         ? [
-            const Color(0xFF1E3A5F),
-            const Color(0xFF2C5A96),
-            const Color(0xFF4A90E2),
+            const Color(0xFF2A1B3D), // Deep purple-blue
+            const Color(0xFF44318D), // Medium purple
+            const Color(0xFF8B9EFF), // Bright primary
           ]
         : [const Color(0xFF667EEA), const Color(0xFF764BA2)];
+  }
+
+  // Additional theme-aware helper methods
+  Color getCardElevationColor(BuildContext context) {
+    return _isDarkMode 
+        ? const Color(0xFF1E1E1E)
+        : const Color(0xFFFFFFFF);
+  }
+
+  Color getSuccessColor(BuildContext context) {
+    return _isDarkMode
+        ? const Color(0xFF4CAF50)
+        : const Color(0xFF2E7D32);
+  }
+
+  Color getWarningColor(BuildContext context) {
+    return _isDarkMode
+        ? const Color(0xFFFFA726)
+        : const Color(0xFFF57C00);
+  }
+
+  Color getInfoColor(BuildContext context) {
+    return _isDarkMode
+        ? const Color(0xFF29B6F6)
+        : const Color(0xFF0277BD);
+  }
+
+  // Enhanced shadow for elevated components in dark mode
+  List<BoxShadow> getElevatedShadow(BuildContext context, {double elevation = 2}) {
+    return _isDarkMode
+        ? [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.6),
+              blurRadius: elevation * 3,
+              offset: Offset(0, elevation),
+            ),
+          ]
+        : [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: elevation * 2,
+              offset: Offset(0, elevation),
+            ),
+          ];
   }
 }

@@ -573,15 +573,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
+                      gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                        colors: Provider.of<ThemeProvider>(context).getGradientColors(context),
                       ),
                       borderRadius: BorderRadius.circular(28),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
                           spreadRadius: 2,
                           blurRadius: 8,
                           offset: const Offset(0, 4),
@@ -593,9 +593,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       child: InkWell(
                         borderRadius: BorderRadius.circular(28),
                         onTap: _onFabPressed,
-                        child: const Icon(
+                        child: Icon(
                           Icons.add,
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.onPrimary,
                           size: 28,
                         ),
                       ),

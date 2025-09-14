@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:attendus/screens/Home/home_screen.dart' as legacy;
 import 'package:attendus/screens/Home/search_screen.dart';
 import 'package:attendus/screens/QRScanner/qr_scanner_flow_screen.dart';
@@ -7,6 +8,7 @@ import 'package:attendus/firebase/organization_helper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/images.dart';
+import 'package:attendus/Utils/theme_provider.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/Utils/logger.dart';
@@ -183,7 +185,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       floatingActionButton: _tabIndex == 1 ? _buildCreateFab() : null,
       body: SafeArea(
         child: Column(
@@ -207,19 +209,20 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   }
 
   Widget _buildCreateFab() {
+    final themeProvider = Provider.of<ThemeProvider>(context);
     return Container(
       width: 56,
       height: 56,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+          colors: themeProvider.getGradientColors(context),
         ),
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
             spreadRadius: 2,
             blurRadius: 8,
             offset: const Offset(0, 4),
@@ -236,7 +239,11 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
               const ChoseSignInMethodsScreen(),
             );
           },
-          child: const Icon(Icons.add, color: Colors.white, size: 28),
+          child: Icon(
+            Icons.add, 
+            color: Theme.of(context).colorScheme.onPrimary, 
+            size: 28,
+          ),
         ),
       ),
     );
@@ -244,7 +251,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
 
   Widget _buildSimpleHeader() {
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
         children: [
@@ -254,10 +261,10 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Discover',
                   style: TextStyle(
-                    color: Color(0xFF64748B),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
                     fontFamily: 'Roboto',
@@ -267,22 +274,22 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
                 const SizedBox(height: 2),
                 ShaderMask(
                   shaderCallback: (Rect bounds) {
-                    return const LinearGradient(
+                    return LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        Color(0xFF0F172A), // slate-900
-                        Color(0xFF667EEA), // primary accent
+                        Theme.of(context).colorScheme.onSurface,
+                        Theme.of(context).colorScheme.primary,
                       ],
                     ).createShader(
                       Rect.fromLTWH(0, 0, bounds.width, bounds.height),
                     );
                   },
                   blendMode: BlendMode.srcIn,
-                  child: const Text(
+                  child: Text(
                     'Amazing Events',
                     style: TextStyle(
-                      color: Color(0xFF1E293B),
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontWeight: FontWeight.w800,
                       fontSize: 20,
                       fontFamily: 'Roboto',
