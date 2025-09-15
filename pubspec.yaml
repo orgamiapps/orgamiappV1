@@ -97,6 +97,9 @@ dependencies:
   
   # On-device AI/ML
   sqflite: ^2.3.0  # For SQLite database caching
+  
+  # NFC functionality for badge activation
+  nfc_manager: ^3.5.0
 
 dev_dependencies:
   flutter_test:
