@@ -259,7 +259,9 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
+          _buildNFCActivationText(),
+          const SizedBox(height: 6),
           Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -300,6 +302,44 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildNFCActivationText() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.15),
+          width: 0.5,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.nfc,
+            size: 10,
+            color: Colors.white.withValues(alpha: 0.85),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'Tap badge at event to activate ticket',
+            style: TextStyle(
+              fontSize: 7.5,
+              fontWeight: FontWeight.w500,
+              color: Colors.white.withValues(alpha: 0.85),
+              letterSpacing: 0.3,
+              shadows: _textShadows(small: true),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 
