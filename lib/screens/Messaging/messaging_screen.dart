@@ -310,7 +310,11 @@ class _MessagingScreenState extends State<MessagingScreen> {
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: theme.dividerColor),
+          child: const Divider(
+            height: 1,
+            thickness: 1,
+            color: Color(0xFFE5E7EB),
+          ),
         ),
       ),
       body: Column(

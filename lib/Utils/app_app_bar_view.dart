@@ -35,22 +35,17 @@ class AppAppBarView {
     required BuildContext context,
     Color? backButtonColor,
   }) {
-    return SafeArea(
-      child: Row(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(15.0),
-            child: InkWell(
-              onTap: () => Navigator.pop(context),
-              child: AppButtons.roundedButton(
-                iconData: Icons.arrow_back_ios_rounded,
-                iconColor: AppThemeColor.pureWhiteColor,
-                backgroundColor:
-                    backButtonColor ?? AppThemeColor.darkGreenColor,
-              ),
-            ),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.only(left: 8.0),
+        child: InkWell(
+          onTap: () => Navigator.pop(context),
+          child: AppButtons.roundedButton(
+            iconData: Icons.arrow_back_ios_rounded,
+            iconColor: AppThemeColor.pureWhiteColor,
+            backgroundColor: backButtonColor ?? AppThemeColor.darkGreenColor,
           ),
-        ],
+        ),
       ),
     );
   }

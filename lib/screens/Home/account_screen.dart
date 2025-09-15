@@ -146,6 +146,15 @@ class _AccountScreenState extends State<AccountScreen> {
       ),
       child: Column(
         children: [
+          // Feedback at top
+          _buildSettingsItem(
+            icon: Icons.feedback,
+            title: 'Feedback',
+            subtitle: 'Share your thoughts with us',
+            onTap: () =>
+                RouterClass.nextScreenNormal(context, FeedbackScreen()),
+          ),
+          _buildDivider(),
           // Profile moved to bottom app bar
           _buildSettingsItem(
             icon: Icons.analytics_rounded,
@@ -197,14 +206,7 @@ class _AccountScreenState extends State<AccountScreen> {
           _buildDivider(),
           _buildDarkModeToggle(),
           _buildDivider(),
-          _buildSettingsItem(
-            icon: Icons.feedback,
-            title: 'Feedback',
-            subtitle: 'Share your thoughts with us',
-            onTap: () =>
-                RouterClass.nextScreenNormal(context, FeedbackScreen()),
-          ),
-          _buildDivider(),
+
           _buildSettingsItem(
             icon: Icons.delete_forever,
             title: 'Delete Account',

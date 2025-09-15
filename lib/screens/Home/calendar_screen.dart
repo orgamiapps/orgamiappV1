@@ -422,28 +422,50 @@ class _CalendarScreenState extends State<CalendarScreen>
               Expanded(
                 child: GestureDetector(
                   onTap: _isDayViewExpanded ? null : _showMonthYearPicker,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _isDayViewExpanded && _selectedDate != null
-                            ? DateFormat('EEEE, MMMM d').format(_selectedDate!)
-                            : DateFormat('MMMM yyyy').format(_currentMonth),
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A1A1A),
-                        ),
-                      ),
-                      if (!_isDayViewExpanded) ...[
-                        const SizedBox(width: 8),
-                        const Icon(
-                          Icons.keyboard_arrow_down,
-                          size: 28,
-                          color: Color(0xFF667EEA),
-                        ),
-                      ],
-                    ],
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final bool useCompactFormat = constraints.maxWidth < 300;
+                      final String title =
+                          _isDayViewExpanded && _selectedDate != null
+                          ? DateFormat(
+                              useCompactFormat ? 'EEE, MMM d' : 'EEEE, MMMM d',
+                            ).format(_selectedDate!)
+                          : DateFormat(
+                              useCompactFormat ? 'MMM yyyy' : 'MMMM yyyy',
+                            ).format(_currentMonth);
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Flexible(
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              switchInCurve: Curves.easeOut,
+                              switchOutCurve: Curves.easeIn,
+                              child: Text(
+                                title,
+                                key: ValueKey<String>(title),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1A1A1A),
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (!_isDayViewExpanded) ...[
+                            const SizedBox(width: 6),
+                            const Icon(
+                              Icons.keyboard_arrow_down,
+                              size: 28,
+                              color: Color(0xFF667EEA),
+                            ),
+                          ],
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
