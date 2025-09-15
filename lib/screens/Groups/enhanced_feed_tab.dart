@@ -388,7 +388,12 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                               'customerUid':
                                   data['customerUid'] ?? data['authorId'] ?? '',
                             });
-                            return SingleEventListViewItem(eventModel: model);
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                              ),
+                              child: SingleEventListViewItem(eventModel: model),
+                            );
                           } else if (item['type'] == 'feed') {
                             final doc = item['doc'] as DocumentSnapshot;
                             final data = doc.data() as Map<String, dynamic>;
@@ -448,12 +453,14 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                                     child: Container(
                                       padding: const EdgeInsets.all(4),
                                       decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.9),
+                                        color: Colors.white.withValues(
+                                          alpha: 0.9,
+                                        ),
                                         borderRadius: BorderRadius.circular(8),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(
-                                              0.1,
+                                            color: Colors.black.withValues(
+                                              alpha: 0.1,
                                             ),
                                             blurRadius: 4,
                                             offset: const Offset(0, 2),
@@ -609,7 +616,7 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -829,7 +836,7 @@ class _PhotoPostCard extends StatelessWidget {
               : null,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
@@ -960,7 +967,7 @@ class _PhotoPostCard extends StatelessWidget {
                                           decoration: BoxDecoration(
                                             color: const Color(
                                               0xFF667EEA,
-                                            ).withOpacity(0.1),
+                                            ).withValues(alpha: 0.1),
                                             borderRadius: BorderRadius.circular(
                                               4,
                                             ),
@@ -1015,18 +1022,24 @@ class _PhotoPostCard extends StatelessWidget {
 
                           try {
                             final db = FirebaseFirestore.instance;
-                            final query = db
-                                .collection('Organizations')
-                                .doc(organizationId)
-                                .collection('Feed')
-                                .where('isPinned', isEqualTo: true)
-                                .orderBy('pinnedOrder', descending: true)
-                                .limit(1);
-                            final snap = await query.get();
-                            int maxOrder = snap.docs.isEmpty
-                                ? 0
-                                : (snap.docs.first.get('pinnedOrder') ?? 0)
-                                      as int;
+                            int nextOrder = 0;
+                            if (value == 'pin') {
+                              final snap = await db
+                                  .collection('Organizations')
+                                  .doc(organizationId)
+                                  .collection('Feed')
+                                  .where('isPinned', isEqualTo: true)
+                                  .get();
+                              int maxOrder = 0;
+                              for (final d in snap.docs) {
+                                final data =
+                                    (d.data() as Map<String, dynamic>?);
+                                final int po =
+                                    (data?['pinnedOrder'] ?? 0) as int;
+                                if (po > maxOrder) maxOrder = po;
+                              }
+                              nextOrder = maxOrder + 1;
+                            }
                             await db
                                 .collection('Organizations')
                                 .doc(organizationId)
@@ -1034,7 +1047,7 @@ class _PhotoPostCard extends StatelessWidget {
                                 .doc(docId)
                                 .update({
                                   'isPinned': value == 'pin',
-                                  'pinnedOrder': maxOrder + 1,
+                                  'pinnedOrder': nextOrder,
                                 });
 
                             if (context.mounted) {
@@ -1309,7 +1322,7 @@ class _AnnouncementCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -1394,18 +1407,24 @@ class _AnnouncementCard extends StatelessWidget {
 
                               try {
                                 final db = FirebaseFirestore.instance;
-                                final query = db
-                                    .collection('Organizations')
-                                    .doc(organizationId)
-                                    .collection('Feed')
-                                    .where('isPinned', isEqualTo: true)
-                                    .orderBy('pinnedOrder', descending: true)
-                                    .limit(1);
-                                final snap = await query.get();
-                                int maxOrder = snap.docs.isEmpty
-                                    ? 0
-                                    : (snap.docs.first.get('pinnedOrder') ?? 0)
-                                          as int;
+                                int nextOrder = 0;
+                                if (value == 'pin') {
+                                  final snap = await db
+                                      .collection('Organizations')
+                                      .doc(organizationId)
+                                      .collection('Feed')
+                                      .where('isPinned', isEqualTo: true)
+                                      .get();
+                                  int maxOrder = 0;
+                                  for (final d in snap.docs) {
+                                    final data =
+                                        (d.data() as Map<String, dynamic>?);
+                                    final int po =
+                                        (data?['pinnedOrder'] ?? 0) as int;
+                                    if (po > maxOrder) maxOrder = po;
+                                  }
+                                  nextOrder = maxOrder + 1;
+                                }
                                 await db
                                     .collection('Organizations')
                                     .doc(organizationId)
@@ -1413,7 +1432,7 @@ class _AnnouncementCard extends StatelessWidget {
                                     .doc(docId)
                                     .update({
                                       'isPinned': value == 'pin',
-                                      'pinnedOrder': maxOrder + 1,
+                                      'pinnedOrder': nextOrder,
                                     });
 
                                 if (context.mounted) {
@@ -1475,7 +1494,7 @@ class _AnnouncementCard extends StatelessWidget {
                                 radius: 16,
                                 backgroundColor: const Color(
                                   0xFF667EEA,
-                                ).withOpacity(0.1),
+                                ).withValues(alpha: 0.1),
                                 child: Text(
                                   displayName.isNotEmpty
                                       ? displayName[0].toUpperCase()
@@ -1630,7 +1649,7 @@ class _PollCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -1719,18 +1738,24 @@ class _PollCard extends StatelessWidget {
 
                               try {
                                 final db = FirebaseFirestore.instance;
-                                final query = db
-                                    .collection('Organizations')
-                                    .doc(organizationId)
-                                    .collection('Feed')
-                                    .where('isPinned', isEqualTo: true)
-                                    .orderBy('pinnedOrder', descending: true)
-                                    .limit(1);
-                                final snap = await query.get();
-                                int maxOrder = snap.docs.isEmpty
-                                    ? 0
-                                    : (snap.docs.first.get('pinnedOrder') ?? 0)
-                                          as int;
+                                int nextOrder = 0;
+                                if (value == 'pin') {
+                                  final snap = await db
+                                      .collection('Organizations')
+                                      .doc(organizationId)
+                                      .collection('Feed')
+                                      .where('isPinned', isEqualTo: true)
+                                      .get();
+                                  int maxOrder = 0;
+                                  for (final d in snap.docs) {
+                                    final data =
+                                        (d.data() as Map<String, dynamic>?);
+                                    final int po =
+                                        (data?['pinnedOrder'] ?? 0) as int;
+                                    if (po > maxOrder) maxOrder = po;
+                                  }
+                                  nextOrder = maxOrder + 1;
+                                }
                                 await db
                                     .collection('Organizations')
                                     .doc(organizationId)
@@ -1738,7 +1763,7 @@ class _PollCard extends StatelessWidget {
                                     .doc(docId)
                                     .update({
                                       'isPinned': value == 'pin',
-                                      'pinnedOrder': maxOrder + 1,
+                                      'pinnedOrder': nextOrder,
                                     });
 
                                 if (context.mounted) {
@@ -1823,7 +1848,7 @@ class _PollCard extends StatelessWidget {
                                     decoration: BoxDecoration(
                                       color: const Color(
                                         0xFF667EEA,
-                                      ).withOpacity(0.1),
+                                      ).withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(11),
                                     ),
                                     child: FractionallySizedBox(
@@ -1833,7 +1858,7 @@ class _PollCard extends StatelessWidget {
                                         decoration: BoxDecoration(
                                           color: const Color(
                                             0xFF667EEA,
-                                          ).withOpacity(0.2),
+                                          ).withValues(alpha: 0.2),
                                           borderRadius: BorderRadius.circular(
                                             11,
                                           ),

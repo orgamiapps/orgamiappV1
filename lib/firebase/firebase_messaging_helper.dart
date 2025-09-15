@@ -1337,7 +1337,30 @@ Future<void> _firebaseMessagingBackgroundHandler(
   fcm.RemoteMessage message,
 ) async {
   if (kDebugMode) {
-    Logger.error('📱 Handling background message: ${message.messageId}');
+    Logger.info('📱 Handling background message: ${message.messageId}');
   }
-  // Handle background messages here
+  
+  // Store notification in Firestore for the user
+  try {
+    final FirebaseAuth auth = FirebaseAuth.instance;
+    final user = auth.currentUser;
+    if (user != null) {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('notifications')
+          .add({
+        'title': message.notification?.title ?? 'New Notification',
+        'body': message.notification?.body ?? '',
+        'type': message.data['type'] ?? 'general',
+        'createdAt': FieldValue.serverTimestamp(),
+        'isRead': false,
+        'data': message.data,
+      });
+    }
+  } catch (e) {
+    if (kDebugMode) {
+      Logger.error('Failed to store background notification: $e');
+    }
+  }
 }

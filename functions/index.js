@@ -16,6 +16,154 @@ const logger = require("firebase-functions/logger");
 // Initialize Firebase Admin SDK
 const admin = require("firebase-admin");
 admin.initializeApp();
+// Optional Twilio setup for SMS sending
+let twilioClient = null;
+try {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  if (accountSid && authToken) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const twilio = require('twilio');
+    twilioClient = twilio(accountSid, authToken);
+    logger.info('Twilio client initialized');
+  } else {
+    logger.info('Twilio not configured; SMS sending will be skipped');
+  }
+} catch (e) {
+  logger.error('Failed to initialize Twilio', e);
+}
+
+/**
+ * Callable: sendCustomNotifications
+ * Input: { userIds: string[], title: string, body: string, type?: string, data?: object }
+ * Behavior: Saves to users/{uid}/notifications and sends FCM if token exists.
+ */
+exports.sendCustomNotifications = onCall({ region: 'us-central1' }, async (req) => {
+  try {
+    const caller = req.auth?.uid || 'anonymous';
+    const { userIds, title, body, type = 'custom', data = {} } = req.data || {};
+    if (!Array.isArray(userIds) || userIds.length === 0 || !title || !body) {
+      throw new Error("INVALID_ARGUMENT: { userIds[], title, body } required");
+    }
+
+    const db = admin.firestore();
+    const messaging = admin.messaging();
+    const now = admin.firestore.Timestamp.now();
+
+    const results = [];
+    let sentCount = 0;
+    for (const userId of userIds) {
+      try {
+        // Save to Firestore first
+        const notificationRef = await db.collection('users').doc(userId).collection('notifications').add({
+          title,
+          body,
+          type,
+          createdAt: now,
+          isRead: false,
+          data,
+          createdBy: caller,
+        });
+
+        // Attempt to push via FCM
+        const userDoc = await db.collection('users').doc(userId).get();
+        const token = userDoc.exists ? userDoc.data().fcmToken : null;
+        if (token) {
+          const message = {
+            token,
+            notification: { title, body },
+            data: {
+              type: String(type),
+              notificationId: notificationRef.id,
+              click_action: 'FLUTTER_NOTIFICATION_CLICK',
+              ...Object.entries(data || {}).reduce((acc, [k, v]) => {
+                acc[String(k)] = String(v);
+                return acc;
+              }, {}),
+            },
+            android: { notification: { channelId: 'orgami_channel', priority: 'high', defaultSound: true, defaultVibrateTimings: true } },
+            apns: { payload: { aps: { sound: 'default', badge: 1 } } },
+          };
+          await messaging.send(message);
+        }
+        sentCount++;
+        results.push({ userId, status: 'ok' });
+      } catch (e) {
+        logger.error('Failed notifying user', { userId, error: e });
+        results.push({ userId, status: 'error', error: String(e?.message || e) });
+      }
+    }
+
+    // Write a history record
+    await db.collection('notification_history').add({
+      type: 'in_app',
+      title,
+      message: body,
+      totalRecipients: userIds.length,
+      successCount: sentCount,
+      timestamp: now,
+      meta: { createdBy: caller, type },
+    });
+    return { status: 'ok', results };
+  } catch (err) {
+    logger.error('sendCustomNotifications failed', err);
+    throw new Error(`INTERNAL: ${err.message}`);
+  }
+});
+
+/**
+ * Callable: sendBulkSms
+ * Input: { phoneNumbers: string[], message: string, meta?: { eventId?, label? } }
+ * Uses Twilio if configured; otherwise no-ops and records history entry.
+ */
+exports.sendBulkSms = onCall({ region: 'us-central1' }, async (req) => {
+  try {
+    const { phoneNumbers, message, meta = {} } = req.data || {};
+    if (!Array.isArray(phoneNumbers) || phoneNumbers.length === 0 || !message) {
+      throw new Error('INVALID_ARGUMENT: { phoneNumbers[], message } required');
+    }
+
+    const db = admin.firestore();
+    const fromNumber = process.env.TWILIO_FROM_NUMBER;
+
+    let sent = 0;
+    let failed = 0;
+    const failures = [];
+
+    if (twilioClient && fromNumber) {
+      // Best-effort sequential send to stay within free-tier limits; batch if needed later
+      for (const to of phoneNumbers) {
+        try {
+          await twilioClient.messages.create({ to, from: fromNumber, body: message });
+          sent++;
+        } catch (e) {
+          failed++;
+          failures.push({ to, error: String(e?.message || e) });
+        }
+      }
+    } else {
+      // No-op fallback in dev; treat as unsent but not erroring loudly
+      logger.info('Twilio not configured; skipping actual SMS send');
+    }
+
+    // Record a history doc for observability
+    await db.collection('notification_history').add({
+      type: 'sms',
+      message,
+      totalRecipients: phoneNumbers.length,
+      successCount: sent,
+      failureCount: failed,
+      failures: failures.slice(0, 10),
+      meta,
+      timestamp: admin.firestore.Timestamp.now(),
+    });
+
+    return { status: 'ok', total: phoneNumbers.length, sent, failed };
+  } catch (err) {
+    logger.error('sendBulkSms failed', err);
+    throw new Error(`INTERNAL: ${err.message}`);
+  }
+});
 
 // For cost control, you can set the maximum number of containers that can be
 // running at the same time. This helps mitigate the impact of unexpected

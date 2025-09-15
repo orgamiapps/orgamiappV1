@@ -3,6 +3,11 @@ allprojects {
         google()
         mavenCentral()
     }
+    
+    // Override SDK versions for all subprojects
+    project.ext.compileSdkVersion = 36
+    project.ext.targetSdkVersion = 36
+    project.ext.minSdkVersion = 24
 }
 
 ext {
@@ -46,8 +51,7 @@ project(":fluttertoast") {
     }
 }
 
-// Force plugins and library modules to build with the same SDK/Java levels
-subprojects {
+project(":nfc_manager") {
     plugins.withId("com.android.library") {
         def androidExt = extensions.findByName("android")
         if (androidExt != null) {
@@ -58,13 +62,22 @@ subprojects {
             }
         }
     }
-    plugins.withId("com.android.application") {
-        def androidExt = extensions.findByName("android")
-        if (androidExt != null) {
-            if (androidExt.hasProperty("compileSdk")) {
-                androidExt.compileSdk = 36
-            } else if (androidExt.hasProperty("compileSdkVersion")) {
-                androidExt.compileSdkVersion 36
+}
+
+// Force plugins and library modules to build with the same SDK/Java levels
+subprojects {
+    beforeEvaluate { project ->
+        project.ext.compileSdkVersion = 36
+        project.ext.targetSdkVersion = 36
+        project.ext.minSdkVersion = 24
+    }
+    
+    plugins.withId("com.android.library") {
+        android {
+            compileSdkVersion 36
+            compileOptions {
+                sourceCompatibility JavaVersion.VERSION_17
+                targetCompatibility JavaVersion.VERSION_17
             }
         }
     }

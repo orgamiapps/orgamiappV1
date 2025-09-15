@@ -189,6 +189,233 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
     }
   }
 
+  void _showEditPriceDialog() {
+    final TextEditingController newPriceController = TextEditingController();
+    final TextEditingController newUpgradePriceController =
+        TextEditingController();
+
+    // Pre-fill current values
+    if (ticketPrice != null && ticketPrice! > 0) {
+      newPriceController.text = ticketPrice!.toStringAsFixed(2);
+    }
+    if (upgradePrice != null && upgradePrice! > 0) {
+      newUpgradePriceController.text = upgradePrice!.toStringAsFixed(2);
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.edit, color: Color(0xFF667EEA), size: 20),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Edit Ticket Pricing',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A1A1A),
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFD97706)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.warning, color: Color(0xFFD97706), size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Price changes will only affect new ticket purchases.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF92400E),
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: newPriceController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'Ticket Price (USD)',
+                  hintText: 'Enter new price or leave empty for free',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  prefixIcon: const Icon(Icons.attach_money),
+                  helperText:
+                      'Current: ${ticketPrice != null && ticketPrice! > 0 ? '\$${ticketPrice!.toStringAsFixed(2)}' : 'Free'}',
+                ),
+              ),
+              if (isUpgradeEnabled) ...[
+                const SizedBox(height: 16),
+                TextField(
+                  controller: newUpgradePriceController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'VIP Upgrade Price (USD)',
+                    hintText: 'Enter new VIP price',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.star,
+                      color: Color(0xFFFFD700),
+                    ),
+                    helperText:
+                        'Current: ${upgradePrice != null && upgradePrice! > 0 ? '\$${upgradePrice!.toStringAsFixed(2)}' : 'Not set'}',
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              newPriceController.dispose();
+              newUpgradePriceController.dispose();
+              Navigator.pop(context);
+            },
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Color(0xFF6B7280)),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              _updateTicketPrice(newPriceController, newUpgradePriceController);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF667EEA),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              'Update Price',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateTicketPrice(
+    TextEditingController priceController,
+    TextEditingController upgradePriceController,
+  ) async {
+    // Parse new ticket price
+    double? newPrice;
+    if (priceController.text.isNotEmpty) {
+      newPrice = double.tryParse(priceController.text);
+      if (newPrice != null && newPrice < 0) {
+        ShowToast().showNormalToast(msg: 'Please enter a valid ticket price');
+        return;
+      }
+    }
+
+    // Parse new upgrade price if upgrade is enabled
+    double? newUpgradePrice;
+    if (isUpgradeEnabled && upgradePriceController.text.isNotEmpty) {
+      newUpgradePrice = double.tryParse(upgradePriceController.text);
+      if (newUpgradePrice == null || newUpgradePrice < 0) {
+        ShowToast().showNormalToast(msg: 'Please enter a valid upgrade price');
+        return;
+      }
+      // Ensure upgrade price is higher than base ticket price
+      if (newPrice != null && newUpgradePrice <= newPrice) {
+        ShowToast().showNormalToast(
+          msg: 'Upgrade price must be higher than base ticket price',
+        );
+        return;
+      }
+    }
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      await FirebaseFirestoreHelper().updateTicketPrice(
+        eventId: widget.eventModel.id,
+        ticketPrice: newPrice ?? 0,
+        ticketUpgradePrice: newUpgradePrice,
+      );
+
+      if (mounted) {
+        setState(() {
+          ticketPrice = newPrice;
+          upgradePrice = newUpgradePrice;
+          isLoading = false;
+        });
+
+        // Update the text controllers for display
+        if (newPrice != null && newPrice > 0) {
+          _ticketPriceController.text = newPrice.toStringAsFixed(2);
+        } else {
+          _ticketPriceController.clear();
+        }
+
+        if (newUpgradePrice != null && newUpgradePrice > 0) {
+          _upgradePriceController.text = newUpgradePrice.toStringAsFixed(2);
+        }
+
+        ShowToast().showNormalToast(
+          msg: 'Ticket pricing updated successfully!',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+        ShowToast().showNormalToast(msg: 'Failed to update pricing: $e');
+      }
+    } finally {
+      priceController.dispose();
+      upgradePriceController.dispose();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -578,34 +805,133 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
             ),
             if (ticketPrice != null && ticketPrice! > 0) ...[
               const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.attach_money,
-                      size: 16,
-                      color: Color(0xFF10B981),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
                     ),
-                    Text(
-                      'Ticket Price: \$${ticketPrice!.toStringAsFixed(2)}',
-                      style: const TextStyle(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.attach_money,
+                          size: 16,
+                          color: Color(0xFF10B981),
+                        ),
+                        Text(
+                          'Ticket Price: \$${ticketPrice!.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF10B981),
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  TextButton.icon(
+                    onPressed: _showEditPriceDialog,
+                    icon: const Icon(
+                      Icons.edit,
+                      size: 16,
+                      color: Color(0xFF667EEA),
+                    ),
+                    label: const Text(
+                      'Edit Price',
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF10B981),
+                        color: Color(0xFF667EEA),
                         fontFamily: 'Roboto',
                       ),
                     ),
-                  ],
-                ),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      backgroundColor: const Color(
+                        0xFF667EEA,
+                      ).withValues(alpha: 0.1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ] else if (ticketPrice == null || ticketPrice == 0) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6B7280).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.local_offer,
+                          size: 16,
+                          color: Color(0xFF6B7280),
+                        ),
+                        Text(
+                          'Free Tickets',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF6B7280),
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  TextButton.icon(
+                    onPressed: _showEditPriceDialog,
+                    icon: const Icon(
+                      Icons.attach_money,
+                      size: 16,
+                      color: Color(0xFF667EEA),
+                    ),
+                    label: const Text(
+                      'Set Price',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF667EEA),
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      backgroundColor: const Color(
+                        0xFF667EEA,
+                      ).withValues(alpha: 0.1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
             const SizedBox(height: 16),

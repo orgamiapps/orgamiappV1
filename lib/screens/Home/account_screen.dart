@@ -9,11 +9,9 @@ import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/screens/Feedback/feedback_screen.dart';
 
 import 'package:attendus/screens/Home/analytics_dashboard_screen.dart';
-import 'package:attendus/Utils/app_constants.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/theme_provider.dart';
 
-import 'package:attendus/Utils/web_view_page.dart';
 // import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/screens/Home/delete_account_screen.dart';
@@ -23,7 +21,11 @@ import 'package:attendus/services/auth_service.dart';
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 
 import 'package:attendus/screens/Home/attendee_notification_screen.dart';
+import 'package:attendus/screens/Home/about_us_screen.dart';
 import 'package:attendus/screens/Home/blocked_users_screen.dart';
+import 'package:attendus/screens/Legal/terms_conditions_screen.dart';
+import 'package:attendus/screens/Legal/privacy_policy_screen.dart';
+import 'package:attendus/screens/Home/help_screen.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -169,7 +171,7 @@ class _AccountScreenState extends State<AccountScreen> {
           _buildSettingsItem(
             icon: Icons.sms_rounded,
             title: 'Send Notifications',
-            subtitle: 'Send SMS notifications to previous attendees',
+            subtitle: 'Send SMS or in-app notifications',
             onTap: () => RouterClass.nextScreenNormal(
               context,
               const AttendeeNotificationScreen(),
@@ -191,17 +193,16 @@ class _AccountScreenState extends State<AccountScreen> {
             icon: CupertinoIcons.info,
             title: 'About Us',
             subtitle: 'Learn more about our app',
-            onTap: () => {},
+            onTap: () =>
+                RouterClass.nextScreenNormal(context, const AboutUsScreen()),
           ),
           _buildDivider(),
           _buildSettingsItem(
             icon: Icons.help,
             title: 'Help',
             subtitle: 'Get help and support',
-            onTap: () => RouterClass.nextScreenNormal(
-              context,
-              WebViewPage(url: AppConstants.supportUrl, title: 'Support'),
-            ),
+            onTap: () =>
+                RouterClass.nextScreenNormal(context, const HelpScreen()),
           ),
           _buildDivider(),
           _buildDarkModeToggle(),
@@ -223,10 +224,7 @@ class _AccountScreenState extends State<AccountScreen> {
             subtitle: 'Read our privacy policy',
             onTap: () => RouterClass.nextScreenNormal(
               context,
-              WebViewPage(
-                url: AppConstants.privacyPolicyUrl,
-                title: 'Privacy Policy',
-              ),
+              const PrivacyPolicyScreen(),
             ),
           ),
           _buildDivider(),
@@ -236,10 +234,7 @@ class _AccountScreenState extends State<AccountScreen> {
             subtitle: 'Read our terms of service',
             onTap: () => RouterClass.nextScreenNormal(
               context,
-              WebViewPage(
-                url: AppConstants.termsConditionsUrl,
-                title: 'Terms & Conditions',
-              ),
+              const TermsConditionsScreen(),
             ),
           ),
           _buildDivider(),

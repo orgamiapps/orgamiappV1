@@ -12,8 +12,6 @@ import 'package:attendus/screens/Groups/group_profile_screen_v2.dart';
 import 'package:attendus/screens/Events/event_feedback_management_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
-import 'package:flutter/foundation.dart';
-import 'package:attendus/firebase/sample_notification_generator.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -153,41 +151,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
-        title: const Text('Notifications'),
-        actions: [
-          if (kDebugMode)
-            IconButton(
-              icon: const Icon(Icons.science),
-              tooltip: 'Generate test notifications',
-              onPressed: () async {
-                await SampleNotificationGenerator.generateSampleNotifications();
-                await _loadInitial();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Sample notifications generated'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.notifications_outlined,
+              size: 24,
+              color: Colors.black87,
             ),
+            const SizedBox(width: 8),
+            const Text('Notifications'),
+          ],
+        ),
+        actions: [
           IconButton(
-            icon: const Icon(Icons.done_all),
-            tooltip: 'Mark all read',
-            onPressed: () async {
-              await _messagingHelper.markAllNotificationsAsRead();
-              await _loadInitial();
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_sweep_outlined),
-            tooltip: 'Clear all',
-            onPressed: () async {
-              await _messagingHelper.clearAllNotifications();
-              await _loadInitial();
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
+            icon: const Icon(Icons.settings, color: Colors.black87),
             onPressed: () {
               Navigator.push(
                 context,
@@ -210,7 +188,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               child: CustomScrollView(
                 controller: _scrollController,
                 slivers: [
-                  SliverToBoxAdapter(child: _buildHeader()),
+                  // Removed header with 'Recent' text
                   if (_items.isEmpty)
                     SliverFillRemaining(
                       hasScrollBody: false,
@@ -231,37 +209,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ],
               ),
             ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF667EEA).withAlpha(25),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.notifications_outlined,
-              color: Color(0xFF667EEA),
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Text(
-            'Recent',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: Colors.black87,
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -453,7 +400,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           const SizedBox(width: 4),
                           Text(
                             DateFormat(
-                              'MMM dd, yyyy • HH:mm',
+                              'MMM dd, yyyy • h:mm a',
                             ).format(notification.createdAt),
                             style: TextStyle(
                               fontSize: 12,

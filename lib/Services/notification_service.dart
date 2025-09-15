@@ -11,14 +11,21 @@ class NotificationService {
       const AndroidInitializationSettings initializationSettingsAndroid =
           AndroidInitializationSettings('@mipmap/ic_launcher');
       const DarwinInitializationSettings initializationSettingsIOS =
-          DarwinInitializationSettings();
+          DarwinInitializationSettings(
+            requestAlertPermission: true,
+            requestBadgePermission: true,
+            requestSoundPermission: true,
+          );
       const InitializationSettings initializationSettings =
           InitializationSettings(
             android: initializationSettingsAndroid,
             iOS: initializationSettingsIOS,
           );
 
-      await _notifications.initialize(initializationSettings);
+      await _notifications.initialize(
+        initializationSettings,
+        onDidReceiveNotificationResponse: onNotificationTapped,
+      );
 
       // Create Android notification channel (Android 8+)
       const AndroidNotificationChannel channel = AndroidNotificationChannel(
@@ -54,7 +61,11 @@ class NotificationService {
             priority: Priority.high,
           );
       const DarwinNotificationDetails iOSPlatformChannelSpecifics =
-          DarwinNotificationDetails();
+          DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          );
       const NotificationDetails platformChannelSpecifics = NotificationDetails(
         android: androidPlatformChannelSpecifics,
         iOS: iOSPlatformChannelSpecifics,

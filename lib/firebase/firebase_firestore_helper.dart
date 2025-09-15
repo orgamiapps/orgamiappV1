@@ -1501,6 +1501,30 @@ class FirebaseFirestoreHelper {
     }
   }
 
+  Future<void> updateTicketPrice({
+    required String eventId,
+    required double ticketPrice,
+    double? ticketUpgradePrice,
+  }) async {
+    try {
+      final updateData = <String, dynamic>{
+        'ticketPrice': ticketPrice,
+      };
+
+      if (ticketUpgradePrice != null) {
+        updateData['ticketUpgradePrice'] = ticketUpgradePrice;
+      }
+
+      await _firestore
+          .collection(EventModel.firebaseKey)
+          .doc(eventId)
+          .update(updateData);
+    } catch (e) {
+      Logger.debug('Error updating ticket price: $e');
+      rethrow;
+    }
+  }
+
   Future<TicketModel?> issueTicket({
     required String eventId,
     required String customerUid,
