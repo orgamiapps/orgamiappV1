@@ -34,8 +34,8 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
 
   @override
   Widget build(BuildContext context) {
-    final Color primary = const Color(0xFF667EEA);
-    final Color barColor = Colors.white;
+    final Color primary = Theme.of(context).colorScheme.primary;
+    final Color barColor = Theme.of(context).cardColor;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -48,7 +48,7 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
             boxShadow: widget.hasScrolledContent
                 ? [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
+                      color: Theme.of(context).shadowColor.withValues(alpha: 0.08),
                       blurRadius: 16,
                       spreadRadius: 0,
                       offset: const Offset(0, 6),
@@ -66,7 +66,7 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
               iconTheme: WidgetStateProperty.resolveWith((states) {
                 final bool selected = states.contains(WidgetState.selected);
                 return IconThemeData(
-                  color: selected ? primary : const Color(0xFF9CA3AF),
+                  color: selected ? primary : Theme.of(context).colorScheme.onSurfaceVariant,
                   size: 24,
                 );
               }),

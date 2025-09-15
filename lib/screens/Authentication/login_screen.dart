@@ -11,6 +11,7 @@ import 'package:attendus/Utils/app_constants.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 import 'package:attendus/firebase/firebase_google_auth_helper.dart';
 import 'package:attendus/services/auth_service.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -44,15 +45,18 @@ class _LoginScreenState extends State<LoginScreen>
           password = _passwordEdtController.text;
 
       Logger.debug('🔐 Starting email/password login...');
-      final User? user = await AuthService().signInWithEmailAndPassword(email, password);
-      
+      final User? user = await AuthService().signInWithEmailAndPassword(
+        email,
+        password,
+      );
+
       if (user != null && mounted) {
         Logger.debug('✅ Login successful, navigating to home...');
         _btnCtlr.success();
-        
+
         // Add small delay to let success animation show before navigation
         await Future.delayed(const Duration(milliseconds: 500));
-        
+
         if (mounted) {
           Logger.debug('🏠 Navigating to dashboard...');
           RouterClass().homeScreenRoute(context: context);
@@ -312,6 +316,8 @@ class _LoginScreenState extends State<LoginScreen>
             const SizedBox(height: 36),
             _buildLoginButton(),
             const SizedBox(height: 16),
+            _buildGoogleSignInButton(),
+            const SizedBox(height: 12),
             if (AppConstants.enableAppleSignIn) _buildAppleSignInButton(),
           ],
         ),
@@ -534,6 +540,51 @@ class _LoginScreenState extends State<LoginScreen>
             fontSize: 16,
             fontWeight: FontWeight.w500,
             decoration: TextDecoration.underline,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGoogleSignInButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(
+            color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        onPressed: () async {
+          final helper = FirebaseGoogleAuthHelper();
+          final user = await helper.loginWithGoogle();
+          if (user != null) {
+            try {
+              await FirebaseFirestoreHelper().ensureUserProfileCompleteness(
+                user.uid,
+              );
+              if (!mounted) return;
+              RouterClass().homeScreenRoute(context: context);
+            } catch (_) {}
+          } else {
+            ShowToast().showNormalToast(msg: 'Google sign-in failed');
+          }
+        },
+        icon: const FaIcon(
+          FontAwesomeIcons.google,
+          size: 20,
+          color: Color(0xFF4285F4),
+        ),
+        label: const Text(
+          'Continue with Google',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.black,
           ),
         ),
       ),

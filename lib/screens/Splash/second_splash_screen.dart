@@ -7,11 +7,10 @@ import 'package:attendus/Utils/images.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/screens/QRScanner/qr_scanner_flow_screen.dart';
 import 'package:attendus/firebase/firebase_google_auth_helper.dart';
-import 'package:attendus/controller/customer_controller.dart';
-import 'package:attendus/models/customer_model.dart';
+
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/app_constants.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:attendus/services/auth_service.dart';
 
@@ -42,8 +41,6 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
   // Social login loading states
   bool _googleLoading = false;
   bool _appleLoading = false;
-  bool _facebookLoading = false;
-  bool _xLoading = false;
 
   @override
   void initState() {
@@ -216,68 +213,6 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
     }
   }
 
-  Future<void> _signInWithFacebook() async {
-    if (_facebookLoading) return;
-
-    setState(() {
-      _facebookLoading = true;
-    });
-
-    try {
-      final helper = FirebaseGoogleAuthHelper();
-      final user = await helper.loginWithFacebook();
-
-      if (user != null) {
-        await _handleSuccessfulLogin(user);
-      } else {
-        ShowToast().showNormalToast(msg: 'Facebook sign-in failed');
-      }
-    } catch (e) {
-      ShowToast().showNormalToast(
-        msg: 'Facebook sign-in error: ${e.toString()}',
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _facebookLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _signInWithX() async {
-    if (_xLoading) return;
-
-    setState(() {
-      _xLoading = true;
-    });
-
-    try {
-      final helper = FirebaseGoogleAuthHelper();
-      final user = await helper.loginWithX();
-
-      if (user != null) {
-        await _handleSuccessfulLogin(user);
-      } else {
-        ShowToast().showNormalToast(
-          msg: 'X sign-in is only available on web platform',
-        );
-      }
-    } catch (e) {
-      String errorMessage = 'X sign-in failed';
-      if (e.toString().contains('web-based')) {
-        errorMessage = 'X sign-in is only available on web platform';
-      }
-      ShowToast().showNormalToast(msg: errorMessage);
-    } finally {
-      if (mounted) {
-        setState(() {
-          _xLoading = false;
-        });
-      }
-    }
-  }
-
   Future<void> _handleSuccessfulLogin(user) async {
     try {
       await AuthService().handleSocialLoginSuccess(user);
@@ -286,28 +221,6 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
     } catch (e) {
       ShowToast().showNormalToast(
         msg: 'Error loading user data: ${e.toString()}',
-      );
-    }
-  }
-
-  Future<void> _createNewUser(CustomerModel newCustomerModel) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection(CustomerModel.firebaseKey)
-          .doc(newCustomerModel.uid)
-          .set(CustomerModel.getMap(newCustomerModel));
-
-      ShowToast().showNormalToast(msg: 'Welcome to ${AppConstants.appName}!');
-
-      setState(() {
-        CustomerController.logeInCustomer = newCustomerModel;
-      });
-
-      if (!mounted) return;
-      RouterClass().homeScreenRoute(context: context);
-    } catch (e) {
-      ShowToast().showNormalToast(
-        msg: 'Error creating account: ${e.toString()}',
       );
     }
   }
@@ -636,7 +549,7 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Quick Check-In',
+                          'Quick Sign-In',
                           style: TextStyle(
                             fontSize: titleSize,
                             fontWeight: FontWeight.bold,
@@ -743,7 +656,7 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
                   ),
                   child: Center(
                     child: Text(
-                      'Sign In',
+                      'Log In',
                       style: TextStyle(
                         color: const Color(0xFF1A1F36),
                         fontSize: fontSize,
@@ -798,26 +711,6 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
                     backgroundColor: Colors.black,
                     isLoading: _appleLoading,
                     onTap: _signInWithApple,
-                    size: socialButtonSize,
-                    iconSize: socialIconSize,
-                  ),
-                  const SizedBox(width: 12),
-                  _buildSocialButton(
-                    icon: FontAwesomeIcons.facebookF,
-                    color: Colors.white,
-                    backgroundColor: const Color(0xFF1877F2),
-                    isLoading: _facebookLoading,
-                    onTap: _signInWithFacebook,
-                    size: socialButtonSize,
-                    iconSize: socialIconSize,
-                  ),
-                  const SizedBox(width: 12),
-                  _buildSocialButton(
-                    icon: FontAwesomeIcons.xTwitter,
-                    color: Colors.white,
-                    backgroundColor: Colors.black,
-                    isLoading: _xLoading,
-                    onTap: _signInWithX,
                     size: socialButtonSize,
                     iconSize: socialIconSize,
                   ),

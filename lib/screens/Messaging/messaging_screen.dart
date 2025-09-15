@@ -286,7 +286,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
         actionsIconTheme: const IconThemeData(color: Colors.black87),
         titleTextStyle: const TextStyle(
           color: Colors.black87,
-          fontSize: 22,
+          fontSize: 18,
           fontWeight: FontWeight.w600,
         ),
         elevation: 0,
@@ -308,9 +308,9 @@ class _MessagingScreenState extends State<MessagingScreen> {
             },
           ),
         ],
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: theme.dividerColor),
         ),
       ),
       body: Column(
@@ -603,9 +603,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
         borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
         boxShadow: [
           BoxShadow(
-            color: isDark
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.05),
+            color: theme.shadowColor.withValues(alpha: isDark ? 0.3 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),

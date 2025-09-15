@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:math' as math;
 
 import 'package:attendus/models/event_model.dart';
 import 'package:intl/intl.dart';
@@ -15,6 +16,15 @@ class AIInsights {
   final DateTime lastUpdated;
   final Map<String, dynamic>? globalPerformanceAnalysis;
   final List<Map<String, dynamic>>? strategyRecommendations;
+  // New, richer global insights
+  final Map<String, dynamic>? dayOfWeekInsights; // {bestDay, distribution}
+  final Map<String, dynamic>?
+  timeOfDayInsights; // {bestHourRange, distribution}
+  final Map<String, dynamic>? forecast; // {nextMonth, method, confidence}
+  final Map<String, dynamic>?
+  dwellInsights; // {avgMinutes, highEngagementPercent}
+  final List<Map<String, dynamic>>? anomalies; // Outlier events
+  final String? naturalSummary; // Narrative overview
 
   AIInsights({
     required this.peakHoursAnalysis,
@@ -25,6 +35,12 @@ class AIInsights {
     required this.lastUpdated,
     this.globalPerformanceAnalysis,
     this.strategyRecommendations,
+    this.dayOfWeekInsights,
+    this.timeOfDayInsights,
+    this.forecast,
+    this.dwellInsights,
+    this.anomalies,
+    this.naturalSummary,
   });
 
   Map<String, dynamic> toMap() {
@@ -37,6 +53,12 @@ class AIInsights {
       'lastUpdated': lastUpdated,
       'globalPerformanceAnalysis': globalPerformanceAnalysis,
       'strategyRecommendations': strategyRecommendations,
+      'dayOfWeekInsights': dayOfWeekInsights,
+      'timeOfDayInsights': timeOfDayInsights,
+      'forecast': forecast,
+      'dwellInsights': dwellInsights,
+      'anomalies': anomalies,
+      'naturalSummary': naturalSummary,
     };
   }
 
@@ -62,6 +84,22 @@ class AIInsights {
       strategyRecommendations: map['strategyRecommendations'] != null
           ? List<Map<String, dynamic>>.from(map['strategyRecommendations'])
           : null,
+      dayOfWeekInsights: map['dayOfWeekInsights'] != null
+          ? Map<String, dynamic>.from(map['dayOfWeekInsights'])
+          : null,
+      timeOfDayInsights: map['timeOfDayInsights'] != null
+          ? Map<String, dynamic>.from(map['timeOfDayInsights'])
+          : null,
+      forecast: map['forecast'] != null
+          ? Map<String, dynamic>.from(map['forecast'])
+          : null,
+      dwellInsights: map['dwellInsights'] != null
+          ? Map<String, dynamic>.from(map['dwellInsights'])
+          : null,
+      anomalies: map['anomalies'] != null
+          ? List<Map<String, dynamic>>.from(map['anomalies'])
+          : null,
+      naturalSummary: map['naturalSummary'] as String?,
     );
   }
 }
@@ -582,13 +620,27 @@ class AIAnalyticsHelper {
         throw Exception('No events provided for global analysis');
       }
 
-      // Aggregate data from all events
+      // Limit number of events analyzed to reduce load on low-end devices
+      final List<EventModel> toAnalyze = events.length > 60
+          ? (events..sort(
+                  (a, b) => b.selectedDateTime.compareTo(a.selectedDateTime),
+                ))
+                .take(60)
+                .toList()
+          : events;
+
+      // Aggregate data from selected events
       int totalAttendees = 0;
       int totalRepeatAttendees = 0;
       Map<String, int> categoryCounts = {};
       Map<String, int> monthlyTrends = {};
+      // New aggregations
+      Map<int, int> hourWeightedAttendance = {}; // hour -> attendees sum
+      Map<int, int> weekdayWeightedAttendance = {}; // 1..7 -> attendees sum
+      List<Map<String, dynamic>> perEventAttendance =
+          []; // [{title, attendees, date}]
 
-      for (final event in events) {
+      for (final event in toAnalyze) {
         try {
           final analyticsDoc = await FirebaseFirestore.instance
               .collection('event_analytics')
@@ -602,6 +654,20 @@ class AIAnalyticsHelper {
 
             totalAttendees += attendees;
             totalRepeatAttendees += repeatAttendees;
+
+            // Weighted scheduling signals (by attendance)
+            final eventHour = event.selectedDateTime.hour;
+            final weekday = event.selectedDateTime.weekday; // 1=Mon..7=Sun
+            hourWeightedAttendance[eventHour] =
+                (hourWeightedAttendance[eventHour] ?? 0) + attendees;
+            weekdayWeightedAttendance[weekday] =
+                (weekdayWeightedAttendance[weekday] ?? 0) + attendees;
+
+            perEventAttendance.add({
+              'title': event.title,
+              'attendees': attendees,
+              'date': event.selectedDateTime.toIso8601String(),
+            });
 
             // Track categories
             final category = event.categories.isNotEmpty
@@ -628,7 +694,7 @@ class AIAnalyticsHelper {
           ? (totalRepeatAttendees / totalAttendees) * 100
           : 0.0;
 
-      final growthRate = events.length > 1
+      final growthRate = toAnalyze.length > 1
           ? 15.0
           : 0.0; // Simplified calculation
 
@@ -636,20 +702,37 @@ class AIAnalyticsHelper {
       final globalPerformanceAnalysis = {
         'performanceScore': performanceScore,
         'growthRate': growthRate,
-        'totalEvents': events.length,
+        'totalEvents': toAnalyze.length,
         'totalAttendees': totalAttendees,
         'recommendation': _generateGlobalRecommendation(
           performanceScore,
-          events.length,
+          toAnalyze.length,
         ),
       };
 
       // Generate strategy recommendations
       final strategyRecommendations = _generateStrategyRecommendations(
         performanceScore,
-        events.length,
+        toAnalyze.length,
         categoryCounts,
         monthlyTrends,
+      );
+
+      // Compute new insights
+      final dayOfWeekInsights = _computeBestWeekday(weekdayWeightedAttendance);
+      final timeOfDayInsights = _computeBestHourRange(hourWeightedAttendance);
+      final forecast = _computeForecast(monthlyTrends);
+      final anomalies = _detectAttendanceAnomalies(perEventAttendance);
+
+      // Dwell time insights (best-effort; may be sparse)
+      final dwellInsights = await _computeDwellInsights(events);
+
+      final naturalSummary = _generateNarrative(
+        globalPerformanceAnalysis,
+        dayOfWeekInsights,
+        timeOfDayInsights,
+        forecast,
+        dwellInsights,
       );
 
       return AIInsights(
@@ -661,10 +744,260 @@ class AIAnalyticsHelper {
         lastUpdated: DateTime.now(),
         globalPerformanceAnalysis: globalPerformanceAnalysis,
         strategyRecommendations: strategyRecommendations,
+        dayOfWeekInsights: dayOfWeekInsights,
+        timeOfDayInsights: timeOfDayInsights,
+        forecast: forecast,
+        dwellInsights: dwellInsights,
+        anomalies: anomalies,
+        naturalSummary: naturalSummary,
       );
     } catch (e) {
       throw Exception('Failed to generate global AI insights: $e');
     }
+  }
+
+  Map<String, dynamic> _computeBestWeekday(Map<int, int> weekdayAttendance) {
+    if (weekdayAttendance.isEmpty) {
+      return {
+        'bestDay': null,
+        'distribution': {},
+        'recommendation': 'Insufficient data for weekday analysis',
+        'confidence': 0.0,
+      };
+    }
+    final names = {
+      1: 'Mon',
+      2: 'Tue',
+      3: 'Wed',
+      4: 'Thu',
+      5: 'Fri',
+      6: 'Sat',
+      7: 'Sun',
+    };
+    int bestKey = weekdayAttendance.keys.first;
+    int bestVal = -1;
+    int total = 0;
+    weekdayAttendance.forEach((k, v) {
+      total += v;
+      if (v > bestVal) {
+        bestVal = v;
+        bestKey = k;
+      }
+    });
+    final confidence = total > 0 ? bestVal / total : 0.0;
+    return {
+      'bestDay': names[bestKey],
+      'distribution': weekdayAttendance.map((k, v) => MapEntry(names[k]!, v)),
+      'recommendation':
+          'Best day to host events appears to be ${names[bestKey]}',
+      'confidence': confidence,
+    };
+  }
+
+  Map<String, dynamic> _computeBestHourRange(Map<int, int> hourAttendance) {
+    if (hourAttendance.isEmpty) {
+      return {
+        'bestHourRange': null,
+        'distribution': {},
+        'recommendation': 'Insufficient data for time-of-day analysis',
+        'confidence': 0.0,
+      };
+    }
+    // Smooth by grouping into 2-hour buckets
+    final Map<String, int> buckets = {};
+    int total = 0;
+    hourAttendance.forEach((hour, count) {
+      final start = (hour ~/ 2) * 2; // 0,2,4,...
+      final label =
+          '${start.toString().padLeft(2, '0')}-${(start + 2).toString().padLeft(2, '0')}';
+      buckets[label] = (buckets[label] ?? 0) + count;
+      total += count;
+    });
+    String best = '';
+    int bestVal = -1;
+    buckets.forEach((label, val) {
+      if (val > bestVal) {
+        bestVal = val;
+        best = label;
+      }
+    });
+    final confidence = total > 0 ? bestVal / total : 0.0;
+    return {
+      'bestHourRange': best,
+      'distribution': buckets,
+      'recommendation': 'Highest attendance tends to be during $best',
+      'confidence': confidence,
+    };
+  }
+
+  Map<String, dynamic> _computeForecast(Map<String, int> monthlyTrends) {
+    if (monthlyTrends.isEmpty) {
+      return {'nextMonth': 0, 'method': 'moving_average', 'confidence': 0.0};
+    }
+    final sorted = monthlyTrends.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    // Use simple weighted moving average of last up to 4 months
+    final last = sorted.length <= 4
+        ? sorted
+        : sorted.sublist(sorted.length - 4);
+    int denom = 0;
+    double num = 0;
+    for (int i = 0; i < last.length; i++) {
+      final weight = (i + 1); // 1..4 with most recent highest
+      denom += weight;
+      num += last[last.length - 1 - i].value * weight;
+    }
+    final prediction = denom == 0 ? 0 : (num / denom).round();
+    // Confidence: more months -> higher; normalized variance
+    final values = sorted.map((e) => e.value.toDouble()).toList();
+    final mean = values.reduce((a, b) => a + b) / values.length;
+    final variance = values.length > 1
+        ? values.map((v) => (v - mean) * (v - mean)).reduce((a, b) => a + b) /
+              (values.length - 1)
+        : 0.0;
+    final volatility = mean == 0 ? 0.0 : (variance / (mean.abs() + 1e-9));
+    final confidence = (0.6 + (0.2 / (1 + volatility))).clamp(0.0, 0.95);
+    return {
+      'nextMonth': prediction,
+      'method': 'weighted_moving_average',
+      'confidence': confidence,
+    };
+  }
+
+  List<Map<String, dynamic>> _detectAttendanceAnomalies(
+    List<Map<String, dynamic>> perEvent,
+  ) {
+    if (perEvent.isEmpty) return [];
+    final values = perEvent
+        .map((e) => (e['attendees'] as int).toDouble())
+        .toList();
+    final mean = values.reduce((a, b) => a + b) / values.length;
+    final variance =
+        values.map((v) => (v - mean) * (v - mean)).reduce((a, b) => a + b) /
+        values.length;
+    final std = math.sqrt(variance);
+    const threshold = 2.0; // z-score threshold
+    final anomalies = <Map<String, dynamic>>[];
+    for (int i = 0; i < perEvent.length; i++) {
+      final z = std == 0 ? 0.0 : ((values[i] - mean) / std);
+      if (z.abs() >= threshold) {
+        anomalies.add({
+          'title': perEvent[i]['title'],
+          'attendees': perEvent[i]['attendees'],
+          'date': perEvent[i]['date'],
+          'zScore': z,
+          'type': z > 0 ? 'high' : 'low',
+        });
+      }
+    }
+    return anomalies;
+  }
+
+  Future<Map<String, dynamic>?> _computeDwellInsights(
+    List<EventModel> events,
+  ) async {
+    try {
+      if (events.isEmpty) return null;
+      int sampleCount = 0;
+      double totalMinutes = 0;
+      int highEngagement = 0; // > 45 minutes
+      for (final e in events) {
+        final attendeesQuery = await FirebaseFirestore.instance
+            .collection('Attendance')
+            .where('eventId', isEqualTo: e.id)
+            .get();
+        for (final doc in attendeesQuery.docs) {
+          final data = doc.data();
+          if (data['dwellTime'] != null) {
+            // Firestore stores Duration as milliseconds or map; best-effort
+            final dt = data['dwellTime'];
+            int minutes;
+            if (dt is int) {
+              minutes = (dt / 60000).round();
+            } else if (dt is Map && dt['inMinutes'] != null) {
+              minutes = (dt['inMinutes'] as num).toInt();
+            } else {
+              continue;
+            }
+            sampleCount++;
+            totalMinutes += minutes;
+            if (minutes >= 45) highEngagement++;
+          }
+        }
+      }
+      if (sampleCount == 0) return null;
+      final avg = totalMinutes / sampleCount;
+      final pct = (highEngagement / sampleCount) * 100;
+      return {
+        'avgMinutes': avg,
+        'highEngagementPercent': pct,
+        'samples': sampleCount,
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _generateNarrative(
+    Map<String, dynamic> performance,
+    Map<String, dynamic> dayOfWeek,
+    Map<String, dynamic> timeOfDay,
+    Map<String, dynamic> forecast,
+    Map<String, dynamic>? dwell,
+  ) {
+    final bestDay = dayOfWeek['bestDay'] ?? 'N/A';
+    final bestHour = timeOfDay['bestHourRange'] ?? 'N/A';
+    final perf =
+        (performance['performanceScore'] as num?)?.toStringAsFixed(1) ?? '0.0';
+    final next = forecast['nextMonth'] ?? 0;
+    final conf = ((forecast['confidence'] ?? 0.0) as num).toDouble();
+    final dwellStr = dwell == null
+        ? 'Dwell data not available.'
+        : 'Average dwell time ${(dwell['avgMinutes'] as num).toStringAsFixed(0)}m with ${(dwell['highEngagementPercent'] as num).toStringAsFixed(0)}% staying >45m.';
+    return 'Engagement score sits at $perf%. Best scheduling signals point to $bestDay around $bestHour. Next month is projected to bring ~$next attendees (confidence ${(conf * 100).toStringAsFixed(0)}%). $dwellStr';
+  }
+
+  /// Very lightweight question answering over computed insights.
+  Future<String> answerQuestion(String question, AIInsights insights) async {
+    final q = question.toLowerCase();
+    if (q.contains('best day')) {
+      return 'Best day appears to be ${insights.dayOfWeekInsights?['bestDay'] ?? 'N/A'} based on attendance weighting.';
+    }
+    if (q.contains('best time') ||
+        q.contains('time of day') ||
+        q.contains('hour')) {
+      return 'Best time window is ${insights.timeOfDayInsights?['bestHourRange'] ?? 'N/A'}.';
+    }
+    if (q.contains('forecast') ||
+        q.contains('next month') ||
+        q.contains('predict')) {
+      final next = insights.forecast?['nextMonth'];
+      final conf = insights.forecast?['confidence'];
+      return next == null
+          ? 'Not enough history to forecast yet.'
+          : 'Projected next-month attendance: $next (confidence ${(conf * 100).toStringAsFixed(0)}%).';
+    }
+    if (q.contains('engagement') || q.contains('score')) {
+      final perf =
+          (insights.globalPerformanceAnalysis?['performanceScore'] as num?)
+              ?.toStringAsFixed(1) ??
+          '0.0';
+      return 'Current engagement score is $perf% (repeat attendees / total).';
+    }
+    if (q.contains('dwell') || q.contains('stay')) {
+      final d = insights.dwellInsights;
+      if (d == null) return 'No dwell-time data available yet.';
+      return 'Average dwell ${(d['avgMinutes'] as num).toStringAsFixed(0)}m; ${(d['highEngagementPercent'] as num).toStringAsFixed(0)}% stayed >45m.';
+    }
+    if (q.contains('anomal')) {
+      final a = insights.anomalies ?? [];
+      if (a.isEmpty) return 'No attendance anomalies detected.';
+      final first = a.first;
+      return 'Anomaly detected: ${first['title']} (${first['attendees']} attendees, ${first['type']} outlier).';
+    }
+    // Default: provide narrative summary
+    return insights.naturalSummary ??
+        'I analyzed your data but could not map this question. Try asking about: best day, best time, forecast, engagement, dwell, anomalies.';
   }
 
   String _generateGlobalRecommendation(

@@ -10,6 +10,7 @@ import 'package:attendus/firebase/firebase_messaging_helper.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
+import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -37,6 +38,8 @@ class _ChatScreenState extends State<ChatScreen> {
   StreamSubscription<List<MessageModel>>? _messagesSubscription;
   ConversationModel? _conversation;
   String? _swipedMessageId; // Track which message is currently swiped
+  final Map<String, double> _messageSwipeOffsets =
+      {}; // Track individual message swipe positions
 
   @override
   void initState() {
@@ -292,7 +295,10 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Widget _buildMessageBubble(MessageModel message) {
+  Widget _buildMessageBubble(
+    MessageModel message, {
+    bool showDateHeader = false,
+  }) {
     User? currentUser = _auth.currentUser;
     bool isMe = currentUser?.uid == message.senderId;
     final isGroup = _conversation?.isGroup == true;
@@ -301,13 +307,21 @@ class _ChatScreenState extends State<ChatScreen> {
         : '';
     final isLastMessage =
         _messages.isNotEmpty && _messages.last.id == message.id;
-    final isSwipedOut = _swipedMessageId == message.id;
+    final currentOffset = _messageSwipeOffsets[message.id] ?? 0.0;
+    final isBeingDragged =
+        currentOffset.abs() > 20; // Show timestamp while dragging
 
-    return GestureDetector(
+    return Column(
+      children: [
+        // Date header
+        if (showDateHeader) _buildDateHeader(message.timestamp),
+
+        GestureDetector(
       onTap: () {
-        // Tap anywhere to close swiped message
-        if (_swipedMessageId != null) {
+            // Tap anywhere to reset any dragging states
+            if (_messageSwipeOffsets.isNotEmpty) {
           setState(() {
+                _messageSwipeOffsets.clear();
             _swipedMessageId = null;
           });
         }
@@ -324,75 +338,137 @@ class _ChatScreenState extends State<ChatScreen> {
                 padding: const EdgeInsets.only(left: 12, bottom: 2),
                 child: Text(
                   senderName,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
                 ),
               ),
             GestureDetector(
-              onHorizontalDragEnd: (details) {
-                // Swipe left to reveal timestamp
-                if (details.primaryVelocity! < -500) {
+                  onHorizontalDragUpdate: (details) {
                   setState(() {
-                    _swipedMessageId = isSwipedOut ? null : message.id;
-                  });
-                }
+                      final currentOffset =
+                          _messageSwipeOffsets[message.id] ?? 0.0;
+                      double newOffset;
+
+                      if (isMe) {
+                        // For sent messages: swipe left to reveal timestamp
+                        newOffset = (currentOffset + details.delta.dx).clamp(
+                          -120.0,
+                          0.0,
+                        );
+                      } else {
+                        // For received messages: swipe right to reveal timestamp
+                        newOffset = (currentOffset + details.delta.dx).clamp(
+                          0.0,
+                          120.0,
+                        );
+                      }
+
+                      _messageSwipeOffsets[message.id] = newOffset;
+                    });
+                  },
+                  onHorizontalDragEnd: (details) {
+                    // Always return to normal state when drag ends
+                    setState(() {
+                      _messageSwipeOffsets[message.id] = 0.0;
+                      if (_swipedMessageId == message.id) {
+                        _swipedMessageId = null;
+                      }
+                    });
               },
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeInOut,
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOutCubic,
                 transform: Matrix4.translationValues(
-                  isSwipedOut ? -80.0 : 0.0,
+                      currentOffset,
                   0.0,
                   0.0,
                 ),
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    // Timestamp behind the message
-                    if (isSwipedOut)
+                        // Timestamp behind the message (only while dragging)
+                        if (isBeingDragged)
                       Positioned(
-                        right: isMe ? -70 : null,
-                        left: isMe ? null : -70,
+                            right: isMe ? -90 : null,
+                            left: isMe ? null : -90,
                         top: 0,
                         bottom: 0,
                         child: Container(
-                          width: 60,
+                              width: 80,
                           alignment: Alignment.center,
-                          child: Text(
-                            _formatDetailedTimestamp(message.timestamp),
-                            style: const TextStyle(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    _formatTimeOnly(message.timestamp),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  Text(
+                                    _formatDateOnly(message.timestamp),
+                                    style: TextStyle(
                               fontSize: 10,
-                              color: Colors.grey,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant
+                                          .withValues(alpha: 0.7),
                             ),
-                            textAlign: TextAlign.center,
                           ),
+                                ],
                         ),
                       ),
-                    // Message bubble
+                          ),
+                        // Message bubble with enhanced iOS styling
                     Container(
-                      margin: const EdgeInsets.symmetric(
-                        vertical: 2,
-                        horizontal: 8,
+                          margin: EdgeInsets.symmetric(
+                            vertical: 1,
+                            horizontal: isMe ? 12 : 8,
                       ),
                       padding: const EdgeInsets.symmetric(
-                        vertical: 10,
-                        horizontal: 14,
+                            vertical: 12,
+                            horizontal: 16,
+                          ),
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width * 0.75,
                       ),
                       decoration: BoxDecoration(
                         color: isMe
-                            ? const Color(0xFF0B93F6)
-                            : const Color(0xFFE5E5EA),
+                            ? Theme.of(context).colorScheme.primary
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.only(
-                          topLeft: const Radius.circular(18),
-                          topRight: const Radius.circular(18),
-                          bottomLeft: Radius.circular(isMe ? 18 : 4),
-                          bottomRight: Radius.circular(isMe ? 4 : 18),
-                        ),
+                              topLeft: const Radius.circular(20),
+                              topRight: const Radius.circular(20),
+                              bottomLeft: Radius.circular(isMe ? 20 : 6),
+                              bottomRight: Radius.circular(isMe ? 6 : 20),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Theme.of(
+                                  context,
+                                ).shadowColor.withValues(alpha: 0.1),
+                                blurRadius: 2,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
                       ),
                       child: Text(
                         message.content,
                         style: TextStyle(
-                          color: isMe ? Colors.white : Colors.black,
+                          color: isMe 
+                              ? Theme.of(context).colorScheme.onPrimary 
+                              : Theme.of(context).colorScheme.onSurface,
                           fontSize: 16,
+                              height: 1.3,
                         ),
                       ),
                     ),
@@ -403,15 +479,22 @@ class _ChatScreenState extends State<ChatScreen> {
             // Delivered status for the most recent sent message
             if (isMe && isLastMessage && !message.id.startsWith('local_'))
               Padding(
-                padding: const EdgeInsets.only(right: 12, top: 2),
+                    padding: const EdgeInsets.only(right: 16, top: 4),
                 child: Text(
                   'Delivered',
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  style: TextStyle(
+                    fontSize: 11, 
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                  ),
                 ),
               ),
           ],
         ),
       ),
+        ),
+      ],
     );
   }
 
@@ -421,20 +504,25 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     if (_messages.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'No messages yet. Start a conversation!',
-          style: TextStyle(fontSize: 16, color: Colors.grey),
+          style: TextStyle(
+            fontSize: 16, 
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       );
     }
 
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.only(bottom: 80),
+      padding: const EdgeInsets.only(top: 8, bottom: 80),
       itemCount: _messages.length,
       itemBuilder: (context, index) {
-        return _buildMessageBubble(_messages[index]);
+        final message = _messages[index];
+        final showDateHeader = _shouldShowDateHeader(index);
+        return _buildMessageBubble(message, showDateHeader: showDateHeader);
       },
     );
   }
@@ -443,10 +531,10 @@ class _ChatScreenState extends State<ChatScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.3),
+            color: Theme.of(context).shadowColor.withValues(alpha: 0.3),
             blurRadius: 5,
             offset: const Offset(0, -2),
           ),
@@ -481,7 +569,11 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  String _formatDetailedTimestamp(DateTime dt) {
+  String _formatTimeOnly(DateTime dt) {
+    return TimeOfDay.fromDateTime(dt).format(context);
+  }
+
+  String _formatDateOnly(DateTime dt) {
     final now = DateTime.now();
     final isToday =
         dt.year == now.year && dt.month == now.month && dt.day == now.day;
@@ -491,15 +583,425 @@ class _ChatScreenState extends State<ChatScreen> {
         dt.month == yesterday.month &&
         dt.day == yesterday.day;
 
-    final timeStr = TimeOfDay.fromDateTime(dt).format(context);
-
     if (isToday) {
-      return 'Today\n$timeStr';
+      return 'Today';
     } else if (isYesterday) {
-      return 'Yesterday\n$timeStr';
+      return 'Yesterday';
     } else {
-      return '${dt.month}/${dt.day}/${dt.year}\n$timeStr';
+      return '${dt.month}/${dt.day}/${dt.year.toString().substring(2)}';
     }
+  }
+
+  bool _shouldShowDateHeader(int index) {
+    if (index == 0) return true;
+
+    final currentMessage = _messages[index];
+    final previousMessage = _messages[index - 1];
+
+    final currentDate = DateTime(
+      currentMessage.timestamp.year,
+      currentMessage.timestamp.month,
+      currentMessage.timestamp.day,
+    );
+
+    final previousDate = DateTime(
+      previousMessage.timestamp.year,
+      previousMessage.timestamp.month,
+      previousMessage.timestamp.day,
+    );
+
+    return !currentDate.isAtSameMomentAs(previousDate);
+  }
+
+  Widget _buildDateHeader(DateTime timestamp) {
+    final now = DateTime.now();
+    final messageDate = DateTime(
+      timestamp.year,
+      timestamp.month,
+      timestamp.day,
+    );
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+
+    String dateText;
+    if (messageDate.isAtSameMomentAs(today)) {
+      dateText = 'Today';
+    } else if (messageDate.isAtSameMomentAs(yesterday)) {
+      dateText = 'Yesterday';
+    } else {
+      // Format as "Monday, January 15" for recent dates
+      final daysDifference = today.difference(messageDate).inDays;
+      if (daysDifference <= 7) {
+        dateText = _formatWeekdayDate(timestamp);
+      } else {
+        dateText = _formatFullDate(timestamp);
+      }
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 16),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.8),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            dateText,
+            style: TextStyle(
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatWeekdayDate(DateTime date) {
+    const weekdays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+
+    final weekday = weekdays[date.weekday - 1];
+    final month = months[date.month - 1];
+    return '$weekday, $month ${date.day}';
+  }
+
+  String _formatFullDate(DateTime date) {
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+
+    final month = months[date.month - 1];
+    return '$month ${date.day}, ${date.year}';
+  }
+
+  void _showGroupMembersModal() {
+    if (_conversation?.isGroup != true) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _buildGroupMembersModal(),
+    );
+  }
+
+  Widget _buildGroupMembersModal() {
+    final conversation = _conversation;
+    if (conversation?.isGroup != true) return const SizedBox.shrink();
+
+    final currentUserId = _auth.currentUser?.uid;
+    final members = conversation!.participantIds
+        .map(
+          (id) => {
+            'id': id,
+            'info':
+                conversation.participantInfo[id] ?? {'name': 'Unknown User'},
+            'isCurrentUser': id == currentUserId,
+          },
+        )
+        .toList();
+
+    // Sort members: current user first, then alphabetically
+    members.sort((a, b) {
+      if (a['isCurrentUser'] == true) return -1;
+      if (b['isCurrentUser'] == true) return 1;
+      final nameA = (a['info'] as Map)['name'] ?? '';
+      final nameB = (b['info'] as Map)['name'] ?? '';
+      return nameA.toString().toLowerCase().compareTo(
+        nameB.toString().toLowerCase(),
+      );
+    });
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.3,
+      maxChildSize: 0.9,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            boxShadow: [
+              BoxShadow(
+                color: Theme.of(context).shadowColor.withValues(alpha: 0.2),
+                blurRadius: 10,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 8, bottom: 16),
+                height: 4,
+                width: 36,
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+
+              // Header
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      child: const Icon(
+                        Icons.group,
+                        color: Colors.white,
+                        size: 30,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      conversation.groupName ?? 'Group',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${members.length} member${members.length != 1 ? 's' : ''}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Divider(height: 32),
+
+              // Members list
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: members.length,
+                  itemBuilder: (context, index) {
+                    final member = members[index];
+                    final memberInfo = member['info'] as Map<String, dynamic>;
+                    final isCurrentUser = member['isCurrentUser'] as bool;
+
+                    return _buildMemberTile(
+                      memberInfo: memberInfo,
+                      isCurrentUser: isCurrentUser,
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMemberTile({
+    required Map<String, dynamic> memberInfo,
+    required bool isCurrentUser,
+  }) {
+    final name = memberInfo['name'] ?? 'Unknown User';
+    final email = memberInfo['email'] ?? '';
+    final username = memberInfo['username'];
+    final profilePictureUrl = memberInfo['profilePictureUrl'];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: isCurrentUser
+            ? Border.all(
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.3),
+                width: 1,
+              )
+            : null,
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: CircleAvatar(
+          radius: 24,
+          backgroundImage: profilePictureUrl != null
+              ? NetworkImage(profilePictureUrl)
+              : null,
+          backgroundColor: Theme.of(
+            context,
+          ).colorScheme.primary.withValues(alpha: 0.1),
+          child: profilePictureUrl == null
+              ? Text(
+                  name.isNotEmpty ? name[0].toUpperCase() : '?',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                )
+              : null,
+        ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                name,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+            ),
+            if (isCurrentUser)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'You',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (username != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                '@$username',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+            if (email.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                email,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
+          ],
+        ),
+        onTap: isCurrentUser
+            ? null
+            : () {
+                Navigator.pop(context); // Close the modal first
+                _navigateToUserProfile(memberInfo);
+              },
+      ),
+    );
+  }
+
+  void _navigateToUserProfile(Map<String, dynamic> memberInfo) {
+    final customerModel = CustomerModel(
+      uid: memberInfo['uid'] ?? '',
+      name: memberInfo['name'] ?? 'Unknown User',
+      email: memberInfo['email'] ?? '',
+      username: memberInfo['username'],
+      profilePictureUrl: memberInfo['profilePictureUrl'],
+      bio: memberInfo['bio'],
+      phoneNumber: memberInfo['phoneNumber'],
+      age: memberInfo['age'],
+      gender: memberInfo['gender'],
+      location: memberInfo['location'],
+      occupation: memberInfo['occupation'],
+      company: memberInfo['company'],
+      website: memberInfo['website'],
+      socialMediaLinks: memberInfo['socialMediaLinks'],
+      isDiscoverable: memberInfo['isDiscoverable'] ?? true,
+      favorites: List<String>.from(memberInfo['favorites'] ?? []),
+      createdAt: memberInfo['createdAt'] != null
+          ? DateTime.parse(memberInfo['createdAt'])
+          : DateTime.now(),
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserProfileScreen(
+          user: customerModel,
+          isOwnProfile: false,
+        ),
+      ),
+    );
+  }
+
+  void _navigateToDirectMessageUserProfile(CustomerModel user) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserProfileScreen(
+          user: user,
+          isOwnProfile: false,
+        ),
+      ),
+    );
   }
 
   @override
@@ -607,46 +1109,87 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildAppBarTitle() {
     if (_conversation?.isGroup == true) {
       final name = _conversation?.groupName ?? 'Group';
-      return Row(
+      return GestureDetector(
+        onTap: () => _showGroupMembersModal(),
+        child: Row(
         children: [
           const CircleAvatar(child: Icon(Icons.group)),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
               name,
-              style: const TextStyle(fontSize: 16),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
               overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    '${_conversation?.participantIds.length ?? 0} members',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              size: 18,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
       );
     }
     final user = widget.otherParticipantInfo;
     if (user == null) return const SizedBox.shrink();
-    return Row(
-      children: [
-        CircleAvatar(
-          backgroundImage: user.profilePictureUrl != null
-              ? NetworkImage(user.profilePictureUrl!)
-              : null,
-          child: user.profilePictureUrl == null
-              ? Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?')
-              : null,
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(user.name, style: const TextStyle(fontSize: 16)),
-              Text(
-                user.email,
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ],
+    return GestureDetector(
+      onTap: () => _navigateToDirectMessageUserProfile(user),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundImage: user.profilePictureUrl != null
+                ? NetworkImage(user.profilePictureUrl!)
+                : null,
+            child: user.profilePictureUrl == null
+                ? Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?')
+                : null,
           ),
-        ),
-      ],
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user.name, 
+                  style: const TextStyle(
+                    fontSize: 16, 
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  user.email,
+                  style: TextStyle(
+                    fontSize: 12, 
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.chevron_right,
+            size: 18,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ],
+      ),
     );
   }
 }

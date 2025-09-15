@@ -1099,18 +1099,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   Widget _buildTabContent() {
-    final margin = ResponsiveHelper.getResponsiveMargin(
-      context,
-      phone: 24,
-      tablet: 32,
-      desktop: 48,
-    );
-
     return Container(
-      constraints: BoxConstraints(
-        maxWidth: ResponsiveHelper.getMaxContentWidth(context),
-      ),
-      margin: EdgeInsets.symmetric(horizontal: margin.horizontal),
+      // Use same padding as home screen for consistent card width
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: _tabController.index == 0
           ? _buildCreatedEventsTab()
           : _buildAttendedEventsTab(),
@@ -1181,53 +1172,18 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       );
     }
 
-    final spacing = ResponsiveHelper.getResponsiveSpacing(
-      context,
-      phone: 12,
-      tablet: 16,
-      desktop: 20,
-    );
-
-    return ResponsiveHelper.buildResponsiveLayout(
-      context: context,
-      phone: ListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: _createdEvents.length,
-        itemBuilder: (context, index) {
-          final event = _createdEvents[index];
-          return Container(
-            margin: EdgeInsets.only(bottom: spacing),
-            child: SingleEventListViewItem(eventModel: event),
-          );
-        },
-      ),
-      tablet: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: ResponsiveHelper.getResponsiveGridDelegate(
-          context,
-          childAspectRatio: 1.2,
-        ),
-        itemCount: _createdEvents.length,
-        itemBuilder: (context, index) {
-          final event = _createdEvents[index];
-          return SingleEventListViewItem(eventModel: event);
-        },
-      ),
-      desktop: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: ResponsiveHelper.getResponsiveGridDelegate(
-          context,
-          childAspectRatio: 1.1,
-        ),
-        itemCount: _createdEvents.length,
-        itemBuilder: (context, index) {
-          final event = _createdEvents[index];
-          return SingleEventListViewItem(eventModel: event);
-        },
-      ),
+    // Use consistent spacing like home screen
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _createdEvents.length,
+      itemBuilder: (context, index) {
+        final event = _createdEvents[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: SingleEventListViewItem(eventModel: event),
+        );
+      },
     );
   }
 
@@ -1244,53 +1200,18 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       );
     }
 
-    final spacing = ResponsiveHelper.getResponsiveSpacing(
-      context,
-      phone: 12,
-      tablet: 16,
-      desktop: 20,
-    );
-
-    return ResponsiveHelper.buildResponsiveLayout(
-      context: context,
-      phone: ListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: _attendedEvents.length,
-        itemBuilder: (context, index) {
-          final event = _attendedEvents[index];
-          return Container(
-            margin: EdgeInsets.only(bottom: spacing),
-            child: SingleEventListViewItem(eventModel: event),
-          );
-        },
-      ),
-      tablet: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: ResponsiveHelper.getResponsiveGridDelegate(
-          context,
-          childAspectRatio: 1.2,
-        ),
-        itemCount: _attendedEvents.length,
-        itemBuilder: (context, index) {
-          final event = _attendedEvents[index];
-          return SingleEventListViewItem(eventModel: event);
-        },
-      ),
-      desktop: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: ResponsiveHelper.getResponsiveGridDelegate(
-          context,
-          childAspectRatio: 1.1,
-        ),
-        itemCount: _attendedEvents.length,
-        itemBuilder: (context, index) {
-          final event = _attendedEvents[index];
-          return SingleEventListViewItem(eventModel: event);
-        },
-      ),
+    // Use consistent spacing like home screen
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _attendedEvents.length,
+      itemBuilder: (context, index) {
+        final event = _attendedEvents[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: SingleEventListViewItem(eventModel: event),
+        );
+      },
     );
   }
 

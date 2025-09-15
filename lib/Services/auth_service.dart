@@ -28,7 +28,7 @@ class AuthService extends ChangeNotifier {
   static const String _keyUserId = 'user_id';
   static const String _keyUserEmail = 'user_email';
   static const String _keyLastLoginTime = 'last_login_time';
-  static const String _keyAutoLoginEnabled = 'auto_login_enabled';
+  // Removed auto-login preference key; auto-login is always on
 
   // Initialization state
   bool _isInitialized = false;
@@ -294,31 +294,14 @@ class AuthService extends ChangeNotifier {
 
   /// Check if auto-login is enabled
   Future<bool> getAutoLoginEnabled() async {
-    try {
-      final value = await _secureStorage.read(key: _keyAutoLoginEnabled);
-      return value == 'true';
-    } catch (e) {
-      Logger.error('Error reading auto-login setting', e);
-      return true; // Default to enabled
-    }
+    // Force-enabled: app always remembers the user unless they sign out
+    return true;
   }
 
   /// Enable or disable auto-login
   Future<void> setAutoLoginEnabled(bool enabled) async {
-    try {
-      await _secureStorage.write(
-        key: _keyAutoLoginEnabled,
-        value: enabled.toString(),
-      );
-      Logger.info('Auto-login ${enabled ? 'enabled' : 'disabled'}');
-
-      if (!enabled) {
-        // If auto-login is disabled, clear session but don't sign out
-        await _clearUserSession();
-      }
-    } catch (e) {
-      Logger.error('Error setting auto-login preference', e);
-    }
+    // No-op: auto-login is always on. Intentionally ignore external toggles.
+    Logger.info('Auto-login preference ignored (always-on).');
   }
 
   /// Get stored user information

@@ -34,11 +34,22 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
   AIInsights? _globalAIInsights;
   bool _isLoadingAI = false;
   bool _hasEvents = false;
+  final TextEditingController _aiQuestionController = TextEditingController();
+  String? _aiAnswer;
+  bool _qaLoading = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.index == 1 &&
+          _globalAIInsights == null &&
+          !_isLoadingAI) {
+        // Lazily compute AI insights only when AI tab is first opened
+        _loadGlobalAIInsights();
+      }
+    });
     _loadUserEvents();
   }
 
@@ -86,6 +97,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _aiQuestionController.dispose();
     super.dispose();
   }
 
@@ -122,7 +134,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
 
       if (events.isNotEmpty) {
         _loadAggregatedAnalytics();
-        _loadGlobalAIInsights();
+        // Defer AI generation until AI tab is opened to avoid jank
       }
     } catch (e) {
       setState(() {
@@ -221,6 +233,54 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
         }
       }
 
+      // Compute Retention Rate based on unique attendees across all events
+      try {
+        // Analyze up to 60 most recent events to bound load
+        final List<EventModel> retentionEvents = _userEvents.length > 60
+            ? (_userEvents..sort(
+                    (a, b) => b.selectedDateTime.compareTo(a.selectedDateTime),
+                  ))
+                  .take(60)
+                  .toList()
+            : _userEvents;
+
+        final futures = retentionEvents.map((event) {
+          return FirebaseFirestore.instance
+              .collection('Attendance')
+              .where('eventId', isEqualTo: event.id)
+              .get();
+        }).toList();
+
+        final snapshots = await Future.wait(futures);
+
+        final Map<String, int> attendeeCountsByUser = {};
+        for (final snap in snapshots) {
+          for (final doc in snap.docs) {
+            final data = doc.data();
+            final uid = data['customerUid'] as String?;
+            if (uid == null || uid.isEmpty) continue;
+            attendeeCountsByUser[uid] = (attendeeCountsByUser[uid] ?? 0) + 1;
+          }
+        }
+
+        final int totalUniqueAttendees = attendeeCountsByUser.length;
+        final int repeatUniqueAttendees = attendeeCountsByUser.values
+            .where((count) => count > 1)
+            .length;
+        final double retentionRate = totalUniqueAttendees > 0
+            ? (repeatUniqueAttendees / totalUniqueAttendees) * 100.0
+            : 0.0;
+
+        analytics['retentionRate'] = retentionRate;
+        analytics['totalUniqueAttendees'] = totalUniqueAttendees;
+        analytics['repeatUniqueAttendees'] = repeatUniqueAttendees;
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('Error computing retention rate: $e');
+        }
+        analytics['retentionRate'] = 0.0;
+      }
+
       // Calculate averages and rates
       if (analytics['totalEvents'] > 0) {
         analytics['averageAttendance'] = analytics['totalEvents'] > 0
@@ -234,12 +294,11 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                   analytics['totalAttendees']) *
               100;
 
-          analytics['engagementScore'] =
-              (analytics['repeatAttendees'] / analytics['totalAttendees']) *
-              100;
+          // Keep engagementScore for backward compatibility but prefer retentionRate in UI
+          analytics['engagementScore'] = analytics['retentionRate'] ?? 0.0;
         } else {
           analytics['dropoutRate'] = 0.0;
-          analytics['engagementScore'] = 0.0;
+          analytics['engagementScore'] = analytics['retentionRate'] ?? 0.0;
         }
       }
 
@@ -1006,11 +1065,11 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                   change: '+0',
                 ),
                 _buildUltraModernAnalyticsCard(
-                  title: 'Engagement Score',
-                  value: (_aggregatedAnalytics['engagementScore'] ?? 0) > 0
-                      ? '${(_aggregatedAnalytics['engagementScore'] ?? 0).toStringAsFixed(0)}%'
+                  title: 'Retention Rate',
+                  value: (_aggregatedAnalytics['retentionRate'] ?? 0) > 0
+                      ? '${(_aggregatedAnalytics['retentionRate'] ?? 0).toStringAsFixed(0)}%'
                       : '0%',
-                  icon: Icons.psychology_rounded,
+                  icon: Icons.loyalty_rounded,
                   gradient: const LinearGradient(
                     colors: [Color(0xFFFF6B6B), Color(0xFFFFE66D)],
                     begin: Alignment.topLeft,
@@ -1934,6 +1993,28 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
 
           const SizedBox(height: Dimensions.spaceSizedLarge),
 
+          // Narrative Summary
+          if (_globalAIInsights!.naturalSummary != null)
+            _modernAiInsightCard(
+              title: 'Executive Summary',
+              icon: Icons.summarize_rounded,
+              gradient: const LinearGradient(
+                colors: [Color(0xFF6A85B6), Color(0xFFBAC8E0)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              content: Text(
+                _globalAIInsights!.naturalSummary!,
+                style: TextStyle(
+                  fontSize: Dimensions.fontSizeDefault,
+                  color: AppThemeColor.darkBlueColor,
+                  height: 1.4,
+                ),
+              ),
+            ),
+
+          const SizedBox(height: Dimensions.spaceSizedLarge),
+
           // Global Performance Analysis
           _modernAiInsightCard(
             title: 'Global Performance Analysis',
@@ -1996,6 +2077,155 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
               ],
             ),
           ),
+
+          const SizedBox(height: Dimensions.spaceSizedLarge),
+
+          // Best Day and Time-of-Day
+          Row(
+            children: [
+              Expanded(
+                child: _modernAiInsightCard(
+                  title: 'Best Day to Host',
+                  icon: Icons.event_available_rounded,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF56CCF2), Color(0xFF2F80ED)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  content: _buildMetricRow(
+                    'Best Day',
+                    _globalAIInsights!.dayOfWeekInsights?['bestDay'] ?? 'N/A',
+                    Icons.today_rounded,
+                  ),
+                ),
+              ),
+              const SizedBox(width: Dimensions.spaceSizedDefault),
+              Expanded(
+                child: _modernAiInsightCard(
+                  title: 'Best Time of Day',
+                  icon: Icons.access_time_rounded,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFF9A9E), Color(0xFFFAD0C4)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  content: _buildMetricRow(
+                    'Peak Window',
+                    _globalAIInsights!.timeOfDayInsights?['bestHourRange'] ??
+                        'N/A',
+                    Icons.timelapse_rounded,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: Dimensions.spaceSizedLarge),
+
+          // Forecast
+          _modernAiInsightCard(
+            title: 'Attendance Forecast',
+            icon: Icons.query_stats_rounded,
+            gradient: const LinearGradient(
+              colors: [Color(0xFF00B09B), Color(0xFF96C93D)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            content: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildMetricRow(
+                  'Next Month Projection',
+                  '${_globalAIInsights!.forecast?['nextMonth'] ?? 0}',
+                  Icons.trending_up_rounded,
+                ),
+                const SizedBox(height: Dimensions.spaceSizedDefault),
+                _buildMetricRow(
+                  'Confidence',
+                  '${((_globalAIInsights!.forecast?['confidence'] ?? 0.0) * 100).toStringAsFixed(0)}%',
+                  Icons.verified_rounded,
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: Dimensions.spaceSizedLarge),
+
+          // Dwell Insights
+          if (_globalAIInsights!.dwellInsights != null)
+            _modernAiInsightCard(
+              title: 'Dwell Time Insights',
+              icon: Icons.av_timer_rounded,
+              gradient: const LinearGradient(
+                colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              content: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildMetricRow(
+                    'Average Dwell',
+                    '${(_globalAIInsights!.dwellInsights!['avgMinutes'] as num).toStringAsFixed(0)} minutes',
+                    Icons.schedule_rounded,
+                  ),
+                  const SizedBox(height: Dimensions.spaceSizedDefault),
+                  _buildMetricRow(
+                    'High Engagement',
+                    '${(_globalAIInsights!.dwellInsights!['highEngagementPercent'] as num).toStringAsFixed(0)}% stay >45m',
+                    Icons.emoji_events_rounded,
+                  ),
+                ],
+              ),
+            ),
+
+          if ((_globalAIInsights!.anomalies ?? []).isNotEmpty) ...[
+            const SizedBox(height: Dimensions.spaceSizedLarge),
+            _modernAiInsightCard(
+              title: 'Attendance Anomalies',
+              icon: Icons.warning_amber_rounded,
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFFD200), Color(0xFFF7971E)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              content: Column(
+                children: [
+                  ..._globalAIInsights!.anomalies!.map(
+                    (a) => Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: Dimensions.spaceSizeSmall,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            a['type'] == 'high'
+                                ? Icons.trending_up
+                                : Icons.trending_down,
+                            color: a['type'] == 'high'
+                                ? Colors.green
+                                : Colors.red,
+                            size: 18,
+                          ),
+                          const SizedBox(width: Dimensions.spaceSizeSmall),
+                          Expanded(
+                            child: Text(
+                              '${a['title']} • ${a['attendees']} attendees',
+                              style: TextStyle(
+                                fontSize: Dimensions.fontSizeSmall,
+                                color: AppThemeColor.darkBlueColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
 
           const SizedBox(height: Dimensions.spaceSizedLarge),
 
@@ -2115,6 +2345,72 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                     ),
                   ),
                 ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: Dimensions.spaceSizedLarge),
+
+          // Ask AI Q&A
+          _modernAiInsightCard(
+            title: 'Ask AI About Your Events',
+            icon: Icons.smart_toy_rounded,
+            gradient: const LinearGradient(
+              colors: [Color(0xFF7F7FD5), Color(0xFF86A8E7)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            content: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _aiQuestionController,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _onAskAI(),
+                        decoration: const InputDecoration(
+                          hintText:
+                              'e.g., What day should I host my next event?',
+                          border: InputBorder.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: _qaLoading ? null : _onAskAI,
+                      icon: _qaLoading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.send_rounded, size: 16),
+                      label: const Text('Ask'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppThemeColor.darkBlueColor,
+                        foregroundColor: AppThemeColor.pureWhiteColor,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_aiAnswer != null) ...[
+                  const SizedBox(height: Dimensions.spaceSizedDefault),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      _aiAnswer!,
+                      style: TextStyle(
+                        fontSize: Dimensions.fontSizeDefault,
+                        color: AppThemeColor.darkBlueColor,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -2288,6 +2584,33 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
         return AppThemeColor.grayColor;
       default:
         return AppThemeColor.dullIconColor;
+    }
+  }
+
+  Future<void> _onAskAI() async {
+    final q = _aiQuestionController.text.trim();
+    if (q.isEmpty || _globalAIInsights == null) return;
+    setState(() {
+      _qaLoading = true;
+      _aiAnswer = null;
+    });
+    try {
+      final helper = AIAnalyticsHelper();
+      final answer = await helper.answerQuestion(q, _globalAIInsights!);
+      if (!mounted) return;
+      setState(() {
+        _aiAnswer = answer;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _aiAnswer = 'Sorry, I could not process that question: $e';
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _qaLoading = false;
+      });
     }
   }
 

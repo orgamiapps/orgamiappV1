@@ -106,6 +106,14 @@ class _CreateEventScreenState extends State<CreateEventScreen>
     _startTime!.minute,
   );
 
+  DateTime get _endDateTime => DateTime(
+    _selectedDate!.year,
+    _selectedDate!.month,
+    _selectedDate!.day,
+    _endTime!.hour,
+    _endTime!.minute,
+  );
+
   int get _durationHours {
     final int startMinutes = (_startTime!.hour * 60) + _startTime!.minute;
     final int endMinutes = (_endTime!.hour * 60) + _endTime!.minute;
@@ -122,9 +130,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   Future<void> _pickLocation() async {
     final picked = await Navigator.of(context).push<LatLng>(
       MaterialPageRoute(
-        builder: (_) => LocationPickerScreen(
-          initialLocation: _selectedLocationInternal,
-        ),
+        builder: (_) =>
+            LocationPickerScreen(initialLocation: _selectedLocationInternal),
       ),
     );
     if (picked != null) {
@@ -621,10 +628,14 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
   String get _timeRangeLabel {
     final DateTime startDt = _startDateTime;
+    final DateTime endDt = _endDateTime;
     final String start = DateFormat('h:mm a').format(startDt);
-    final DateTime endDt = startDt.add(Duration(hours: _durationHours));
     final String end = DateFormat('h:mm a').format(endDt);
-    final String duration = '${_durationHours}h';
+    final int minutes = endDt.difference(startDt).inMinutes;
+    final double hoursPrecise = minutes / 60.0;
+    final String duration = hoursPrecise % 1 == 0
+        ? '${hoursPrecise.toStringAsFixed(0)}H'
+        : '${hoursPrecise.toStringAsFixed(1)}H';
     return '$start – $end ($duration)';
   }
 
@@ -639,42 +650,53 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Date & Time',
-            style: TextStyle(
-              color: Color(0xFF1A1A1A),
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-              fontFamily: 'Roboto',
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Date on first row; times below to avoid overflow on smaller screens
-          _buildDateField(),
-          const SizedBox(height: 12),
-          Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool stackVertically = constraints.maxWidth < 360;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: _buildStartTimeField()),
-              const SizedBox(width: 12),
-              Expanded(child: _buildEndTimeField()),
-            ],
-          ),
-          if (_hasDateTime) ...[
-            const SizedBox(height: 10),
-            Text(
-              _timeRangeLabel,
-              style: const TextStyle(
-                color: Color(0xFF667EEA),
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-                fontFamily: 'Roboto',
+              const Text(
+                'Date & Time',
+                style: TextStyle(
+                  color: Color(0xFF1A1A1A),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  fontFamily: 'Roboto',
+                ),
               ),
-            ),
-          ],
-        ],
+              const SizedBox(height: 12),
+              // Date on first row; times below to avoid overflow on smaller screens
+              _buildDateField(),
+              const SizedBox(height: 12),
+              if (stackVertically) ...[
+                _buildStartTimeField(),
+                const SizedBox(height: 12),
+                _buildEndTimeField(),
+              ] else ...[
+                Row(
+                  children: [
+                    Expanded(child: _buildStartTimeField()),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildEndTimeField()),
+                  ],
+                ),
+              ],
+              if (_hasDateTime) ...[
+                const SizedBox(height: 10),
+                Text(
+                  _timeRangeLabel,
+                  style: const TextStyle(
+                    color: Color(0xFF667EEA),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -794,14 +816,28 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(icon, size: 18, color: const Color(0xFF667EEA)),
-                  const SizedBox(width: 8),
-                  Text(label),
-                ],
+              Expanded(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 18, color: const Color(0xFF667EEA)),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        label,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        softWrap: false,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const Icon(Icons.arrow_drop_down, color: Color(0xFF9CA3AF)),
+              const Icon(
+                Icons.arrow_drop_down,
+                color: Color(0xFF9CA3AF),
+                size: 20,
+              ),
             ],
           ),
         ),
@@ -861,7 +897,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                   privateEvent = value;
                 });
               },
-              activeColor: const Color(0xFF667EEA),
+              activeThumbColor: const Color(0xFF667EEA),
               activeTrackColor: const Color(0xFF667EEA).withValues(alpha: 0.3),
             ),
           ],
@@ -916,7 +952,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                 privateEvent = !value;
               });
             },
-            activeColor: const Color(0xFF10B981),
+            activeThumbColor: const Color(0xFF10B981),
             activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
           ),
         ],
@@ -1061,7 +1097,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             )
           else
             DropdownButtonFormField<String>(
-              value: _selectedOrganizationId,
+              initialValue: _selectedOrganizationId,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(borderSide: BorderSide.none),
                 filled: true,
@@ -1211,7 +1247,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   }
 
   Widget _buildLocationSelector() {
-    final hasLocation = _selectedLocationInternal != null &&
+    final hasLocation =
+        _selectedLocationInternal != null &&
         !(_selectedLocationInternal!.latitude == 0 &&
             _selectedLocationInternal!.longitude == 0);
     return Container(
@@ -1245,7 +1282,11 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                   color: const Color(0xFF667EEA).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.location_on, color: Color(0xFF667EEA), size: 20),
+                child: const Icon(
+                  Icons.location_on,
+                  color: Color(0xFF667EEA),
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1265,12 +1306,18 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                       const SizedBox(height: 6),
                       Text(
                         '${_selectedLocationInternal!.latitude.toStringAsFixed(6)}, ${_selectedLocationInternal!.longitude.toStringAsFixed(6)}',
-                        style: TextStyle(color: Colors.grey.withValues(alpha: 0.8), fontSize: 12),
+                        style: TextStyle(
+                          color: Colors.grey.withValues(alpha: 0.8),
+                          fontSize: 12,
+                        ),
                       ),
                     ] else ...[
                       const Text(
                         'No location selected',
-                        style: TextStyle(color: Color(0xFF6B7280), fontSize: 14),
+                        style: TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontSize: 14,
+                        ),
                       ),
                     ],
                     if (_isResolvingAddress) ...[
@@ -1280,7 +1327,12 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                           SizedBox(
                             width: 14,
                             height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA))),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Color(0xFF667EEA),
+                              ),
+                            ),
                           ),
                           const SizedBox(width: 8),
                           const Text('Resolving address...'),

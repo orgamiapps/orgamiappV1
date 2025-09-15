@@ -250,10 +250,10 @@ class _MonthYearPickerSheetState extends State<MonthYearPickerSheet>
                           ? FontWeight.bold
                           : FontWeight.w600,
                       color: isSelected
-                          ? Colors.white
+                          ? Theme.of(context).colorScheme.onPrimary
                           : isCurrentYear
-                          ? const Color(0xFF667EEA)
-                          : const Color(0xFF374151),
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   if (isCurrentYear && !isSelected) ...[
@@ -264,15 +264,15 @@ class _MonthYearPickerSheetState extends State<MonthYearPickerSheet>
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF667EEA).withOpacity(0.2),
+                        color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Current',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF667EEA),
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                     ),
@@ -348,30 +348,33 @@ class _MonthYearPickerSheetState extends State<MonthYearPickerSheet>
                 duration: const Duration(milliseconds: 200),
                 decoration: BoxDecoration(
                   gradient: isSelected
-                      ? const LinearGradient(
+                      ? LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [Color(0xFF667EEA), Color(0xFF7C3AED)],
+                          colors: [
+                            Theme.of(context).colorScheme.primary, 
+                            Theme.of(context).colorScheme.secondary
+                          ],
                         )
                       : null,
                   color: !isSelected
                       ? isCurrentMonth
-                            ? const Color(0xFF667EEA).withOpacity(0.1)
-                            : const Color(0xFFF9FAFB)
+                            ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                            : Theme.of(context).colorScheme.surfaceContainerHighest
                       : null,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: isSelected
                         ? Colors.transparent
                         : isCurrentMonth
-                        ? const Color(0xFF667EEA).withOpacity(0.3)
-                        : const Color(0xFFE5E7EB),
+                        ? Theme.of(context).colorScheme.primary.withOpacity(0.3)
+                        : Theme.of(context).dividerColor,
                     width: isSelected ? 0 : 1.5,
                   ),
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: const Color(0xFF667EEA).withOpacity(0.3),
+                            color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 4),
                           ),
@@ -465,8 +468,8 @@ class _MonthYearPickerSheetState extends State<MonthYearPickerSheet>
                 widget.onDateSelected(DateTime(_selectedYear, _selectedMonth));
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF667EEA),
-                foregroundColor: Colors.white,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
