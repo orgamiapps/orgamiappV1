@@ -34,6 +34,7 @@ class AuthService extends ChangeNotifier {
   bool _isInitialized = false;
   bool _isInitializing = false;
   Completer<void>? _initializationCompleter;
+  bool _initialAuthChecked = false;
 
   User? get currentUser => _auth.currentUser;
   bool get isLoggedIn =>
@@ -70,6 +71,21 @@ class AuthService extends ChangeNotifier {
     try {
       await _ensureFirebaseInitialized();
       Logger.debug('AuthService: Starting initialization');
+
+      // Ensure FirebaseAuth has delivered the initial persisted state
+      await _waitForInitialAuthState().timeout(
+        const Duration(seconds: 2),
+        onTimeout: () {
+          Logger.warning('Initial auth state wait timed out; continuing');
+        },
+      );
+
+      // If a user is present but local model is missing, set a minimal profile immediately
+      if (_auth.currentUser != null &&
+          CustomerController.logeInCustomer == null) {
+        _setMinimalCustomerFromFirebaseUser(_auth.currentUser!);
+        await _saveUserSession(_auth.currentUser!);
+      }
 
       // Listen to auth state changes
       _auth.authStateChanges().listen(_onAuthStateChanged);
@@ -110,6 +126,56 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  /// Wait for the first auth state emission so persisted sessions are available
+  Future<void> _waitForInitialAuthState() async {
+    if (_initialAuthChecked) return;
+    try {
+      // If a user is already present, nothing to wait for
+      if (_auth.currentUser != null) {
+        _initialAuthChecked = true;
+        return;
+      }
+
+      // Await the first emission which delivers persisted user (if any)
+      await _auth.authStateChanges().first;
+    } catch (e) {
+      Logger.warning('Failed waiting for initial auth state: $e');
+    } finally {
+      _initialAuthChecked = true;
+    }
+  }
+
+  void _setMinimalCustomerFromFirebaseUser(User user) {
+    try {
+      if (CustomerController.logeInCustomer != null) return;
+      final minimalCustomer = CustomerModel(
+        uid: user.uid,
+        name: user.displayName ?? '',
+        email: user.email ?? '',
+        createdAt: DateTime.now(),
+      );
+      CustomerController.logeInCustomer = minimalCustomer;
+      notifyListeners();
+    } catch (e) {
+      Logger.warning('Failed to set minimal customer model: $e');
+    }
+  }
+
+  /// Ensure an in-memory user model exists when Firebase has a current user
+  Future<bool> ensureInMemoryUserModel() async {
+    try {
+      if (_auth.currentUser == null) return false;
+      if (CustomerController.logeInCustomer == null) {
+        _setMinimalCustomerFromFirebaseUser(_auth.currentUser!);
+        await _saveUserSession(_auth.currentUser!);
+      }
+      return true;
+    } catch (e) {
+      Logger.warning('ensureInMemoryUserModel failed: $e');
+      return false;
+    }
+  }
+
   /// Handle Firebase auth state changes
   void _onAuthStateChanged(User? user) async {
     if (user != null) {
@@ -139,9 +205,11 @@ class AuthService extends ChangeNotifier {
         Logger.warning(
           'Stored user ID does not match current user, clearing session',
         );
+        // Do not force sign-out on startup; prefer keeping Firebase session
+        // Clear only local session data and re-save with current user
         await _clearUserSession();
-        await _auth.signOut();
-        return false;
+        await _saveUserSession(user);
+        // Continue with user data fetch below
       }
 
       // Check if session is still valid (optional: implement session timeout)
@@ -177,9 +245,19 @@ class AuthService extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        Logger.warning('Could not load user data from Firestore');
-        await signOut();
-        return false;
+        // Fallback: set minimal customer model so app can proceed offline
+        Logger.warning(
+          'Could not load user data from Firestore, using minimal profile',
+        );
+        final minimalCustomer = CustomerModel(
+          uid: user.uid,
+          name: user.displayName ?? '',
+          email: user.email ?? '',
+          createdAt: DateTime.now(),
+        );
+        CustomerController.logeInCustomer = minimalCustomer;
+        notifyListeners();
+        return true;
       }
     } catch (e) {
       Logger.error('Error restoring user session', e);

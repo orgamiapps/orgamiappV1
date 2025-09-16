@@ -1,8 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:attendus/services/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:attendus/Services/auth_service.dart';
 import 'package:attendus/Services/firebase_initializer.dart';
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/models/customer_model.dart';
 
 import 'package:attendus/Utils/images.dart';
 import 'package:attendus/Utils/router.dart';
@@ -39,8 +42,8 @@ class _SplashScreenState extends State<SplashScreen>
       _startLoadingSequence();
     });
 
-    // Fail-safe: navigate if we haven't moved within 3 seconds
-    _timeoutTimer = Timer(const Duration(seconds: 3), () {
+    // Fail-safe: navigate if we haven't moved within 8 seconds (cold start tolerance)
+    _timeoutTimer = Timer(const Duration(seconds: 8), () {
       if (mounted && !_hasNavigated) {
         debugPrint('⏰ Global timeout - forcing navigation to prevent hanging');
         _navigateToSecondSplash();
@@ -140,7 +143,46 @@ class _SplashScreenState extends State<SplashScreen>
     });
 
     try {
-      debugPrint('🔄 Initializing AuthService...');
+      debugPrint('🔄 Checking Firebase Auth state directly...');
+
+      // Direct Firebase Auth check first - this is immediately available after force-close
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser != null) {
+        debugPrint('🔍 Firebase user found directly: ${firebaseUser.uid}');
+        
+        // Set minimal customer model immediately for fast navigation
+        if (CustomerController.logeInCustomer == null) {
+          CustomerController.logeInCustomer = CustomerModel(
+            uid: firebaseUser.uid,
+            name: firebaseUser.displayName ?? '',
+            email: firebaseUser.email ?? '',
+            createdAt: DateTime.now(),
+          );
+        }
+
+        setState(() {
+          _loadingText = "Welcome back!";
+        });
+
+        // Brief pause to show welcome message
+        await Future.delayed(const Duration(milliseconds: 300));
+
+        if (!mounted || _hasNavigated) return;
+        _navigateToHome();
+        
+        // Initialize AuthService in background for full functionality
+        Future.microtask(() async {
+          try {
+            await AuthService().initialize();
+          } catch (e) {
+            debugPrint('Background AuthService init failed: $e');
+          }
+        });
+        
+        return;
+      }
+
+      debugPrint('🔄 No direct Firebase user, initializing AuthService...');
 
       // Initialize AuthService with timeout to prevent hanging
       await AuthService().initialize().timeout(
@@ -179,9 +221,7 @@ class _SplashScreenState extends State<SplashScreen>
           _loadingText = "Welcome to Attendus";
         });
 
-        await Future.delayed(
-          const Duration(milliseconds: 300),
-        ); // Reduced from 800ms
+        await Future.delayed(const Duration(milliseconds: 500));
         if (!mounted || _hasNavigated) return;
         _navigateToSecondSplash();
       }

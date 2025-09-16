@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
-import 'package:attendus/screens/Splash/splash_screen.dart';
+import 'package:attendus/widgets/auth_gate.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
@@ -270,7 +270,7 @@ class MyApp extends StatelessWidget {
             GlobalCupertinoLocalizations.delegate,
           ],
           supportedLocales: const [Locale('en')],
-          home: homeOverride ?? const SplashScreen(),
+          home: homeOverride ?? const AuthGate(),
         );
       },
     );
