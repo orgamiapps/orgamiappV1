@@ -4518,11 +4518,11 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         boxShadow: [
           BoxShadow(
             color: _isRsvpStatusLoading
-                ? const Color(0xFF9CA3AF).withOpacity(0.3)
+                ? const Color(0xFF9CA3AF).withValues(alpha: 0.3)
                 : (_isRsvped
                           ? const Color(0xFF10B981)
                           : const Color(0xFF667EEA))
-                      .withOpacity(0.3),
+                      .withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -4554,7 +4554,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
@@ -4590,7 +4590,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                               Text(
                                 'See you at the event',
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.9),
+                                  color: Colors.white.withValues(alpha: 0.9),
                                   fontWeight: FontWeight.w400,
                                   fontSize: 13,
                                   fontFamily: 'Roboto',
@@ -4605,7 +4605,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                         Icon(
                           Icons.arrow_forward_ios,
                           size: 16,
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withValues(alpha: 0.8),
                         ),
                     ],
                   ),

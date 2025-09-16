@@ -298,7 +298,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                 );
               }
             : null,
-        activeColor: const Color(0xFF667EEA),
+        activeThumbColor: const Color(0xFF667EEA),
         inactiveThumbColor: _hasPermission ? null : Colors.grey[400],
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       ),
@@ -570,7 +570,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           ),
           value: value,
           onChanged: _hasPermission ? onChanged : null,
-          activeColor: const Color(0xFF667EEA),
+          activeThumbColor: const Color(0xFF667EEA),
           inactiveThumbColor: _hasPermission ? null : Colors.grey[400],
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,

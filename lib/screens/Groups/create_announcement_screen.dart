@@ -267,7 +267,7 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
                 onChanged: (value) {
                   setState(() => _isPinned = value);
                 },
-                activeColor: const Color(0xFF667EEA),
+                activeThumbColor: const Color(0xFF667EEA),
               ),
             ),
             const SizedBox(height: 24),

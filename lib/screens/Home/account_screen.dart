@@ -16,7 +16,7 @@ import 'package:attendus/Utils/theme_provider.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/screens/Home/delete_account_screen.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:attendus/services/auth_service.dart';
+import 'package:attendus/Services/auth_service.dart';
 
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 
