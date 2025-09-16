@@ -89,7 +89,13 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Admin Settings'),
+          title: const Text(
+            'Admin Settings',
+            style: TextStyle(
+              color: Colors.black87,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           backgroundColor: Colors.white,
           foregroundColor: Colors.black87,
           leading: IconButton(
@@ -104,7 +110,13 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
     if (!_isAdmin || _organization == null) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Admin Settings'),
+          title: const Text(
+            'Admin Settings',
+            style: TextStyle(
+              color: Colors.black87,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           backgroundColor: Colors.white,
           foregroundColor: Colors.black87,
           leading: IconButton(
@@ -139,7 +151,10 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Admin Settings'),
+        title: const Text(
+          'Admin Settings',
+          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
+        ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         elevation: 0,
@@ -347,8 +362,6 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
     ).then((_) => _checkAdminAndLoadData());
   }
 
-
-
   void _editLocation() {
     Navigator.push(
       context,
@@ -460,8 +473,6 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
 
 // Import the actual implementation
 // The EditGroupDetailsScreen is implemented in edit_group_details_screen.dart
-
-
 
 class EditGroupLocationScreen extends StatelessWidget {
   final String organizationId;
