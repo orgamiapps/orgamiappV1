@@ -2739,6 +2739,10 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                       ),
                   ],
                 ),
+                if (eventModel.status.toLowerCase() == 'cancelled') ...[
+                  const SizedBox(height: 10),
+                  _buildCanceledBanner(),
+                ],
               ],
             ),
           ),
@@ -2929,6 +2933,36 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             const SizedBox(height: 140), // Increased space for bottom buttons
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCanceledBanner() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.red.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Icon(Icons.cancel, color: Colors.red, size: 18),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'Event canceled',
+              style: TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                letterSpacing: 0.1,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

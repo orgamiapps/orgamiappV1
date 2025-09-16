@@ -5,6 +5,7 @@ import 'package:attendus/models/organization_model.dart';
 import 'package:attendus/screens/Groups/edit_group_details_screen.dart';
 import 'package:attendus/screens/Groups/join_requests_screen.dart';
 import 'package:attendus/screens/Groups/manage_members_screen.dart';
+import 'package:attendus/screens/Groups/manage_feed_posts_screen.dart';
 
 class GroupAdminSettingsScreen extends StatefulWidget {
   final String organizationId;
@@ -493,19 +494,8 @@ class EditGroupLocationScreen extends StatelessWidget {
   }
 }
 
-class ManageFeedPostsScreen extends StatelessWidget {
-  final String organizationId;
-
-  const ManageFeedPostsScreen({super.key, required this.organizationId});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Manage Feed Posts')),
-      body: const Center(child: Text('Manage Feed Posts Screen')),
-    );
-  }
-}
+// Removed placeholder ManageFeedPostsScreen in favor of the full
+// implementation in manage_feed_posts_screen.dart
 
 class EditEventSettingsScreen extends StatelessWidget {
   final String organizationId;
