@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/models/organization_model.dart';
 import 'package:attendus/screens/Groups/edit_group_details_screen.dart';
 import 'package:attendus/screens/Groups/join_requests_screen.dart';
+import 'package:attendus/screens/Groups/manage_members_screen.dart';
 
 class GroupAdminSettingsScreen extends StatefulWidget {
   final String organizationId;
@@ -514,19 +515,8 @@ class EditEventSettingsScreen extends StatelessWidget {
   }
 }
 
-class ManageMembersScreen extends StatelessWidget {
-  final String organizationId;
-
-  const ManageMembersScreen({super.key, required this.organizationId});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Manage Members')),
-      body: const Center(child: Text('Manage Members Screen')),
-    );
-  }
-}
+// Removed placeholder ManageMembersScreen. The real implementation is
+// in manage_members_screen.dart (imported above).
 
 class ManageJoinRequestsScreen extends StatelessWidget {
   final String organizationId;
