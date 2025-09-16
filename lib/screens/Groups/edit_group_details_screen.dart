@@ -343,7 +343,7 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
 
                     // Category Dropdown
                     DropdownButtonFormField<String>(
-                      value: _selectedCategory,
+                      initialValue: _selectedCategory,
                       decoration: InputDecoration(
                         labelText: 'Category *',
                         border: OutlineInputBorder(

@@ -147,11 +147,12 @@ class _GroupsScreenState extends State<GroupsScreen> {
         return data;
       }).toList();
 
-      if (mounted)
+      if (mounted) {
         setState(() {
           _discoverOrgs = list;
           _isLoadingDiscover = false;
         });
+      }
     } catch (e) {
       debugPrint('Error discovering organizations: $e');
       if (mounted) {
@@ -330,7 +331,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
                             leading: logoUrl.isNotEmpty
                                 ? CircleAvatar(
                                     foregroundImage: NetworkImage(logoUrl),
-                                    onForegroundImageError: (_, __) {},
+                                    onForegroundImageError: (exception, stackTrace) {},
                                   )
                                 : const CircleAvatar(
                                     child: Icon(Icons.apartment),
@@ -413,7 +414,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
             CircleAvatar(
               radius: 10,
               foregroundImage: NetworkImage(imageUrl),
-              onForegroundImageError: (_, __) {},
+              onForegroundImageError: (exception, stackTrace) {},
               child: Icon(icon ?? Icons.apartment, size: 14),
             ),
             const SizedBox(width: 6),

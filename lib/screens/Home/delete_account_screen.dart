@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
-import 'package:attendus/services/auth_service.dart';
+import 'package:attendus/Services/auth_service.dart';
 
 class DeleteAccountScreen extends StatefulWidget {
   const DeleteAccountScreen({super.key});

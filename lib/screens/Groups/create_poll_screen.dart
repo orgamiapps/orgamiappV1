@@ -368,7 +368,7 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
                   ],
                 ),
               );
-            }).toList(),
+            }),
             const SizedBox(height: 24),
             Card(
               shape: RoundedRectangleBorder(
@@ -383,7 +383,7 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
                     onChanged: (value) {
                       setState(() => _allowMultipleVotes = value);
                     },
-                    activeColor: const Color(0xFF667EEA),
+                    activeThumbColor: const Color(0xFF667EEA),
                   ),
                   const Divider(height: 1),
                   ListTile(

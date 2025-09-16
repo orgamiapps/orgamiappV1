@@ -1,6 +1,4 @@
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:attendus/firebase/ai_analytics_helper.dart';
@@ -9,9 +7,6 @@ import 'package:attendus/screens/Events/event_analytics_screen.dart';
 import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/dimensions.dart';
 import 'package:flutter/foundation.dart';
-import 'package:attendus/Utils/toast.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 
 class GroupAnalyticsDashboardScreen extends StatefulWidget {

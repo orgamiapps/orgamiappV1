@@ -280,12 +280,18 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
               // Apply filter
               if (_selectedFilter != 'All') {
                 if (_selectedFilter == 'Announcements' &&
-                    type != 'announcement')
+                    type != 'announcement') {
                   continue;
-                if (_selectedFilter == 'Polls' && type != 'poll') continue;
-                if (_selectedFilter == 'Photos' && type != 'photo') continue;
-                if (_selectedFilter == 'Events')
+                }
+                if (_selectedFilter == 'Polls' && type != 'poll') {
+                  continue;
+                }
+                if (_selectedFilter == 'Photos' && type != 'photo') {
+                  continue;
+                }
+                if (_selectedFilter == 'Events') {
                   continue; // Skip feed items if Events filter
+                }
               }
 
               combinedItems.add({
@@ -301,8 +307,9 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
               final data = doc.data() as Map<String, dynamic>;
 
               // Apply filter
-              if (_selectedFilter != 'All' && _selectedFilter != 'Events')
+              if (_selectedFilter != 'All' && _selectedFilter != 'Events') {
                 continue;
+              }
 
               combinedItems.add({
                 'type': 'event',
@@ -1902,7 +1909,7 @@ class _PollCard extends StatelessWidget {
                         ),
                       ),
                     );
-                  }).toList(),
+                  }),
                   const SizedBox(height: 12),
                   Row(
                     children: [

@@ -741,7 +741,7 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
                 ],
               ),
             );
-          }).toList(),
+          }),
           if (options.length > 3)
             Padding(
               padding: const EdgeInsets.only(top: 4),
