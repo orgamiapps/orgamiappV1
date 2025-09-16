@@ -6,6 +6,7 @@ import 'package:attendus/screens/Groups/edit_group_details_screen.dart';
 import 'package:attendus/screens/Groups/join_requests_screen.dart';
 import 'package:attendus/screens/Groups/manage_members_screen.dart';
 import 'package:attendus/screens/Groups/manage_feed_posts_screen.dart';
+import 'package:attendus/screens/Groups/group_analytics_dashboard_screen.dart';
 
 class GroupAdminSettingsScreen extends StatefulWidget {
   final String organizationId;
@@ -225,7 +226,7 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
           // Advanced Settings Section
           _buildSectionCard('Advanced', Icons.settings, [
             _buildSettingTile(
-              'Group Statistics',
+              'Group Analytics',
               'View detailed analytics',
               Icons.analytics,
               () => _viewStatistics(),
@@ -422,7 +423,7 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
       context,
       MaterialPageRoute(
         builder: (_) =>
-            GroupStatisticsScreen(organizationId: widget.organizationId),
+            GroupAnalyticsDashboardScreen(organizationId: widget.organizationId),
       ),
     );
   }
@@ -533,16 +534,3 @@ class ManageJoinRequestsScreen extends StatelessWidget {
   }
 }
 
-class GroupStatisticsScreen extends StatelessWidget {
-  final String organizationId;
-
-  const GroupStatisticsScreen({super.key, required this.organizationId});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Group Statistics')),
-      body: const Center(child: Text('Group Statistics Screen')),
-    );
-  }
-}
