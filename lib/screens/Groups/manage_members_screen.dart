@@ -21,6 +21,7 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
   String _searchQuery = '';
   bool _isCurrentUserOwner = false;
   bool _isCurrentUserAdmin = false;
+  bool _isCurrentUserEventCreator = false;
   String? _currentUserId;
 
   @override
@@ -79,6 +80,21 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
         setState(() {
           _isCurrentUserAdmin = _isCurrentUserOwner;
         });
+      }
+
+      // Check if current user is the creator of any event within this organization
+      try {
+        final eventsQuery = await _db
+            .collection('Events')
+            .where('organizationId', isEqualTo: widget.organizationId)
+            .where('customerUid', isEqualTo: user.uid)
+            .limit(1)
+            .get();
+        setState(() {
+          _isCurrentUserEventCreator = eventsQuery.docs.isNotEmpty;
+        });
+      } catch (_) {
+        // Leave as false on error
       }
     } catch (e) {
       // Handle error
@@ -373,7 +389,9 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
     // Permission logic for action visibility
     final bool canCurrentUserManage =
         !isCurrentUser &&
-        (_isCurrentUserOwner || (_isCurrentUserAdmin && !isAdmin));
+        (_isCurrentUserOwner ||
+            _isCurrentUserEventCreator ||
+            (_isCurrentUserAdmin && !isAdmin));
 
     Color roleColor;
     IconData roleIcon;
@@ -526,6 +544,7 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
     final role = data['role']?.toString() ?? 'member';
     final status = data['status']?.toString() ?? 'approved';
     final isAdmin = role == 'admin' || role == 'owner';
+    final isOwner = role == 'owner';
     final isPending = status == 'pending';
 
     List<PopupMenuEntry<String>> actions = [];
@@ -569,7 +588,7 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
                   color: isAdmin ? Colors.orange : Colors.blue,
                 ),
                 const SizedBox(width: 12),
-                Text(isAdmin ? 'Remove Admin' : 'Make Admin'),
+                Text(isAdmin ? 'Demote to Member' : 'Make Admin'),
               ],
             ),
           ),
@@ -586,6 +605,36 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
             ),
           ),
         );
+      } else if (_isCurrentUserEventCreator) {
+        // Event creators can promote members to admin and demote admins to member (but not the owner)
+        if (!isAdmin) {
+          actions.add(
+            const PopupMenuItem(
+              value: 'promote',
+              child: Row(
+                children: [
+                  Icon(Icons.person_add, color: Colors.blue),
+                  SizedBox(width: 12),
+                  Text('Make Admin'),
+                ],
+              ),
+            ),
+          );
+        } else if (!isOwner) {
+          actions.add(
+            const PopupMenuItem(
+              value: 'demote',
+              child: Row(
+                children: [
+                  Icon(Icons.person_remove, color: Colors.orange),
+                  SizedBox(width: 12),
+                  Text('Demote to Member'),
+                ],
+              ),
+            ),
+          );
+        }
+        // Event creators do not gain extra remove permissions
       } else if (_isCurrentUserAdmin && !isAdmin) {
         // Admins can remove regular members only
         actions.add(
@@ -695,6 +744,19 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
     String memberId,
     Map<String, dynamic> data,
   ) async {
+    if (!(_isCurrentUserOwner || _isCurrentUserEventCreator)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Only the event creator or group owner can make admins',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
     try {
       await _db
           .collection('Organizations')
@@ -727,6 +789,19 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
   }
 
   Future<void> _demoteMember(String memberId, Map<String, dynamic> data) async {
+    if (!(_isCurrentUserOwner || _isCurrentUserEventCreator)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Only the event creator or group owner can demote admins',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
     try {
       await _db
           .collection('Organizations')

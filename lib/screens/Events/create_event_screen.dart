@@ -311,6 +311,57 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   Future uploadEvent() async {
     try {
       await FirebaseFirestoreHelper().getEventID().then((docId) async {
+        // Check if organization requires approval for member-created events
+        String eventStatus = 'scheduled'; // Default status
+        bool needsApproval = false;
+        
+        if (_selectedOrganizationId != null && _selectedOrganizationId!.isNotEmpty) {
+          try {
+            final orgDoc = await FirebaseFirestore.instance
+                .collection('Organizations')
+                .doc(_selectedOrganizationId!)
+                .get();
+            
+            if (orgDoc.exists) {
+              final orgData = orgDoc.data()!;
+              final requireApproval = orgData['requireEventApproval'] ?? false;
+              final allowMemberCreation = orgData['allowMemberEventCreation'] ?? true;
+              final createdBy = orgData['createdBy'];
+              final currentUserId = FirebaseAuth.instance.currentUser!.uid;
+              
+              // Check if current user is admin
+              bool isAdmin = createdBy == currentUserId;
+              if (!isAdmin) {
+                final memberDoc = await FirebaseFirestore.instance
+                    .collection('Organizations')
+                    .doc(_selectedOrganizationId!)
+                    .collection('Members')
+                    .doc(currentUserId)
+                    .get();
+                
+                if (memberDoc.exists) {
+                  final role = memberDoc.data()?['role'];
+                  isAdmin = role == 'admin' || role == 'owner';
+                }
+              }
+              
+              // If member creation is disabled and user is not admin, show error
+              if (!allowMemberCreation && !isAdmin) {
+                throw Exception('Only admins can create events in this group');
+              }
+              
+              // If approval is required and user is not admin, set pending status
+              if (requireApproval && !isAdmin) {
+                eventStatus = 'pending_approval';
+                needsApproval = true;
+              }
+            }
+          } catch (e) {
+            debugPrint('Error checking organization settings: $e');
+            // Continue with default status if check fails
+          }
+        }
+
         EventModel newEvent = EventModel(
           id: docId,
           groupName: groupNameEdtController.text,
@@ -321,7 +372,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           imageUrl: thumbnailUrlCtlr.text,
           selectedDateTime: _startDateTime,
           eventGenerateTime: DateTime.now(),
-          status: '',
+          status: eventStatus,
           getLocation: true,
           radius: widget.radios,
           longitude: _selectedLocationInternal!.longitude,
@@ -346,14 +397,25 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
         // Create notification for event creator
         final messagingHelper = FirebaseMessagingHelper();
-        await messagingHelper.createLocalNotification(
-          title: 'Event Created Successfully',
-          body:
-              'Your event "${titleEdtController.text}" has been created and is now live!',
-          type: 'new_event',
-          eventId: docId,
-          eventTitle: titleEdtController.text,
-        );
+        if (needsApproval) {
+          await messagingHelper.createLocalNotification(
+            title: 'Event Submitted for Approval',
+            body:
+                'Your event "${titleEdtController.text}" has been submitted and is awaiting admin approval.',
+            type: 'event_pending',
+            eventId: docId,
+            eventTitle: titleEdtController.text,
+          );
+        } else {
+          await messagingHelper.createLocalNotification(
+            title: 'Event Created Successfully',
+            body:
+                'Your event "${titleEdtController.text}" has been created and is now live!',
+            type: 'new_event',
+            eventId: docId,
+            eventTitle: titleEdtController.text,
+          );
+        }
 
         // Save questions if provided
         if (widget.questions != null && widget.questions!.isNotEmpty) {

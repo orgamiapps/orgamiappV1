@@ -3,9 +3,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/models/organization_model.dart';
 import 'package:attendus/screens/Groups/edit_group_details_screen.dart';
+import 'package:attendus/screens/Groups/edit_event_settings_screen.dart';
 import 'package:attendus/screens/Groups/join_requests_screen.dart';
 import 'package:attendus/screens/Groups/manage_members_screen.dart';
 import 'package:attendus/screens/Groups/manage_feed_posts_screen.dart';
+import 'package:attendus/screens/Groups/group_analytics_dashboard_screen.dart';
+import 'package:attendus/screens/Groups/group_location_settings_screen.dart';
+import 'package:attendus/screens/Groups/pending_events_screen.dart';
 
 class GroupAdminSettingsScreen extends StatefulWidget {
   final String organizationId;
@@ -200,6 +204,12 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
               Icons.event,
               () => _editEventSettings(),
             ),
+            _buildSettingTile(
+              'Pending Events',
+              'Review and approve member events',
+              Icons.event_note,
+              () => _managePendingEvents(),
+            ),
           ]),
 
           const SizedBox(height: 16),
@@ -225,7 +235,7 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
           // Advanced Settings Section
           _buildSectionCard('Advanced', Icons.settings, [
             _buildSettingTile(
-              'Group Statistics',
+              'Group Analytics',
               'View detailed analytics',
               Icons.analytics,
               () => _viewStatistics(),
@@ -367,12 +377,17 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => EditGroupLocationScreen(
+        builder: (_) => GroupLocationSettingsScreen(
           organizationId: widget.organizationId,
           organization: _organization!,
         ),
       ),
-    ).then((_) => _checkAdminAndLoadData());
+    ).then((result) {
+      // Refresh organization data if location was updated
+      if (result == true) {
+        _checkAdminAndLoadData();
+      }
+    });
   }
 
   void _manageFeedPosts() {
@@ -417,12 +432,23 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
     );
   }
 
-  void _viewStatistics() {
+  void _managePendingEvents() {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) =>
-            GroupStatisticsScreen(organizationId: widget.organizationId),
+            PendingEventsScreen(organizationId: widget.organizationId),
+      ),
+    );
+  }
+
+  void _viewStatistics() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => GroupAnalyticsDashboardScreen(
+          organizationId: widget.organizationId,
+        ),
       ),
     );
   }
@@ -475,74 +501,11 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
 // Import the actual implementation
 // The EditGroupDetailsScreen is implemented in edit_group_details_screen.dart
 
-class EditGroupLocationScreen extends StatelessWidget {
-  final String organizationId;
-  final OrganizationModel organization;
-
-  const EditGroupLocationScreen({
-    super.key,
-    required this.organizationId,
-    required this.organization,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Edit Location')),
-      body: const Center(child: Text('Edit Location Screen')),
-    );
-  }
-}
-
 // Removed placeholder ManageFeedPostsScreen in favor of the full
 // implementation in manage_feed_posts_screen.dart
-
-class EditEventSettingsScreen extends StatelessWidget {
-  final String organizationId;
-  final OrganizationModel organization;
-
-  const EditEventSettingsScreen({
-    super.key,
-    required this.organizationId,
-    required this.organization,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Event Settings')),
-      body: const Center(child: Text('Event Settings Screen')),
-    );
-  }
-}
 
 // Removed placeholder ManageMembersScreen. The real implementation is
 // in manage_members_screen.dart (imported above).
 
-class ManageJoinRequestsScreen extends StatelessWidget {
-  final String organizationId;
-
-  const ManageJoinRequestsScreen({super.key, required this.organizationId});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Join Requests')),
-      body: const Center(child: Text('Join Requests Screen')),
-    );
-  }
-}
-
-class GroupStatisticsScreen extends StatelessWidget {
-  final String organizationId;
-
-  const GroupStatisticsScreen({super.key, required this.organizationId});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Group Statistics')),
-      body: const Center(child: Text('Group Statistics Screen')),
-    );
-  }
-}
+// Removed placeholder ManageJoinRequestsScreen. The real implementation is
+// in join_requests_screen.dart (imported above).
