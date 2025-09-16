@@ -825,64 +825,57 @@ class _FeedTabState extends State<_FeedTab> {
   void _showCreateOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.announcement, color: Color(0xFF667EEA)),
-              title: const Text('Post Announcement'),
-              subtitle: const Text('Share important updates with members'),
-              onTap: () async {
-                Navigator.pop(context);
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CreateAnnouncementScreen(
-                      organizationId: widget.organizationId,
+      builder: (context) {
+        final bottomInset = MediaQuery.of(context).padding.bottom;
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.only(top: 20, bottom: 20 + bottomInset + 24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                );
-                if (result == true && mounted) {
-                  setState(() {});
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.poll, color: Color(0xFF667EEA)),
-              title: const Text('Create Poll'),
-              subtitle: const Text('Get feedback from group members'),
-              onTap: () async {
-                Navigator.pop(context);
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        CreatePollScreen(organizationId: widget.organizationId),
+                  // Photo sharing available to all members
+                  ListTile(
+                    leading: const Icon(
+                      Icons.photo_camera,
+                      color: Color(0xFF667EEA),
+                    ),
+                    title: const Text('Share Photo'),
+                    subtitle: const Text('Post photos to share with the group'),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CreatePhotoPostScreen(
+                            organizationId: widget.organizationId,
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                );
-                if (result == true && mounted) {
-                  setState(() {});
-                }
-              },
+                  // Admin options are handled in the FAB modal
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -2662,132 +2655,147 @@ class _AdminFabState extends State<_AdminFab> {
   void _showCreateOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            // Photo sharing available to all members
-            ListTile(
-              leading: const Icon(Icons.photo_camera, color: Color(0xFF667EEA)),
-              title: const Text('Share Photo'),
-              subtitle: const Text('Post photos to share with the group'),
-              onTap: () async {
-                Navigator.pop(context);
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CreatePhotoPostScreen(
-                      organizationId: widget.organizationId,
+      builder: (context) {
+        final bottomInset = MediaQuery.of(context).padding.bottom;
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.only(top: 20, bottom: 20 + bottomInset + 24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                );
-              },
+                  // Photo sharing available to all members
+                  ListTile(
+                    leading: const Icon(
+                      Icons.photo_camera,
+                      color: Color(0xFF667EEA),
+                    ),
+                    title: const Text('Share Photo'),
+                    subtitle: const Text('Post photos to share with the group'),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CreatePhotoPostScreen(
+                            organizationId: widget.organizationId,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  // Admin-only options
+                  if (_isAdmin) ...[
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(
+                        Icons.event,
+                        color: Color(0xFF667EEA),
+                      ),
+                      title: const Text('Create Event'),
+                      subtitle: const Text(
+                        'Schedule a new event for this group',
+                      ),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CreateEventScreen(
+                              selectedLocation: const LatLng(0, 0),
+                              radios: 100,
+                              preselectedOrganizationId: widget.organizationId,
+                              forceOrganizationEvent: true,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(
+                        Icons.announcement,
+                        color: Color(0xFF667EEA),
+                      ),
+                      title: const Text('Post Announcement'),
+                      subtitle: const Text(
+                        'Share important updates with members',
+                      ),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CreateAnnouncementScreen(
+                              organizationId: widget.organizationId,
+                            ),
+                          ),
+                        );
+                        if (result == true && context.mounted) {
+                          // Feed will auto-refresh via stream
+                        }
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.poll, color: Color(0xFF667EEA)),
+                      title: const Text('Create Poll'),
+                      subtitle: const Text('Get feedback from group members'),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CreatePollScreen(
+                              organizationId: widget.organizationId,
+                            ),
+                          ),
+                        );
+                        if (result == true && context.mounted) {
+                          // Feed will auto-refresh via stream
+                        }
+                      },
+                    ),
+                    const Divider(height: 32),
+                    ListTile(
+                      leading: const Icon(
+                        Icons.admin_panel_settings,
+                        color: Color(0xFF667EEA),
+                      ),
+                      title: const Text('Admin Settings'),
+                      subtitle: const Text('Manage group settings and content'),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => GroupAdminSettingsScreen(
+                              organizationId: widget.organizationId,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
-            // Admin-only options
-            if (_isAdmin) ...[
-              const Divider(height: 1),
-              ListTile(
-                leading: const Icon(Icons.event, color: Color(0xFF667EEA)),
-                title: const Text('Create Event'),
-                subtitle: const Text('Schedule a new event for this group'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  // Navigate to create event screen with preselected organization
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => CreateEventScreen(
-                        selectedLocation: const LatLng(
-                          0,
-                          0,
-                        ), // Default location
-                        radios: 100, // Default radius
-                        preselectedOrganizationId: widget.organizationId,
-                        forceOrganizationEvent: true,
-                      ),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(
-                  Icons.announcement,
-                  color: Color(0xFF667EEA),
-                ),
-                title: const Text('Post Announcement'),
-                subtitle: const Text('Share important updates with members'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => CreateAnnouncementScreen(
-                        organizationId: widget.organizationId,
-                      ),
-                    ),
-                  );
-                  if (result == true && context.mounted) {
-                    // Feed will auto-refresh via stream
-                  }
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.poll, color: Color(0xFF667EEA)),
-                title: const Text('Create Poll'),
-                subtitle: const Text('Get feedback from group members'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => CreatePollScreen(
-                        organizationId: widget.organizationId,
-                      ),
-                    ),
-                  );
-                  if (result == true && context.mounted) {
-                    // Feed will auto-refresh via stream
-                  }
-                },
-              ),
-              const Divider(height: 32),
-              ListTile(
-                leading: const Icon(
-                  Icons.admin_panel_settings,
-                  color: Color(0xFF667EEA),
-                ),
-                title: const Text('Admin Settings'),
-                subtitle: const Text('Manage group settings and content'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => GroupAdminSettingsScreen(
-                        organizationId: widget.organizationId,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 

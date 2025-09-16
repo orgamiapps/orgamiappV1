@@ -12,7 +12,7 @@ import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/app_constants.dart';
 
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:attendus/services/auth_service.dart';
+import 'package:attendus/Services/auth_service.dart';
 
 class SecondSplashScreen extends StatefulWidget {
   const SecondSplashScreen({super.key});
@@ -155,10 +155,10 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
 
     try {
       final helper = FirebaseGoogleAuthHelper();
-      final user = await helper.loginWithGoogle();
+      final profileData = await helper.loginWithGoogle();
 
-      if (user != null) {
-        await _handleSuccessfulLogin(user);
+      if (profileData != null) {
+        await _handleSuccessfulLoginWithProfileData(profileData);
       } else {
         ShowToast().showNormalToast(msg: 'Google sign-in failed');
       }
@@ -187,10 +187,10 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
 
     try {
       final helper = FirebaseGoogleAuthHelper();
-      final user = await helper.loginWithApple();
+      final profileData = await helper.loginWithApple();
 
-      if (user != null) {
-        await _handleSuccessfulLogin(user);
+      if (profileData != null) {
+        await _handleSuccessfulLoginWithProfileData(profileData);
       } else {
         ShowToast().showNormalToast(
           msg: 'Apple sign-in is not available on this device',
@@ -213,9 +213,9 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
     }
   }
 
-  Future<void> _handleSuccessfulLogin(user) async {
+  Future<void> _handleSuccessfulLoginWithProfileData(Map<String, dynamic> profileData) async {
     try {
-      await AuthService().handleSocialLoginSuccess(user);
+      await AuthService().handleSocialLoginSuccessWithProfileData(profileData);
       if (!mounted) return;
       RouterClass().homeScreenRoute(context: context);
     } catch (e) {

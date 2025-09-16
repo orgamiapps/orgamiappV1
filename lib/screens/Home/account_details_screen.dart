@@ -12,6 +12,9 @@ import 'package:attendus/firebase/firebase_storage_helper.dart';
 import 'package:attendus/screens/Authentication/forgot_password_screen.dart';
 import 'package:attendus/Utils/full_screen_image_viewer.dart';
 import 'package:attendus/Utils/cached_image.dart';
+import 'package:attendus/Services/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:attendus/firebase/firebase_google_auth_helper.dart';
 
 class AccountDetailsScreen extends StatefulWidget {
   const AccountDetailsScreen({super.key});
@@ -84,6 +87,9 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
   bool _notifyEventReminders = true;
   bool _notifyMessages = true;
   bool _notifyAnnouncements = true;
+  
+  // Profile auto-update state
+  bool _hasAutoUpdated = false;
 
   late TabController _tabController;
 
@@ -93,6 +99,10 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
     // Tabs removed; keep controller only if referenced elsewhere
     _tabController = TabController(length: 1, vsync: this);
     _loadUserData();
+    // Automatically attempt to enhance profile on screen load
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _autoEnhanceProfile();
+    });
   }
 
   @override
@@ -358,6 +368,161 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
         ),
       ),
     );
+  }
+
+  /// Automatically enhance profile with Google/Apple account data
+  Future<void> _autoEnhanceProfile() async {
+    if (_hasAutoUpdated) return;
+    
+    try {
+      print('🔄 Auto-enhancing profile on account details screen load...');
+      
+      // Run comprehensive profile enhancement
+      await _performComprehensiveProfileUpdate();
+      
+      _hasAutoUpdated = true;
+    } catch (e) {
+      print('❌ Auto profile enhancement failed: $e');
+    }
+  }
+  
+  /// Comprehensive profile update that tries multiple strategies
+  Future<void> _performComprehensiveProfileUpdate() async {
+    final customer = CustomerController.logeInCustomer;
+    if (customer == null) return;
+    
+    print('📊 Analyzing profile completeness...');
+    print('Current name: "${customer.name}"');
+    print('Current email: "${customer.email}"');
+    print('Current phone: "${customer.phoneNumber}"');
+    
+    // Check if profile needs enhancement
+    bool needsUpdate = _profileNeedsEnhancement(customer);
+    print('Profile needs update: $needsUpdate');
+    
+    if (!needsUpdate) {
+      print('✅ Profile already complete');
+      return;
+    }
+    
+    // Strategy 1: Try to get fresh data by re-authenticating with the social provider
+    bool success = await _tryFreshSocialAuthentication();
+    
+    if (!success) {
+      // Strategy 2: Try to enhance from existing Firebase Auth data
+      success = await _tryUpdateFromFirebaseAuth();
+    }
+    
+    if (!success) {
+      // Strategy 3: Try to force refresh Firebase Auth token and retry
+      success = await _tryForceTokenRefreshAndUpdate();
+    }
+    
+    if (success) {
+      print('✅ Profile successfully enhanced');
+      // Reload UI with updated data
+      await _loadUserData();
+    } else {
+      print('⚠️ Could not enhance profile - no additional data available');
+    }
+  }
+  
+  /// Check if profile needs enhancement
+  bool _profileNeedsEnhancement(CustomerModel customer) {
+    // Check name
+    if (customer.name.isEmpty ||
+        customer.name == customer.email.split('@')[0] ||
+        customer.name.toLowerCase() == 'user' ||
+        customer.name.toLowerCase() == 'unknown' ||
+        customer.name.contains('@') ||
+        customer.name.length < 2) {
+      return true;
+    }
+    
+    // Could add more checks for phone, profile picture, etc.
+    return false;
+  }
+  
+  /// Strategy 1: Fresh social authentication
+  Future<bool> _tryFreshSocialAuthentication() async {
+    try {
+      print('🔄 Trying fresh social authentication...');
+      
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return false;
+      
+      // Check which social provider they used
+      final hasGoogle = currentUser.providerData.any((p) => p.providerId == 'google.com');
+      final hasApple = currentUser.providerData.any((p) => p.providerId == 'apple.com');
+      
+      print('Has Google provider: $hasGoogle');
+      print('Has Apple provider: $hasApple');
+      
+      if (hasGoogle) {
+        print('🔄 Performing fresh Google authentication...');
+        final helper = FirebaseGoogleAuthHelper();
+        final profileData = await helper.loginWithGoogle();
+        
+        if (profileData != null) {
+          print('✅ Got fresh Google data');
+          await AuthService().handleSocialLoginSuccessWithProfileData(profileData);
+          return true;
+        }
+      } else if (hasApple) {
+        print('🔄 Performing fresh Apple authentication...');
+        final helper = FirebaseGoogleAuthHelper();
+        final profileData = await helper.loginWithApple();
+        
+        if (profileData != null) {
+          print('✅ Got fresh Apple data');
+          await AuthService().handleSocialLoginSuccessWithProfileData(profileData);
+          return true;
+        }
+      }
+      
+      return false;
+    } catch (e) {
+      print('❌ Fresh social authentication failed: $e');
+      return false;
+    }
+  }
+  
+  /// Strategy 2: Update from existing Firebase Auth data
+  Future<bool> _tryUpdateFromFirebaseAuth() async {
+    try {
+      print('🔄 Trying update from Firebase Auth...');
+      return await AuthService().updateCurrentUserProfileFromAuth();
+    } catch (e) {
+      print('❌ Firebase Auth update failed: $e');
+      return false;
+    }
+  }
+  
+  /// Strategy 3: Force token refresh and retry
+  Future<bool> _tryForceTokenRefreshAndUpdate() async {
+    try {
+      print('🔄 Forcing token refresh...');
+      
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return false;
+      
+      // Force refresh the token to get latest user info
+      await currentUser.reload();
+      final refreshedUser = FirebaseAuth.instance.currentUser;
+      
+      if (refreshedUser != null) {
+        print('Current displayName after reload: "${refreshedUser.displayName}"');
+        print('Current email after reload: "${refreshedUser.email}"');
+        
+        // Try to update with refreshed data
+        return await AuthService().updateCurrentUserProfileFromAuth();
+      }
+      
+      return false;
+    } catch (e) {
+      print('❌ Token refresh failed: $e');
+      return false;
+    }
   }
 
   Widget _headerSection() {

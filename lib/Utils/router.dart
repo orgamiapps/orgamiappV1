@@ -39,8 +39,14 @@ class RouterClass {
     return navigator.pushAndRemoveUntil(
       PageRouteBuilder(
         pageBuilder: (ctx, a, b) => const DashboardScreen(),
-        transitionDuration: const Duration(milliseconds: 0),
-        reverseTransitionDuration: const Duration(milliseconds: 0),
+        transitionsBuilder: (ctx, animation, secondaryAnimation, child) {
+          return FadeTransition(
+            opacity: animation.drive(CurveTween(curve: Curves.easeInOut)),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 220),
+        reverseTransitionDuration: const Duration(milliseconds: 200),
       ),
       (route) => false,
     );

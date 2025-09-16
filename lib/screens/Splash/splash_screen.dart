@@ -149,7 +149,7 @@ class _SplashScreenState extends State<SplashScreen>
       final firebaseUser = FirebaseAuth.instance.currentUser;
       if (firebaseUser != null) {
         debugPrint('🔍 Firebase user found directly: ${firebaseUser.uid}');
-        
+
         // Set minimal customer model immediately for fast navigation
         if (CustomerController.logeInCustomer == null) {
           CustomerController.logeInCustomer = CustomerModel(
@@ -169,16 +169,18 @@ class _SplashScreenState extends State<SplashScreen>
 
         if (!mounted || _hasNavigated) return;
         _navigateToHome();
-        
+
         // Initialize AuthService in background for full functionality
         Future.microtask(() async {
           try {
             await AuthService().initialize();
+            // Try to update current user profile from Firebase Auth if incomplete
+            await AuthService().updateCurrentUserProfileFromAuth();
           } catch (e) {
             debugPrint('Background AuthService init failed: $e');
           }
         });
-        
+
         return;
       }
 
@@ -213,6 +215,21 @@ class _SplashScreenState extends State<SplashScreen>
 
         if (!mounted || _hasNavigated) return;
         _navigateToHome();
+
+        // Try to update user profile from Firebase Auth in background
+        Future.microtask(() async {
+          try {
+            // Run aggressive profile update on app startup
+            bool success = await AuthService().aggressiveProfileUpdate();
+            if (!success) {
+              // Fallback to regular update
+              await AuthService().updateCurrentUserProfileFromAuth();
+            }
+            debugPrint('Background profile update completed');
+          } catch (e) {
+            debugPrint('Background profile update failed: $e');
+          }
+        });
       } else {
         debugPrint('🔍 No user session found, navigating to second splash');
         if (!mounted || _hasNavigated) return;

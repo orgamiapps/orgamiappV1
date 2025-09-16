@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
@@ -13,7 +15,7 @@ import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 import 'package:attendus/screens/MyProfile/Widgets/professional_badge_widget.dart';
 import 'package:attendus/models/badge_model.dart';
 import 'package:attendus/Services/badge_service.dart';
-import 'package:attendus/screens/Home/account_details_screen.dart';
+import 'package:attendus/screens/Home/account_details_screen_v2.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -72,6 +74,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     super.initState();
     _initializeAnimations();
     _loadProfileData();
+    _ensureProfileDataUpdated();
   }
 
   void _initializeAnimations() {
@@ -142,6 +145,14 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         return;
       }
 
+      // Refresh user data from Firestore to get latest updates
+      final latestUserData = await FirebaseFirestoreHelper().getSingleCustomer(
+        customerId: CustomerController.logeInCustomer!.uid,
+      );
+      if (latestUserData != null) {
+        CustomerController.logeInCustomer = latestUserData;
+      }
+
       debugPrint(
         'Loading profile data for user: ${CustomerController.logeInCustomer!.uid}',
       );
@@ -188,6 +199,59 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           msg: 'Failed to load profile data: ${e.toString()}',
         );
       }
+    }
+  }
+
+  // Ensure profile data is updated from Firebase Auth
+  Future<void> _ensureProfileDataUpdated() async {
+    try {
+      // Trigger background profile update from Firebase Auth
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      final currentUser = CustomerController.logeInCustomer;
+      if (currentUser == null) return;
+
+      // Check if name needs updating
+      if (currentUser.name.isEmpty ||
+          currentUser.name == currentUser.email.split('@')[0] ||
+          currentUser.name.toLowerCase() == 'user' ||
+          currentUser.name.contains('@')) {
+        debugPrint(
+          'Profile name needs updating, attempting to fetch from Firebase Auth',
+        );
+
+        // Try to update from Firebase Auth
+        final firebaseUser = FirebaseAuth.instance.currentUser;
+        if (firebaseUser != null) {
+          // Force reload to get latest data
+          await firebaseUser.reload();
+          final refreshedUser = FirebaseAuth.instance.currentUser;
+
+          if (refreshedUser?.displayName != null &&
+              refreshedUser!.displayName!.isNotEmpty) {
+            // Update in Firestore
+            await FirebaseFirestore.instance
+                .collection('Customers')
+                .doc(currentUser.uid)
+                .update({'name': refreshedUser.displayName});
+
+            // Update local model
+            currentUser.name = refreshedUser.displayName!;
+            CustomerController.logeInCustomer = currentUser;
+
+            // Refresh UI
+            if (mounted) {
+              setState(() {});
+            }
+
+            debugPrint(
+              'Successfully updated profile name to: ${refreshedUser.displayName}',
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error ensuring profile data updated: $e');
     }
   }
 
@@ -287,10 +351,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                       child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.account_balance_wallet_outlined,
-                            size: 24,
-                          ),
+                          Icon(Icons.account_balance_wallet_outlined, size: 24),
                           SizedBox(width: 12),
                           Text(
                             'Save to Wallet',
@@ -343,7 +404,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       });
 
       final urlString = result.data['url'] as String;
-      
+
       // Dismiss loading indicator
       if (context.mounted) {
         Navigator.pop(context);
@@ -363,21 +424,22 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       }
 
       final url = Uri.parse(urlString);
-      
+
       if (await canLaunchUrl(url)) {
         await launchUrl(
-          url, 
-          mode: urlString.startsWith('data:') 
-            ? LaunchMode.inAppWebView 
-            : LaunchMode.externalApplication
+          url,
+          mode: urlString.startsWith('data:')
+              ? LaunchMode.inAppWebView
+              : LaunchMode.externalApplication,
         );
-        
+
         if (!context.mounted) return;
         Navigator.pop(context);
-        
+
         // Show success message
-        const successMessage = 'Badge generated successfully! You can now add it to your wallet.';
-          
+        const successMessage =
+            'Badge generated successfully! You can now add it to your wallet.';
+
         ShowToast().showNormalToast(msg: successMessage);
       } else {
         if (!context.mounted) return;
@@ -393,7 +455,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       if (context.mounted && ModalRoute.of(context)?.isCurrent == false) {
         Navigator.pop(context);
       }
-      
+
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -746,7 +808,8 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (context) => const AccountDetailsScreen(),
+                            builder: (context) =>
+                                const AccountDetailsScreenV2(),
                           ),
                         );
                       },
@@ -838,7 +901,12 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          user?.name ?? 'User',
+                          (user?.name != null &&
+                                  user!.name.isNotEmpty &&
+                                  !user.name.contains('@') &&
+                                  user.name.toLowerCase() != 'user')
+                              ? user.name
+                              : (user?.email?.split('@').first ?? 'User'),
                           style: const TextStyle(
                             color: Color(0xFF1A1A1A),
                             fontSize: 22,
@@ -919,7 +987,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (context) => const AccountDetailsScreen(),
+                      builder: (context) => const AccountDetailsScreenV2(),
                     ),
                   );
                 },

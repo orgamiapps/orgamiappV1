@@ -1,11 +1,7 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:attendus/controller/customer_controller.dart';
-import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/firebase/firebase_google_auth_helper.dart';
-import 'package:attendus/models/customer_model.dart';
-import 'package:attendus/Utils/app_constants.dart';
+import 'package:attendus/Services/auth_service.dart';
 import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
@@ -30,40 +26,25 @@ class _SocialLoginViewState extends State<SocialLoginView> {
               _googleBtnLoading = true;
             });
             final navigator = Navigator.of(context);
-            await FirebaseGoogleAuthHelper().loginWithGoogle().then((
-              googleFirebaseUser,
-            ) async {
-              if (googleFirebaseUser != null) {
-                await FirebaseFirestoreHelper()
-                    .getSingleCustomer(customerId: googleFirebaseUser.uid)
-                    .then((userData) {
-                      if (userData != null) {
-                        setState(() {
-                          CustomerController.logeInCustomer = userData;
-                          _googleBtnLoading = false;
-                        });
-                        if (!mounted) return;
-                        RouterClass().homeScreenRoute(
-                          context: navigator.context,
-                        );
-                      } else {
-                        CustomerModel newCustomerModel = CustomerModel(
-                          uid: googleFirebaseUser.uid,
-                          name: googleFirebaseUser.displayName ?? '',
-                          email: googleFirebaseUser.email!,
-                          createdAt: DateTime.now(),
-                        );
-                        _createNewUser(
-                          newCustomerModel: newCustomerModel,
-                          loading: _googleBtnLoading,
-                        );
-                      }
-                    });
-              } else {
-                setState(() {
-                  _googleBtnLoading = false;
-                });
+            final profileData = await FirebaseGoogleAuthHelper()
+                .loginWithGoogle();
+            if (profileData != null) {
+              try {
+                await AuthService().handleSocialLoginSuccessWithProfileData(
+                  profileData,
+                );
+                if (!mounted) return;
+                RouterClass().homeScreenRoute(context: navigator.context);
+              } catch (e) {
+                ShowToast().showNormalToast(
+                  msg: 'Error setting up profile: ${e.toString()}',
+                );
               }
+            } else {
+              ShowToast().showNormalToast(msg: 'Google sign-in failed');
+            }
+            setState(() {
+              _googleBtnLoading = false;
             });
           }
         } catch (e) {
@@ -109,27 +90,5 @@ class _SocialLoginViewState extends State<SocialLoginView> {
         ),
       ),
     );
-  }
-
-  Future<void> _createNewUser({
-    required CustomerModel newCustomerModel,
-    required bool loading,
-  }) async {
-    await FirebaseFirestore.instance
-        .collection(CustomerModel.firebaseKey)
-        .doc(newCustomerModel.uid)
-        .set(CustomerModel.getMap(newCustomerModel))
-        .then((value) {
-          ShowToast().showNormalToast(
-            msg: 'Welcome to ${AppConstants.appName}',
-          );
-
-          setState(() {
-            CustomerController.logeInCustomer = newCustomerModel;
-            loading = false;
-          });
-          if (!mounted) return;
-          RouterClass().homeScreenRoute(context: context);
-        });
   }
 }

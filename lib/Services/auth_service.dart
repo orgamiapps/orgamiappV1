@@ -8,6 +8,7 @@ import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Services/firebase_initializer.dart';
+import 'package:attendus/firebase/firebase_google_auth_helper.dart';
 
 /// Authentication service that handles persistent login functionality
 /// using Firebase Auth and secure storage for enhanced security
@@ -464,6 +465,476 @@ class AuthService extends ChangeNotifier {
     } catch (e) {
       Logger.error('Error handling social login success', e);
       rethrow;
+    }
+  }
+
+  /// Enhanced method to handle social login with profile data extraction
+  Future<void> handleSocialLoginSuccessWithProfileData(
+    Map<String, dynamic> profileData,
+  ) async {
+    try {
+      final user = profileData['user'] as User;
+
+      // Check if user exists in Firestore
+      final userData = await FirebaseFirestoreHelper().getSingleCustomer(
+        customerId: user.uid,
+      );
+
+      if (userData != null) {
+        // Existing user - update profile with new information
+        CustomerController.logeInCustomer = userData;
+
+        // Always attempt to update profile for existing users
+        // This ensures that users who previously had incomplete profiles
+        // get their information updated from their social accounts
+        await _updateExistingUserProfile(userData, profileData);
+
+        // Also run aggressive profile update to catch any additional data
+        Future.microtask(() async {
+          try {
+            await aggressiveProfileUpdate();
+          } catch (e) {
+            Logger.warning(
+              'Aggressive profile update failed during social login: $e',
+            );
+          }
+        });
+      } else {
+        // New user - create enhanced profile with extracted information
+        final newCustomerModel = await _createEnhancedUserProfile(
+          user,
+          profileData,
+        );
+
+        await FirebaseFirestore.instance
+            .collection(CustomerModel.firebaseKey)
+            .doc(newCustomerModel.uid)
+            .set(CustomerModel.getMap(newCustomerModel));
+
+        CustomerController.logeInCustomer = newCustomerModel;
+        Logger.info('Created new user profile with enhanced data');
+      }
+
+      await _saveUserSession(user);
+      notifyListeners();
+    } catch (e) {
+      Logger.error('Error handling social login success with profile data', e);
+      rethrow;
+    }
+  }
+
+  /// Update current user's profile from Firebase Auth data if incomplete
+  /// This is useful for existing users who may have incomplete profile information
+  Future<bool> updateCurrentUserProfileFromAuth() async {
+    try {
+      final currentFirebaseUser = _auth.currentUser;
+      final currentCustomer = CustomerController.logeInCustomer;
+
+      Logger.info('=== MANUAL PROFILE UPDATE DEBUG ===');
+      Logger.info('Current Firebase User: ${currentFirebaseUser?.uid}');
+      Logger.info('Display Name: "${currentFirebaseUser?.displayName}"');
+      Logger.info('Email: "${currentFirebaseUser?.email}"');
+      Logger.info('Photo URL: "${currentFirebaseUser?.photoURL}"');
+      Logger.info('Current Customer Name: "${currentCustomer?.name}"');
+      Logger.info('Current Customer Email: "${currentCustomer?.email}"');
+
+      if (currentFirebaseUser == null || currentCustomer == null) {
+        Logger.warning('No current user to update profile for');
+        return false;
+      }
+
+      // Create minimal profile data from Firebase Auth user
+      Map<String, dynamic> profileData = {'user': currentFirebaseUser};
+
+      // Add display name if available
+      if (currentFirebaseUser.displayName != null &&
+          currentFirebaseUser.displayName!.isNotEmpty) {
+        profileData['fullName'] = currentFirebaseUser.displayName;
+        Logger.info(
+          'Added fullName to profile data: ${currentFirebaseUser.displayName}',
+        );
+
+        // Try to split full name into first and last name
+        final nameParts = currentFirebaseUser.displayName!.trim().split(' ');
+        if (nameParts.isNotEmpty) {
+          profileData['firstName'] = nameParts[0];
+          Logger.info('Added firstName to profile data: ${nameParts[0]}');
+          if (nameParts.length > 1) {
+            profileData['lastName'] = nameParts.sublist(1).join(' ');
+            Logger.info(
+              'Added lastName to profile data: ${nameParts.sublist(1).join(' ')}',
+            );
+          }
+        }
+      } else {
+        Logger.warning('Firebase Auth user has no displayName to extract from');
+      }
+
+      Logger.info('Profile data to use for update: ${profileData.keys}');
+
+      // Update the existing user profile
+      await _updateExistingUserProfile(currentCustomer, profileData);
+
+      Logger.info(
+        'Successfully completed manual profile update from Firebase Auth',
+      );
+      return true;
+    } catch (e) {
+      Logger.error('Error updating current user profile from auth', e);
+      return false;
+    }
+  }
+
+  /// Diagnose current user's profile and Firebase Auth state
+  /// This method provides detailed logging to help debug profile issues
+  Future<Map<String, dynamic>> diagnoseUserProfile() async {
+    final diagnosis = <String, dynamic>{};
+
+    try {
+      final currentFirebaseUser = _auth.currentUser;
+      final currentCustomer = CustomerController.logeInCustomer;
+
+      Logger.info('=== USER PROFILE DIAGNOSIS ===');
+
+      // Firebase Auth User Info
+      diagnosis['firebaseUser'] = {
+        'exists': currentFirebaseUser != null,
+        'uid': currentFirebaseUser?.uid,
+        'email': currentFirebaseUser?.email,
+        'displayName': currentFirebaseUser?.displayName,
+        'photoURL': currentFirebaseUser?.photoURL,
+        'providers': currentFirebaseUser?.providerData
+            .map((p) => p.providerId)
+            .toList(),
+        'emailVerified': currentFirebaseUser?.emailVerified,
+      };
+
+      Logger.info('Firebase Auth User: ${diagnosis['firebaseUser']}');
+
+      // Customer Model Info
+      diagnosis['customerModel'] = {
+        'exists': currentCustomer != null,
+        'uid': currentCustomer?.uid,
+        'name': currentCustomer?.name,
+        'email': currentCustomer?.email,
+        'phoneNumber': currentCustomer?.phoneNumber,
+        'profilePictureUrl': currentCustomer?.profilePictureUrl,
+        'username': currentCustomer?.username,
+        'age': currentCustomer?.age,
+        'location': currentCustomer?.location,
+        'occupation': currentCustomer?.occupation,
+        'company': currentCustomer?.company,
+      };
+
+      Logger.info('Customer Model: ${diagnosis['customerModel']}');
+
+      // Profile Completeness Analysis
+      diagnosis['profileAnalysis'] = {
+        'hasGoogleProvider':
+            currentFirebaseUser?.providerData.any(
+              (p) => p.providerId == 'google.com',
+            ) ??
+            false,
+        'hasAppleProvider':
+            currentFirebaseUser?.providerData.any(
+              (p) => p.providerId == 'apple.com',
+            ) ??
+            false,
+        'nameNeedsUpdate': _shouldUpdateName(currentCustomer),
+        'hasFirebaseDisplayName':
+            currentFirebaseUser?.displayName != null &&
+            currentFirebaseUser!.displayName!.isNotEmpty,
+        'canUpdateFromFirebaseAuth':
+            currentFirebaseUser?.displayName != null &&
+            currentFirebaseUser!.displayName!.isNotEmpty &&
+            _shouldUpdateName(currentCustomer),
+      };
+
+      Logger.info('Profile Analysis: ${diagnosis['profileAnalysis']}');
+
+      // Recommendations
+      final recommendations = <String>[];
+      if (diagnosis['profileAnalysis']['hasGoogleProvider'] ||
+          diagnosis['profileAnalysis']['hasAppleProvider']) {
+        recommendations.add('User signed in with social provider');
+      }
+      if (diagnosis['profileAnalysis']['canUpdateFromFirebaseAuth']) {
+        recommendations.add(
+          'Profile can be updated from Firebase Auth displayName',
+        );
+      }
+      if (!diagnosis['profileAnalysis']['hasFirebaseDisplayName']) {
+        recommendations.add(
+          'Firebase Auth user has no displayName - need fresh sign-in',
+        );
+      }
+
+      diagnosis['recommendations'] = recommendations;
+      Logger.info('Recommendations: $recommendations');
+    } catch (e) {
+      diagnosis['error'] = e.toString();
+      Logger.error('Error during profile diagnosis', e);
+    }
+
+    Logger.info('=== END DIAGNOSIS ===');
+    return diagnosis;
+  }
+
+  /// Helper method to determine if a user's name should be updated
+  bool _shouldUpdateName(CustomerModel? customer) {
+    if (customer == null) return false;
+
+    if (customer.name.isEmpty) return true;
+    if (customer.name == customer.email.split('@')[0]) return true;
+    if (customer.name.toLowerCase() == 'user' ||
+        customer.name.toLowerCase() == 'unknown' ||
+        customer.name.contains('@'))
+      return true;
+
+    return false;
+  }
+
+  /// Force refresh current user's profile by re-authenticating with the same provider
+  /// This will re-trigger the Google/Apple sign-in to get fresh profile data
+  Future<bool> refreshCurrentUserProfileFromProvider() async {
+    try {
+      final currentFirebaseUser = _auth.currentUser;
+      if (currentFirebaseUser == null) {
+        Logger.warning('No current user to refresh profile for');
+        return false;
+      }
+
+      Logger.info('=== PROVIDER PROFILE REFRESH DEBUG ===');
+      Logger.info(
+        'Current user providers: ${currentFirebaseUser.providerData.map((p) => p.providerId)}',
+      );
+
+      // Check if user signed in with Google
+      final googleProvider = currentFirebaseUser.providerData
+          .where((provider) => provider.providerId == 'google.com')
+          .firstOrNull;
+
+      // Check if user signed in with Apple
+      final appleProvider = currentFirebaseUser.providerData
+          .where((provider) => provider.providerId == 'apple.com')
+          .firstOrNull;
+
+      if (googleProvider != null) {
+        Logger.info(
+          'User has Google provider, attempting fresh Google sign-in',
+        );
+        final helper = FirebaseGoogleAuthHelper();
+        final profileData = await helper.loginWithGoogle();
+        if (profileData != null) {
+          await handleSocialLoginSuccessWithProfileData(profileData);
+          Logger.info('Successfully refreshed profile from Google');
+          return true;
+        }
+      } else if (appleProvider != null) {
+        Logger.info('User has Apple provider, attempting fresh Apple sign-in');
+        final helper = FirebaseGoogleAuthHelper();
+        final profileData = await helper.loginWithApple();
+        if (profileData != null) {
+          await handleSocialLoginSuccessWithProfileData(profileData);
+          Logger.info('Successfully refreshed profile from Apple');
+          return true;
+        }
+      } else {
+        Logger.warning(
+          'User did not sign in with Google or Apple, cannot refresh from provider',
+        );
+        // Fallback to updating from existing Firebase Auth data
+        return await updateCurrentUserProfileFromAuth();
+      }
+
+      return false;
+    } catch (e) {
+      Logger.error('Error refreshing user profile from provider', e);
+      return false;
+    }
+  }
+
+  /// Create enhanced user profile with extracted social login data
+  Future<CustomerModel> _createEnhancedUserProfile(
+    User user,
+    Map<String, dynamic> profileData,
+  ) async {
+    // Use the full name from profile data, fallback to displayName, then email
+    String displayName = '';
+    if (profileData.containsKey('fullName') &&
+        profileData['fullName'] != null) {
+      displayName = profileData['fullName'];
+    } else if (user.displayName != null && user.displayName!.isNotEmpty) {
+      displayName = user.displayName!;
+    } else {
+      // Extract name from email as last resort
+      displayName = user.email?.split('@')[0] ?? 'User';
+    }
+
+    return CustomerModel(
+      uid: user.uid,
+      name: displayName,
+      email: user.email ?? '',
+      phoneNumber:
+          profileData['phoneNumber'], // Will be null for Google/Apple basic
+      createdAt: DateTime.now(),
+      isDiscoverable: true, // Default to discoverable
+    );
+  }
+
+  /// Update existing user profile with any new information from social login
+  Future<void> _updateExistingUserProfile(
+    CustomerModel existingUser,
+    Map<String, dynamic> profileData,
+  ) async {
+    try {
+      Map<String, dynamic> updates = {};
+      final user = profileData['user'] as User;
+
+      // Force reload Firebase user to get latest data
+      await user.reload();
+      final refreshedUser = FirebaseAuth.instance.currentUser;
+
+      Logger.info('=== AGGRESSIVE PROFILE UPDATE ===');
+      Logger.info('Current customer name: "${existingUser.name}"');
+      Logger.info('Firebase displayName: "${refreshedUser?.displayName}"');
+      Logger.info('Profile data fullName: "${profileData['fullName']}"');
+      Logger.info('Profile data keys: ${profileData.keys}');
+
+      // Always try to get the best name available
+      String? bestName;
+
+      // Priority 1: fullName from profile data (from Google/Apple)
+      if (profileData.containsKey('fullName') &&
+          profileData['fullName'] != null &&
+          profileData['fullName'].toString().trim().isNotEmpty) {
+        bestName = profileData['fullName'].toString().trim();
+        Logger.info('Using fullName from profile data: "$bestName"');
+      }
+      // Priority 2: Firebase Auth displayName after reload
+      else if (refreshedUser?.displayName != null &&
+          refreshedUser!.displayName!.trim().isNotEmpty) {
+        bestName = refreshedUser.displayName!.trim();
+        Logger.info('Using Firebase displayName: "$bestName"');
+      }
+      // Priority 3: Original user displayName
+      else if (user.displayName != null &&
+          user.displayName!.trim().isNotEmpty) {
+        bestName = user.displayName!.trim();
+        Logger.info('Using original user displayName: "$bestName"');
+      }
+
+      // Update name if we found a better one or current one needs improvement
+      bool needsNameUpdate =
+          _shouldUpdateName(existingUser) ||
+          (bestName != null &&
+              bestName != existingUser.name &&
+              bestName.length > existingUser.name.length &&
+              !bestName.contains('@'));
+
+      if (needsNameUpdate && bestName != null) {
+        final oldName = existingUser.name;
+        updates['name'] = bestName;
+        existingUser.name = bestName;
+        Logger.info('✅ Updating name from "$oldName" to "$bestName"');
+      } else {
+        Logger.info('Name update not needed or no better name found');
+      }
+
+      // Update phone number if it's empty and available from profile
+      if (existingUser.phoneNumber == null &&
+          profileData.containsKey('phoneNumber') &&
+          profileData['phoneNumber'] != null &&
+          profileData['phoneNumber'].toString().trim().isNotEmpty) {
+        updates['phoneNumber'] = profileData['phoneNumber'].toString().trim();
+        existingUser.phoneNumber = profileData['phoneNumber'].toString().trim();
+      }
+
+      // Ensure profile picture URL is preserved from Firebase Auth if missing
+      if ((existingUser.profilePictureUrl == null ||
+              existingUser.profilePictureUrl!.isEmpty) &&
+          user.photoURL != null &&
+          user.photoURL!.isNotEmpty) {
+        updates['profilePictureUrl'] = user.photoURL;
+        existingUser.profilePictureUrl = user.photoURL;
+      }
+
+      // Apply updates to Firestore if any
+      if (updates.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection(CustomerModel.firebaseKey)
+            .doc(existingUser.uid)
+            .update(updates);
+
+        Logger.info(
+          'Updated existing user profile with: ${updates.keys.join(', ')}',
+        );
+      } else {
+        Logger.info('No profile updates needed for existing user');
+      }
+
+      // Update the controller with the latest data
+      CustomerController.logeInCustomer = existingUser;
+    } catch (e) {
+      Logger.error('Error updating existing user profile', e);
+      // Don't rethrow as this is not critical for login success
+    }
+  }
+
+  /// Enhanced method to aggressively update user profile on every opportunity
+  Future<bool> aggressiveProfileUpdate() async {
+    try {
+      final currentFirebaseUser = _auth.currentUser;
+      final currentCustomer = CustomerController.logeInCustomer;
+
+      Logger.info('=== AGGRESSIVE PROFILE UPDATE ===');
+
+      if (currentFirebaseUser == null || currentCustomer == null) {
+        Logger.warning('No current user/customer for aggressive update');
+        return false;
+      }
+
+      // Force reload Firebase Auth user to get fresh data
+      await currentFirebaseUser.reload();
+      final refreshedUser = _auth.currentUser;
+
+      if (refreshedUser != null) {
+        Logger.info('Current displayName: "${refreshedUser.displayName}"');
+        Logger.info('Current email: "${refreshedUser.email}"');
+        Logger.info('Current photoURL: "${refreshedUser.photoURL}"');
+
+        // Create comprehensive profile data
+        Map<String, dynamic> profileData = {'user': refreshedUser};
+
+        // Add all available name data
+        if (refreshedUser.displayName != null &&
+            refreshedUser.displayName!.isNotEmpty) {
+          profileData['fullName'] = refreshedUser.displayName;
+          Logger.info(
+            'Added fullName to profile data: ${refreshedUser.displayName}',
+          );
+
+          // Split name into parts
+          final nameParts = refreshedUser.displayName!.trim().split(' ');
+          if (nameParts.isNotEmpty) {
+            profileData['firstName'] = nameParts[0];
+            if (nameParts.length > 1) {
+              profileData['lastName'] = nameParts.sublist(1).join(' ');
+            }
+          }
+        } else {
+          Logger.warning('Firebase Auth displayName is null or empty');
+        }
+
+        // Force update the profile
+        await _updateExistingUserProfile(currentCustomer, profileData);
+        return true;
+      }
+
+      return false;
+    } catch (e) {
+      Logger.error('Error in aggressive profile update', e);
+      return false;
     }
   }
 }

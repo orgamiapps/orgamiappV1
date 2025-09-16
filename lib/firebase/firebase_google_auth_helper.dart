@@ -10,37 +10,112 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 class FirebaseGoogleAuthHelper extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  Future<User?> loginWithGoogle() async {
-    User? user;
+  Future<Map<String, dynamic>?> loginWithGoogle() async {
     try {
+      User? user;
       if (kIsWeb) {
         // Web uses popup auth flow
         final GoogleAuthProvider googleProvider = GoogleAuthProvider();
         googleProvider.addScope('email');
+        googleProvider.addScope(
+          'profile',
+        ); // Add profile scope for better user info
         final UserCredential userCredential = await _auth.signInWithPopup(
           googleProvider,
         );
         user = userCredential.user;
-        notifyListeners();
-        return user;
+      } else {
+        // Mobile/desktop: use Firebase Auth's native provider sign-in
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        googleProvider.addScope('email');
+        googleProvider.addScope(
+          'profile',
+        ); // Add profile scope for better user info
+        final UserCredential userCredential = await _auth.signInWithProvider(
+          googleProvider,
+        );
+        user = userCredential.user;
       }
 
-      // Mobile/desktop: use Firebase Auth's native provider sign-in
-      final GoogleAuthProvider googleProvider = GoogleAuthProvider();
-      googleProvider.addScope('email');
-      final UserCredential userCredential = await _auth.signInWithProvider(
-        googleProvider,
-      );
-      user = userCredential.user;
-      notifyListeners();
-      return user;
+      if (user != null) {
+        // Extract profile information from Google user
+        Map<String, dynamic> profileData = {'user': user};
+
+        // Force reload to ensure we have the latest data
+        await user.reload();
+        user = _auth.currentUser;
+
+        // Try multiple sources for display name
+        String? displayName = user?.displayName;
+        String? photoUrl = user?.photoURL;
+        String? phoneNumber = user?.phoneNumber;
+
+        // Check provider data for additional information
+        if (user != null) {
+          for (final provider in user.providerData) {
+            if (provider.providerId == 'google.com') {
+              displayName = displayName ?? provider.displayName;
+              photoUrl = photoUrl ?? provider.photoURL;
+              phoneNumber = phoneNumber ?? provider.phoneNumber;
+
+              // If we got a display name from provider, update Firebase user
+              if (displayName != null &&
+                  displayName.isNotEmpty &&
+                  (user.displayName == null || user.displayName!.isEmpty)) {
+                try {
+                  await user.updateDisplayName(displayName);
+                  await user.reload();
+                  Logger.info(
+                    'Updated Firebase displayName from Google provider',
+                  );
+                } catch (e) {
+                  Logger.warning('Could not update displayName: $e');
+                }
+              }
+            }
+          }
+        }
+
+        // Extract name information from displayName
+        if (displayName != null && displayName.isNotEmpty) {
+          profileData['fullName'] = displayName;
+
+          // Try to split full name into first and last name
+          final nameParts = displayName.trim().split(' ');
+          if (nameParts.isNotEmpty) {
+            profileData['firstName'] = nameParts[0];
+            if (nameParts.length > 1) {
+              profileData['lastName'] = nameParts.sublist(1).join(' ');
+            }
+          }
+        }
+
+        // Add photo URL if available
+        if (photoUrl != null && photoUrl.isNotEmpty) {
+          profileData['photoUrl'] = photoUrl;
+        }
+
+        // Add phone number if available (rare for Google)
+        if (phoneNumber != null && phoneNumber.isNotEmpty) {
+          profileData['phoneNumber'] = phoneNumber;
+        }
+
+        Logger.info(
+          'Google sign-in successful with profile data: ${profileData.keys}',
+        );
+        Logger.info('Display name extracted: "$displayName"');
+        notifyListeners();
+        return profileData;
+      }
+
+      return null;
     } catch (error) {
       Logger.error('Google sign-in error: $error', error);
       return null;
     }
   }
 
-  Future<User?> loginWithApple() async {
+  Future<Map<String, dynamic>?> loginWithApple() async {
     if (!AppConstants.enableAppleSignIn) {
       Logger.warning('Apple sign-in is disabled via feature flag');
       return null;
@@ -78,21 +153,37 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
       final User? user = userCredential.user;
 
       if (user != null) {
-        // Update display name if it's not set and we have name info from Apple
-        if (user.displayName == null || user.displayName!.isEmpty) {
-          final fullName =
-              appleCredential.givenName != null &&
-                  appleCredential.familyName != null
-              ? '${appleCredential.givenName} ${appleCredential.familyName}'
-              : null;
+        // Extract profile information from Apple credentials
+        Map<String, dynamic> profileData = {'user': user};
 
-          if (fullName != null && fullName.isNotEmpty) {
+        // Extract first name and last name from Apple credential
+        if (appleCredential.givenName != null) {
+          profileData['firstName'] = appleCredential.givenName;
+        }
+        if (appleCredential.familyName != null) {
+          profileData['lastName'] = appleCredential.familyName;
+        }
+
+        // Create full name from first and last name
+        final fullName = [
+          appleCredential.givenName,
+          appleCredential.familyName,
+        ].where((name) => name != null && name.isNotEmpty).join(' ');
+
+        if (fullName.isNotEmpty) {
+          profileData['fullName'] = fullName;
+
+          // Update Firebase Auth display name if not set
+          if (user.displayName == null || user.displayName!.isEmpty) {
             await user.updateDisplayName(fullName);
           }
         }
 
+        Logger.info(
+          'Apple sign-in successful with profile data: ${profileData.keys}',
+        );
         notifyListeners();
-        return user;
+        return profileData;
       }
 
       return null;

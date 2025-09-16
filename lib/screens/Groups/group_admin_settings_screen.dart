@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/models/organization_model.dart';
 import 'package:attendus/screens/Groups/edit_group_details_screen.dart';
+import 'package:attendus/screens/Groups/join_requests_screen.dart';
 
 class GroupAdminSettingsScreen extends StatefulWidget {
   final String organizationId;
@@ -268,7 +269,7 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: CircleAvatar(
-        backgroundColor: const Color(0xFF667EEA).withOpacity(0.1),
+        backgroundColor: const Color(0xFF667EEA).withValues(alpha: 0.1),
         child: Icon(icon, color: const Color(0xFF667EEA), size: 20),
       ),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
@@ -396,7 +397,7 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
       context,
       MaterialPageRoute(
         builder: (_) =>
-            ManageJoinRequestsScreen(organizationId: widget.organizationId),
+            JoinRequestsScreen(organizationId: widget.organizationId),
       ),
     );
   }

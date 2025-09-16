@@ -1729,9 +1729,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                 showDialog(
                                   context: context,
                                   barrierDismissible: true,
-                                  builder: (context) => ShareQRDialog(
-                                    singleEvent: eventModel,
-                                  ),
+                                  builder: (context) =>
+                                      ShareQRDialog(singleEvent: eventModel),
                                 ).then((_) => _showEventManagementModal());
                               },
                             ),

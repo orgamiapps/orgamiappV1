@@ -1,6 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/screens/Authentication/forgot_password_screen.dart';
 import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/images.dart';
@@ -10,7 +9,7 @@ import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Utils/app_constants.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 import 'package:attendus/firebase/firebase_google_auth_helper.dart';
-import 'package:attendus/services/auth_service.dart';
+import 'package:attendus/Services/auth_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -38,6 +37,7 @@ class _LoginScreenState extends State<LoginScreen>
   late AnimationController logoAnimation;
   late Animation<double> fadeAnimation;
   late Animation<Offset> slideAnimation;
+  bool _socialSigningIn = false;
 
   void _makeLogin() async {
     try {
@@ -158,7 +158,23 @@ class _LoginScreenState extends State<LoginScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Stack(children: [_bodyView(), _modernAppBar()]),
+      body: Stack(
+        children: [
+          _bodyView(),
+          _modernAppBar(),
+          if (_socialSigningIn)
+            Container(
+              color: Colors.black.withValues(alpha: 0.15),
+              child: const Center(
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -560,18 +576,27 @@ class _LoginScreenState extends State<LoginScreen>
           ),
         ),
         onPressed: () async {
-          final helper = FirebaseGoogleAuthHelper();
-          final user = await helper.loginWithGoogle();
-          if (user != null) {
-            try {
-              await FirebaseFirestoreHelper().ensureUserProfileCompleteness(
-                user.uid,
-              );
-              if (!mounted) return;
-              RouterClass().homeScreenRoute(context: context);
-            } catch (_) {}
-          } else {
-            ShowToast().showNormalToast(msg: 'Google sign-in failed');
+          if (_socialSigningIn) return;
+          setState(() => _socialSigningIn = true);
+          try {
+            final helper = FirebaseGoogleAuthHelper();
+            final profileData = await helper.loginWithGoogle();
+            if (profileData != null) {
+              try {
+                await AuthService().handleSocialLoginSuccessWithProfileData(
+                  profileData,
+                );
+                if (!mounted) return;
+                await Future.delayed(const Duration(milliseconds: 120));
+                RouterClass().homeScreenRoute(context: context);
+              } catch (e) {
+                ShowToast().showNormalToast(msg: 'Login error');
+              }
+            } else {
+              ShowToast().showNormalToast(msg: 'Google sign-in failed');
+            }
+          } finally {
+            if (mounted) setState(() => _socialSigningIn = false);
           }
         },
         icon: const FaIcon(
@@ -605,18 +630,27 @@ class _LoginScreenState extends State<LoginScreen>
           ),
         ),
         onPressed: () async {
-          final helper = FirebaseGoogleAuthHelper();
-          final user = await helper.loginWithApple();
-          if (user != null) {
-            try {
-              await FirebaseFirestoreHelper().ensureUserProfileCompleteness(
-                user.uid,
-              );
-              if (!mounted) return;
-              RouterClass().homeScreenRoute(context: context);
-            } catch (_) {}
-          } else {
-            ShowToast().showNormalToast(msg: 'Apple sign-in failed');
+          if (_socialSigningIn) return;
+          setState(() => _socialSigningIn = true);
+          try {
+            final helper = FirebaseGoogleAuthHelper();
+            final profileData = await helper.loginWithApple();
+            if (profileData != null) {
+              try {
+                await AuthService().handleSocialLoginSuccessWithProfileData(
+                  profileData,
+                );
+                if (!mounted) return;
+                await Future.delayed(const Duration(milliseconds: 120));
+                RouterClass().homeScreenRoute(context: context);
+              } catch (e) {
+                ShowToast().showNormalToast(msg: 'Login error');
+              }
+            } else {
+              ShowToast().showNormalToast(msg: 'Apple sign-in failed');
+            }
+          } finally {
+            if (mounted) setState(() => _socialSigningIn = false);
           }
         },
         icon: const Icon(Icons.apple, size: 22, color: Colors.black),

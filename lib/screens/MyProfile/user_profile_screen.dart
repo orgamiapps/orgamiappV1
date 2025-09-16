@@ -48,6 +48,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadUserData();
+    _refreshUserDataFromFirestore();
   }
 
   @override
@@ -448,7 +449,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                widget.user.name,
+                _getDisplayName(),
                 style: TextStyle(
                   color: const Color(0xFF1A1A1A),
                   fontSize: nameSize,
@@ -820,13 +821,13 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           followerId: CustomerController.logeInCustomer!.uid,
           followingId: widget.user.uid,
         );
-        ShowToast().showNormalToast(msg: 'Following ${widget.user.name}');
+        ShowToast().showNormalToast(msg: 'Following ${_getDisplayName()}');
       } else {
         await FirebaseFirestoreHelper().unfollowUser(
           followerId: CustomerController.logeInCustomer!.uid,
           followingId: widget.user.uid,
         );
-        ShowToast().showNormalToast(msg: 'Unfollowed ${widget.user.name}');
+        ShowToast().showNormalToast(msg: 'Unfollowed ${_getDisplayName()}');
       }
 
       // Reload data to get accurate counts
@@ -1334,10 +1335,47 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     });
   }
 
+  String _getDisplayName() {
+    // Return the best available name for display
+    if (widget.user.name.isNotEmpty && 
+        !widget.user.name.contains('@') && 
+        widget.user.name.toLowerCase() != 'user') {
+      return widget.user.name;
+    }
+    // Fallback to email prefix if name is not good
+    return widget.user.email.split('@').first;
+  }
+  
+  Future<void> _refreshUserDataFromFirestore() async {
+    try {
+      // Wait a bit to allow other updates to complete
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Fetch latest user data from Firestore
+      final latestUserData = await FirebaseFirestoreHelper().getSingleCustomer(
+        customerId: widget.user.uid,
+      );
+      
+      if (latestUserData != null && mounted) {
+        // Update the widget's user data if name has changed
+        if (latestUserData.name != widget.user.name) {
+          setState(() {
+            widget.user.name = latestUserData.name;
+            widget.user.profilePictureUrl = latestUserData.profilePictureUrl;
+            widget.user.phoneNumber = latestUserData.phoneNumber;
+          });
+          debugPrint('Updated user profile name to: ${latestUserData.name}');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error refreshing user data: $e');
+    }
+  }
+  
   void _shareProfile() {
     SharePlus.instance.share(
       ShareParams(
-        text: 'Check out ${widget.user.name}\'s profile on AttendUs!',
+        text: 'Check out ${_getDisplayName()}\'s profile on AttendUs!',
       ),
     );
   }

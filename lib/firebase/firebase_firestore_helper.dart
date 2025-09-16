@@ -1507,9 +1507,7 @@ class FirebaseFirestoreHelper {
     double? ticketUpgradePrice,
   }) async {
     try {
-      final updateData = <String, dynamic>{
-        'ticketPrice': ticketPrice,
-      };
+      final updateData = <String, dynamic>{'ticketPrice': ticketPrice};
 
       if (ticketUpgradePrice != null) {
         updateData['ticketUpgradePrice'] = ticketUpgradePrice;
@@ -2444,6 +2442,77 @@ class FirebaseFirestoreHelper {
       }
     } catch (e) {
       Logger.debug('Error ensuring user profile completeness: $e');
+    }
+  }
+
+  // Method to update user profile from Firebase Auth data if incomplete
+  Future<bool> updateUserProfileFromFirebaseAuth(String userId) async {
+    try {
+      final userDoc = await _firestore
+          .collection(CustomerModel.firebaseKey)
+          .doc(userId)
+          .get();
+
+      if (!userDoc.exists) {
+        Logger.debug('User document does not exist: $userId');
+        return false;
+      }
+
+      final customerModel = CustomerModel.fromFirestore(userDoc);
+
+      // Get Firebase Auth user data
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser == null || firebaseUser.uid != userId) {
+        Logger.debug('Firebase Auth user not found or UID mismatch');
+        return false;
+      }
+
+      Map<String, dynamic> updates = {};
+
+      // Check if we should update the name
+      bool shouldUpdateName = false;
+
+      if (customerModel.name.isEmpty ||
+          customerModel.name == customerModel.email.split('@')[0] ||
+          customerModel.name.toLowerCase() == 'user' ||
+          customerModel.name.toLowerCase() == 'unknown' ||
+          customerModel.name.contains('@')) {
+        shouldUpdateName = true;
+      }
+
+      // Update name if needed and Firebase Auth has better data
+      if (shouldUpdateName &&
+          firebaseUser.displayName != null &&
+          firebaseUser.displayName!.trim().isNotEmpty &&
+          firebaseUser.displayName != customerModel.name) {
+        updates['name'] = firebaseUser.displayName!.trim();
+        Logger.debug(
+          'Updating user $userId name to: ${firebaseUser.displayName}',
+        );
+      }
+
+      // Update profile picture if missing and available in Firebase Auth
+      if ((customerModel.profilePictureUrl == null ||
+              customerModel.profilePictureUrl!.isEmpty) &&
+          firebaseUser.photoURL != null &&
+          firebaseUser.photoURL!.isNotEmpty) {
+        updates['profilePictureUrl'] = firebaseUser.photoURL;
+        Logger.debug('Updating user $userId profile picture');
+      }
+
+      // Apply updates if any
+      if (updates.isNotEmpty) {
+        await userDoc.reference.update(updates);
+        Logger.info(
+          'Updated user $userId profile from Firebase Auth with: ${updates.keys.join(', ')}',
+        );
+        return true;
+      }
+
+      return false;
+    } catch (e) {
+      Logger.error('Error updating user profile from Firebase Auth: $e', e);
+      return false;
     }
   }
 
