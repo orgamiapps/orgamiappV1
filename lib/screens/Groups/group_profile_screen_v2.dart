@@ -167,7 +167,7 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
               gradient: LinearGradient(
                 colors: [
                   Colors.transparent,
-                  Colors.black.withOpacity(0.05),
+                  Colors.black.withValues(alpha: 0.05),
                   Colors.transparent,
                 ],
                 stops: const [0.0, 0.5, 1.0],
@@ -185,7 +185,7 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.white.withOpacity(0.15), Colors.transparent],
+                  colors: [Colors.white.withValues(alpha: 0.15), Colors.transparent],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -278,8 +278,8 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
                                 end: Alignment.bottomCenter,
                                 colors: [
                                   Colors.transparent,
-                                  Colors.black.withOpacity(0.2),
-                                  Colors.black.withOpacity(0.4),
+                                  Colors.black.withValues(alpha: 0.2),
+                                  Colors.black.withValues(alpha: 0.4),
                                 ],
                                 stops: const [0.0, 0.6, 1.0],
                               ),
@@ -1520,8 +1520,8 @@ class _PollCardState extends State<_PollCard> {
                                 borderRadius: BorderRadius.circular(11),
                                 gradient: LinearGradient(
                                   colors: [
-                                    const Color(0xFF667EEA).withOpacity(0.1),
-                                    const Color(0xFF667EEA).withOpacity(0.05),
+                                    const Color(0xFF667EEA).withValues(alpha: 0.1),
+                                    const Color(0xFF667EEA).withValues(alpha: 0.05),
                                   ],
                                   stops: [percentage / 100, percentage / 100],
                                   begin: Alignment.centerLeft,
@@ -1574,7 +1574,7 @@ class _PollCardState extends State<_PollCard> {
                   ),
                 ),
               );
-            }).toList(),
+            }),
           ],
         ),
       ),
@@ -1788,7 +1788,7 @@ class _MembersTabState extends State<_MembersTab> {
                             : null,
                         color: role == 'admin' || role == 'owner'
                             ? null
-                            : const Color(0xFF667EEA).withOpacity(0.1),
+                            : const Color(0xFF667EEA).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
@@ -2262,7 +2262,7 @@ class _AboutTab extends StatelessWidget {
           Text(
             label,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+              color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
             ),
             textAlign: TextAlign.center,
           ),
@@ -2320,7 +2320,7 @@ class _AboutTab extends StatelessWidget {
           Text(
             label,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+              color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
             ),
             textAlign: TextAlign.center,
           ),
@@ -2469,7 +2469,7 @@ class _AboutTab extends StatelessWidget {
                 Text(
                   'Group Admin',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+                    color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
                   ),
                 ),
                 const SizedBox(height: 2),

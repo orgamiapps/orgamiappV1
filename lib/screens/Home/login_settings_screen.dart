@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:attendus/services/auth_service.dart';
+import 'package:attendus/Services/auth_service.dart';
 import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/toast.dart';
 
@@ -131,7 +131,7 @@ class _LoginSettingsScreenState extends State<LoginSettingsScreen> {
               ),
               value: _autoLoginEnabled,
               onChanged: _updateAutoLogin,
-              activeColor: AppColors.primaryColor,
+              activeThumbColor: AppColors.primaryColor,
               contentPadding: EdgeInsets.zero,
             ),
           ],

@@ -688,8 +688,9 @@ class AuthService extends ChangeNotifier {
     if (customer.name == customer.email.split('@')[0]) return true;
     if (customer.name.toLowerCase() == 'user' ||
         customer.name.toLowerCase() == 'unknown' ||
-        customer.name.contains('@'))
+        customer.name.contains('@')) {
       return true;
+    }
 
     return false;
   }

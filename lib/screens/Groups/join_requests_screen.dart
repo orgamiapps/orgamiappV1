@@ -337,7 +337,7 @@ class _JoinRequestsScreenState extends State<JoinRequestsScreen> {
                           )
                         : ListView.separated(
                             itemCount: filtered.length,
-                            separatorBuilder: (_, __) =>
+                            separatorBuilder: (context, index) =>
                                 const Divider(height: 0),
                             itemBuilder: (context, i) {
                               final r = filtered[i];
