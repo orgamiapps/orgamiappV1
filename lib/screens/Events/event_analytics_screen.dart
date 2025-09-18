@@ -45,7 +45,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    _checkAuthorization();
+    _loadEventData();
   }
 
   String _getEventStatusLabel() {
@@ -104,26 +104,21 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
     super.dispose();
   }
 
-  Future<void> _checkAuthorization() async {
+  Future<void> _loadEventData() async {
     try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) {
-        setState(() {
-          _isAuthorized = false;
-        });
-        return;
-      }
-
-      // Get event details to check if user is the host
       final eventDoc = await FirebaseFirestore.instance
           .collection('Events')
           .doc(widget.eventId)
           .get();
 
       if (!eventDoc.exists) {
-        setState(() {
-          _isAuthorized = false;
-        });
+        if (mounted) {
+          ShowToast().showSnackBar(
+            'Event not found or access denied.',
+            context,
+          );
+          Navigator.pop(context);
+        }
         return;
       }
 
@@ -134,35 +129,21 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
       final String? eventTitle = eventData['title'] as String?;
 
       setState(() {
-        _isAuthorized = currentUser.uid == eventHostUid;
         _eventHostUid = eventHostUid;
         _eventDate = eventDate;
         _eventTitle = eventTitle;
+        _isAuthorized = true; // Assume authorization
       });
 
-      if (!_isAuthorized) {
-        if (!mounted) return;
-        ShowToast().showSnackBar(
-          'Access denied. Only event hosts can view analytics.',
-          context,
-        );
-        if (!mounted) return;
-        Navigator.pop(context);
-      } else {
-        // Load attendees data if authorized
-        await _loadAttendeesData();
-        // Build repeat-attendance history for Users tab
-        await _buildAttendeeRepeatHistory();
-        _loadAIInsights();
-      }
+      // Load attendees data and other dependent data
+      await _loadAttendeesData();
+      await _buildAttendeeRepeatHistory();
+      _loadAIInsights();
     } catch (e) {
-      setState(() {
-        _isAuthorized = false;
-      });
-      if (!mounted) return;
-      ShowToast().showSnackBar('Error checking authorization: $e', context);
-      if (!mounted) return;
-      Navigator.pop(context);
+      if (mounted) {
+        ShowToast().showSnackBar('Error loading event data: $e', context);
+        Navigator.pop(context);
+      }
     }
   }
 
@@ -811,7 +792,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
         }
 
         if (!snapshot.hasData || !snapshot.data!.exists) {
-          return Center(
+          return SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
               child: Column(
@@ -868,58 +849,6 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                       height: 1.5,
                     ),
                     textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: Dimensions.spaceSizedLarge * 2),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
-                          AppThemeColor.lightBlueColor,
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(
-                        Dimensions.radiusLarge,
-                      ),
-                      border: Border.all(
-                        color: AppThemeColor.darkBlueColor.withValues(
-                          alpha: 0.2,
-                        ),
-                        width: 2,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppThemeColor.darkBlueColor,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(
-                            Icons.qr_code_rounded,
-                            size: 20,
-                            color: AppThemeColor.pureWhiteColor,
-                          ),
-                        ),
-                        const SizedBox(width: Dimensions.spaceSizeSmall),
-                        Expanded(
-                          child: Text(
-                            'Share your event QR code to start collecting analytics data',
-                            style: TextStyle(
-                              fontSize: Dimensions.fontSizeDefault,
-                              color: AppThemeColor.darkBlueColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            textAlign: TextAlign.left,
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
                 ],
               ),
@@ -1606,22 +1535,25 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
         }
 
         if (!snapshot.hasData || !snapshot.data!.exists) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.trending_up, size: 64, color: Colors.grey[400]),
-                const SizedBox(height: 16),
-                Text(
-                  'No trends data available',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[600],
-                    fontFamily: 'Roboto',
+          return SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.trending_up, size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No trends data available',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[600],
+                      fontFamily: 'Roboto',
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         }

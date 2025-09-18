@@ -8,6 +8,10 @@ import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/dimensions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xlsio;
 
 class GroupAnalyticsDashboardScreen extends StatefulWidget {
   final String organizationId;
@@ -51,46 +55,6 @@ class _GroupAnalyticsDashboardScreenState
       }
     });
     _loadGroupData();
-  }
-
-  Widget _buildFilterChip(String label, String value) {
-    final isSelected = _selectedDateFilter == value;
-    return FilterChip(
-      label: Text(
-        label,
-        style: TextStyle(
-          color: isSelected
-              ? AppThemeColor.pureWhiteColor
-              : AppThemeColor.darkBlueColor,
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-          fontSize: Dimensions.fontSizeSmall,
-        ),
-      ),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() {
-          _selectedDateFilter = value;
-        });
-      },
-      selectedColor: AppThemeColor.darkBlueColor,
-      checkmarkColor: AppThemeColor.pureWhiteColor,
-      backgroundColor: AppThemeColor.lightBlueColor,
-      side: BorderSide(
-        color: isSelected
-            ? AppThemeColor.darkBlueColor
-            : AppThemeColor.borderColor,
-        width: 1.5,
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-      ),
-      elevation: isSelected ? 6 : 1,
-      pressElevation: 8,
-      padding: const EdgeInsets.symmetric(
-        horizontal: Dimensions.paddingSizeDefault,
-        vertical: Dimensions.paddingSizeSmall,
-      ),
-    );
   }
 
   @override
@@ -408,6 +372,44 @@ class _GroupAnalyticsDashboardScreenState
     }
   }
 
+  Future<void> _exportData() async {
+    final xlsio.Workbook workbook = xlsio.Workbook();
+    final xlsio.Worksheet sheet = workbook.worksheets[0];
+    sheet.name = 'Group Analytics';
+
+    // Headers
+    sheet.getRangeByName('A1').setText('Metric');
+    sheet.getRangeByName('B1').setText('Value');
+
+    // Data
+    int rowIndex = 2;
+    _aggregatedAnalytics.forEach((key, value) {
+      sheet.getRangeByIndex(rowIndex, 1).setText(key);
+      if (value is Map) {
+        // Handle maps (like topPerformingEvent) by serializing them to a string
+        sheet
+            .getRangeByIndex(rowIndex, 2)
+            .setText(
+              value.entries.map((e) => '${e.key}: ${e.value}').join(', '),
+            );
+      } else {
+        sheet.getRangeByIndex(rowIndex, 2).setText(value.toString());
+      }
+      rowIndex++;
+    });
+
+    final List<int> bytes = workbook.saveAsStream();
+    workbook.dispose();
+
+    final String? directory = (await getTemporaryDirectory()).path;
+    final String fileName =
+        '$directory/group_analytics_${_groupName.replaceAll(' ', '_')}_${DateFormat('yyyyMMdd').format(DateTime.now())}.xlsx';
+    final File file = File(fileName);
+    await file.writeAsBytes(bytes, flush: true);
+
+    await Share.shareXFiles([XFile(fileName)], text: 'Group Analytics Export');
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -602,18 +604,31 @@ class _GroupAnalyticsDashboardScreenState
           headerSliverBuilder: (context, innerBoxIsScrolled) {
             return [
               SliverAppBar(
-                expandedHeight: 200,
+                expandedHeight: 220,
                 floating: false,
                 pinned: true,
                 backgroundColor: AppThemeColor.darkBlueColor,
                 foregroundColor: AppThemeColor.pureWhiteColor,
+                surfaceTintColor: AppThemeColor.darkBlueColor,
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.download),
+                    onPressed: _exportData,
+                    tooltip: 'Export Data',
+                  ),
+                ],
                 flexibleSpace: FlexibleSpaceBar(
                   title: Text(
                     '$_groupName Analytics',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
                       fontSize: 16,
+                      color: AppThemeColor.pureWhiteColor,
                     ),
+                  ),
+                  titlePadding: const EdgeInsetsDirectional.only(
+                    start: 16.0,
+                    bottom: 56.0, // Above the tab bar
                   ),
                   background: Container(
                     decoration: BoxDecoration(
@@ -626,34 +641,30 @@ class _GroupAnalyticsDashboardScreenState
                         end: Alignment.bottomRight,
                       ),
                     ),
-                    child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.only(
-                          top: 60,
-                          left: 16,
-                          right: 16,
-                          bottom: 16,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            _buildQuickStat(
-                              'Total Events',
-                              '${_aggregatedAnalytics['totalEvents'] ?? 0}',
-                              Icons.event,
-                            ),
-                            _buildQuickStat(
-                              'Total Attendees',
-                              '${_aggregatedAnalytics['totalAttendees'] ?? 0}',
-                              Icons.people,
-                            ),
-                            _buildQuickStat(
-                              'Avg Attendance',
-                              '${(_aggregatedAnalytics['averageAttendance'] ?? 0.0).toStringAsFixed(1)}',
-                              Icons.trending_up,
-                            ),
-                          ],
-                        ),
+                    child: Padding(
+                      padding: const EdgeInsets.only(
+                        bottom: 50.0,
+                      ), // Space for title and tab bar
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          _buildQuickStat(
+                            'Total Events',
+                            '${_aggregatedAnalytics['totalEvents'] ?? 0}',
+                            Icons.event,
+                          ),
+                          _buildQuickStat(
+                            'Total Attendees',
+                            '${_aggregatedAnalytics['totalAttendees'] ?? 0}',
+                            Icons.people,
+                          ),
+                          _buildQuickStat(
+                            'Avg Attendance',
+                            '${(_aggregatedAnalytics['averageAttendance'] ?? 0.0).toStringAsFixed(1)}',
+                            Icons.trending_up,
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -698,39 +709,32 @@ class _GroupAnalyticsDashboardScreenState
   }
 
   Widget _buildQuickStat(String title, String value, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.3),
-          width: 1,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          color: AppThemeColor.pureWhiteColor.withAlpha((255 * 0.9).round()),
+          size: 24,
         ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: AppThemeColor.pureWhiteColor, size: 20),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              color: AppThemeColor.pureWhiteColor,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: const TextStyle(
+            color: AppThemeColor.pureWhiteColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
           ),
-          Text(
-            title,
-            style: TextStyle(
-              color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.8),
-              fontSize: 10,
-            ),
-            textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          title,
+          style: TextStyle(
+            color: AppThemeColor.pureWhiteColor.withAlpha((255 * 0.7).round()),
+            fontSize: 12,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1165,105 +1169,98 @@ class _GroupAnalyticsDashboardScreenState
     final event =
         _aggregatedAnalytics['topPerformingEvent'] as Map<String, dynamic>;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppThemeColor.darkBlueColor, AppThemeColor.dullBlueColor],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                EventAnalyticsScreen(eventId: event['id'] as String),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [AppThemeColor.darkBlueColor, AppThemeColor.dullBlueColor],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.star,
-                color: AppThemeColor.pureWhiteColor,
-                size: 24,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Top Performing Event',
-                style: TextStyle(
-                  fontSize: Dimensions.fontSizeLarge,
-                  fontWeight: FontWeight.w600,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.star,
                   color: AppThemeColor.pureWhiteColor,
+                  size: 24,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            event['title'] as String,
-            style: TextStyle(
-              fontSize: Dimensions.fontSizeOverLarge,
-              fontWeight: FontWeight.bold,
-              color: AppThemeColor.pureWhiteColor,
+                const SizedBox(width: 8),
+                Text(
+                  'Top Performing Event',
+                  style: TextStyle(
+                    fontSize: Dimensions.fontSizeLarge,
+                    fontWeight: FontWeight.w600,
+                    color: AppThemeColor.pureWhiteColor,
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(
-                Icons.people,
-                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.8),
-                size: 16,
+            const SizedBox(height: 12),
+            Text(
+              event['title'] as String,
+              style: TextStyle(
+                fontSize: Dimensions.fontSizeOverLarge,
+                fontWeight: FontWeight.bold,
+                color: AppThemeColor.pureWhiteColor,
               ),
-              const SizedBox(width: 4),
-              Text(
-                '${event['attendees']} attendees',
-                style: TextStyle(
-                  color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.8),
-                  fontSize: Dimensions.fontSizeDefault,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Icon(
-                Icons.calendar_today,
-                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.8),
-                size: 16,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                DateFormat('MMM dd, yyyy').format(event['date'] as DateTime),
-                style: TextStyle(
-                  color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.8),
-                  fontSize: Dimensions.fontSizeDefault,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      EventAnalyticsScreen(eventId: event['id'] as String),
-                ),
-              );
-            },
-            icon: const Icon(Icons.analytics, size: 16),
-            label: const Text('View Details'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppThemeColor.pureWhiteColor,
-              foregroundColor: AppThemeColor.darkBlueColor,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  Icons.people,
+                  color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.8),
+                  size: 16,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '${event['attendees']} attendees',
+                  style: TextStyle(
+                    color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.8),
+                    fontSize: Dimensions.fontSizeDefault,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Icon(
+                  Icons.calendar_today,
+                  color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.8),
+                  size: 16,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  DateFormat('MMM dd, yyyy').format(event['date'] as DateTime),
+                  style: TextStyle(
+                    color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.8),
+                    fontSize: Dimensions.fontSizeDefault,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
       ),
     );
   }

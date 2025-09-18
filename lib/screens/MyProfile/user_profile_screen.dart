@@ -42,6 +42,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   bool _isFollowing = false;
   int _followersCount = 0;
   int _followingCount = 0;
+  bool _isFollowUpdating = false;
 
   @override
   void initState() {
@@ -576,7 +577,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             // Follow/Following button
             Expanded(
               child: GestureDetector(
-                onTap: _toggleFollow,
+                onTap: _isFollowUpdating ? null : _toggleFollow,
                 child: Container(
                   height: buttonHeight,
                   decoration: BoxDecoration(
@@ -648,7 +649,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                 tabletPercent: 0.3,
               ),
               child: GestureDetector(
-                onTap: _toggleFollow,
+                onTap: _isFollowUpdating ? null : _toggleFollow,
                 child: Container(
                   height: buttonHeight,
                   decoration: BoxDecoration(
@@ -724,7 +725,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                 desktopPercent: 0.2,
               ),
               child: GestureDetector(
-                onTap: _toggleFollow,
+                onTap: _isFollowUpdating ? null : _toggleFollow,
                 child: Container(
                   height: buttonHeight,
                   decoration: BoxDecoration(
@@ -805,6 +806,14 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       return;
     }
 
+    if (_isFollowUpdating) return;
+
+    if (mounted) {
+      setState(() {
+        _isFollowUpdating = true;
+      });
+    }
+
     setState(() {
       _isFollowing = !_isFollowing;
       // Update followers count immediately for better UX
@@ -816,18 +825,39 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     });
 
     try {
-      if (_isFollowing) {
-        await FirebaseFirestoreHelper().followUser(
-          followerId: CustomerController.logeInCustomer!.uid,
-          followingId: widget.user.uid,
-        );
-        ShowToast().showNormalToast(msg: 'Following ${_getDisplayName()}');
-      } else {
-        await FirebaseFirestoreHelper().unfollowUser(
-          followerId: CustomerController.logeInCustomer!.uid,
-          followingId: widget.user.uid,
-        );
-        ShowToast().showNormalToast(msg: 'Unfollowed ${_getDisplayName()}');
+      final maxAttempts = 3;
+      int attempt = 0;
+      while (true) {
+        try {
+          if (_isFollowing) {
+            await FirebaseFirestoreHelper().followUser(
+              followerId: CustomerController.logeInCustomer!.uid,
+              followingId: widget.user.uid,
+            );
+            ShowToast().showNormalToast(msg: 'Following ${_getDisplayName()}');
+          } else {
+            await FirebaseFirestoreHelper().unfollowUser(
+              followerId: CustomerController.logeInCustomer!.uid,
+              followingId: widget.user.uid,
+            );
+            ShowToast().showNormalToast(msg: 'Unfollowed ${_getDisplayName()}');
+          }
+          break;
+        } catch (e) {
+          attempt++;
+          final message = e.toString().toLowerCase();
+          final isTransient =
+              message.contains('unavailable') ||
+              message.contains('deadline') ||
+              message.contains('aborted') ||
+              message.contains('network') ||
+              message.contains('timeout') ||
+              message.contains('failed-precondition');
+          if (attempt >= maxAttempts || !isTransient) {
+            rethrow;
+          }
+          await Future.delayed(Duration(milliseconds: 300 * attempt));
+        }
       }
 
       // Reload data to get accurate counts
@@ -853,8 +883,16 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           msg: 'Error updating follow status. Please try again.',
         );
       }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isFollowUpdating = false;
+        });
+      }
     }
   }
+
+  // (Optional) Helper could be added for shared transient error detection
 
   void _sendMessage() async {
     if (CustomerController.logeInCustomer == null) {
@@ -1337,25 +1375,25 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   String _getDisplayName() {
     // Return the best available name for display
-    if (widget.user.name.isNotEmpty && 
-        !widget.user.name.contains('@') && 
+    if (widget.user.name.isNotEmpty &&
+        !widget.user.name.contains('@') &&
         widget.user.name.toLowerCase() != 'user') {
       return widget.user.name;
     }
     // Fallback to email prefix if name is not good
     return widget.user.email.split('@').first;
   }
-  
+
   Future<void> _refreshUserDataFromFirestore() async {
     try {
       // Wait a bit to allow other updates to complete
       await Future.delayed(const Duration(milliseconds: 500));
-      
+
       // Fetch latest user data from Firestore
       final latestUserData = await FirebaseFirestoreHelper().getSingleCustomer(
         customerId: widget.user.uid,
       );
-      
+
       if (latestUserData != null && mounted) {
         // Update the widget's user data if name has changed
         if (latestUserData.name != widget.user.name) {
@@ -1371,7 +1409,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       debugPrint('Error refreshing user data: $e');
     }
   }
-  
+
   void _shareProfile() {
     SharePlus.instance.share(
       ShareParams(

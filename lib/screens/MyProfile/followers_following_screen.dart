@@ -41,6 +41,7 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
 
   // Follow status tracking
   final Map<String, bool> _followStatus = {};
+  final Set<String> _updatingFollowIds = {};
 
   @override
   void initState() {
@@ -540,7 +541,9 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
             : null,
       ),
       child: TextButton(
-        onPressed: () => _toggleFollow(user),
+        onPressed: _updatingFollowIds.contains(user.uid)
+            ? null
+            : () => _toggleFollow(user),
         style: TextButton.styleFrom(
           padding: EdgeInsets.zero,
           minimumSize: Size.zero,
@@ -574,23 +577,49 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
 
     final currentStatus = _followStatus[user.uid] ?? false;
 
+    if (_updatingFollowIds.contains(user.uid)) return;
+    setState(() {
+      _updatingFollowIds.add(user.uid);
+    });
+
     setState(() {
       _followStatus[user.uid] = !currentStatus;
     });
 
     try {
-      if (currentStatus) {
-        await FirebaseFirestoreHelper().unfollowUser(
-          followerId: CustomerController.logeInCustomer!.uid,
-          followingId: user.uid,
-        );
-        ShowToast().showNormalToast(msg: 'Unfollowed ${user.name}');
-      } else {
-        await FirebaseFirestoreHelper().followUser(
-          followerId: CustomerController.logeInCustomer!.uid,
-          followingId: user.uid,
-        );
-        ShowToast().showNormalToast(msg: 'Following ${user.name}');
+      final maxAttempts = 3;
+      int attempt = 0;
+      while (true) {
+        try {
+          if (currentStatus) {
+            await FirebaseFirestoreHelper().unfollowUser(
+              followerId: CustomerController.logeInCustomer!.uid,
+              followingId: user.uid,
+            );
+            ShowToast().showNormalToast(msg: 'Unfollowed ${user.name}');
+          } else {
+            await FirebaseFirestoreHelper().followUser(
+              followerId: CustomerController.logeInCustomer!.uid,
+              followingId: user.uid,
+            );
+            ShowToast().showNormalToast(msg: 'Following ${user.name}');
+          }
+          break;
+        } catch (e) {
+          attempt++;
+          final message = e.toString().toLowerCase();
+          final isTransient =
+              message.contains('unavailable') ||
+              message.contains('deadline') ||
+              message.contains('aborted') ||
+              message.contains('network') ||
+              message.contains('timeout') ||
+              message.contains('failed-precondition');
+          if (attempt >= maxAttempts || !isTransient) {
+            rethrow;
+          }
+          await Future.delayed(Duration(milliseconds: 300 * attempt));
+        }
       }
     } catch (e) {
       debugPrint('Error toggling follow status: $e');
@@ -607,6 +636,12 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
         ShowToast().showNormalToast(
           msg: 'Error updating follow status. Please try again.',
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _updatingFollowIds.remove(user.uid);
+        });
       }
     }
   }

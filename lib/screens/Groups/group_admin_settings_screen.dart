@@ -240,12 +240,6 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
               Icons.analytics,
               () => _viewStatistics(),
             ),
-            _buildSettingTile(
-              'Export Data',
-              'Export member and activity data',
-              Icons.download,
-              () => _exportData(),
-            ),
           ]),
 
           const SizedBox(height: 32),
@@ -450,12 +444,6 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
           organizationId: widget.organizationId,
         ),
       ),
-    );
-  }
-
-  void _exportData() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Export functionality coming soon!')),
     );
   }
 
