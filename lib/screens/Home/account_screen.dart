@@ -26,6 +26,8 @@ import 'package:attendus/screens/Home/blocked_users_screen.dart';
 import 'package:attendus/screens/Legal/terms_conditions_screen.dart';
 import 'package:attendus/screens/Legal/privacy_policy_screen.dart';
 import 'package:attendus/screens/Home/help_screen.dart';
+import 'package:attendus/screens/Premium/premium_upgrade_screen.dart';
+import 'package:attendus/Services/subscription_service.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -132,35 +134,47 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Widget _buildSettingsSection() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).shadowColor.withValues(alpha: 0.05),
-            spreadRadius: 0,
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+    return Consumer<SubscriptionService>(
+      builder: (context, subscriptionService, child) {
+        return Container(
+          margin: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Theme.of(context).shadowColor.withValues(alpha: 0.05),
+                spreadRadius: 0,
+                blurRadius: 20,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Feedback at top
-          _buildSettingsItem(
-            icon: Icons.feedback,
-            title: 'Feedback',
-            subtitle: 'Share your thoughts with us',
-            onTap: () =>
-                RouterClass.nextScreenNormal(context, FeedbackScreen()),
-          ),
-          _buildDivider(),
-          // Profile moved to bottom app bar
-          _buildSettingsItem(
-            icon: Icons.analytics_rounded,
-            title: 'Analytics Dashboard',
+          child: Column(
+            children: [
+              // Premium upgrade button at top (only show if not premium)
+              if (!subscriptionService.hasPremium) ...[
+                _buildPremiumUpgradeItem(),
+                _buildDivider(),
+              ],
+              // If user has premium, show premium management
+              if (subscriptionService.hasPremium) ...[
+                _buildPremiumManageItem(subscriptionService),
+                _buildDivider(),
+              ],
+              // Feedback
+              _buildSettingsItem(
+                icon: Icons.feedback,
+                title: 'Feedback',
+                subtitle: 'Share your thoughts with us',
+                onTap: () =>
+                    RouterClass.nextScreenNormal(context, FeedbackScreen()),
+              ),
+              _buildDivider(),
+              // Profile moved to bottom app bar
+              _buildSettingsItem(
+                icon: Icons.analytics_rounded,
+                title: 'Analytics Dashboard',
             subtitle: 'Comprehensive insights across all events',
             onTap: () => RouterClass.nextScreenNormal(
               context,
@@ -265,10 +279,219 @@ class _AccountScreenState extends State<AccountScreen> {
             },
             isDestructive: true,
           ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPremiumUpgradeItem() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Theme.of(context).colorScheme.primary,
+            Theme.of(context).colorScheme.primary.withOpacity(0.8),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.workspace_premium,
+                  color: Theme.of(context).colorScheme.onPrimary,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Upgrade to Premium',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Create unlimited events • \$20/month',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.9),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward,
+                color: Theme.of(context).colorScheme.onPrimary,
+                size: 20,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 36,
+            child: ElevatedButton(
+              onPressed: () {
+                RouterClass.nextScreenNormal(
+                  context,
+                  const PremiumUpgradeScreen(),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Theme.of(context).colorScheme.primary,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Get Premium',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
+
+  Widget _buildPremiumManageItem(SubscriptionService subscriptionService) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.green.shade600,
+            Colors.green.shade500,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.verified,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      subscriptionService.getSubscriptionStatusText(),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      subscriptionService.getNextBillingDate() != null 
+                          ? 'Next billing: ${subscriptionService.getNextBillingDate()}'
+                          : 'Premium features active',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white.withOpacity(0.9),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.arrow_forward,
+                color: Colors.white,
+                size: 20,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 36,
+            child: ElevatedButton(
+              onPressed: () {
+                RouterClass.nextScreenNormal(
+                  context,
+                  const PremiumUpgradeScreen(),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.green.shade600,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Manage Subscription',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   Widget _buildSettingsItem({
     required IconData icon,

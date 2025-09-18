@@ -6,6 +6,7 @@ import 'firebase_options.dart';
 import 'package:attendus/widgets/auth_gate.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Utils/theme_provider.dart';
+import 'package:attendus/Services/subscription_service.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:attendus/Utils/error_handler.dart';
@@ -42,8 +43,11 @@ void main() async {
   await EmulatorConfig.configureForEmulator();
 
   // Build the app immediately to keep UI responsive
-  final Widget appWidget = ChangeNotifierProvider(
-    create: (context) => ThemeProvider(),
+  final Widget appWidget = MultiProvider(
+    providers: [
+      ChangeNotifierProvider(create: (context) => ThemeProvider()),
+      ChangeNotifierProvider(create: (context) => SubscriptionService()),
+    ],
     child: const MyApp(),
   );
   runApp(appWidget);
@@ -123,6 +127,12 @@ void main() async {
 
           // Initialize background services
           _initializeBackgroundServices();
+
+          // Initialize subscription service
+          final subscriptionService = SubscriptionService();
+          subscriptionService.initialize().catchError((e) {
+            Logger.warning('Subscription service initialization failed: $e');
+          });
 
           if (kDebugMode) {
             Logger.success('App initialization complete');
