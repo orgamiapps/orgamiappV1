@@ -13,7 +13,7 @@ import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
-import 'package:attendus/screens/Events/chose_sign_in_methods_screen.dart';
+import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:attendus/screens/Home/calendar_screen.dart';
 
 class HomeHubScreen extends StatefulWidget {
@@ -91,13 +91,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
         Logger.debug('🏠 HomeHubScreen: Loading user orgs in background...');
         final helper = OrganizationHelper();
 
-        final my = await helper.getUserOrganizationsLite().timeout(
-          const Duration(seconds: 3),
-          onTimeout: () {
-            Logger.warning('⚠️ Background getUserOrganizationsLite timed out');
-            return <Map<String, String>>[];
-          },
-        );
+        final my = await helper.getUserOrganizationsLite();
 
         Logger.debug(
           '🏠 HomeHubScreen: Background load completed, got ${my.length} orgs',
@@ -236,7 +230,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
           onTap: () {
             RouterClass.nextScreenNormal(
               context,
-              const ChoseSignInMethodsScreen(),
+              const PremiumEventCreationWrapper(),
             );
           },
           child: Icon(

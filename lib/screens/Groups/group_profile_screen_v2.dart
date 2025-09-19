@@ -8,7 +8,7 @@ import 'package:attendus/firebase/organization_helper.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
-import 'package:attendus/screens/Events/create_event_screen.dart';
+import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:attendus/screens/Groups/create_announcement_screen.dart';
 import 'package:attendus/screens/Groups/create_poll_screen.dart';
 import 'package:attendus/screens/Groups/create_photo_post_screen.dart';
@@ -2715,9 +2715,7 @@ class _AdminFabState extends State<_AdminFab> {
                         await Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => CreateEventScreen(
-                              selectedLocation: const LatLng(0, 0),
-                              radios: 100,
+                            builder: (_) => PremiumEventCreationWrapper(
                               preselectedOrganizationId: widget.organizationId,
                               forceOrganizationEvent: true,
                             ),

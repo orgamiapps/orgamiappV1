@@ -34,15 +34,17 @@ class AppAppBarView {
   static Widget appBarWithOnlyBackButton({
     required BuildContext context,
     Color? backButtonColor,
+    Color? iconColor,
   }) {
-    return Center(
+    return Align(
+      alignment: Alignment.topLeft,
       child: Padding(
         padding: const EdgeInsets.only(left: 8.0),
         child: InkWell(
           onTap: () => Navigator.pop(context),
           child: AppButtons.roundedButton(
             iconData: Icons.arrow_back_ios_rounded,
-            iconColor: AppThemeColor.pureWhiteColor,
+            iconColor: iconColor ?? AppThemeColor.pureWhiteColor,
             backgroundColor: backButtonColor ?? AppThemeColor.darkGreenColor,
           ),
         ),

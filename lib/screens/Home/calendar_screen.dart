@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
-import 'package:attendus/screens/Events/chose_sign_in_methods_screen.dart';
+import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/widgets/month_year_picker.dart';
@@ -1131,7 +1131,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     HapticFeedback.mediumImpact();
     await RouterClass.nextScreenNormal(
       context,
-      const ChoseSignInMethodsScreen(),
+      const PremiumEventCreationWrapper(),
     );
     // Always refresh when returning from event creation
     if (mounted) {

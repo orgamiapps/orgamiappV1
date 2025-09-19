@@ -72,14 +72,7 @@ class OrganizationHelper {
           .where('userId', isEqualTo: user.uid)
           .where('status', isEqualTo: 'approved')
           .limit(50)
-          .get()
-          .timeout(
-            const Duration(seconds: 3),
-            onTimeout: () {
-              Logger.warning('getUserOrganizationsLite timeout');
-              throw Exception('Query timeout');
-            },
-          );
+          .get();
 
       // Collect all org IDs first
       final Set<String> orgIds = {};
@@ -100,14 +93,7 @@ class OrganizationHelper {
             (id) => _firestore
                 .collection('Organizations')
                 .doc(id)
-                .get()
-                .timeout(
-                  const Duration(seconds: 2),
-                  onTimeout: () {
-                    Logger.warning('Organization fetch timeout for $id');
-                    throw Exception('Fetch timeout');
-                  },
-                ),
+                .get(),
           )
           .toList();
 

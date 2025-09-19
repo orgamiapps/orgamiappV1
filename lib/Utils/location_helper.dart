@@ -12,6 +12,7 @@ class LocationHelper {
   static DateTime? _lastLocationUpdate;
   static bool _isRequestingLocation = false;
   static const Duration _cacheExpiry = Duration(minutes: 5);
+  static const Duration _overallMax = Duration(seconds: 5);
 
   /// Get current location with proper error handling and caching
   static Future<Position?> getCurrentLocation({
@@ -23,10 +24,10 @@ class LocationHelper {
       Logger.debug('Location request already in progress');
       return _cachedPosition;
     }
-    
+
     // Add debug logging for location requests
     Logger.debug('LocationHelper: Starting location request');
-    
+
     // Check if running on emulator and return mock location if needed
     final isEmulator = await PlatformHelper.isEmulator();
     if (isEmulator) {
@@ -53,6 +54,7 @@ class LocationHelper {
     _isRequestingLocation = true;
 
     try {
+      final Stopwatch _overallTimer = Stopwatch()..start();
       // Check if location service is enabled
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
@@ -87,18 +89,47 @@ class LocationHelper {
         return null;
       }
 
+      // Try last known position first for instant response
+      try {
+        final Position? lastKnown = await Geolocator.getLastKnownPosition();
+        if (lastKnown != null) {
+          Logger.debug('Using last known position for fast response');
+          _cachedPosition = lastKnown;
+          _lastLocationUpdate = DateTime.now();
+          // Background refresh (non-blocking)
+          // ignore: unawaited_futures
+          Future(() async {
+            try {
+              await Geolocator.getCurrentPosition(
+                locationSettings: const LocationSettings(
+                  accuracy: LocationAccuracy.medium,
+                  timeLimit: Duration(seconds: 4),
+                ),
+              );
+            } catch (_) {}
+          });
+          return lastKnown;
+        }
+      } catch (e) {
+        Logger.debug('No last known position available: $e');
+      }
+
       // Get current position with timeout and adaptive accuracy for better performance
       Logger.debug('Getting current location...');
       Position? position;
 
       try {
-        // First attempt with high accuracy and shorter timeout for emulators
-        position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            timeLimit: Duration(seconds: 5),
-          ),
-        );
+        // First attempt with high accuracy (cap by remaining budget)
+        position =
+            await Geolocator.getCurrentPosition(
+              locationSettings: const LocationSettings(
+                accuracy: LocationAccuracy.high,
+                timeLimit: Duration(seconds: 3),
+              ),
+            ).timeout(
+              _remainingBudget(_overallTimer, const Duration(seconds: 3)),
+              onTimeout: () => throw TimeoutException('high'),
+            );
         Logger.debug('High accuracy location obtained successfully');
       } catch (timeoutError) {
         // Fallback to medium accuracy with shorter timeout if high accuracy fails
@@ -106,24 +137,32 @@ class LocationHelper {
           'High accuracy location timed out, trying medium accuracy: $timeoutError',
         );
         try {
-          position = await Geolocator.getCurrentPosition(
-            locationSettings: const LocationSettings(
-              accuracy: LocationAccuracy.medium,
-              timeLimit: Duration(seconds: 3),
-            ),
-          );
+          position =
+              await Geolocator.getCurrentPosition(
+                locationSettings: const LocationSettings(
+                  accuracy: LocationAccuracy.medium,
+                  timeLimit: Duration(seconds: 2),
+                ),
+              ).timeout(
+                _remainingBudget(_overallTimer, const Duration(seconds: 2)),
+                onTimeout: () => throw TimeoutException('med'),
+              );
           Logger.debug('Medium accuracy location obtained as fallback');
         } catch (fallbackError) {
           // Final fallback to low accuracy with very short timeout
           Logger.warning(
             'Medium accuracy also failed, trying low accuracy: $fallbackError',
           );
-          position = await Geolocator.getCurrentPosition(
-            locationSettings: const LocationSettings(
-              accuracy: LocationAccuracy.low,
-              timeLimit: Duration(seconds: 2),
-            ),
-          );
+          position =
+              await Geolocator.getCurrentPosition(
+                locationSettings: const LocationSettings(
+                  accuracy: LocationAccuracy.low,
+                  timeLimit: Duration(seconds: 1),
+                ),
+              ).timeout(
+                _remainingBudget(_overallTimer, const Duration(seconds: 1)),
+                onTimeout: () => throw TimeoutException('low'),
+              );
           Logger.debug('Low accuracy location obtained as final fallback');
         }
       }
@@ -157,6 +196,16 @@ class LocationHelper {
     } finally {
       _isRequestingLocation = false;
     }
+  }
+
+  static Duration _remainingBudget(Stopwatch overall, Duration desired) {
+    final int elapsed = overall.elapsedMilliseconds;
+    final int max = _overallMax.inMilliseconds;
+    final int left = (max - elapsed);
+    final int grant = left < 0
+        ? 0
+        : (left < desired.inMilliseconds ? left : desired.inMilliseconds);
+    return Duration(milliseconds: grant);
   }
 
   /// Convert Position to LatLng
