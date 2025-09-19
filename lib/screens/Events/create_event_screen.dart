@@ -990,10 +990,10 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: const Color(0xFF10B981).withValues(alpha: 0.1),
+              color: const Color(0xFF667EEA).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.public, color: Color(0xFF10B981), size: 20),
+            child: const Icon(Icons.public, color: Color(0xFF667EEA), size: 20),
           ),
           const SizedBox(width: 16),
           const Expanded(
@@ -1014,8 +1014,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                 privateEvent = !value;
               });
             },
-            activeThumbColor: const Color(0xFF10B981),
-            activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
+            activeThumbColor: const Color(0xFF667EEA),
+            activeTrackColor: const Color(0xFF667EEA).withValues(alpha: 0.3),
           ),
         ],
       ),

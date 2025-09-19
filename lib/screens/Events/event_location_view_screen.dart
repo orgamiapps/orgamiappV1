@@ -548,12 +548,12 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
                 Icons.calendar_month,
-                color: Color(0xFF10B981),
+                color: Color(0xFF667EEA),
                 size: 20,
               ),
             ),

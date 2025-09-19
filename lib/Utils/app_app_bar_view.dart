@@ -8,26 +8,29 @@ class AppAppBarView {
     required BuildContext context,
     required String title,
   }) {
-    return Row(
-      children: [
-        InkWell(
-          onTap: () => Navigator.pop(context),
-          child: AppButtons.roundedButton(
-            iconData: Icons.arrow_back_ios_rounded,
-            iconColor: AppThemeColor.pureWhiteColor,
-            backgroundColor: AppThemeColor.darkGreenColor,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          InkWell(
+            onTap: () => Navigator.pop(context),
+            child: AppButtons.roundedButton(
+              iconData: Icons.arrow_back_ios_rounded,
+              iconColor: AppThemeColor.pureWhiteColor,
+              backgroundColor: AppThemeColor.primaryIndigo,
+            ),
           ),
-        ),
-        const SizedBox(width: 15),
-        Text(
-          title,
-          style: const TextStyle(
-            color: AppThemeColor.darkBlueColor,
-            fontSize: Dimensions.paddingSizeLarge,
-            fontWeight: FontWeight.w500,
+          const SizedBox(width: 15),
+          Text(
+            title,
+            style: const TextStyle(
+              color: AppThemeColor.darkBlueColor,
+              fontSize: Dimensions.paddingSizeLarge,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -45,7 +48,7 @@ class AppAppBarView {
           child: AppButtons.roundedButton(
             iconData: Icons.arrow_back_ios_rounded,
             iconColor: iconColor ?? AppThemeColor.pureWhiteColor,
-            backgroundColor: backButtonColor ?? AppThemeColor.darkGreenColor,
+            backgroundColor: backButtonColor ?? AppThemeColor.primaryIndigo,
           ),
         ),
       ),

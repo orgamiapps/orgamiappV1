@@ -201,7 +201,7 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Group details updated successfully!'),
-            backgroundColor: Colors.green,
+            backgroundColor: const Color(0xFF667EEA),
           ),
         );
         Navigator.pop(context, true);

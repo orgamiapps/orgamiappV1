@@ -329,7 +329,7 @@ class _AddQuestionPopupState extends State<AddQuestionPopup>
                                 _isRequired ? Icons.error : Icons.check_circle,
                                 color: _isRequired
                                     ? const Color(0xFFEF4444)
-                                    : const Color(0xFF10B981),
+                                    : const Color(0xFF667EEA),
                                 size: 20,
                               ),
                             ),
@@ -347,7 +347,7 @@ class _AddQuestionPopupState extends State<AddQuestionPopup>
                                       fontWeight: FontWeight.w600,
                                       color: _isRequired
                                           ? const Color(0xFFEF4444)
-                                          : const Color(0xFF10B981),
+                                          : const Color(0xFF667EEA),
                                       fontFamily: 'Roboto',
                                     ),
                                   ),
@@ -376,9 +376,9 @@ class _AddQuestionPopupState extends State<AddQuestionPopup>
                               activeTrackColor: const Color(
                                 0xFFEF4444,
                               ).withValues(alpha: 0.3),
-                              inactiveThumbColor: const Color(0xFF10B981),
+                              inactiveThumbColor: const Color(0xFF667EEA),
                               inactiveTrackColor: const Color(
-                                0xFF10B981,
+                                0xFF667EEA,
                               ).withValues(alpha: 0.3),
                             ),
                           ],

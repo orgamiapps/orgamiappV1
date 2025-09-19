@@ -1058,7 +1058,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                       : '0.0',
                   icon: Icons.trending_up_rounded,
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF11998E), Color(0xFF38EF7D)],
+                    colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -1313,7 +1313,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                       'Date',
                       DateFormat('MMM dd').format(topEvent['date']),
                       Icons.calendar_today_rounded,
-                      const Color(0xFF11998E),
+                      const Color(0xFF667EEA),
                     ),
                   ),
                 ],
@@ -2020,7 +2020,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
             title: 'Global Performance Analysis',
             icon: Icons.analytics_rounded,
             gradient: const LinearGradient(
-              colors: [Color(0xFF11998E), Color(0xFF38EF7D)],
+              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -2042,19 +2042,19 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                 Container(
                   padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF11998E).withValues(alpha: 0.1),
+          color: const Color(0xFF667EEA).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(
                       Dimensions.radiusDefault,
                     ),
                     border: Border.all(
-                      color: const Color(0xFF11998E).withValues(alpha: 0.3),
+              color: const Color(0xFF667EEA).withValues(alpha: 0.3),
                     ),
                   ),
                   child: Row(
                     children: [
                       Icon(
                         Icons.lightbulb_outline_rounded,
-                        color: const Color(0xFF11998E),
+                        color: const Color(0xFF667EEA),
                         size: 20,
                       ),
                       const SizedBox(width: Dimensions.spaceSizeSmall),
@@ -2203,7 +2203,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                                 ? Icons.trending_up
                                 : Icons.trending_down,
                             color: a['type'] == 'high'
-                                ? Colors.green
+                                ? const Color(0xFF667EEA)
                                 : Colors.red,
                             size: 18,
                           ),

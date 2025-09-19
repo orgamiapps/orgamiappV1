@@ -89,7 +89,7 @@ class _TestConnectivityScreenState extends State<TestConnectivityScreen> {
               style: TextStyle(
                 fontSize: 16,
                 color: status.startsWith('✅')
-                    ? Colors.green
+                    ? const Color(0xFF667EEA)
                     : status.startsWith('❌')
                     ? Colors.red
                     : Colors.orange,

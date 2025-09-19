@@ -781,7 +781,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
           ] else ...[
             Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.green[600], size: 20),
+                Icon(Icons.check_circle, color: const Color(0xFF667EEA), size: 20),
                 const SizedBox(width: 8),
                 const Text(
                   'Tickets are enabled',
@@ -982,12 +982,12 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF10B981), Color(0xFF059669)],
+              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
           ),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF10B981).withValues(alpha: 0.3),
+              color: const Color(0xFF667EEA).withValues(alpha: 0.3),
               spreadRadius: 0,
               blurRadius: 20,
               offset: const Offset(0, 10),
@@ -1108,7 +1108,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                   title: 'Issued Tickets',
                   value: issuedTickets.toString(),
                   icon: Icons.person_add,
-                  color: const Color(0xFF10B981),
+                  color: const Color(0xFF667EEA),
                 ),
               ),
             ],
@@ -1369,7 +1369,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                   decoration: BoxDecoration(
                     color: ticket.isUsed
                         ? const Color(0xFFEF4444).withValues(alpha: 0.1)
-                        : const Color(0xFF10B981).withValues(alpha: 0.1),
+                        : const Color(0xFF667EEA).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -1379,7 +1379,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                       fontWeight: FontWeight.w600,
                       color: ticket.isUsed
                           ? const Color(0xFFEF4444)
-                          : const Color(0xFF10B981),
+                          : const Color(0xFF667EEA),
                       fontFamily: 'Roboto',
                     ),
                   ),
@@ -1784,7 +1784,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                                 : Icons.confirmation_number,
                             color: ticket.isUsed
                                 ? const Color(0xFFEF4444)
-                                : const Color(0xFF10B981),
+                                : const Color(0xFF667EEA),
                             size: 16,
                           ),
                           const SizedBox(width: 8),
@@ -1795,7 +1795,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                               fontWeight: FontWeight.w600,
                               color: ticket.isUsed
                                   ? const Color(0xFFEF4444)
-                                  : const Color(0xFF10B981),
+                                  : const Color(0xFF667EEA),
                               fontFamily: 'Roboto',
                             ),
                           ),

@@ -620,7 +620,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                             color: isSelected
                                 ? Colors.white
                                 : events.any((e) => e.ticketsEnabled)
-                                ? const Color(0xFF10B981)
+                                ? const Color(0xFF667EEA)
                                 : events.any((e) => e.private)
                                 ? const Color(0xFFEF4444)
                                 : const Color(0xFF667EEA),
@@ -630,7 +630,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                                     BoxShadow(
                                       color:
                                           (events.any((e) => e.ticketsEnabled)
-                                                  ? const Color(0xFF10B981)
+                                                  ? const Color(0xFF667EEA)
                                                   : events.any((e) => e.private)
                                                   ? const Color(0xFFEF4444)
                                                   : const Color(0xFF667EEA))
@@ -1032,7 +1032,7 @@ class _CalendarScreenState extends State<CalendarScreen>
   Color _getEventColor(EventModel event) {
     // You can customize this based on event categories or other properties
     if (event.ticketsEnabled) {
-      return const Color(0xFF10B981); // Green for ticketed events
+      return const Color(0xFF667EEA); // Primary for ticketed events
     } else if (event.private) {
       return const Color(0xFFEF4444); // Red for private events
     } else if (event.organizationId != null) {

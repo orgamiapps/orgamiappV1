@@ -735,7 +735,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
                 _buildSectionHeader(
                   'Professional Information',
                   Icons.work,
-                  Colors.green,
+                  const Color(0xFF667EEA),
                 ),
                 const SizedBox(height: 16),
                 _buildOccupationField(),

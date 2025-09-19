@@ -426,7 +426,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
           ElevatedButton(
             onPressed: () => _validateTicket(ticket),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF10B981),
+              backgroundColor: const Color(0xFF667EEA),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -475,7 +475,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                 decoration: BoxDecoration(
                   color:
                       (success
-                              ? const Color(0xFF10B981)
+                              ? const Color(0xFF667EEA)
                               : const Color(0xFFEF4444))
                           .withAlpha(30),
                   shape: BoxShape.circle,
@@ -483,7 +483,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                 child: Icon(
                   success ? Icons.check_circle : Icons.error_outline,
                   color: success
-                      ? const Color(0xFF10B981)
+                      ? const Color(0xFF667EEA)
                       : const Color(0xFFEF4444),
                   size: 36,
                 ),
@@ -903,7 +903,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: isNFCScanning 
-                        ? const Color(0xFF10B981) 
+                        ? const Color(0xFF667EEA) 
                         : const Color(0xFFE5E7EB),
                     width: 1.5,
                   ),
@@ -915,7 +915,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                         Icon(
                           Icons.nfc,
                           color: isNFCScanning 
-                              ? const Color(0xFF10B981) 
+                              ? const Color(0xFF667EEA) 
                               : const Color(0xFF6B7280),
                           size: 20,
                         ),
@@ -926,7 +926,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: isNFCScanning 
-                                ? const Color(0xFF10B981) 
+                                ? const Color(0xFF667EEA) 
                                 : const Color(0xFF374151),
                             fontFamily: 'Roboto',
                           ),
@@ -953,7 +953,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: isNFCScanning 
                               ? const Color(0xFFEF4444) 
-                              : const Color(0xFF10B981),
+                              : const Color(0xFF667EEA),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
@@ -1097,7 +1097,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                 decoration: BoxDecoration(
                   color: scannedTicket!.isUsed
                       ? const Color(0xFFEF4444).withAlpha(25)
-                      : const Color(0xFF10B981).withAlpha(25),
+                      : const Color(0xFF667EEA).withAlpha(25),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -1106,7 +1106,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                       : Icons.confirmation_number,
                   color: scannedTicket!.isUsed
                       ? const Color(0xFFEF4444)
-                      : const Color(0xFF10B981),
+                      : const Color(0xFF667EEA),
                   size: 20,
                 ),
               ),
@@ -1118,7 +1118,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                   fontWeight: FontWeight.bold,
                   color: scannedTicket!.isUsed
                       ? const Color(0xFFEF4444)
-                      : const Color(0xFF10B981),
+                      : const Color(0xFF667EEA),
                   fontFamily: 'Roboto',
                 ),
               ),

@@ -457,7 +457,7 @@ class _EventFeedbackManagementScreenState
   Color _getSentimentColor(String sentiment) {
     switch (sentiment.toLowerCase()) {
       case 'positive':
-        return Colors.green;
+        return const Color(0xFF667EEA);
       case 'negative':
         return Colors.red;
       default:

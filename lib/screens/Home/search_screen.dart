@@ -234,11 +234,11 @@ class _SearchScreenState extends State<SearchScreen>
                     width: 6,
                     height: 6,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF10B981),
+                      color: const Color(0xFF667EEA),
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.4),
+                          color: const Color(0xFF667EEA).withValues(alpha: 0.4),
                           blurRadius: 4,
                         ),
                       ],

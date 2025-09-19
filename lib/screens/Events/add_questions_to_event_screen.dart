@@ -307,7 +307,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Question deleted successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: const Color(0xFF667EEA),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
@@ -374,7 +374,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Question "${template['title']}" added successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: const Color(0xFF667EEA),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
@@ -413,7 +413,7 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
               content: Text(
                 'Question "${template['title']}" added successfully',
               ),
-              backgroundColor: Colors.green,
+              backgroundColor: const Color(0xFF667EEA),
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),

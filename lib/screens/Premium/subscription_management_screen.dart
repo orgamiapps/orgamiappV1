@@ -112,7 +112,7 @@ class _SubscriptionManagementScreenState
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).shadowColor.withOpacity(0.1),
+            color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -126,7 +126,9 @@ class _SubscriptionManagementScreenState
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: _getStatusColor(subscription.status).withOpacity(0.1),
+                  color: _getStatusColor(
+                    subscription.status,
+                  ).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
@@ -191,7 +193,7 @@ class _SubscriptionManagementScreenState
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).shadowColor.withOpacity(0.1),
+            color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -240,7 +242,7 @@ class _SubscriptionManagementScreenState
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).shadowColor.withOpacity(0.1),
+            color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -269,7 +271,7 @@ class _SubscriptionManagementScreenState
               'Reactivate Subscription',
               'Resume your premium subscription',
               Icons.restart_alt,
-              Colors.green,
+              Theme.of(context).colorScheme.primary,
               () => _reactivateSubscription(subscriptionService),
             ),
           ],
@@ -296,7 +298,7 @@ class _SubscriptionManagementScreenState
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).shadowColor.withOpacity(0.1),
+            color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -389,8 +391,8 @@ class _SubscriptionManagementScreenState
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: enabled
-              ? color.withOpacity(0.1)
-              : Colors.grey.withOpacity(0.1),
+              ? color.withValues(alpha: 0.1)
+              : Colors.grey.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(icon, color: enabled ? color : Colors.grey, size: 20),
@@ -513,7 +515,7 @@ class _SubscriptionManagementScreenState
   Color _getStatusColor(String status) {
     switch (status) {
       case 'active':
-        return Colors.green;
+        return const Color(0xFF667EEA);
       case 'cancelled':
         return Colors.orange;
       case 'past_due':

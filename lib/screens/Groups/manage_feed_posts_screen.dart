@@ -812,7 +812,7 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
             content: Text(
               pin ? 'Post pinned successfully' : 'Post unpinned successfully',
             ),
-            backgroundColor: Colors.green,
+            backgroundColor: const Color(0xFF667EEA),
           ),
         );
       }
@@ -946,7 +946,7 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Post deleted successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: const Color(0xFF667EEA),
           ),
         );
       }
@@ -1293,7 +1293,7 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Event deleted'),
-                      backgroundColor: Colors.green,
+                      backgroundColor: const Color(0xFF667EEA),
                     ),
                   );
                 }

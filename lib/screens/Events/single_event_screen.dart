@@ -1756,7 +1756,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                         _buildManagementSection(
                           icon: Icons.analytics,
                           title: 'Analytics & Insights',
-                          color: const Color(0xFF10B981),
+                          color: const Color(0xFF667EEA),
                           children: [
                             _buildManagementOption(
                               icon: Icons.analytics,

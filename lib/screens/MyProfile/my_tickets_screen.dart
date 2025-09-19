@@ -284,7 +284,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     final bool isUsed = ticket.isUsed;
     final Color statusColor = isUsed
         ? const Color(0xFF6B7280)
-        : const Color(0xFF10B981);
+        : const Color(0xFF667EEA);
     final String statusText = isUsed ? 'Used' : 'Active';
 
     return Card(
@@ -611,7 +611,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                           color:
                               (ticket.isUsed
                                       ? Colors.red
-                                      : const Color(0xFF10B981))
+                                      : const Color(0xFF667EEA))
                                   .withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(999),
                         ),
@@ -620,7 +620,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                           style: TextStyle(
                             color: ticket.isUsed
                                 ? Colors.red
-                                : const Color(0xFF10B981),
+                                : const Color(0xFF667EEA),
                             fontWeight: FontWeight.bold,
                             fontSize: 12,
                           ),
@@ -864,7 +864,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                                               decoration: BoxDecoration(
                                                 color: ticket.isUsed
                                                     ? Colors.red[100]
-                                                    : Colors.green[100],
+                                                    : Color(0xFF667EEA).withAlpha(25),
                                                 borderRadius:
                                                     BorderRadius.circular(20),
                                               ),
@@ -875,7 +875,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                                                 style: TextStyle(
                                                   color: ticket.isUsed
                                                       ? Colors.red
-                                                      : Colors.green,
+                                                      : Color(0xFF667EEA),
                                                   fontWeight: FontWeight.bold,
                                                 ),
                                               ),
@@ -1163,7 +1163,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 32),
+            const Icon(Icons.check_circle, color: Color(0xFF667EEA), size: 32),
             const SizedBox(height: 16),
             const Text(
               'Skip the line benefits:',
@@ -1255,7 +1255,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          const Icon(Icons.check, color: Color(0xFF10B981), size: 20),
+          const Icon(Icons.check, color: Color(0xFF667EEA), size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Text(

@@ -413,15 +413,15 @@ class _AccountScreenState extends State<AccountScreen> {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Colors.green.shade600, Colors.green.shade500],
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.green.withValues(alpha: 0.3),
+            color: const Color(0xFF667EEA).withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -484,7 +484,7 @@ class _AccountScreenState extends State<AccountScreen> {
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
-                foregroundColor: Colors.green.shade600,
+                foregroundColor: const Color(0xFF667EEA),
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(
                   vertical: 12,

@@ -410,7 +410,7 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
       roleIcon = Icons.hourglass_empty;
       roleLabel = 'Pending';
     } else {
-      roleColor = Colors.green;
+      roleColor = const Color(0xFF667EEA);
       roleIcon = Icons.person;
       roleLabel = 'Member';
     }
@@ -557,7 +557,7 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
             value: 'approve',
             child: Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.green),
+                Icon(Icons.check_circle, color: const Color(0xFF667EEA)),
                 SizedBox(width: 12),
                 Text('Approve'),
               ],

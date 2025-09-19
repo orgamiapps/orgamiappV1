@@ -813,7 +813,7 @@ class _GroupAnalyticsDashboardScreenState
         'title': 'Total Attendees',
         'value': '${_aggregatedAnalytics['totalAttendees']}',
         'icon': Icons.people,
-        'color': Colors.green,
+        'color': const Color(0xFF667EEA),
       },
       {
         'title': 'Upcoming Events',

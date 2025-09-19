@@ -27,9 +27,7 @@ class PremiumEventCreationWrapper extends StatelessWidget {
         // Show loading while checking subscription
         if (subscriptionService.isLoading) {
           return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+            body: Center(child: CircularProgressIndicator()),
           );
         }
 
@@ -46,10 +44,7 @@ class PremiumEventCreationWrapper extends StatelessWidget {
         // Otherwise, show premium requirement screen
         return _PremiumRequiredScreen(
           onUpgrade: () {
-            RouterClass.nextScreenNormal(
-              context,
-              const PremiumUpgradeScreen(),
-            );
+            RouterClass.nextScreenNormal(context, const PremiumUpgradeScreen());
           },
         );
       },
@@ -61,9 +56,7 @@ class PremiumEventCreationWrapper extends StatelessWidget {
 class _PremiumRequiredScreen extends StatefulWidget {
   final VoidCallback onUpgrade;
 
-  const _PremiumRequiredScreen({
-    required this.onUpgrade,
-  });
+  const _PremiumRequiredScreen({required this.onUpgrade});
 
   @override
   State<_PremiumRequiredScreen> createState() => _PremiumRequiredScreenState();
@@ -87,21 +80,17 @@ class _PremiumRequiredScreenState extends State<_PremiumRequiredScreen>
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutCubic,
-    ));
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
 
     _animationController.forward();
   }
@@ -140,7 +129,7 @@ class _PremiumRequiredScreenState extends State<_PremiumRequiredScreen>
           end: Alignment.bottomCenter,
           colors: [
             Theme.of(context).colorScheme.primary,
-            Theme.of(context).colorScheme.primary.withOpacity(0.8),
+            Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
             Theme.of(context).scaffoldBackgroundColor,
           ],
           stops: const [0.0, 0.3, 1.0],
@@ -160,7 +149,7 @@ class _PremiumRequiredScreenState extends State<_PremiumRequiredScreen>
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
@@ -224,17 +213,13 @@ class _PremiumRequiredScreenState extends State<_PremiumRequiredScreen>
       height: 100,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.white.withOpacity(0.2),
+        color: Colors.white.withValues(alpha: 0.2),
         border: Border.all(
-          color: Colors.white.withOpacity(0.3),
+          color: Colors.white.withValues(alpha: 0.3),
           width: 2,
         ),
       ),
-      child: const Icon(
-        Icons.lock,
-        size: 50,
-        color: Colors.white,
-      ),
+      child: const Icon(Icons.lock, size: 50, color: Colors.white),
     );
   }
 
@@ -255,7 +240,7 @@ class _PremiumRequiredScreenState extends State<_PremiumRequiredScreen>
       'To create events, you need a Premium subscription. Upgrade now to unlock unlimited event creation!',
       style: TextStyle(
         fontSize: 16,
-        color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.9),
+        color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.9),
         height: 1.5,
       ),
       textAlign: TextAlign.center,
@@ -273,10 +258,10 @@ class _PremiumRequiredScreenState extends State<_PremiumRequiredScreen>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withOpacity(0.2),
+          color: Colors.white.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -292,28 +277,32 @@ class _PremiumRequiredScreenState extends State<_PremiumRequiredScreen>
             ),
           ),
           const SizedBox(height: 16),
-          ...features.map((feature) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.check_circle,
-                      color: Colors.green[300],
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        feature,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.9),
-                        ),
+          ...features.map(
+            (feature) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    color: const Color(0xFF667EEA),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      feature,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onPrimary.withValues(alpha: 0.9),
                       ),
                     ),
-                  ],
-                ),
-              )),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -327,7 +316,7 @@ class _PremiumRequiredScreenState extends State<_PremiumRequiredScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -399,7 +388,7 @@ class _PremiumRequiredScreenState extends State<_PremiumRequiredScreen>
           backgroundColor: Colors.white,
           foregroundColor: Theme.of(context).colorScheme.primary,
           elevation: 8,
-          shadowColor: Colors.black.withOpacity(0.3),
+          shadowColor: Colors.black.withValues(alpha: 0.3),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -415,10 +404,7 @@ class _PremiumRequiredScreenState extends State<_PremiumRequiredScreen>
             const SizedBox(width: 8),
             const Text(
               'Upgrade to Premium',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -435,7 +421,9 @@ class _PremiumRequiredScreenState extends State<_PremiumRequiredScreen>
         child: Text(
           'Maybe Later',
           style: TextStyle(
-            color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.8),
+            color: Theme.of(
+              context,
+            ).colorScheme.onPrimary.withValues(alpha: 0.8),
             fontSize: 16,
           ),
         ),

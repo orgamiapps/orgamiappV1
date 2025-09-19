@@ -508,7 +508,7 @@ class ThemeProvider extends ChangeNotifier {
   }
 
   Color getSuccessColor(BuildContext context) {
-    return _isDarkMode ? const Color(0xFF4CAF50) : const Color(0xFF2E7D32);
+    return _isDarkMode ? const Color(0xFF667EEA) : const Color(0xFF764BA2);
   }
 
   Color getWarningColor(BuildContext context) {

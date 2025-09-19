@@ -478,9 +478,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'geofence_checkin':
         return Colors.teal;
       case 'new_event':
-        return Colors.green;
+    return const Color(0xFF667EEA);
       case 'group_event':
-        return Colors.green.shade600;
+    return const Color(0xFF667EEA);
       case 'ticket_update':
         return Colors.blue;
       case 'message_mention':

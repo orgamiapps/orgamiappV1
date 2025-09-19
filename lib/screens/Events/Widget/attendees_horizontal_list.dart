@@ -97,12 +97,12 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                        color: const Color(0xFF667EEA).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
                         Icons.people,
-                        color: Color(0xFF10B981),
+                        color: Color(0xFF667EEA),
                         size: 20,
                       ),
                     ),
@@ -191,8 +191,8 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
                                         begin: Alignment.topLeft,
                                         end: Alignment.bottomRight,
                                         colors: [
-                                          Color(0xFF10B981),
-                                          Color(0xFF059669),
+                                          Color(0xFF667EEA),
+                                          Color(0xFF764BA2),
                                         ],
                                       ),
                                 boxShadow: [
@@ -202,7 +202,7 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
                                             0xFF6B7280,
                                           ).withValues(alpha: 0.3)
                                         : const Color(
-                                            0xFF10B981,
+                                            0xFF667EEA,
                                           ).withValues(alpha: 0.3),
                                     spreadRadius: 0,
                                     blurRadius: 8,
@@ -294,14 +294,14 @@ class _AttendeesHorizontalListState extends State<AttendeesHorizontalList> {
                               ),
                               decoration: BoxDecoration(
                                 color: const Color(
-                                  0xFF10B981,
+                                  0xFF667EEA,
                                 ).withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
                                 'Signed In',
                                 style: const TextStyle(
-                                  color: Color(0xFF10B981),
+                                  color: Color(0xFF667EEA),
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                   fontFamily: 'Roboto',

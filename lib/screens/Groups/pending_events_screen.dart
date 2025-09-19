@@ -214,13 +214,13 @@ class _PendingEventsScreenState extends State<PendingEventsScreen> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.green.withValues(alpha: 0.08),
+                color: const Color(0xFF667EEA).withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Icon(
                 Icons.check_circle_outline,
                 size: 64,
-                color: Colors.green.shade400,
+                color: const Color(0xFF667EEA),
               ),
             ),
             const SizedBox(height: 24),
@@ -341,7 +341,7 @@ class _PendingEventsScreenState extends State<PendingEventsScreen> {
                           onPressed: () => _approveEvent(eventId, data),
                           icon: const Icon(
                             Icons.check_circle,
-                            color: Colors.green,
+                            color: const Color(0xFF667EEA),
                           ),
                           tooltip: 'Approve Event',
                         ),
@@ -538,7 +538,7 @@ class _PendingEventsScreenState extends State<PendingEventsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Event "${data['title']}" approved successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: const Color(0xFF667EEA),
           ),
         );
       }

@@ -185,7 +185,10 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.white.withValues(alpha: 0.15), Colors.transparent],
+                  colors: [
+                    Colors.white.withValues(alpha: 0.15),
+                    Colors.transparent,
+                  ],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -254,7 +257,7 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
                                     image: NetworkImage(bannerUrl),
                                     fit: BoxFit.cover,
                                     colorFilter: ColorFilter.mode(
-                                      Colors.black.withOpacity(0.3),
+                                      Colors.black.withValues(alpha: 0.3),
                                       BlendMode.darken,
                                     ),
                                   )
@@ -406,10 +409,12 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
                                           _memberRole == 'Owner' ||
                                               _memberRole == 'Admin'
                                           ? null
-                                          : Colors.white.withOpacity(0.2),
+                                          : Colors.white.withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(
-                                        color: Colors.white.withOpacity(0.3),
+                                        color: Colors.white.withValues(
+                                          alpha: 0.3,
+                                        ),
                                         width: 1,
                                       ),
                                     ),
@@ -753,7 +758,7 @@ class _FeedTabState extends State<_FeedTab> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -979,7 +984,7 @@ class _AnnouncementCardState extends State<_AnnouncementCard> {
             content: Text(
               isPinned ? 'Announcement unpinned' : 'Announcement pinned',
             ),
-            backgroundColor: Colors.green,
+            backgroundColor: const Color(0xFF667EEA),
           ),
         );
       }
@@ -1031,7 +1036,7 @@ class _AnnouncementCardState extends State<_AnnouncementCard> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Announcement deleted'),
-            backgroundColor: Colors.green,
+            backgroundColor: Color(0xFF667EEA),
           ),
         );
       }
@@ -1083,7 +1088,7 @@ class _AnnouncementCardState extends State<_AnnouncementCard> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -1520,8 +1525,12 @@ class _PollCardState extends State<_PollCard> {
                                 borderRadius: BorderRadius.circular(11),
                                 gradient: LinearGradient(
                                   colors: [
-                                    const Color(0xFF667EEA).withValues(alpha: 0.1),
-                                    const Color(0xFF667EEA).withValues(alpha: 0.05),
+                                    const Color(
+                                      0xFF667EEA,
+                                    ).withValues(alpha: 0.1),
+                                    const Color(
+                                      0xFF667EEA,
+                                    ).withValues(alpha: 0.05),
                                   ],
                                   stops: [percentage / 100, percentage / 100],
                                   begin: Alignment.centerLeft,
@@ -1723,7 +1732,7 @@ class _MembersTabState extends State<_MembersTab> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
+                        color: Colors.black.withValues(alpha: 0.06),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -2205,7 +2214,7 @@ class _AboutTab extends StatelessWidget {
         Text(
           label,
           style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+            color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -2219,7 +2228,7 @@ class _AboutTab extends StatelessWidget {
           Text(
             subtitle,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.textTheme.bodySmall?.color?.withOpacity(0.6),
+              color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
             ),
           ),
         ],
@@ -2469,7 +2478,9 @@ class _AboutTab extends StatelessWidget {
                 Text(
                   'Group Admin',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                    color: theme.textTheme.bodySmall?.color?.withValues(
+                      alpha: 0.7,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -2485,7 +2496,7 @@ class _AboutTab extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFF667EEA).withOpacity(0.1),
+              color: const Color(0xFF667EEA).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -2844,7 +2855,7 @@ class _EmptyState extends StatelessWidget {
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.black.withOpacity(0.6)),
+              style: TextStyle(color: Colors.black.withValues(alpha: 0.6)),
             ),
           ],
         ),
@@ -2858,7 +2869,7 @@ class _GeometricPatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.08)
+      ..color = Colors.white.withValues(alpha: 0.08)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
 
@@ -2881,7 +2892,7 @@ class _GeometricPatternPainter extends CustomPainter {
 
     // Add some subtle curved elements for elegance
     final curvePaint = Paint()
-      ..color = Colors.white.withOpacity(0.04)
+      ..color = Colors.white.withValues(alpha: 0.04)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
 

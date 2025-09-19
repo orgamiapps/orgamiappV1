@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+// import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
@@ -1009,7 +1009,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                                 : 'Loading...',
                             icon: Icons.loyalty_rounded,
                             gradient: const LinearGradient(
-                              colors: [Color(0xFF11998E), Color(0xFF38EF7D)],
+                              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
@@ -1207,14 +1207,14 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF11998E), Color(0xFF38EF7D)],
+                  colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF11998E).withValues(alpha: 0.3),
+                    color: const Color(0xFF667EEA).withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -1257,10 +1257,10 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFF11998E).withValues(alpha: 0.1),
+                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: const Color(0xFF11998E).withValues(alpha: 0.3),
+                  color: const Color(0xFF667EEA).withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -1270,7 +1270,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                     width: 6,
                     height: 6,
                     decoration: const BoxDecoration(
-                      color: Color(0xFF11998E),
+                      color: Color(0xFF667EEA),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -1279,7 +1279,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                     'Live',
                     style: TextStyle(
                       fontSize: Dimensions.fontSizeSmall,
-                      color: const Color(0xFF11998E),
+                      color: const Color(0xFF667EEA),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -2283,7 +2283,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
             title: 'Peak Hours Analysis',
             icon: Icons.access_time_rounded,
             gradient: const LinearGradient(
-              colors: [Color(0xFF11998E), Color(0xFF38EF7D)],
+              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -2305,19 +2305,19 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                 Container(
                   padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF11998E).withValues(alpha: 0.1),
+                    color: const Color(0xFF667EEA).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(
                       Dimensions.radiusDefault,
                     ),
                     border: Border.all(
-                      color: const Color(0xFF11998E).withValues(alpha: 0.3),
+                      color: const Color(0xFF667EEA).withValues(alpha: 0.3),
                     ),
                   ),
                   child: Row(
                     children: [
                       Icon(
                         Icons.lightbulb_outline_rounded,
-                        color: const Color(0xFF11998E),
+                        color: const Color(0xFF667EEA),
                         size: 20,
                       ),
                       const SizedBox(width: Dimensions.spaceSizeSmall),
@@ -3148,7 +3148,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                           ? DateFormat('MMM dd').format(topEvent['date'])
                           : 'N/A',
                       Icons.calendar_today_rounded,
-                      const Color(0xFF11998E),
+                      const Color(0xFF667EEA),
                     ),
                   ),
                 ],
@@ -3421,7 +3421,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                   'Retention Rate',
                   '${retentionRate.toStringAsFixed(1)}%',
                   Icons.trending_up_rounded,
-                  const Color(0xFF11998E),
+                  const Color(0xFF667EEA),
                   subtitle: 'Overall',
                 ),
                 _buildStatCard(
@@ -3504,7 +3504,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                                 title: totalUniqueAttendees > 0
                                     ? '${(totalReturnees / totalUniqueAttendees * 100).toStringAsFixed(0)}%'
                                     : '0%',
-                                color: const Color(0xFF11998E),
+                                color: const Color(0xFF667EEA),
                                 radius: 45,
                                 titleStyle: const TextStyle(
                                   fontSize: 12,
@@ -3611,7 +3611,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                           _buildEnhancedLegendItem(
                             'Returning Cohort',
                             totalReturnees,
-                            const Color(0xFF11998E),
+                            const Color(0xFF667EEA),
                             totalUniqueAttendees > 0
                                 ? (totalReturnees / totalUniqueAttendees * 100)
                                 : 0,

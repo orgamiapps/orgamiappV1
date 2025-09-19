@@ -116,7 +116,7 @@ class _EditEventSettingsScreenState extends State<EditEventSettingsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Event settings updated successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: const Color(0xFF667EEA),
           ),
         );
       }

@@ -5,14 +5,17 @@ class AppThemeColor {
   static const Color pureWhiteColor = Color(0xFFFFFFFF);
   static const Color pureBlackColor = Color(0xFF000000);
 
-  static const Color darkGreenColor = Color(0xFF9CC092);
-  // Deeper, more saturated green for emphasis in call-to-action text
-  static const Color deepGreenColor = Color(0xFF2E7D32);
+  // Modern primary palette: purple/blue gradient family
+  static const Color primaryIndigo = Color(0xFF667EEA); // Indigo
+  static const Color primaryPurple = Color(0xFF764BA2); // Purple
+  // Backwards-compat aliases for deprecated green naming
+  // These now point to the modern palette to keep the UI consistent
+  static const Color darkGreenColor = primaryIndigo;
+  static const Color deepGreenColor = primaryPurple;
   static const Color darkBlueColor = Color(0xFF2C5A96);
   static const Color transparentBlueColor = Color(0x600C0C0C);
   static const Color orangeColor = Color(0xFFF27423);
   static const Color yellowColor = Colors.yellow;
-  static const Color greenColor = Colors.green;
   static const Color dullBlueColor = Color(0xFF73ABE4);
   static const Color lightBlueColor = Color(0xFFF3F8FC);
   static const Color dullFontColor = Color(0xFF6E757C);
@@ -28,13 +31,13 @@ class AppThemeColor {
 
   static const Gradient buttonGradient = LinearGradient(
     colors: [
-      darkBlueColor,
-      darkGreenColor,
-      darkBlueColor,
-      darkGreenColor,
-      darkBlueColor,
-      darkGreenColor,
-      darkBlueColor,
+      primaryIndigo,
+      primaryPurple,
+      primaryIndigo,
+      primaryPurple,
+      primaryIndigo,
+      primaryPurple,
+      primaryIndigo,
     ],
     tileMode: TileMode.clamp,
   );

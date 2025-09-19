@@ -274,7 +274,7 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
                   children: [
                     Icon(
                       Icons.check_circle,
-                      color: Colors.green[300],
+                      color: const Color(0xFF667EEA),
                       size: 20,
                     ),
                     const SizedBox(width: 12),
@@ -427,7 +427,7 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
             children: [
               Icon(
                 Icons.verified,
-                color: Colors.green[300],
+                color: const Color(0xFF667EEA),
                 size: 24,
               ),
               const SizedBox(width: 12),
