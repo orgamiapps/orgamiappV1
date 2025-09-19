@@ -260,7 +260,7 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
         children: [
           _buildHeader(),
           const SizedBox(height: 4),
-          _buildNFCActivationText(),
+          _buildOrSeparator(),
           const SizedBox(height: 6),
           Expanded(
             child: Row(
@@ -268,7 +268,20 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
               children: [
                 _buildProfileSection(),
                 const SizedBox(width: 12),
-                Expanded(child: Center(child: _buildQrSection())),
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Spacer(),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minWidth: 140,
+                          maxWidth: 190,
+                        ),
+                        child: Center(child: _buildQrSection()),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -279,26 +292,75 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
   }
 
   Widget _buildHeader() {
-    return Column(
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'ATTENDUS',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: Colors.white.withValues(alpha: 0.98),
-            letterSpacing: 2,
-            shadows: _textShadows(),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'ATTENDUS',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white.withValues(alpha: 0.98),
+                  letterSpacing: 2,
+                  shadows: _textShadows(),
+                ),
+              ),
+              Text(
+                'EVENT BADGE',
+                style: TextStyle(
+                  fontSize: 9,
+                  color: Colors.white.withValues(alpha: 0.9),
+                  letterSpacing: 1.5,
+                  shadows: _textShadows(small: true),
+                ),
+              ),
+            ],
           ),
         ),
-        Text(
-          'EVENT BADGE',
-          style: TextStyle(
-            fontSize: 9,
-            color: Colors.white.withValues(alpha: 0.9),
-            letterSpacing: 1.5,
-            shadows: _textShadows(small: true),
+        ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 140, maxWidth: 190),
+          child: Center(child: _buildNFCActivationText()),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOrSeparator() {
+    final scale = _uiScale(context);
+    Widget line = Container(
+      height: 1,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(1),
+      ),
+    );
+    return Row(
+      children: [
+        const Spacer(),
+        ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 140, maxWidth: 190),
+          child: Row(
+            children: [
+              Expanded(child: line),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6 * scale),
+                child: Text(
+                  'OR',
+                  style: TextStyle(
+                    fontSize: 8 * scale,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
+                    color: Colors.white.withValues(alpha: 0.9),
+                    shadows: _textShadows(small: true),
+                  ),
+                ),
+              ),
+              Expanded(child: line),
+            ],
           ),
         ),
       ],
@@ -307,7 +369,6 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
 
   Widget _buildNFCActivationText() {
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.2),
