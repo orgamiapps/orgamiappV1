@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:attendus/Utils/logger.dart';
+import 'package:intl/intl.dart';
 import 'package:attendus/models/subscription_model.dart';
 import 'package:attendus/Services/stripe_service.dart';
 
@@ -25,11 +26,11 @@ class SubscriptionService extends ChangeNotifier {
   /// Initialize subscription service and load user's subscription
   Future<void> initialize() async {
     if (_auth.currentUser == null) return;
-    
+
     try {
       _isLoading = true;
       notifyListeners();
-      
+
       await _loadUserSubscription();
     } catch (e) {
       Logger.error('Failed to initialize subscription service', e);
@@ -87,7 +88,9 @@ class SubscriptionService extends ChangeNotifier {
         updatedAt: DateTime.now(),
         // For testing, make it free but still show $20/month
         isTrial: true,
-        trialEndsAt: DateTime.now().add(const Duration(days: 365)), // 1 year trial
+        trialEndsAt: DateTime.now().add(
+          const Duration(days: 365),
+        ), // 1 year trial
       );
 
       await _firestore
@@ -97,7 +100,7 @@ class SubscriptionService extends ChangeNotifier {
 
       _currentSubscription = subscription;
       Logger.success('Premium subscription created successfully');
-      
+
       notifyListeners();
       return true;
     } catch (e) {
@@ -132,7 +135,7 @@ class SubscriptionService extends ChangeNotifier {
 
       _currentSubscription = updatedSubscription;
       Logger.info('Subscription cancelled successfully');
-      
+
       notifyListeners();
       return true;
     } catch (e) {
@@ -169,7 +172,7 @@ class SubscriptionService extends ChangeNotifier {
 
       _currentSubscription = updatedSubscription;
       Logger.success('Subscription reactivated successfully');
-      
+
       notifyListeners();
       return true;
     } catch (e) {
@@ -212,9 +215,9 @@ class SubscriptionService extends ChangeNotifier {
   /// Get next billing date
   String? getNextBillingDate() {
     if (_currentSubscription?.isActive != true) return null;
-    
+
     final date = _currentSubscription!.currentPeriodEnd;
-    return '${date.day}/${date.month}/${date.year}';
+    return DateFormat('MM/dd/yyyy').format(date);
   }
 
   /// Refresh subscription data
@@ -238,7 +241,7 @@ class SubscriptionService extends ChangeNotifier {
     try {
       final userId = _auth.currentUser?.uid;
       final userEmail = _auth.currentUser?.email;
-      
+
       if (userId == null || userEmail == null) {
         Logger.error('User not authenticated');
         return null;
@@ -265,10 +268,7 @@ class SubscriptionService extends ChangeNotifier {
       final subscription = await _stripeService.createSubscription(
         customerId: customer['id'],
         priceId: priceId,
-        metadata: {
-          'firebase_uid': userId,
-          'plan_id': planId,
-        },
+        metadata: {'firebase_uid': userId, 'plan_id': planId},
       );
 
       if (subscription == null) {
@@ -277,7 +277,8 @@ class SubscriptionService extends ChangeNotifier {
       }
 
       return {
-        'client_secret': subscription['latest_invoice']['payment_intent']['client_secret'],
+        'client_secret':
+            subscription['latest_invoice']['payment_intent']['client_secret'],
         'subscription_id': subscription['id'],
         'customer_id': customer['id'],
       };
@@ -321,7 +322,7 @@ class SubscriptionService extends ChangeNotifier {
 
       _currentSubscription = subscription;
       Logger.success('Subscription created successfully');
-      
+
       notifyListeners();
       return true;
     } catch (e) {
@@ -331,9 +332,7 @@ class SubscriptionService extends ChangeNotifier {
   }
 
   /// Process real Stripe payment (for future use)
-  Future<bool> processStripePayment({
-    required String planId,
-  }) async {
+  Future<bool> processStripePayment({required String planId}) async {
     try {
       _isLoading = true;
       notifyListeners();

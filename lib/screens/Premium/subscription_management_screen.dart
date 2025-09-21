@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:attendus/Services/subscription_service.dart';
 import 'package:attendus/Utils/app_app_bar_view.dart';
 import 'package:attendus/Utils/toast.dart';
+import 'package:intl/intl.dart';
 
 class SubscriptionManagementScreen extends StatefulWidget {
   const SubscriptionManagementScreen({super.key});
@@ -543,7 +544,7 @@ class _SubscriptionManagementScreenState
   }
 
   String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
+    return DateFormat('MM/dd/yyyy').format(date);
   }
 
   String _capitalizeFirst(String text) {

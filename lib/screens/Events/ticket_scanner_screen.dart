@@ -29,7 +29,7 @@ class TicketScannerScreen extends StatefulWidget {
 class _TicketScannerScreenState extends State<TicketScannerScreen> {
   final TextEditingController _ticketCodeController = TextEditingController();
   final NFCBadgeService _nfcService = NFCBadgeService();
-  
+
   bool isLoading = false;
   TicketModel? scannedTicket;
   bool isScanning = false;
@@ -99,7 +99,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
 
     try {
       final organizerUid = CustomerController.logeInCustomer?.uid ?? '';
-      
+
       final result = await _nfcService.startNFCBadgeReading(
         eventId: widget.eventId,
         organizerUid: organizerUid,
@@ -123,7 +123,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
           setState(() {
             scannedTicket = result.ticket;
           });
-          
+
           _showScanResult(
             success: true,
             title: 'Ticket Activated!',
@@ -143,7 +143,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
           isNFCScanning = false;
           nfcStatus = 'Ready to scan';
         });
-        
+
         _showScanResult(
           success: false,
           title: 'NFC Error',
@@ -638,6 +638,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFAFBFC),
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: const Color(0xFF667EEA),
         elevation: 0,
@@ -654,15 +655,18 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           children: [
             _buildEventInfo(),
             const SizedBox(height: 24),
             _buildScannerSection(),
             const SizedBox(height: 24),
             if (scannedTicket != null) _buildTicketInfo(),
+            // Add extra space equal to keyboard inset to avoid overflow
+            SizedBox(height: MediaQuery.of(context).viewInsets.bottom + 12),
           ],
         ),
       ),
@@ -730,6 +734,17 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
   }
 
   Widget _buildScannerSection() {
+    final mediaQuery = MediaQuery.of(context);
+    final isPortrait = mediaQuery.orientation == Orientation.portrait;
+    final screenHeight = mediaQuery.size.height;
+    // Responsive camera viewport: comfortable slice of screen, clamped for extremes
+    final double suggested = isPortrait
+        ? screenHeight * 0.28
+        : screenHeight * 0.5;
+    final double scannerHeight = suggested < 240
+        ? 240
+        : (suggested > 420 ? 420 : suggested);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -789,7 +804,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
           // QR Scanner Section
           if (isScanning) ...[
             Container(
-              height: 300,
+              height: scannerHeight,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFF667EEA)),
@@ -892,7 +907,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // NFC Badge Scanner Section
             if (isNFCAvailable) ...[
               Container(
@@ -902,8 +917,8 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                   color: const Color(0xFFF3F4F6),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: isNFCScanning 
-                        ? const Color(0xFF667EEA) 
+                    color: isNFCScanning
+                        ? const Color(0xFF667EEA)
                         : const Color(0xFFE5E7EB),
                     width: 1.5,
                   ),
@@ -914,8 +929,8 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                       children: [
                         Icon(
                           Icons.nfc,
-                          color: isNFCScanning 
-                              ? const Color(0xFF667EEA) 
+                          color: isNFCScanning
+                              ? const Color(0xFF667EEA)
                               : const Color(0xFF6B7280),
                           size: 20,
                         ),
@@ -925,8 +940,8 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: isNFCScanning 
-                                ? const Color(0xFF667EEA) 
+                            color: isNFCScanning
+                                ? const Color(0xFF667EEA)
                                 : const Color(0xFF374151),
                             fontFamily: 'Roboto',
                           ),
@@ -935,8 +950,8 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      isNFCScanning 
-                          ? nfcStatus 
+                      isNFCScanning
+                          ? nfcStatus
                           : 'Tap to activate tickets via NFC badge',
                       style: const TextStyle(
                         fontSize: 12,
@@ -951,8 +966,8 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                       child: ElevatedButton.icon(
                         onPressed: isLoading ? null : _startNFCScanning,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isNFCScanning 
-                              ? const Color(0xFFEF4444) 
+                          backgroundColor: isNFCScanning
+                              ? const Color(0xFFEF4444)
                               : const Color(0xFF667EEA),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
@@ -979,7 +994,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
               ),
               const SizedBox(height: 20),
             ],
-            
+
             const Text(
               'Or enter ticket code manually:',
               style: TextStyle(

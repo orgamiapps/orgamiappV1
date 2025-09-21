@@ -5,6 +5,7 @@ import 'package:attendus/Utils/app_app_bar_view.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/screens/Premium/subscription_management_screen.dart';
+import 'package:intl/intl.dart';
 
 class PremiumUpgradeScreen extends StatefulWidget {
   const PremiumUpgradeScreen({super.key});
@@ -24,7 +25,7 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
   void initState() {
     super.initState();
     _setupAnimations();
-    
+
     // Initialize subscription service
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<SubscriptionService>(context, listen: false).initialize();
@@ -37,21 +38,17 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutCubic,
-    ));
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
 
     _animationController.forward();
   }
@@ -145,6 +142,8 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
               _buildPricingCard(),
               const SizedBox(height: 32),
               _buildUpgradeButton(subscriptionService),
+              const SizedBox(height: 8),
+              _buildTrialHelperLine(),
               const SizedBox(height: 16),
               _buildDisclaimer(),
               const SizedBox(height: 20),
@@ -179,7 +178,9 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
               'You have full access to create unlimited events',
               style: TextStyle(
                 fontSize: 16,
-                color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.9),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onPrimary.withValues(alpha: 0.9),
               ),
               textAlign: TextAlign.center,
             ),
@@ -205,11 +206,7 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
           width: 2,
         ),
       ),
-      child: const Icon(
-        Icons.workspace_premium,
-        size: 50,
-        color: Colors.white,
-      ),
+      child: const Icon(Icons.workspace_premium, size: 50, color: Colors.white),
     );
   }
 
@@ -240,10 +237,10 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
     final features = [
       'Create unlimited events',
       'Advanced event analytics',
-      'Priority customer support',
-      'Custom event branding',
-      'Advanced attendee management',
+      'Track attendance',
       'Export attendee data',
+      'Sell tickets',
+      'Manage events',
     ];
 
     return Container(
@@ -268,28 +265,32 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
             ),
           ),
           const SizedBox(height: 16),
-          ...features.map((feature) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.check_circle,
-                      color: const Color(0xFF667EEA),
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        feature,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.9),
-                        ),
+          ...features.map(
+            (feature) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    color: const Color(0xFF667EEA),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      feature,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onPrimary.withValues(alpha: 0.9),
                       ),
                     ),
-                  ],
-                ),
-              )),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -371,7 +372,9 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
       width: double.infinity,
       height: 56,
       child: ElevatedButton(
-        onPressed: _isUpgrading ? null : () => _handleUpgrade(subscriptionService),
+        onPressed: _isUpgrading
+            ? null
+            : () => _handleUpgrade(subscriptionService),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           foregroundColor: Theme.of(context).colorScheme.primary,
@@ -384,13 +387,21 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
         child: _isUpgrading
             ? const CircularProgressIndicator()
             : const Text(
-                'Start Free Trial',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                'Start 1-Month Free Trial',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
       ),
+    );
+  }
+
+  Widget _buildTrialHelperLine() {
+    return Text(
+      'Free for 1 month, then \$20/month. Cancel anytime',
+      style: TextStyle(
+        fontSize: 14,
+        color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.9),
+      ),
+      textAlign: TextAlign.center,
     );
   }
 
@@ -408,7 +419,7 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
 
   Widget _buildSubscriptionStatusCard(SubscriptionService subscriptionService) {
     final subscription = subscriptionService.currentSubscription!;
-    
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -425,11 +436,7 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
         children: [
           Row(
             children: [
-              Icon(
-                Icons.verified,
-                color: const Color(0xFF667EEA),
-                size: 24,
-              ),
+              Icon(Icons.verified, color: const Color(0xFF667EEA), size: 24),
               const SizedBox(width: 12),
               Text(
                 subscriptionService.getSubscriptionStatusText(),
@@ -446,7 +453,9 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
             'Plan: ${subscription.planDisplayName}',
             style: TextStyle(
               fontSize: 14,
-              color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.9),
+              color: Theme.of(
+                context,
+              ).colorScheme.onPrimary.withValues(alpha: 0.9),
             ),
           ),
           if (subscription.isTrial && subscription.trialEndsAt != null) ...[
@@ -455,7 +464,9 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
               'Trial ends: ${_formatDate(subscription.trialEndsAt!)}',
               style: TextStyle(
                 fontSize: 14,
-                color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.9),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onPrimary.withValues(alpha: 0.9),
               ),
             ),
           ] else if (subscriptionService.getNextBillingDate() != null) ...[
@@ -464,7 +475,9 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
               'Next billing: ${subscriptionService.getNextBillingDate()}',
               style: TextStyle(
                 fontSize: 14,
-                color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.9),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onPrimary.withValues(alpha: 0.9),
               ),
             ),
           ],
@@ -508,7 +521,9 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
             child: Text(
               'Back to Account',
               style: TextStyle(
-                color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.9),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onPrimary.withValues(alpha: 0.9),
                 fontSize: 16,
               ),
             ),
@@ -525,12 +540,12 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
 
     try {
       final success = await subscriptionService.createPremiumSubscription();
-      
+
       if (success) {
         ShowToast().showNormalToast(
           msg: '🎉 Welcome to Premium! You can now create events.',
         );
-        
+
         // Refresh the UI
         setState(() {});
       } else {
@@ -550,6 +565,6 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
   }
 
   String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
+    return DateFormat('MM/dd/yyyy').format(date);
   }
 }
