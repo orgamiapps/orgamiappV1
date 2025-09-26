@@ -557,7 +557,7 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
             value: 'approve',
             child: Row(
               children: [
-                Icon(Icons.check_circle, color: const Color(0xFF667EEA)),
+                Icon(Icons.check_circle, color: Color(0xFF667EEA)),
                 SizedBox(width: 12),
                 Text('Approve'),
               ],

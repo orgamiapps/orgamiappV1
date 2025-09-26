@@ -378,7 +378,7 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                         final isAdmin = adminSnapshot.data ?? false;
 
                         // Define local methods here
-                        Widget _buildItem(dynamic item) {
+                        Widget buildItem(dynamic item) {
                           if (item['type'] == 'event') {
                             // Display event as a card
                             final doc = item['doc'] as DocumentSnapshot;
@@ -441,7 +441,7 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                           return const SizedBox.shrink();
                         }
 
-                        Widget _buildReorderableItem(
+                        Widget buildReorderableItem(
                           dynamic item,
                           Key key,
                           int index,
@@ -452,7 +452,7 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                             index: index,
                             child: Stack(
                               children: [
-                                _buildItem(item),
+                                buildItem(item),
                                 if (isAdmin)
                                   Positioned(
                                     top: 12,
@@ -486,7 +486,7 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                           );
                         }
 
-                        Future<void> _handleReorder(
+                        Future<void> handleReorder(
                           int oldIndex,
                           int newIndex,
                           List<dynamic> pinnedItems,
@@ -573,14 +573,14 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                                       itemCount: pinnedItems.length,
                                       itemBuilder: (context, index) {
                                         final item = pinnedItems[index];
-                                        return _buildReorderableItem(
+                                        return buildReorderableItem(
                                           item,
                                           Key(item['doc'].id),
                                           index,
                                         );
                                       },
                                       onReorder: (oldIndex, newIndex) =>
-                                          _handleReorder(
+                                          handleReorder(
                                             oldIndex,
                                             newIndex,
                                             pinnedItems,
@@ -589,14 +589,14 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                                   : SliverList(
                                       delegate: SliverChildBuilderDelegate(
                                         (context, index) =>
-                                            _buildItem(pinnedItems[index]),
+                                            buildItem(pinnedItems[index]),
                                         childCount: pinnedItems.length,
                                       ),
                                     ),
                             SliverList(
                               delegate: SliverChildBuilderDelegate(
                                 (context, index) =>
-                                    _buildItem(regularItems[index]),
+                                    buildItem(regularItems[index]),
                                 childCount: regularItems.length,
                               ),
                             ),
@@ -813,7 +813,7 @@ class _PhotoPostCard extends StatelessWidget {
     final authorRole = data['authorRole'] ?? 'member';
     final createdAt = data['createdAt'] as Timestamp?;
 
-    Future<String> _resolveAuthorName() async {
+    Future<String> resolveAuthorName() async {
       final raw = authorName.toString().trim();
       if (raw.isNotEmpty && raw.toLowerCase() != 'unknown') return raw;
       final String? authorId = data['authorId'];
@@ -884,7 +884,7 @@ class _PhotoPostCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: FutureBuilder<String>(
-                      future: _resolveAuthorName(),
+                      future: resolveAuthorName(),
                       builder: (context, snapshot) {
                         final displayName = (snapshot.data ?? authorName)
                             .trim();
@@ -1302,7 +1302,7 @@ class _AnnouncementCard extends StatelessWidget {
     final createdAt = data['createdAt'] as Timestamp?;
     final likes = List<String>.from(data['likes'] ?? []);
 
-    Future<String> _resolveAuthorName() async {
+    Future<String> resolveAuthorName() async {
       final raw = authorName.toString().trim();
       if (raw.isNotEmpty && raw.toLowerCase() != 'unknown') return raw;
       final String? authorId = data['authorId'];
@@ -1491,7 +1491,7 @@ class _AnnouncementCard extends StatelessWidget {
                   Row(
                     children: [
                       FutureBuilder<String>(
-                        future: _resolveAuthorName(),
+                        future: resolveAuthorName(),
                         builder: (context, snapshot) {
                           final displayName = (snapshot.data ?? authorName)
                               .trim();
@@ -1629,7 +1629,7 @@ class _PollCard extends StatelessWidget {
     final authorName = data['authorName'] ?? 'Unknown';
     final createdAt = data['createdAt'] as Timestamp?;
 
-    Future<String> _resolveAuthorName() async {
+    Future<String> resolveAuthorName() async {
       final raw = authorName.toString().trim();
       if (raw.isNotEmpty && raw.toLowerCase() != 'unknown') return raw;
       final String? authorId = data['authorId'];
@@ -1924,7 +1924,7 @@ class _PollCard extends StatelessWidget {
                       Text('•', style: TextStyle(color: Colors.grey.shade400)),
                       const SizedBox(width: 8),
                       FutureBuilder<String>(
-                        future: _resolveAuthorName(),
+                        future: resolveAuthorName(),
                         builder: (context, snapshot) {
                           final displayName = (snapshot.data ?? authorName)
                               .trim();

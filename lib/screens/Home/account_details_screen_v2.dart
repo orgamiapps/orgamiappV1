@@ -465,12 +465,12 @@ class _AccountDetailsScreenV2State extends State<AccountDetailsScreenV2> {
                             color: Theme.of(context).primaryColor,
                             shape: BoxShape.circle,
                           ),
+                          padding: const EdgeInsets.all(4),
                           child: const Icon(
                             Icons.camera_alt,
                             color: Colors.white,
                             size: 20,
                           ),
-                          padding: const EdgeInsets.all(4),
                         ),
                       ),
                     ],

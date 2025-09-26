@@ -3484,7 +3484,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
             const SizedBox(height: Dimensions.spaceSizedDefault),
 
             // Advanced Donut Chart with Statistics
-            Container(
+            SizedBox(
               height: 280,
               child: Row(
                 children: [
@@ -3688,7 +3688,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
             ),
             const SizedBox(height: Dimensions.spaceSizeSmall),
 
-            Container(
+            SizedBox(
               height: 200,
               child: BarChart(
                 BarChartData(

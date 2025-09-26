@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:attendus/firebase/organization_helper.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
@@ -1904,10 +1903,10 @@ class _MembersTabState extends State<_MembersTab> {
       return '${difference.inDays} days ago';
     } else if (difference.inDays < 365) {
       final months = (difference.inDays / 30).floor();
-      return '${months} month${months > 1 ? 's' : ''} ago';
+      return '$months month${months > 1 ? 's' : ''} ago';
     } else {
       final years = (difference.inDays / 365).floor();
-      return '${years} year${years > 1 ? 's' : ''} ago';
+      return '$years year${years > 1 ? 's' : ''} ago';
     }
   }
 }
@@ -2542,10 +2541,10 @@ class _AboutTab extends StatelessWidget {
       return 'Created ${difference.inDays} days ago';
     } else if (difference.inDays < 365) {
       final months = (difference.inDays / 30).floor();
-      return 'Created ${months} month${months > 1 ? 's' : ''} ago';
+      return 'Created $months month${months > 1 ? 's' : ''} ago';
     } else {
       final years = (difference.inDays / 365).floor();
-      return 'Created ${years} year${years > 1 ? 's' : ''} ago';
+      return 'Created $years year${years > 1 ? 's' : ''} ago';
     }
   }
 }

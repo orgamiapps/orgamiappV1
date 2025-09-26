@@ -202,20 +202,28 @@ Future<void> _initializeBackgroundServices() async {
                 });
           }
 
-          // Android notifications permission - non-blocking
+          // Android notifications permission - avoid prompting on emulator
           if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-            final plugin = FlutterLocalNotificationsPlugin();
-            plugin
-                .resolvePlatformSpecificImplementation<
-                  AndroidFlutterLocalNotificationsPlugin
-                >()
-                ?.requestNotificationsPermission()
-                .catchError((e) {
-                  Logger.warning(
-                    'Failed to request notification permission: $e',
-                  );
-                  return false;
-                });
+            PlatformHelper.isEmulator().then((isEmulator) {
+              if (isEmulator) {
+                Logger.info(
+                  'Skipping Android notification permission on emulator',
+                );
+                return;
+              }
+              final plugin = FlutterLocalNotificationsPlugin();
+              plugin
+                  .resolvePlatformSpecificImplementation<
+                    AndroidFlutterLocalNotificationsPlugin
+                  >()
+                  ?.requestNotificationsPermission()
+                  .catchError((e) {
+                    Logger.warning(
+                      'Failed to request notification permission: $e',
+                    );
+                    return false;
+                  });
+            });
           }
 
           // Initialize notifications in background

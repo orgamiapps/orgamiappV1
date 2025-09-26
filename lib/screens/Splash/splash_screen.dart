@@ -145,20 +145,32 @@ class _SplashScreenState extends State<SplashScreen>
     try {
       debugPrint('🔄 Checking Firebase Auth state directly...');
 
+      // Ensure Firebase is initialized before accessing FirebaseAuth
+      try {
+        await FirebaseInitializer.initializeOnce().timeout(
+          const Duration(seconds: 4),
+          onTimeout: () {
+            debugPrint('⚠️ Firebase init timeout in Splash; continuing');
+            throw TimeoutException('firebase-init-timeout');
+          },
+        );
+      } catch (e) {
+        // Non-fatal: proceed to check currentUser which may still be present
+        debugPrint('ℹ️ Splash: proceeding without confirmed Firebase init: $e');
+      }
+
       // Direct Firebase Auth check first - this is immediately available after force-close
       final firebaseUser = FirebaseAuth.instance.currentUser;
       if (firebaseUser != null) {
         debugPrint('🔍 Firebase user found directly: ${firebaseUser.uid}');
 
         // Set minimal customer model immediately for fast navigation
-        if (CustomerController.logeInCustomer == null) {
-          CustomerController.logeInCustomer = CustomerModel(
-            uid: firebaseUser.uid,
-            name: firebaseUser.displayName ?? '',
-            email: firebaseUser.email ?? '',
-            createdAt: DateTime.now(),
-          );
-        }
+        CustomerController.logeInCustomer ??= CustomerModel(
+          uid: firebaseUser.uid,
+          name: firebaseUser.displayName ?? '',
+          email: firebaseUser.email ?? '',
+          createdAt: DateTime.now(),
+        );
 
         setState(() {
           _loadingText = "Welcome back!";

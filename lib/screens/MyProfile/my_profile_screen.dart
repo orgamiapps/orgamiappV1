@@ -906,7 +906,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                                   !user.name.contains('@') &&
                                   user.name.toLowerCase() != 'user')
                               ? user.name
-                              : (user?.email?.split('@').first ?? 'User'),
+                              : (user?.email.split('@').first ?? 'User'),
                           style: const TextStyle(
                             color: Color(0xFF1A1A1A),
                             fontSize: 22,

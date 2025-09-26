@@ -341,7 +341,7 @@ class _PendingEventsScreenState extends State<PendingEventsScreen> {
                           onPressed: () => _approveEvent(eventId, data),
                           icon: const Icon(
                             Icons.check_circle,
-                            color: const Color(0xFF667EEA),
+                            color: Color(0xFF667EEA),
                           ),
                           tooltip: 'Approve Event',
                         ),

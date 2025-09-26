@@ -30,7 +30,7 @@ class _GroupAnalyticsDashboardScreenState
     extends State<GroupAnalyticsDashboardScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  String _selectedDateFilter = 'all'; // 'all', 'week', 'month', 'year'
+  final String _selectedDateFilter = 'all'; // 'all', 'week', 'month', 'year'
   bool _isLoading = false;
   List<EventModel> _groupEvents = [];
   Map<String, dynamic> _aggregatedAnalytics = {};
@@ -401,7 +401,7 @@ class _GroupAnalyticsDashboardScreenState
     final List<int> bytes = workbook.saveAsStream();
     workbook.dispose();
 
-    final String? directory = (await getTemporaryDirectory()).path;
+    final String directory = (await getTemporaryDirectory()).path;
     final String fileName =
         '$directory/group_analytics_${_groupName.replaceAll(' ', '_')}_${DateFormat('yyyyMMdd').format(DateTime.now())}.xlsx';
     final File file = File(fileName);
@@ -830,7 +830,7 @@ class _GroupAnalyticsDashboardScreenState
       {
         'title': 'Avg Attendance',
         'value':
-            '${(_aggregatedAnalytics['averageAttendance'] as double).toStringAsFixed(1)}',
+            (_aggregatedAnalytics['averageAttendance'] as double).toStringAsFixed(1),
         'icon': Icons.trending_up,
         'color': Colors.teal,
       },

@@ -54,7 +54,7 @@ class LocationHelper {
     _isRequestingLocation = true;
 
     try {
-      final Stopwatch _overallTimer = Stopwatch()..start();
+      final Stopwatch overallTimer = Stopwatch()..start();
       // Check if location service is enabled
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
@@ -127,7 +127,7 @@ class LocationHelper {
                 timeLimit: Duration(seconds: 3),
               ),
             ).timeout(
-              _remainingBudget(_overallTimer, const Duration(seconds: 3)),
+              _remainingBudget(overallTimer, const Duration(seconds: 3)),
               onTimeout: () => throw TimeoutException('high'),
             );
         Logger.debug('High accuracy location obtained successfully');
@@ -144,7 +144,7 @@ class LocationHelper {
                   timeLimit: Duration(seconds: 2),
                 ),
               ).timeout(
-                _remainingBudget(_overallTimer, const Duration(seconds: 2)),
+                _remainingBudget(overallTimer, const Duration(seconds: 2)),
                 onTimeout: () => throw TimeoutException('med'),
               );
           Logger.debug('Medium accuracy location obtained as fallback');
@@ -160,7 +160,7 @@ class LocationHelper {
                   timeLimit: Duration(seconds: 1),
                 ),
               ).timeout(
-                _remainingBudget(_overallTimer, const Duration(seconds: 1)),
+                _remainingBudget(overallTimer, const Duration(seconds: 1)),
                 onTimeout: () => throw TimeoutException('low'),
               );
           Logger.debug('Low accuracy location obtained as final fallback');

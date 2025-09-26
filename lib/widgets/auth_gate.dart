@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/screens/Splash/splash_screen.dart';
 import 'package:attendus/screens/Home/dashboard_screen.dart';
@@ -8,6 +7,7 @@ import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/Services/auth_service.dart';
 import 'package:attendus/Utils/logger.dart';
+import 'package:attendus/Services/firebase_initializer.dart';
 
 /// AuthGate determines the initial screen based on Firebase Auth state
 /// This ensures persistent login works immediately after force-close
@@ -37,13 +37,13 @@ class _AuthGateState extends State<AuthGate> {
     try {
       Logger.debug('🔄 AuthGate: Checking Firebase Auth state...');
 
-      // Ensure Firebase is initialized first
+      // Ensure Firebase is initialized first (centralized + idempotent)
       try {
-        await Firebase.initializeApp();
+        await FirebaseInitializer.initializeOnce();
         Logger.debug('✅ AuthGate: Firebase initialized');
       } catch (e) {
         Logger.debug(
-          'ℹ️ AuthGate: Firebase already initialized or init failed: $e',
+          'ℹ️ AuthGate: Firebase init failed or timed out, continuing: $e',
         );
       }
 
@@ -112,14 +112,12 @@ class _AuthGateState extends State<AuthGate> {
     if (!mounted || !_isChecking) return;
 
     // Set minimal customer model for immediate navigation
-    if (CustomerController.logeInCustomer == null) {
-      CustomerController.logeInCustomer = CustomerModel(
-        uid: user.uid,
-        name: user.displayName ?? '',
-        email: user.email ?? '',
-        createdAt: DateTime.now(),
-      );
-    }
+    CustomerController.logeInCustomer ??= CustomerModel(
+      uid: user.uid,
+      name: user.displayName ?? '',
+      email: user.email ?? '',
+      createdAt: DateTime.now(),
+    );
 
     setState(() {
       _isLoggedIn = true;

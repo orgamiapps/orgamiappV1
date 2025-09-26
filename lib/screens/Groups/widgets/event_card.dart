@@ -63,7 +63,7 @@ class EventCard extends StatelessWidget {
     final imageUrl = data['imageUrl'] ?? '';
     final creatorName = data['customerName'] ?? 'Unknown';
 
-    Future<String> _resolveCreatorName() async {
+    Future<String> resolveCreatorName() async {
       final raw = creatorName.toString().trim();
       if (raw.isNotEmpty && raw.toLowerCase() != 'unknown') return raw;
       final String? creatorId = data['customerUid'] ?? data['authorId'];
@@ -336,7 +336,7 @@ class EventCard extends StatelessWidget {
                     Row(
                       children: [
                         FutureBuilder<String>(
-                          future: _resolveCreatorName(),
+                          future: resolveCreatorName(),
                           builder: (context, snapshot) {
                             final displayName = (snapshot.data ?? creatorName)
                                 .trim();

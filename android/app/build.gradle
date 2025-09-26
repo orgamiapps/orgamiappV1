@@ -63,8 +63,9 @@ dependencies {
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.5"
     // Facebook SDK
     implementation 'com.facebook.android:facebook-android-sdk:17.0.2'
-    // ONNX Runtime Mobile (smaller, faster startup)
-    implementation 'com.microsoft.onnxruntime:onnxruntime-mobile:1.16.3'
+    // ONNX Runtime Mobile temporarily disabled due to missing model files
+    // TODO: Re-enable after adding model files to assets/models/
+    // implementation 'com.microsoft.onnxruntime:onnxruntime-mobile:1.16.3'
     // Coroutines for async operations
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
 }

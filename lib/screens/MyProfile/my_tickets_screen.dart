@@ -23,7 +23,7 @@ class MyTicketsScreen extends StatefulWidget {
 
 class _MyTicketsScreenState extends State<MyTicketsScreen> {
   List<TicketModel> userTickets = [];
-  Map<String, EventModel> _eventCache = {};
+  final Map<String, EventModel> _eventCache = {};
   bool isLoading = true;
   int selectedTab = 0; // 0 = All, 1 = Active, 2 = Used
   final GlobalKey ticketShareKey = GlobalKey();

@@ -889,7 +889,7 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Are you sure you want to delete this ${type}?'),
+            Text('Are you sure you want to delete this $type?'),
             if (title.isNotEmpty) ...[
               const SizedBox(height: 8),
               Container(
@@ -946,7 +946,7 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Post deleted successfully'),
-            backgroundColor: const Color(0xFF667EEA),
+            backgroundColor: Color(0xFF667EEA),
           ),
         );
       }
@@ -1293,7 +1293,7 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Event deleted'),
-                      backgroundColor: const Color(0xFF667EEA),
+                      backgroundColor: Color(0xFF667EEA),
                     ),
                   );
                 }

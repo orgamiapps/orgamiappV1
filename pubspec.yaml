@@ -44,7 +44,7 @@ dependencies:
   # twitter_login: ^4.4.2  # X (Twitter) authentication - disabled due to namespace issues
   cloud_firestore: ^6.0.0
   rounded_loading_button_plus: ^3.0.1
-  fluttertoast: ^8.2.4
+  fluttertoast: ^9.0.0
   font_awesome_flutter: ^10.7.0
   dotted_border: ^3.1.0
   image_picker: ^1.0.5
@@ -101,6 +101,8 @@ dependencies:
   # NFC functionality for badge activation
   nfc_manager: ^4.0.2
 
+  path: any
+  ndef_record: any
 dev_dependencies:
   flutter_test:
     sdk: flutter
