@@ -32,6 +32,12 @@ class SubscriptionService extends ChangeNotifier {
       notifyListeners();
 
       await _loadUserSubscription();
+
+      // Automatically migrate old $20 prices to $5
+      if (_currentSubscription?.priceAmount == 2000) {
+        Logger.info('Migrating subscription price from \$20 to \$5');
+        await updateSubscriptionPrice();
+      }
     } catch (e) {
       Logger.error('Failed to initialize subscription service', e);
     } finally {
@@ -79,14 +85,14 @@ class SubscriptionService extends ChangeNotifier {
         userId: userId,
         planId: 'premium_monthly',
         status: 'active',
-        priceAmount: 2000, // $20.00 in cents
+        priceAmount: 500, // $5.00 in cents
         currency: 'USD',
         interval: 'month',
         currentPeriodStart: DateTime.now(),
         currentPeriodEnd: DateTime.now().add(const Duration(days: 30)),
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
-        // For testing, make it free but still show $20/month
+        // For testing, make it free but still show $5/month
         isTrial: true,
         trialEndsAt: DateTime.now().add(
           const Duration(days: 365),
@@ -304,7 +310,7 @@ class SubscriptionService extends ChangeNotifier {
         userId: userId,
         planId: 'premium_monthly',
         status: 'active',
-        priceAmount: 2000, // $20.00 in cents
+        priceAmount: 500, // $5.00 in cents
         currency: 'USD',
         interval: 'month',
         currentPeriodStart: DateTime.now(),
@@ -381,6 +387,38 @@ class SubscriptionService extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  /// Update existing subscription price (for migration purposes)
+  /// This method updates the price from $20 to $5 for existing subscriptions
+  Future<bool> updateSubscriptionPrice() async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null || _currentSubscription == null) return false;
+
+    try {
+      // Only update if the price is currently $20 (2000 cents)
+      if (_currentSubscription!.priceAmount != 2000) {
+        Logger.info(
+          'Subscription price is already correct: ${_currentSubscription!.formattedPrice}',
+        );
+        return true;
+      }
+
+      await _firestore.collection('subscriptions').doc(userId).update({
+        'priceAmount': 500, // Update to $5.00
+        'updatedAt': Timestamp.now(),
+      });
+
+      // Reload the subscription to reflect the change
+      await _loadUserSubscription();
+
+      Logger.success('Updated subscription price from \$20.00 to \$5.00');
+      notifyListeners();
+      return true;
+    } catch (e) {
+      Logger.error('Error updating subscription price', e);
+      return false;
     }
   }
 }

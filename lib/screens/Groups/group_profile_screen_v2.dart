@@ -4,9 +4,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:attendus/firebase/organization_helper.dart';
-import 'package:attendus/models/event_model.dart';
-import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
-import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:attendus/screens/Groups/create_announcement_screen.dart';
 import 'package:attendus/screens/Groups/create_poll_screen.dart';
@@ -352,34 +349,30 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
                                   ),
                                 ),
                                 if (!_isMember && !_checkingMembership) ...[
-                                  const SizedBox(width: 8), // Reduced from 12
-                                  Container(
-                                    child: FilledButton(
-                                      onPressed: _hasRequestedJoin
-                                          ? null
-                                          : _requestToJoin,
-                                      style: FilledButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 6,
-                                        ), // Compact padding
-                                        backgroundColor: _hasRequestedJoin
-                                            ? Colors.grey.shade400
-                                            : Colors.white,
-                                        foregroundColor: _hasRequestedJoin
-                                            ? Colors.white
-                                            : const Color(0xFF667EEA),
-                                        disabledBackgroundColor:
-                                            Colors.grey.shade400,
-                                        disabledForegroundColor: Colors.white,
+                                  const SizedBox(width: 8),
+                                  FilledButton(
+                                    onPressed: _hasRequestedJoin
+                                        ? null
+                                        : _requestToJoin,
+                                    style: FilledButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 6,
                                       ),
-                                      child: Text(
-                                        _hasRequestedJoin
-                                            ? 'Requested'
-                                            : 'Join',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                                      backgroundColor: _hasRequestedJoin
+                                          ? Colors.grey.shade400
+                                          : Colors.white,
+                                      foregroundColor: _hasRequestedJoin
+                                          ? Colors.white
+                                          : const Color(0xFF667EEA),
+                                      disabledBackgroundColor:
+                                          Colors.grey.shade400,
+                                      disabledForegroundColor: Colors.white,
+                                    ),
+                                    child: Text(
+                                      _hasRequestedJoin ? 'Requested' : 'Join',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ),
@@ -1586,59 +1579,6 @@ class _PollCardState extends State<_PollCard> {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _EventsTab extends StatelessWidget {
-  final String organizationId;
-  const _EventsTab({required this.organizationId});
-
-  @override
-  Widget build(BuildContext context) {
-    final query = FirebaseFirestore.instance
-        .collection('Events')
-        .where('organizationId', isEqualTo: organizationId);
-
-    return StreamBuilder<QuerySnapshot>(
-      stream: query.snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final docs = snapshot.data?.docs ?? [];
-        if (docs.isEmpty) {
-          return const _EmptyState(
-            icon: Icons.event_busy,
-            title: 'No Events Yet',
-            subtitle: 'Events will appear here once they are created.',
-          );
-        }
-        final items = docs.map((d) {
-          final map = d.data() as Map<String, dynamic>;
-          map['id'] = map['id'] ?? d.id;
-          return EventModel.fromJson(map);
-        }).toList();
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: items.length,
-          itemBuilder: (context, i) {
-            final model = items[i];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: SingleEventListViewItem(
-                eventModel: model,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => SingleEventScreen(eventModel: model),
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
     );
   }
 }

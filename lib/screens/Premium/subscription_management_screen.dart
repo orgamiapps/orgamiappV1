@@ -19,19 +19,39 @@ class _SubscriptionManagementScreenState
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: Stack(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: Column(
         children: [
           SafeArea(
-            child: Column(
-              children: [
-                AppAppBarView.appBarView(
-                  context: context,
-                  title: 'Manage Subscription',
+            bottom: false,
+            child: AppAppBarView.appBarView(
+              context: context,
+              title: 'Manage Subscription',
+            ),
+          ),
+          Expanded(
+            child: SafeArea(
+              top: false,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      theme.colorScheme.primary.withValues(
+                        alpha: theme.brightness == Brightness.dark
+                            ? 0.18
+                            : 0.08,
+                      ),
+                      theme.scaffoldBackgroundColor,
+                    ],
+                  ),
                 ),
-                Expanded(child: _buildBody()),
-              ],
+                child: _buildBody(),
+              ),
             ),
           ),
         ],
@@ -52,17 +72,21 @@ class _SubscriptionManagementScreenState
         }
 
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildSubscriptionOverview(subscription, subscriptionService),
+              _buildHeaderCard(subscription, subscriptionService),
+              const SizedBox(height: 20),
+              _buildPlanSummaryCard(subscription, subscriptionService),
+              const SizedBox(height: 20),
+              _buildBenefitsCard(),
+              const SizedBox(height: 20),
+              _buildManageCard(subscription, subscriptionService),
+              const SizedBox(height: 20),
+              _buildBillingHistoryPlaceholder(),
               const SizedBox(height: 24),
-              _buildSubscriptionDetails(subscription),
-              const SizedBox(height: 24),
-              _buildManagementActions(subscription, subscriptionService),
-              const SizedBox(height: 24),
-              _buildBillingHistory(),
+              _buildSupportSection(),
             ],
           ),
         );
@@ -71,351 +95,352 @@ class _SubscriptionManagementScreenState
   }
 
   Widget _buildNoSubscription() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.card_membership,
-            size: 64,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No Active Subscription',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'You don\'t have an active subscription.',
-            style: Theme.of(context).textTheme.bodyMedium,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Back to Premium'),
-          ),
-        ],
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.workspace_premium_outlined,
+              size: 72,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No active subscription',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You do not currently have a premium plan. Return to explore premium options.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Back to premium'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSubscriptionOverview(
-    subscription,
+  Widget _buildHeaderCard(
+    dynamic subscription,
     SubscriptionService subscriptionService,
   ) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: _getStatusColor(
-                    subscription.status,
-                  ).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+    final theme = Theme.of(context);
+    final statusColor = _getStatusColor(subscription.status);
+    final isTrial = subscription.isTrial && subscription.trialEndsAt != null;
+    final nextLabel = isTrial
+        ? 'Trial ends ${_formatDate(subscription.trialEndsAt!)}'
+        : 'Renews ${subscriptionService.getNextBillingDate() ?? 'soon'}';
+
+    return Card(
+      elevation: 3,
+      shadowColor: theme.colorScheme.primary.withValues(alpha: 0.2),
+      color: theme.colorScheme.primaryContainer,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: statusColor.withValues(alpha: 0.2),
+                  ),
+                  child: Icon(
+                    _getStatusIcon(subscription.status),
+                    color: statusColor,
+                    size: 28,
+                  ),
                 ),
-                child: Icon(
-                  _getStatusIcon(subscription.status),
-                  color: _getStatusColor(subscription.status),
-                  size: 24,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        subscription.planDisplayName,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: theme.colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subscriptionService.getSubscriptionStatusText(),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onPrimaryContainer
+                              .withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(width: 20),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      subscriptionService.getSubscriptionStatusText(),
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
+                      subscription.formattedPrice,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: theme.colorScheme.onPrimaryContainer,
+                        letterSpacing: -0.5,
                       ),
                     ),
+                    const SizedBox(height: 2),
                     Text(
-                      subscription.planDisplayName,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      'per month',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onPrimaryContainer.withValues(
+                          alpha: 0.7,
+                        ),
+                        fontSize: 11,
                       ),
                     ),
                   ],
                 ),
-              ),
-              Text(
-                subscription.formattedPrice,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.primary,
+              ],
+            ),
+            const SizedBox(height: 18),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                _buildSummaryChip(
+                  icon: Icons.calendar_month_outlined,
+                  label: nextLabel,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (subscription.isTrial && subscription.trialEndsAt != null)
-            _buildInfoRow(
-              'Trial Ends',
-              _formatDate(subscription.trialEndsAt!),
-              Icons.schedule,
-            )
-          else
-            _buildInfoRow(
-              'Next Billing',
-              subscriptionService.getNextBillingDate() ?? 'N/A',
-              Icons.calendar_today,
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSubscriptionDetails(subscription) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Subscription Details',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          _buildDetailRow('Plan', subscription.planDisplayName),
-          _buildDetailRow('Status', _capitalizeFirst(subscription.status)),
-          _buildDetailRow(
-            'Price',
-            '${subscription.formattedPrice}/${subscription.interval}',
-          ),
-          _buildDetailRow('Started', _formatDate(subscription.createdAt)),
-          _buildDetailRow(
-            'Current Period',
-            '${_formatDate(subscription.currentPeriodStart)} - ${_formatDate(subscription.currentPeriodEnd)}',
-          ),
-          if (subscription.cancelledAt != null)
-            _buildDetailRow(
-              'Cancelled',
-              _formatDate(subscription.cancelledAt!),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildManagementActions(
-    subscription,
-    SubscriptionService subscriptionService,
-  ) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Manage Your Subscription',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          if (subscription.status == 'active') ...[
-            _buildActionButton(
-              'Cancel Subscription',
-              'Your subscription will remain active until the end of the current billing period',
-              Icons.cancel,
-              Colors.orange,
-              () => _showCancelConfirmation(subscriptionService),
-            ),
-          ] else if (subscription.status == 'cancelled') ...[
-            _buildActionButton(
-              'Reactivate Subscription',
-              'Resume your premium subscription',
-              Icons.restart_alt,
-              Theme.of(context).colorScheme.primary,
-              () => _reactivateSubscription(subscriptionService),
+                _buildSummaryChip(
+                  icon: Icons.event_available_outlined,
+                  label: 'Member since ${_formatDate(subscription.createdAt)}',
+                ),
+              ],
             ),
           ],
-          const SizedBox(height: 12),
-          _buildActionButton(
-            'Update Payment Method',
-            'Change your payment information (Coming Soon)',
-            Icons.payment,
-            Theme.of(context).colorScheme.primary,
-            () => _showComingSoon('Payment method updates'),
-            enabled: false,
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildBillingHistory() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+  Widget _buildPlanSummaryCard(
+    dynamic subscription,
+    SubscriptionService subscriptionService,
+  ) {
+    final details = <({String label, String value})>[
+      (label: 'Plan', value: subscription.planDisplayName),
+      (
+        label: 'Billing',
+        value: '${subscription.formattedPrice}/${subscription.interval}',
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Billing History',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+      (
+        label: 'Current period',
+        value:
+            '${_formatDate(subscription.currentPeriodStart)} – ${_formatDate(subscription.currentPeriodEnd)}',
+      ),
+      (
+        label: 'Next renewal',
+        value: subscriptionService.getNextBillingDate() ?? 'Pending',
+      ),
+      if (subscription.cancelledAt != null)
+        (label: 'Cancelled on', value: _formatDate(subscription.cancelledAt!)),
+    ];
+
+    return _buildSectionCard(
+      title: 'Plan details',
+      children: [
+        for (int i = 0; i < details.length; i++) ...[
+          _buildInfoRow(label: details[i].label, value: details[i].value),
+          if (i != details.length - 1) const Divider(height: 24),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildBenefitsCard() {
+    final theme = Theme.of(context);
+    final benefits = <({IconData icon, String title, String subtitle})>[
+      (
+        icon: Icons.event_available_outlined,
+        title: 'Unlimited events',
+        subtitle: 'Launch as many events as your team needs.',
+      ),
+      (
+        icon: Icons.query_stats_outlined,
+        title: 'Advanced analytics',
+        subtitle: 'Understand performance with deeper insights.',
+      ),
+      (
+        icon: Icons.support_agent_outlined,
+        title: 'Priority support',
+        subtitle: 'Reach our dedicated team when you need help.',
+      ),
+    ];
+
+    return _buildSectionCard(
+      title: 'What you get',
+      children: benefits
+          .map(
+            (benefit) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer.withValues(
+                        alpha: theme.brightness == Brightness.dark ? 0.4 : 0.3,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      benefit.icon,
+                      color: theme.colorScheme.onPrimaryContainer,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          benefit.title,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          benefit.subtitle,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  Widget _buildManageCard(
+    dynamic subscription,
+    SubscriptionService subscriptionService,
+  ) {
+    final theme = Theme.of(context);
+    final isActive = subscription.status == 'active';
+    final helperText = isActive
+        ? 'You will keep access until the end of the current billing period.'
+        : 'Restore premium features immediately.';
+
+    return _buildSectionCard(
+      title: 'Manage subscription',
+      children: [
+        Text(
+          helperText,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
           ),
-          const SizedBox(height: 16),
-          Text(
-            'No billing history available yet. This feature will be added when payment processing is implemented.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: isActive
+                ? () => _showCancelConfirmation(subscriptionService)
+                : () => _reactivateSubscription(subscriptionService),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+            child: Text(
+              isActive ? 'Cancel subscription' : 'Reactivate subscription',
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value, IconData icon) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: 16,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
-        const SizedBox(width: 8),
-        Text(
-          '$label: ',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: () => _showComingSoon('Payment method updates'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+            child: const Text('Update payment method'),
           ),
-        ),
-        Text(
-          value,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
       ],
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              '$label:',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
+  Widget _buildBillingHistoryPlaceholder() {
+    final theme = Theme.of(context);
+
+    return _buildSectionCard(
+      title: 'Billing history',
+      children: [
+        Text(
+          'Billing receipts will appear here once available. You can download invoices and review renewals in this space.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            height: 1.4,
           ),
-          Expanded(
-            child: Text(
-              value,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildActionButton(
-    String title,
-    String subtitle,
-    IconData icon,
-    Color color,
-    VoidCallback onTap, {
-    bool enabled = true,
-  }) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: enabled
-              ? color.withValues(alpha: 0.1)
-              : Colors.grey.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
+  Widget _buildSupportSection() {
+    final theme = Theme.of(context);
+
+    return _buildSectionCard(
+      title: 'Need a hand?',
+      children: [
+        Text(
+          'Our support team is here to help with any billing or plan questions.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
-        child: Icon(icon, color: enabled ? color : Colors.grey, size: 20),
-      ),
-      title: Text(
-        title,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.w600,
-          color: enabled ? null : Colors.grey,
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => _showComingSoon('Support chat'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+            icon: const Icon(Icons.chat_bubble_outline),
+            label: const Text('Message support'),
+          ),
         ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: enabled
-              ? Theme.of(context).colorScheme.onSurfaceVariant
-              : Colors.grey,
-        ),
-      ),
-      trailing: enabled ? const Icon(Icons.arrow_forward_ios, size: 16) : null,
-      onTap: enabled ? onTap : null,
-      contentPadding: EdgeInsets.zero,
+      ],
     );
   }
 
@@ -513,6 +538,108 @@ class _SubscriptionManagementScreenState
     ShowToast().showNormalToast(msg: '$feature will be available soon!');
   }
 
+  Widget _buildSectionCard({
+    required String title,
+    required List<Widget> children,
+  }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cardColor = isDark
+        ? Color.alphaBlend(
+            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+            theme.colorScheme.surface,
+          )
+        : theme.colorScheme.surface;
+    final borderColor = theme.colorScheme.outline.withValues(
+      alpha: isDark ? 0.2 : 0.08,
+    );
+
+    return Card(
+      elevation: isDark ? 1 : 3,
+      shadowColor: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
+      color: cardColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: borderColor),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow({required String label, required String value}) {
+    final theme = Theme.of(context);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 2,
+          child: Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 3,
+          child: Text(
+            value,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSummaryChip({required IconData icon, required String label}) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        color: theme.colorScheme.onPrimaryContainer.withValues(
+          alpha: theme.brightness == Brightness.dark ? 0.2 : 0.12,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: theme.colorScheme.onPrimaryContainer),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onPrimaryContainer,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Color _getStatusColor(String status) {
     switch (status) {
       case 'active':
@@ -545,10 +672,5 @@ class _SubscriptionManagementScreenState
 
   String _formatDate(DateTime date) {
     return DateFormat('MM/dd/yyyy').format(date);
-  }
-
-  String _capitalizeFirst(String text) {
-    if (text.isEmpty) return text;
-    return text[0].toUpperCase() + text.substring(1);
   }
 }

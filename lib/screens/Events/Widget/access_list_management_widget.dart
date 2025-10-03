@@ -107,9 +107,7 @@ class _AccessListManagementWidgetState
     final toShare = (AppConstants.dynamicLinksDomain.isNotEmpty)
         ? dynamicLink
         : deepLink;
-    await SharePlus.instance.share(
-      ShareParams(text: 'Join my private event: $toShare'),
-    );
+    await Share.share('Join my private event: $toShare');
   }
 
   @override

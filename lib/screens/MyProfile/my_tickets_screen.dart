@@ -541,12 +541,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
       );
       await file.writeAsBytes(bytes);
 
-      await SharePlus.instance.share(
-        ShareParams(
-          text:
-              'My AttendUs Ticket • ${ticket.eventTitle} • Code: ${ticket.ticketCode}',
-          files: [XFile(file.path)],
-        ),
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'My AttendUs Ticket • ${ticket.eventTitle} • Code: ${ticket.ticketCode}',
       );
     } catch (e) {
       debugPrint('Error sharing ticket: $e');

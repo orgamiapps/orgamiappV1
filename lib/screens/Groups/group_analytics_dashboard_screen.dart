@@ -30,7 +30,6 @@ class _GroupAnalyticsDashboardScreenState
     extends State<GroupAnalyticsDashboardScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final String _selectedDateFilter = 'all'; // 'all', 'week', 'month', 'year'
   bool _isLoading = false;
   List<EventModel> _groupEvents = [];
   Map<String, dynamic> _aggregatedAnalytics = {};
@@ -252,17 +251,17 @@ class _GroupAnalyticsDashboardScreenState
           }
         }
 
-        final int totalUniqueAttendees = attendeeCountsByUser.length;
-        final int repeatUniqueAttendees = attendeeCountsByUser.values
-            .where((count) => count > 1)
+        final int uniqueAttendeeCount = attendeeCountsByUser.length;
+        final int returningAttendeeCount = attendeeCountsByUser.values
+            .where((attendeeCount) => attendeeCount > 1)
             .length;
-        final double retentionRate = totalUniqueAttendees > 0
-            ? (repeatUniqueAttendees / totalUniqueAttendees) * 100.0
+        final double retentionRate = uniqueAttendeeCount > 0
+            ? (returningAttendeeCount / uniqueAttendeeCount) * 100.0
             : 0.0;
 
         analytics['retentionRate'] = retentionRate;
-        analytics['totalUniqueAttendees'] = totalUniqueAttendees;
-        analytics['repeatUniqueAttendees'] = repeatUniqueAttendees;
+        analytics['totalUniqueAttendees'] = uniqueAttendeeCount;
+        analytics['repeatUniqueAttendees'] = returningAttendeeCount;
       } catch (e) {
         if (kDebugMode) {
           debugPrint('Error computing retention rate: $e');
@@ -829,8 +828,8 @@ class _GroupAnalyticsDashboardScreenState
       },
       {
         'title': 'Avg Attendance',
-        'value':
-            (_aggregatedAnalytics['averageAttendance'] as double).toStringAsFixed(1),
+        'value': (_aggregatedAnalytics['averageAttendance'] as double)
+            .toStringAsFixed(1),
         'icon': Icons.trending_up,
         'color': Colors.teal,
       },
@@ -970,7 +969,9 @@ class _GroupAnalyticsDashboardScreenState
   Widget _buildCategoriesChart() {
     final categories =
         _aggregatedAnalytics['eventCategories'] as Map<String, int>;
-    final total = categories.values.fold(0, (sum, value) => sum + value);
+    final total = categories.values.fold<int>(0, (accumulator, value) {
+      return accumulator + value;
+    });
 
     return Container(
       padding: const EdgeInsets.all(16),

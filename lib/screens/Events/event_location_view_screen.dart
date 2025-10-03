@@ -800,8 +800,9 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
           'Maps: https://www.google.com/maps/search/?api=1&query=$lat,$lng';
 
       // Use the existing share functionality
-      await SharePlus.instance.share(
-        ShareParams(text: shareText, subject: 'Event Location: $eventTitle'),
+      await Share.share(
+        shareText,
+        subject: 'Event Location: $eventTitle',
       );
     } catch (e) {
       if (!mounted) return;

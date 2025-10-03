@@ -346,7 +346,7 @@ class _PremiumRequiredScreenState extends State<_PremiumRequiredScreen>
                 ),
               ),
               Text(
-                '20',
+                '5',
                 style: TextStyle(
                   fontSize: 36,
                   fontWeight: FontWeight.bold,

@@ -5,7 +5,7 @@ class SubscriptionModel {
   final String userId;
   final String planId; // e.g., 'premium_monthly', 'premium_yearly'
   final String status; // 'active', 'cancelled', 'past_due', 'incomplete'
-  final int priceAmount; // Price in cents (e.g., 2000 = $20.00)
+  final int priceAmount; // Price in cents (e.g., 500 = $5.00)
   final String currency; // 'USD', 'EUR', etc.
   final String interval; // 'month', 'year'
   final DateTime currentPeriodStart;
@@ -40,14 +40,14 @@ class SubscriptionModel {
   /// Check if subscription is currently active
   bool get isActive {
     if (status != 'active') return false;
-    
+
     final now = DateTime.now();
-    
+
     // If it's a trial, check trial end date
     if (isTrial && trialEndsAt != null) {
       return now.isBefore(trialEndsAt!);
     }
-    
+
     // Check if current period is still valid
     return now.isBefore(currentPeriodEnd);
   }
@@ -73,7 +73,7 @@ class SubscriptionModel {
   /// Create from Firestore document
   factory SubscriptionModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-    
+
     return SubscriptionModel(
       id: doc.id,
       userId: data['userId'] ?? '',
@@ -86,14 +86,14 @@ class SubscriptionModel {
       currentPeriodEnd: _parseTimestamp(data['currentPeriodEnd']),
       createdAt: _parseTimestamp(data['createdAt']),
       updatedAt: _parseTimestamp(data['updatedAt']),
-      cancelledAt: data['cancelledAt'] != null 
-          ? _parseTimestamp(data['cancelledAt']) 
+      cancelledAt: data['cancelledAt'] != null
+          ? _parseTimestamp(data['cancelledAt'])
           : null,
       stripeSubscriptionId: data['stripeSubscriptionId'],
       stripeCustomerId: data['stripeCustomerId'],
       isTrial: data['isTrial'] ?? false,
-      trialEndsAt: data['trialEndsAt'] != null 
-          ? _parseTimestamp(data['trialEndsAt']) 
+      trialEndsAt: data['trialEndsAt'] != null
+          ? _parseTimestamp(data['trialEndsAt'])
           : null,
     );
   }
@@ -111,11 +111,15 @@ class SubscriptionModel {
       'currentPeriodEnd': Timestamp.fromDate(currentPeriodEnd),
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
-      'cancelledAt': cancelledAt != null ? Timestamp.fromDate(cancelledAt!) : null,
+      'cancelledAt': cancelledAt != null
+          ? Timestamp.fromDate(cancelledAt!)
+          : null,
       'stripeSubscriptionId': stripeSubscriptionId,
       'stripeCustomerId': stripeCustomerId,
       'isTrial': isTrial,
-      'trialEndsAt': trialEndsAt != null ? Timestamp.fromDate(trialEndsAt!) : null,
+      'trialEndsAt': trialEndsAt != null
+          ? Timestamp.fromDate(trialEndsAt!)
+          : null,
     };
   }
 

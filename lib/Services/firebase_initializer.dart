@@ -44,7 +44,7 @@ class FirebaseInitializer {
         await FirebaseAppCheck.instance.activate(
           androidProvider: androidProvider,
           appleProvider: appleProvider,
-          webProvider: kDebugMode
+          providerWeb: kDebugMode
               ? ReCaptchaV3Provider('recaptcha-v3-site-key')
               : ReCaptchaV3Provider('recaptcha-v3-site-key'),
         );

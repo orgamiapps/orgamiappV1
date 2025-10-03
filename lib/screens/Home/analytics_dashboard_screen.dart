@@ -263,17 +263,17 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
           }
         }
 
-        final int totalUniqueAttendees = attendeeCountsByUser.length;
-        final int repeatUniqueAttendees = attendeeCountsByUser.values
-            .where((count) => count > 1)
+        final int uniqueAttendeeCount = attendeeCountsByUser.length;
+        final int repeatAttendeeCount = attendeeCountsByUser.values
+            .where((attendanceCount) => attendanceCount > 1)
             .length;
-        final double retentionRate = totalUniqueAttendees > 0
-            ? (repeatUniqueAttendees / totalUniqueAttendees) * 100.0
+        final double retentionRate = uniqueAttendeeCount > 0
+            ? (repeatAttendeeCount / uniqueAttendeeCount) * 100.0
             : 0.0;
 
         analytics['retentionRate'] = retentionRate;
-        analytics['totalUniqueAttendees'] = totalUniqueAttendees;
-        analytics['repeatUniqueAttendees'] = repeatUniqueAttendees;
+        analytics['totalUniqueAttendees'] = uniqueAttendeeCount;
+        analytics['repeatUniqueAttendees'] = repeatAttendeeCount;
       } catch (e) {
         if (kDebugMode) {
           debugPrint('Error computing retention rate: $e');
@@ -2042,12 +2042,12 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
                 Container(
                   padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
                   decoration: BoxDecoration(
-          color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                    color: const Color(0xFF667EEA).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(
                       Dimensions.radiusDefault,
                     ),
                     border: Border.all(
-              color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+                      color: const Color(0xFF667EEA).withValues(alpha: 0.3),
                     ),
                   ),
                   child: Row(
@@ -2607,10 +2607,11 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
         _aiAnswer = 'Sorry, I could not process that question: $e';
       });
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _qaLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _qaLoading = false;
+        });
+      }
     }
   }
 
@@ -2988,12 +2989,10 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
       await file.writeAsString(csvString);
 
       // Share file
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path)],
-          subject: 'Analytics Dashboard - ${DateTime.now().toString()}',
-          text: 'Analytics dashboard data exported from Orgami app',
-        ),
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        subject: 'Analytics Dashboard - ${DateTime.now().toString()}',
+        text: 'Analytics dashboard data exported from Orgami app',
       );
 
       if (!mounted) return;

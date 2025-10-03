@@ -794,8 +794,8 @@ class AIAnalyticsHelper {
     };
   }
 
-  Map<String, dynamic> _computeBestHourRange(Map<int, int> hourAttendance) {
-    if (hourAttendance.isEmpty) {
+  Map<String, dynamic> _computeBestHourRange(Map<int, int> hourCounts) {
+    if (hourCounts.isEmpty) {
       return {
         'bestHourRange': null,
         'distribution': {},
@@ -806,12 +806,12 @@ class AIAnalyticsHelper {
     // Smooth by grouping into 2-hour buckets
     final Map<String, int> buckets = {};
     int total = 0;
-    hourAttendance.forEach((hour, count) {
+    hourCounts.forEach((hour, attendeeCount) {
       final start = (hour ~/ 2) * 2; // 0,2,4,...
       final label =
           '${start.toString().padLeft(2, '0')}-${(start + 2).toString().padLeft(2, '0')}';
-      buckets[label] = (buckets[label] ?? 0) + count;
-      total += count;
+      buckets[label] = (buckets[label] ?? 0) + attendeeCount;
+      total += attendeeCount;
     });
     String best = '';
     int bestVal = -1;

@@ -16,7 +16,7 @@ I have successfully implemented a comprehensive premium subscription system for 
 ### 2. Premium Upgrade Screen (`lib/screens/Premium/premium_upgrade_screen.dart`)
 - **Beautiful UI**: Modern, gradient-based design showcasing premium features
 - **Feature Highlights**: Lists all premium benefits (unlimited events, analytics, etc.)
-- **Pricing Display**: Shows $20/month pricing with clear billing information
+- **Pricing Display**: Shows $5/month pricing with clear billing information
 - **Free Trial**: Currently activates free premium for testing purposes
 - **Subscription Management**: Redirects to management screen for existing subscribers
 
@@ -52,7 +52,7 @@ I have successfully implemented a comprehensive premium subscription system for 
   userId: string,           // Firebase user ID
   planId: string,          // 'premium_monthly', 'premium_yearly'
   status: string,          // 'active', 'cancelled', 'past_due', 'incomplete'
-  priceAmount: number,     // Price in cents (2000 = $20.00)
+  priceAmount: number,     // Price in cents (500 = $5.00)
   currency: string,        // 'USD'
   interval: string,        // 'month', 'year'
   currentPeriodStart: timestamp,

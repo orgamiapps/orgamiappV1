@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:attendus/Services/subscription_service.dart';
@@ -155,37 +157,22 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
   }
 
   Widget _buildManagementView(SubscriptionService subscriptionService) {
+    final theme = Theme.of(context);
+
     return FadeTransition(
       opacity: _fadeAnimation,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const SizedBox(height: 20),
-            _buildPremiumIcon(),
-            const SizedBox(height: 24),
-            Text(
-              '🎉 You\'re Premium!',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onPrimary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'You have full access to create unlimited events',
-              style: TextStyle(
-                fontSize: 16,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onPrimary.withValues(alpha: 0.9),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 40),
+            _buildCelebrationHeader(theme),
+            const SizedBox(height: 32),
+            _buildPremiumSpotlight(theme),
+            const SizedBox(height: 32),
             _buildSubscriptionStatusCard(subscriptionService),
+            const SizedBox(height: 24),
+            _buildPerksGrid(theme),
             const SizedBox(height: 24),
             _buildManagementButtons(subscriptionService),
           ],
@@ -195,18 +182,298 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
   }
 
   Widget _buildPremiumIcon() {
+    final theme = Theme.of(context);
+
     return Container(
-      width: 100,
-      height: 100,
+      width: 120,
+      height: 120,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.white.withValues(alpha: 0.2),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.3),
-          width: 2,
+        gradient: SweepGradient(
+          colors: [
+            theme.colorScheme.secondary,
+            theme.colorScheme.primary,
+            theme.colorScheme.tertiary,
+            theme.colorScheme.secondary,
+          ],
+          stops: const [0.0, 0.33, 0.66, 1.0],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 30,
+            offset: const Offset(0, 18),
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Container(
+        margin: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [
+              Colors.white.withValues(alpha: 0.95),
+              Colors.white.withValues(alpha: 0.65),
+            ],
+          ),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.6),
+            width: 2,
+          ),
+        ),
+        child: const Icon(
+          Icons.workspace_premium,
+          size: 56,
+          color: Color(0xFF8667F2),
         ),
       ),
-      child: const Icon(Icons.workspace_premium, size: 50, color: Colors.white),
+    );
+  }
+
+  Widget _buildCelebrationHeader(ThemeData theme) {
+    final borderColor = Colors.white.withValues(alpha: 0.32);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 28),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            theme.colorScheme.primary.withValues(alpha: 0.95),
+            theme.colorScheme.secondary.withValues(alpha: 0.9),
+            theme.colorScheme.primary.withValues(alpha: 0.7),
+          ],
+        ),
+        border: Border.all(color: borderColor, width: 1.3),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.primary.withValues(alpha: 0.35),
+            blurRadius: 38,
+            offset: const Offset(0, 22),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -30,
+            right: -18,
+            child: Container(
+              width: 130,
+              height: 130,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.18),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -26,
+            left: -14,
+            child: Container(
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.2),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: borderColor, width: 1),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.stars_rounded, size: 18, color: Colors.white),
+                    SizedBox(width: 8),
+                    Text(
+                      'Premium unlocked',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'You\'re Premium! 🎉',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                  height: 1.2,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Your workspace now has unlimited events, deeper insights, and dedicated support.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.92),
+                  height: 1.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPremiumSpotlight(ThemeData theme) {
+    final borderColor = Colors.white.withValues(alpha: 0.25);
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 40,
+            offset: const Offset(0, 26),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withValues(alpha: 0.22),
+                  Colors.white.withValues(alpha: 0.08),
+                ],
+              ),
+              border: Border.all(color: borderColor, width: 1.1),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 160,
+                      height: 160,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            theme.colorScheme.secondary.withValues(alpha: 0.35),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                    _buildPremiumIcon(),
+                  ],
+                ),
+                const SizedBox(height: 22),
+                Text(
+                  'Welcome to the premium experience',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: theme.colorScheme.onPrimary,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.1,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Launch memorable events faster, delight your attendees, and scale with confidence.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.85),
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 22),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    _buildInfoChip(
+                      theme,
+                      Icons.event_available_outlined,
+                      'Unlimited events',
+                    ),
+                    _buildInfoChip(
+                      theme,
+                      Icons.insights_outlined,
+                      'Advanced analytics',
+                    ),
+                    _buildInfoChip(
+                      theme,
+                      Icons.headset_mic_outlined,
+                      'Priority support',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoChip(ThemeData theme, IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.25),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: theme.colorScheme.onPrimary),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onPrimary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -335,7 +602,7 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
                 ),
               ),
               Text(
-                '20',
+                '5',
                 style: TextStyle(
                   fontSize: 48,
                   fontWeight: FontWeight.bold,
@@ -396,7 +663,7 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
 
   Widget _buildTrialHelperLine() {
     return Text(
-      'Free for 1 month, then \$20/month. Cancel anytime',
+      'Free for 1 month, then \$5/month. Cancel anytime',
       style: TextStyle(
         fontSize: 14,
         color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.9),
@@ -422,76 +689,310 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.2),
-          width: 1,
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.14),
+        gradient: LinearGradient(
+          colors: [
+            Colors.white.withValues(alpha: 0.16),
+            Colors.white.withValues(alpha: 0.06),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.25),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            offset: const Offset(0, 16),
+            blurRadius: 32,
+            spreadRadius: 0,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _buildStatusHeader(subscriptionService),
+          const SizedBox(height: 20),
+          Text(
+            'Plan: ${subscription.planDisplayName}',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(
+                context,
+              ).colorScheme.onPrimary.withValues(alpha: 0.95),
+            ),
+          ),
+          const SizedBox(height: 6),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Icon(Icons.verified, color: const Color(0xFF667EEA), size: 24),
+              _buildStatusPill(
+                icon: Icons.calendar_today_outlined,
+                label: subscription.isTrial
+                    ? 'Trial access'
+                    : 'Monthly billing',
+              ),
               const SizedBox(width: 12),
+              if (subscription.isTrial && subscription.trialEndsAt != null)
+                _buildStatusPill(
+                  icon: Icons.hourglass_top_rounded,
+                  label: 'Ends ${_formatDate(subscription.trialEndsAt!)}',
+                )
+              else if (subscriptionService.getNextBillingDate() != null)
+                _buildStatusPill(
+                  icon: Icons.payments_outlined,
+                  label: 'Next ${subscriptionService.getNextBillingDate()}',
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusPill({required IconData icon, required String label}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.24),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusHeader(SubscriptionService subscriptionService) {
+    final theme = Theme.of(context);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: [
+                theme.colorScheme.primary.withValues(alpha: 0.9),
+                theme.colorScheme.secondary.withValues(alpha: 0.9),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.35),
+              width: 1.3,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: theme.colorScheme.primary.withValues(alpha: 0.35),
+                blurRadius: 26,
+                offset: const Offset(0, 14),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.verified_rounded,
+            color: Colors.white,
+            size: 26,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
                 subscriptionService.getSubscriptionStatusText(),
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onPrimary,
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.onPrimary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Your premium benefits are active and ready to use.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: theme.colorScheme.onPrimary.withValues(alpha: 0.78),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPerksGrid(ThemeData theme) {
+    final perks = [
+      {
+        'icon': Icons.auto_graph_rounded,
+        'title': 'Growth analytics',
+        'description':
+            'Spot trends with real-time insights and attendee heatmaps.',
+      },
+      {
+        'icon': Icons.people_alt_rounded,
+        'title': 'Team collaboration',
+        'description': 'Add co-hosts, assign roles, and run events together.',
+      },
+      {
+        'icon': Icons.notifications_active_outlined,
+        'title': 'Smart reminders',
+        'description':
+            'Automated nudges keep your community engaged and informed.',
+      },
+      {
+        'icon': Icons.workspace_premium_outlined,
+        'title': 'Premium badge',
+        'description':
+            'Stand out with a verified badge on every event you publish.',
+      },
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+        color: Colors.white.withValues(alpha: 0.08),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Text(
-            'Plan: ${subscription.planDisplayName}',
-            style: TextStyle(
-              fontSize: 14,
-              color: Theme.of(
-                context,
-              ).colorScheme.onPrimary.withValues(alpha: 0.9),
+            'What’s unlocked for you',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: theme.colorScheme.onPrimary,
             ),
           ),
-          if (subscription.isTrial && subscription.trialEndsAt != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              'Trial ends: ${_formatDate(subscription.trialEndsAt!)}',
-              style: TextStyle(
-                fontSize: 14,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onPrimary.withValues(alpha: 0.9),
-              ),
-            ),
-          ] else if (subscriptionService.getNextBillingDate() != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              'Next billing: ${subscriptionService.getNextBillingDate()}',
-              style: TextStyle(
-                fontSize: 14,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onPrimary.withValues(alpha: 0.9),
-              ),
-            ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 14,
+            runSpacing: 14,
+            children: perks
+                .map(
+                  (perk) => _buildPerkCard(
+                    theme,
+                    icon: perk['icon'] as IconData,
+                    title: perk['title'] as String,
+                    description: perk['description'] as String,
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPerkCard(
+    ThemeData theme, {
+    required IconData icon,
+    required String title,
+    required String description,
+  }) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 150, maxWidth: 220),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.18),
+            Colors.white.withValues(alpha: 0.08),
           ],
+        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: theme.colorScheme.primary.withValues(alpha: 0.18),
+            ),
+            child: Icon(icon, size: 20, color: theme.colorScheme.onPrimary),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: theme.colorScheme.onPrimary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            description,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onPrimary.withValues(alpha: 0.75),
+              height: 1.45,
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildManagementButtons(SubscriptionService subscriptionService) {
+    final theme = Theme.of(context);
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(
-          width: double.infinity,
-          height: 48,
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                theme.colorScheme.primary.withValues(alpha: 0.95),
+                theme.colorScheme.secondary.withValues(alpha: 0.95),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: theme.colorScheme.primary.withValues(alpha: 0.33),
+                blurRadius: 32,
+                offset: const Offset(0, 18),
+              ),
+            ],
+          ),
           child: ElevatedButton.icon(
             onPressed: () {
               RouterClass.nextScreenNormal(
@@ -499,33 +1000,49 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
                 const SubscriptionManagementScreen(),
               );
             },
-            icon: const Icon(Icons.settings),
-            label: const Text('Manage Subscription'),
+            icon: const Icon(Icons.settings_outlined, color: Colors.white),
+            label: const Text(
+              'Manage Subscription',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white.withValues(alpha: 0.2),
-              foregroundColor: Colors.white,
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              minimumSize: const Size.fromHeight(56),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(18),
               ),
             ),
           ),
         ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: Text(
-              'Back to Account',
-              style: TextStyle(
-                color: Theme.of(
-                  context,
-                ).colorScheme.onPrimary.withValues(alpha: 0.9),
-                fontSize: 16,
-              ),
+        const SizedBox(height: 14),
+        TextButton.icon(
+          onPressed: () {
+            Navigator.pop(context);
+          },
+          icon: Icon(
+            Icons.arrow_back_rounded,
+            color: theme.colorScheme.onPrimary.withValues(alpha: 0.85),
+          ),
+          label: Text(
+            'Back to Account',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onPrimary.withValues(alpha: 0.85),
+            ),
+          ),
+          style: TextButton.styleFrom(
+            foregroundColor: theme.colorScheme.onPrimary.withValues(
+              alpha: 0.85,
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
             ),
           ),
         ),

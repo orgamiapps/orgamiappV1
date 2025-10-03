@@ -2,6 +2,7 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        maven { url "https://maven.stripe.com" }
     }
     
     // Override SDK versions for all subprojects

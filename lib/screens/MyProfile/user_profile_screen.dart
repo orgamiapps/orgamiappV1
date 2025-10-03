@@ -1411,10 +1411,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   void _shareProfile() {
-    SharePlus.instance.share(
-      ShareParams(
-        text: 'Check out ${_getDisplayName()}\'s profile on AttendUs!',
-      ),
+    Share.share(
+      'Check out ${_getDisplayName()}\'s profile on AttendUs!',
     );
   }
 

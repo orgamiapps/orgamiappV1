@@ -27,6 +27,7 @@ import 'package:attendus/screens/Legal/terms_conditions_screen.dart';
 import 'package:attendus/screens/Legal/privacy_policy_screen.dart';
 import 'package:attendus/screens/Home/help_screen.dart';
 import 'package:attendus/screens/Premium/premium_upgrade_screen.dart';
+import 'package:attendus/screens/Premium/subscription_management_screen.dart';
 import 'package:attendus/Services/subscription_service.dart';
 
 class AccountScreen extends StatefulWidget {
@@ -305,106 +306,13 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Widget _buildPremiumUpgradeItem() {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Theme.of(context).colorScheme.primary,
-            Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.workspace_premium,
-                  color: Theme.of(context).colorScheme.onPrimary,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Upgrade to Premium',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onPrimary,
-                      ),
-                    ),
-                    Text(
-                      'Create unlimited events • \$20/month',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onPrimary.withValues(alpha: 0.9),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.arrow_forward,
-                color: Theme.of(context).colorScheme.onPrimary,
-                size: 20,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                RouterClass.nextScreenNormal(
-                  context,
-                  const PremiumUpgradeScreen(),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: Theme.of(context).colorScheme.primary,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 16,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Get Premium',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ),
-        ],
-      ),
+    // Subtle inline CTA matching settings list style
+    return _buildSettingsItem(
+      icon: Icons.workspace_premium,
+      title: 'Upgrade to Premium',
+      subtitle: 'Unlock unlimited events • \$5/month',
+      onTap: () =>
+          RouterClass.nextScreenNormal(context, const PremiumUpgradeScreen()),
     );
   }
 
@@ -479,7 +387,7 @@ class _AccountScreenState extends State<AccountScreen> {
               onPressed: () {
                 RouterClass.nextScreenNormal(
                   context,
-                  const PremiumUpgradeScreen(),
+                  const SubscriptionManagementScreen(),
                 );
               },
               style: ElevatedButton.styleFrom(

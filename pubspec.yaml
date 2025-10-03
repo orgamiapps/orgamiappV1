@@ -47,25 +47,25 @@ dependencies:
   fluttertoast: ^9.0.0
   font_awesome_flutter: ^10.7.0
   dotted_border: ^3.1.0
-  image_picker: ^1.0.5
+  image_picker: ^1.2.0
   firebase_ui_firestore: ^2.0.0
   cached_network_image: ^3.3.1
   flashy_tab_bar2: ^0.0.10
   qr_code_scanner_plus: ^2.0.9+1
   qr_flutter: ^4.1.0
   screenshot: ^3.0.0
-  share_plus: ^11.1.0
-  path_provider: ^2.1.2
+  share_plus: ^10.1.0
+  path_provider: ^2.1.5
   image: ^4.5.4
   # Removed 'excel' package due to conflict with Syncfusion v30; using Syncfusion XLSIO only.
   # excel: ^4.0.6
-  syncfusion_flutter_xlsio: ^31.1.17
-  google_maps_flutter: ^2.10.0
+  syncfusion_flutter_xlsio: ^31.1.21
+  google_maps_flutter: ^2.13.1
   geolocator: ^14.0.2
   geocoding: ^4.0.0
-  permission_handler: ^12.0.0+1
-  webview_flutter: ^4.7.0
-  url_launcher: ^6.3.0
+  permission_handler: ^12.0.1
+  webview_flutter: ^4.13.0
+  url_launcher: ^6.3.2
   carousel_slider: ^5.1.1
   shimmer: ^3.0.0
   fl_chart: ^1.0.0
@@ -78,7 +78,7 @@ dependencies:
   pdf: ^3.10.7
   printing: ^5.11.1
   # HTTP for API calls
-  http: ^1.1.2
+  http: ^1.2.2
   cloud_functions: ^6.0.0
   # Date formatting
   intl: ^0.20.2
@@ -86,23 +86,23 @@ dependencies:
   # natural: ^0.2.0  # Removed due to compatibility issues
   # Theme management
   shared_preferences: ^2.2.2
-  provider: ^6.1.1
+  provider: ^6.1.2
   # Secure storage for authentication tokens
-  flutter_secure_storage: ^9.2.2
+  flutter_secure_storage: ^9.2.4
   mobile_scanner: ^7.0.1
   calendar_view: ^1.4.0
-  connectivity_plus: ^6.0.5
+  connectivity_plus: ^7.0.0
   # Payment processing
   flutter_stripe: ^12.0.2
   
   # On-device AI/ML
-  sqflite: ^2.3.0  # For SQLite database caching
+  sqflite: ^2.3.3  # For SQLite database caching
   
   # NFC functionality for badge activation
-  nfc_manager: ^4.0.2
+  nfc_manager: ^4.1.1
 
-  path: any
-  ndef_record: any
+  path: ^1.9.0
+  ndef_record: ^1.3.3
 dev_dependencies:
   flutter_test:
     sdk: flutter

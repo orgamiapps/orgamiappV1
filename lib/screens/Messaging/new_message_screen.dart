@@ -52,7 +52,6 @@ class _NewMessageScreenState extends State<NewMessageScreen>
   TabController? _groupTabController;
   int _groupTabIndex = 0;
   String? _selectedOrgId;
-  String? _selectedOrgName;
   final ScrollController _listController = ScrollController();
   int _listLimit = 30;
   bool _isNavigating = false;
@@ -343,7 +342,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
     }
   }
 
-  Future<void> _createGroupAndOpenChat() async {
+  Future<void> _createGroupChat() async {
     try {
       final currentUser = _auth.currentUser;
       if (currentUser == null) return;
@@ -356,12 +355,11 @@ class _NewMessageScreenState extends State<NewMessageScreen>
         return;
       }
 
-      // Ask for a name just-in-time in a bottom sheet
-      final name = await _promptForGroupName(context);
-      final groupName = name?.trim() ?? '';
+      final groupName = await _promptForGroupName(context);
+      final sanitizedName = groupName?.trim();
 
       final conv = await _messagingHelper.createGroupConversation(
-        groupName: groupName.isEmpty ? null : groupName,
+        groupName: sanitizedName?.isEmpty ?? true ? null : sanitizedName,
         participantIds: participants,
       );
       if (conv == null) {
@@ -457,7 +455,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
     );
   }
 
-  Future<void> _createGroupFromOrganization(
+  Future<void> _createGroupChatFromOrganization(
     String organizationId,
     String organizationName,
   ) async {
@@ -573,6 +571,18 @@ class _NewMessageScreenState extends State<NewMessageScreen>
                   ? _buildEmptyState()
                   : _buildUsersList(),
             ),
+            if (_selectedUserIds.length >= 2)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _createGroupChat,
+                    icon: const Icon(Icons.group_add),
+                    label: Text(_t('createWithSelected')),
+                  ),
+                ),
+              ),
           ],
         ],
       ),
@@ -969,30 +979,48 @@ class _NewMessageScreenState extends State<NewMessageScreen>
                               );
                             },
                           ),
-                      trailing: Radio<String>(
-                        value: orgId,
-                        groupValue: _selectedOrgId,
-                        onChanged: (val) {
+                      trailing: Checkbox(
+                        value: _selectedOrgId == orgId,
+                        onChanged: (_) {
                           setState(() {
-                            _selectedOrgId = val;
-                            _selectedOrgName = orgName;
+                            if (_selectedOrgId == orgId) {
+                              _selectedOrgId = null;
+                            } else {
+                              _selectedOrgId = orgId;
+                            }
                           });
                         },
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
                       ),
                       onTap: () {
                         setState(() {
                           if (_selectedOrgId == orgId) {
                             _selectedOrgId = null;
-                            _selectedOrgName = null;
                           } else {
                             _selectedOrgId = orgId;
-                            _selectedOrgName = orgName;
                           }
                         });
                       },
                     ),
                   );
                 },
+              ),
+            ),
+          if (_selectedOrgId != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: FilledButton.icon(
+                onPressed: () {
+                  final org = _myOrgs.firstWhere(
+                    (item) => item['id'] == _selectedOrgId,
+                  );
+                  final orgName = (org['name'] ?? '').toString();
+                  _createGroupChatFromOrganization(_selectedOrgId!, orgName);
+                },
+                icon: const Icon(Icons.groups_2),
+                label: Text(_t('createFromOrg')),
               ),
             ),
         ],
@@ -1013,7 +1041,9 @@ class _NewMessageScreenState extends State<NewMessageScreen>
     return CircleAvatar(
       backgroundColor: bgColor,
       foregroundImage: NetworkImage(logoUrl),
-      onForegroundImageError: (_, __) {},
+      onForegroundImageError: (_, error) {
+        Logger.warning('Failed to load organization logo: $error');
+      },
       child: const Icon(Icons.group, color: Colors.white),
     );
   }
@@ -1642,9 +1672,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
   }
 
   void _inviteFriends() {
-    SharePlus.instance.share(
-      ShareParams(text: 'Join me on AttendUs to chat and collaborate!'),
-    );
+    Share.share('Join me on AttendUs to chat and collaborate!');
   }
 
   void _discoverPeople() {

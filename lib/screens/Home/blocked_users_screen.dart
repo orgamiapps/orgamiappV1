@@ -315,7 +315,8 @@ class _BlockUserSearchSheetState extends State<_BlockUserSearchSheet> {
                   : ListView.separated(
                       shrinkWrap: true,
                       itemCount: _results.length,
-                      separatorBuilder: (_, __) => const Divider(height: 0),
+                      separatorBuilder: (context, _) =>
+                          const Divider(height: 0),
                       itemBuilder: (context, index) {
                         final user = _results[index];
                         final isBlocked = _blockedIds.contains(user.uid);

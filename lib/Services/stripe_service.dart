@@ -43,7 +43,7 @@ class StripeService {
 
   /// Create a payment intent for subscription
   Future<Map<String, dynamic>?> createPaymentIntent({
-    required String amount, // Amount in cents (e.g., '2000' for $20.00)
+    required String amount, // Amount in cents (e.g., '500' for $5.00)
     required String currency,
     required String customerId,
     Map<String, dynamic>? metadata,
@@ -226,19 +226,6 @@ class StripeService {
       return null;
     }
   }
-
-  /// Backend endpoint URLs (to be implemented)
-  static const String _baseUrl = 'https://your-backend-url.com/api';
-  static const String _createPaymentIntentEndpoint =
-      '$_baseUrl/create-payment-intent';
-  static const String _createSubscriptionEndpoint =
-      '$_baseUrl/create-subscription';
-  static const String _cancelSubscriptionEndpoint =
-      '$_baseUrl/cancel-subscription';
-  static const String _updateSubscriptionEndpoint =
-      '$_baseUrl/update-subscription';
-  static const String _createCustomerEndpoint = '$_baseUrl/create-customer';
-  static const String _getCustomerEndpoint = '$_baseUrl/get-customer';
 
   /// Get price IDs for different subscription plans
   static const Map<String, String> priceIds = {
