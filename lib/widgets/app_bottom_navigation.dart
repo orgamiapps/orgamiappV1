@@ -18,6 +18,40 @@ class AppBottomNavigation extends StatefulWidget {
 }
 
 class _AppBottomNavigationState extends State<AppBottomNavigation> {
+  // Cache navigation destinations to avoid rebuilding
+  static const List<NavigationDestination> _destinations = [
+    NavigationDestination(
+      icon: Icon(Icons.home_outlined),
+      selectedIcon: Icon(Icons.home),
+      label: 'Home',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.apartment_outlined),
+      selectedIcon: Icon(Icons.apartment),
+      label: 'Orgs',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.forum_outlined),
+      selectedIcon: Icon(Icons.forum),
+      label: 'Messages',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.person_outline),
+      selectedIcon: Icon(Icons.person),
+      label: 'Profile',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.notifications_none),
+      selectedIcon: Icon(Icons.notifications),
+      label: 'Alerts',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.menu),
+      selectedIcon: Icon(Icons.menu),
+      label: 'Account',
+    ),
+  ];
+
   void _navigateToTab(int index) {
     if (widget.onDestinationSelected != null) {
       widget.onDestinationSelected!(index);
@@ -76,38 +110,7 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
               selectedIndex: widget.selectedIndex ?? 0,
               labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
               onDestinationSelected: _navigateToTab,
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home),
-                  label: 'Home',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.apartment_outlined),
-                  selectedIcon: Icon(Icons.apartment),
-                  label: 'Orgs',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.forum_outlined),
-                  selectedIcon: Icon(Icons.forum),
-                  label: 'Messages',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.person_outline),
-                  selectedIcon: Icon(Icons.person),
-                  label: 'Profile',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.notifications_none),
-                  selectedIcon: Icon(Icons.notifications),
-                  label: 'Alerts',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.menu),
-                  selectedIcon: Icon(Icons.menu),
-                  label: 'Account',
-                ),
-              ],
+              destinations: _destinations,
             ),
           ),
         ),

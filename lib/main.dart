@@ -44,10 +44,17 @@ void main() async {
   await EmulatorConfig.configureForEmulator();
 
   // Build the app immediately to keep UI responsive
+  // Use lazy initialization for providers to improve startup time
   final Widget appWidget = MultiProvider(
     providers: [
-      ChangeNotifierProvider(create: (context) => ThemeProvider()),
-      ChangeNotifierProvider(create: (context) => SubscriptionService()),
+      ChangeNotifierProvider(
+        create: (context) => ThemeProvider(),
+        lazy: false, // Load immediately as it affects initial render
+      ),
+      ChangeNotifierProvider(
+        create: (context) => SubscriptionService(),
+        lazy: true, // Lazy load - only initialize when first accessed
+      ),
     ],
     child: const MyApp(),
   );
@@ -126,13 +133,26 @@ void main() async {
             }
           });
 
-          // Initialize background services
+          // Initialize background services (non-blocking)
           _initializeBackgroundServices();
 
-          // Initialize subscription service
-          final subscriptionService = SubscriptionService();
-          subscriptionService.initialize().catchError((e) {
-            Logger.warning('Subscription service initialization failed: $e');
+          // Delay subscription service initialization to reduce startup time
+          // It will auto-initialize when first accessed due to lazy: true
+          Future.delayed(const Duration(seconds: 2), () {
+            try {
+              final context = appNavigatorKey.currentContext;
+              if (context != null) {
+                final subscriptionService = Provider.of<SubscriptionService>(
+                  context,
+                  listen: false,
+                );
+                subscriptionService.initialize().catchError((e) {
+                  Logger.warning('Subscription service initialization failed: $e');
+                });
+              }
+            } catch (e) {
+              Logger.warning('Could not initialize subscription service: $e');
+            }
           });
 
           if (kDebugMode) {
@@ -160,14 +180,14 @@ void main() async {
 /// Initialize background services after app startup
 Future<void> _initializeBackgroundServices() async {
   try {
-    // Configure Firestore settings with memory optimization
+    // Configure Firestore settings with aggressive memory optimization
     FirebaseFirestore.instance.settings = Settings(
       persistenceEnabled: true,
-      // Limit cache size to prevent excessive memory usage (100MB instead of unlimited)
+      // Optimize cache size for better memory management
       cacheSizeBytes: kDebugMode
-          ? 50 * 1024 * 1024
-          : 100 * 1024 * 1024, // 50MB in debug, 100MB in release
-    );
+          ? 40 * 1024 * 1024  // 40MB in debug mode
+          : 80 * 1024 * 1024, // 80MB in release (reduced from 100MB)
+    );"}, {"old_string": "          // Initialize notifications in background\n          NotificationService.initialize().catchError((e) {\n            Logger.warning('Notification service initialization failed: $e');\n            return;\n          });\n\n          // Initialize Firebase Messaging in background if online\n          if (isReachable) {\n            // Delay messaging initialization to avoid blocking\n            Future.delayed(const Duration(seconds: 3), () {\n              FirebaseMessagingHelper().initialize().catchError((e) {\n                Logger.warning('Firebase Messaging initialization failed: $e');\n              });\n            });\n          }", "new_string": "          // Initialize notifications in background (delayed for faster startup)\n          Future.delayed(const Duration(milliseconds: 500), () {\n            NotificationService.initialize().catchError((e) {\n              Logger.warning('Notification service initialization failed: $e');\n              return;\n            });\n          });\n\n          // Initialize Firebase Messaging in background if online (increased delay)\n          if (isReachable) {\n            // Further delay messaging initialization to prioritize UI\n            Future.delayed(const Duration(seconds: 5), () {\n              FirebaseMessagingHelper().initialize().catchError((e) {\n                Logger.warning('Firebase Messaging initialization failed: $e');\n              });\n            });\n          }"}]
 
     // Quick connectivity check without blocking
     Connectivity()
@@ -226,16 +246,18 @@ Future<void> _initializeBackgroundServices() async {
             });
           }
 
-          // Initialize notifications in background
-          NotificationService.initialize().catchError((e) {
-            Logger.warning('Notification service initialization failed: $e');
-            return;
+          // Initialize notifications in background (delayed for faster startup)
+          Future.delayed(const Duration(milliseconds: 500), () {
+            NotificationService.initialize().catchError((e) {
+              Logger.warning('Notification service initialization failed: $e');
+              return;
+            });
           });
 
-          // Initialize Firebase Messaging in background if online
+          // Initialize Firebase Messaging in background if online (increased delay)
           if (isReachable) {
-            // Delay messaging initialization to avoid blocking
-            Future.delayed(const Duration(seconds: 3), () {
+            // Further delay messaging initialization to prioritize UI
+            Future.delayed(const Duration(seconds: 5), () {
               FirebaseMessagingHelper().initialize().catchError((e) {
                 Logger.warning('Firebase Messaging initialization failed: $e');
               });

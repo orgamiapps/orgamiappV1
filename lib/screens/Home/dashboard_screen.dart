@@ -21,40 +21,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late int _selectedIndex;
   bool _hasScrolledContent = false;
 
+  // Pre-built screens list - IndexedStack keeps widget state and improves performance
+  late final List<Widget> _screens;
+
   @override
   void initState() {
     super.initState();
     Logger.debug('📱 DashboardScreen: initState started');
     _selectedIndex = widget.initialIndex;
+    
+    // Initialize screens list once - IndexedStack will handle caching
+    _screens = const [
+      HomeHubScreen(),
+      GroupsScreen(),
+      MessagingScreen(),
+      MyProfileScreen(showBackButton: false),
+      NotificationsScreen(),
+      AccountScreen(),
+    ];
+    
     Logger.debug('📱 DashboardScreen: initState finished - rendering immediately');
-  }
-
-  // Lazy initialization of screens to prevent all screens from building at once
-  Widget _getScreen(int index) {
-    Logger.debug('📱 DashboardScreen: Building screen for index $index');
-    switch (index) {
-      case 0:
-        Logger.debug('📱 DashboardScreen: Creating HomeHubScreen');
-        return const HomeHubScreen();
-      case 1:
-        Logger.debug('📱 DashboardScreen: Creating GroupsScreen');
-        return const GroupsScreen();
-      case 2:
-        Logger.debug('📱 DashboardScreen: Creating MessagingScreen');
-        return const MessagingScreen();
-      case 3:
-        Logger.debug('📱 DashboardScreen: Creating MyProfileScreen');
-        return const MyProfileScreen(showBackButton: false);
-      case 4:
-        Logger.debug('📱 DashboardScreen: Creating NotificationsScreen');
-        return const NotificationsScreen();
-      case 5:
-        Logger.debug('📱 DashboardScreen: Creating AccountScreen');
-        return const AccountScreen();
-      default:
-        Logger.debug('📱 DashboardScreen: Creating default HomeHubScreen');
-        return const HomeHubScreen();
-    }
   }
 
   @override
@@ -87,12 +73,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _bodyView() {
     final size = MediaQuery.of(context).size;
     
-    // Always render the content immediately - no loading state
+    // Use IndexedStack for better performance - keeps widget state and avoids rebuilding
     return SizedBox(
       height: size.height,
       width: size.width,
-      child: Column(
-        children: [Expanded(child: _getScreen(_selectedIndex))],
+      child: IndexedStack(
+        index: _selectedIndex,
+        sizing: StackFit.expand,
+        children: _screens,
       ),
     );
   }
