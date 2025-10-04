@@ -16,6 +16,32 @@ class PremiumUpgradeScreen extends StatefulWidget {
   State<PremiumUpgradeScreen> createState() => _PremiumUpgradeScreenState();
 }
 
+// State class for Selector optimization
+class _SubscriptionState {
+  final bool isLoading;
+  final bool hasPremium;
+  final SubscriptionModel? subscription;
+
+  const _SubscriptionState({
+    required this.isLoading,
+    required this.hasPremium,
+    this.subscription,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _SubscriptionState &&
+          runtimeType == other.runtimeType &&
+          isLoading == other.isLoading &&
+          hasPremium == other.hasPremium &&
+          subscription == other.subscription;
+
+  @override
+  int get hashCode =>
+      isLoading.hashCode ^ hasPremium.hashCode ^ subscription.hashCode;
+}
+
 class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
@@ -103,26 +129,34 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
   }
 
   Widget _buildBody() {
-    return Consumer<SubscriptionService>(
-      builder: (context, subscriptionService, child) {
-        if (subscriptionService.isLoading) {
+    // Use Selector instead of Consumer for targeted rebuilds
+    return Selector<SubscriptionService, _SubscriptionState>(
+      selector: (context, service) => _SubscriptionState(
+        isLoading: service.isLoading,
+        hasPremium: service.hasPremium,
+        subscription: service.currentSubscription,
+      ),
+      builder: (context, state, child) {
+        if (state.isLoading) {
           return const Center(
             child: CircularProgressIndicator(color: Colors.white),
           );
         }
 
         // If user already has premium, show management screen
-        if (subscriptionService.hasPremium) {
-          return _buildManagementView(subscriptionService);
+        if (state.hasPremium) {
+          return _buildManagementView();
         }
 
         // Show upgrade options
-        return _buildUpgradeView(subscriptionService);
+        return _buildUpgradeView();
       },
     );
   }
 
-  Widget _buildUpgradeView(SubscriptionService subscriptionService) {
+  Widget _buildUpgradeView() {
+    // Cache the subscription service to avoid repeated lookups
+    final subscriptionService = context.read<SubscriptionService>();
     return FadeTransition(
       opacity: _fadeAnimation,
       child: SlideTransition(
@@ -143,7 +177,7 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
               const SizedBox(height: 40),
               _buildPricingCard(),
               const SizedBox(height: 32),
-              _buildUpgradeButton(subscriptionService),
+              _buildUpgradeButton(),
               const SizedBox(height: 8),
               _buildTrialHelperLine(),
               const SizedBox(height: 16),
@@ -156,7 +190,9 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
     );
   }
 
-  Widget _buildManagementView(SubscriptionService subscriptionService) {
+  Widget _buildManagementView() {
+    // Use read instead of watch to avoid unnecessary rebuilds
+    final subscriptionService = context.read<SubscriptionService>();
     final theme = Theme.of(context);
 
     return FadeTransition(
@@ -170,11 +206,11 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
             const SizedBox(height: 32),
             _buildPremiumSpotlight(theme),
             const SizedBox(height: 32),
-            _buildSubscriptionStatusCard(subscriptionService),
+            _buildSubscriptionStatusCard(),
             const SizedBox(height: 24),
             _buildPerksGrid(theme),
             const SizedBox(height: 24),
-            _buildManagementButtons(subscriptionService),
+            _buildManagementButtons(),
           ],
         ),
       ),
@@ -184,7 +220,9 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
   Widget _buildPremiumIcon() {
     final theme = Theme.of(context);
 
-    return Container(
+    // Use RepaintBoundary to avoid repainting this expensive widget
+    return RepaintBoundary(
+      child: Container(
       width: 120,
       height: 120,
       decoration: BoxDecoration(
@@ -227,6 +265,7 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
           size: 56,
           color: Color(0xFF8667F2),
         ),
+      ),
       ),
     );
   }
@@ -532,31 +571,9 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
             ),
           ),
           const SizedBox(height: 16),
-          ...features.map(
-            (feature) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.check_circle,
-                    color: const Color(0xFF667EEA),
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      feature,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onPrimary.withValues(alpha: 0.9),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            // Pre-build feature list to avoid rebuilding on every frame
+            ...features.map(
+            (feature) => _FeatureItem(feature: feature),
           ),
         ],
       ),
@@ -634,7 +651,8 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
     );
   }
 
-  Widget _buildUpgradeButton(SubscriptionService subscriptionService) {
+  Widget _buildUpgradeButton() {
+    final subscriptionService = context.read<SubscriptionService>();
     return SizedBox(
       width: double.infinity,
       height: 56,
@@ -684,7 +702,8 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
     );
   }
 
-  Widget _buildSubscriptionStatusCard(SubscriptionService subscriptionService) {
+  Widget _buildSubscriptionStatusCard() {
+    final subscriptionService = context.read<SubscriptionService>();
     final subscription = subscriptionService.currentSubscription!;
 
     return Container(
@@ -717,7 +736,7 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildStatusHeader(subscriptionService),
+            _buildStatusHeader(),
           const SizedBox(height: 20),
           Text(
             'Plan: ${subscription.planDisplayName}',
@@ -786,7 +805,8 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
     );
   }
 
-  Widget _buildStatusHeader(SubscriptionService subscriptionService) {
+  Widget _buildStatusHeader() {
+    final subscriptionService = context.read<SubscriptionService>();
     final theme = Theme.of(context);
 
     return Row(
@@ -968,7 +988,8 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
     );
   }
 
-  Widget _buildManagementButtons(SubscriptionService subscriptionService) {
+  Widget _buildManagementButtons() {
+    final subscriptionService = context.read<SubscriptionService>();
     final theme = Theme.of(context);
 
     return Column(
@@ -1083,5 +1104,78 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
 
   String _formatDate(DateTime date) {
     return DateFormat('MM/dd/yyyy').format(date);
+  }
+}
+
+// Optimized feature item widget - extracted to avoid rebuilding
+class _FeatureItem extends StatelessWidget {
+  final String feature;
+
+  const _FeatureItem({required this.feature});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.check_circle,
+            color: Color(0xFF667EEA),
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              feature,
+              style: TextStyle(
+                fontSize: 16,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onPrimary
+                    .withValues(alpha: 0.9),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Optimized pricing feature item
+class _PricingFeatureItem extends StatelessWidget {
+  final String feature;
+  final Color color;
+
+  const _PricingFeatureItem({
+    required this.feature,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Icon(
+            Icons.check_circle,
+            size: 18,
+            color: color,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              feature,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.w500,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

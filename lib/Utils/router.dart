@@ -3,9 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:attendus/screens/Home/dashboard_screen.dart';
 import 'package:attendus/main.dart' show appNavigatorKey;
 import 'package:attendus/screens/Splash/second_splash_screen.dart';
+import 'package:attendus/Utils/performance_config.dart';
 
+/// Optimized router class with faster transitions and better performance
 class RouterClass {
   static late BuildContext splashContext;
+
+  // Optimized transition duration constants
+  static const Duration _transitionDuration = Duration(milliseconds: 180);
+  static const Duration _reverseTransitionDuration = Duration(milliseconds: 150);
 
   Future<T?> appLogout<T>({required BuildContext context}) =>
       Navigator.of(context, rootNavigator: false).pushAndRemoveUntil(
@@ -40,22 +46,66 @@ class RouterClass {
       PageRouteBuilder(
         pageBuilder: (ctx, a, b) => const DashboardScreen(),
         transitionsBuilder: (ctx, animation, secondaryAnimation, child) {
+          // Optimized fade transition with faster curve
           return FadeTransition(
-            opacity: animation.drive(CurveTween(curve: Curves.easeInOut)),
+            opacity: animation.drive(
+              CurveTween(curve: Curves.easeOut), // Faster curve
+            ),
             child: child,
           );
         },
-        transitionDuration: const Duration(milliseconds: 220),
-        reverseTransitionDuration: const Duration(milliseconds: 200),
+        transitionDuration: _transitionDuration,
+        reverseTransitionDuration: _reverseTransitionDuration,
       ),
       (route) => false,
     );
   }
 
-  static Future<T?> nextScreenNormal<T>(BuildContext context, Widget page) {
+  /// Optimized page route with faster transitions
+  static PageRouteBuilder<T> optimizedPageRoute<T>(
+    Widget page, {
+    bool useSlideTransition = false,
+  }) {
+    return PageRouteBuilder<T>(
+      pageBuilder: (ctx, animation, secondaryAnimation) => page,
+      transitionsBuilder: (ctx, animation, secondaryAnimation, child) {
+        if (useSlideTransition) {
+          // Slide from right with optimized curve
+          const begin = Offset(1.0, 0.0);
+          const end = Offset.zero;
+          const curve = Curves.easeOutCubic;
+
+          final tween = Tween(begin: begin, end: end)
+              .chain(CurveTween(curve: curve));
+
+          return SlideTransition(
+            position: animation.drive(tween),
+            child: child,
+          );
+        } else {
+          // Fast fade transition
+          return FadeTransition(
+            opacity: animation.drive(
+              CurveTween(curve: Curves.easeOut),
+            ),
+            child: child,
+          );
+        }
+      },
+      transitionDuration: _transitionDuration,
+      reverseTransitionDuration: _reverseTransitionDuration,
+    );
+  }
+
+  static Future<T?> nextScreenNormal<T>(
+    BuildContext context,
+    Widget page, {
+    bool useSlideTransition = false,
+  }) {
+    // Use optimized page route for better performance
     return Navigator.push<T>(
       context,
-      MaterialPageRoute(builder: (context) => page),
+      optimizedPageRoute<T>(page, useSlideTransition: useSlideTransition),
     );
   }
 

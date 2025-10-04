@@ -26,9 +26,8 @@ class PerformanceMonitor {
       debugPrint('🔍 Starting performance monitoring...');
     }
 
-    // Monitor frame rate with reduced frequency
-    _frameTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
-      // Increased from 1 second
+    // Monitor frame rate with reduced frequency (every 3 seconds instead of 2)
+    _frameTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       _checkFrameRate();
     });
 
@@ -52,9 +51,12 @@ class PerformanceMonitor {
   }
 
   void _checkFrameRate() {
-    if (_frameCount < _minFrameRate) {
+    // Calculate actual FPS based on time period (3 seconds)
+    final fps = _frameCount / 3.0;
+    
+    if (fps < _minFrameRate) {
       if (kDebugMode) {
-        debugPrint('⚠️ WARNING: Low frame rate detected: $_frameCount fps');
+        debugPrint('⚠️ WARNING: Low frame rate detected: ${fps.toStringAsFixed(1)} fps');
       }
       _handleFrameRateWarning();
     }
@@ -82,9 +84,9 @@ class PerformanceMonitor {
     return _frameCount >= _minFrameRate;
   }
 
-  // Method to get current frame rate
+  // Method to get current frame rate (calculated over 3 second window)
   double get currentFrameRate {
-    return _frameCount.toDouble();
+    return _frameCount / 3.0;
   }
 }
 
