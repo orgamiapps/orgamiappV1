@@ -44,24 +44,43 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   int _followingCount = 0;
   bool _isFollowUpdating = false;
 
+  void _handleTabChange() {
+    if (mounted && _tabController.indexIsChanging) {
+      setState(() {});
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    
+    // Add listener to handle tab changes safely
+    _tabController.addListener(_handleTabChange);
+    
     _loadUserData();
     _refreshUserDataFromFirestore();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    // Dispose of the tab controller safely
+    try {
+      // Remove all listeners before disposing
+      _tabController.removeListener(_handleTabChange);
+      _tabController.dispose();
+    } catch (e) {
+      debugPrint('Error disposing tab controller: $e');
+    }
     super.dispose();
   }
 
   Future<void> _loadUserData() async {
     if (!mounted) return;
 
-    setState(() => _isLoading = true);
+    if (mounted) {
+      setState(() => _isLoading = true);
+    }
 
     try {
       debugPrint('Loading user data for: ${widget.user.uid}');
@@ -195,9 +214,14 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       backgroundColor: const Color(0xFFFAFBFC),
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: _loadUserData,
+          onRefresh: () async {
+            if (mounted) {
+              await _loadUserData();
+            }
+          },
           color: AppThemeColor.darkBlueColor,
           child: CustomScrollView(
+            key: PageStorageKey<String>('user_profile_${widget.user.uid}'),
             slivers: [
               // Profile header removed – show compact info row directly
               SliverToBoxAdapter(child: _buildProfileHeaderUser()),
@@ -796,6 +820,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   Future<void> _toggleFollow() async {
+    if (!mounted) return;
+    
     if (CustomerController.logeInCustomer == null) {
       ShowToast().showNormalToast(msg: 'Please log in to follow users');
       return;
@@ -895,6 +921,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   // (Optional) Helper could be added for shared transient error detection
 
   void _sendMessage() async {
+    if (!mounted) return;
+    
     if (CustomerController.logeInCustomer == null) {
       ShowToast().showNormalToast(msg: 'Please log in to send messages');
       return;
@@ -1148,7 +1176,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   Widget _buildTabButton({required String label, required int index}) {
-    final isSelected = _tabController.index == index;
+    // Safe check to prevent index out of bounds
+    final isSelected = _tabController.index == index && index < _tabController.length;
     final fontSize = ResponsiveHelper.getResponsiveFontSize(
       context,
       phone: 14,
@@ -1359,7 +1388,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       if (selectedUser != null && selectedUser is CustomerModel) {
         // Navigate to the selected user's profile
         if (!mounted) return;
-        Navigator.pushReplacement(
+        // Use regular push instead of pushReplacement to avoid disposal issues
+        Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => UserProfileScreen(
@@ -1894,9 +1924,11 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     File? stagedAvatarFile,
     File? stagedBannerFile,
   }) async {
+    if (!mounted) return;
+    
     final current = CustomerController.logeInCustomer;
     if (current == null) {
-      Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
       return;
     }
 
