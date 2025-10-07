@@ -42,7 +42,12 @@ class _MessagingScreenState extends State<MessagingScreen> {
   @override
   void initState() {
     super.initState();
-    _loadConversations();
+    // Defer conversation loading to prevent blocking app startup
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadConversations();
+      }
+    });
   }
 
   @override

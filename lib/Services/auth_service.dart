@@ -75,7 +75,7 @@ class AuthService extends ChangeNotifier {
 
       // Ensure FirebaseAuth has delivered the initial persisted state
       await _waitForInitialAuthState().timeout(
-        const Duration(seconds: 2),
+        const Duration(seconds: 1),
         onTimeout: () {
           Logger.warning('Initial auth state wait timed out; continuing');
         },
@@ -109,7 +109,7 @@ class AuthService extends ChangeNotifier {
 
       // Attempt to restore session with timeout to prevent hanging
       await _restoreUserSession().timeout(
-        const Duration(seconds: 2),
+        const Duration(seconds: 1),
         onTimeout: () {
           Logger.warning('Session restoration timed out');
           return false;
