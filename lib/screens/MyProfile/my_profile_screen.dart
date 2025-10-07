@@ -101,8 +101,13 @@ class _MyProfileScreenState extends State<MyProfileScreen>
 
   @override
   void dispose() {
-    _fadeController.dispose();
-    _slideController.dispose();
+    // Safely dispose animation controllers
+    try {
+      _fadeController.dispose();
+      _slideController.dispose();
+    } catch (e) {
+      debugPrint('Error disposing animation controllers: $e');
+    }
     super.dispose();
   }
 
@@ -130,6 +135,8 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   }
 
   Future<void> _loadProfileData() async {
+    if (!mounted) return;
+    
     setState(() {
       isLoading = true;
     });
@@ -286,6 +293,8 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   }
 
   void _showBadgeWalletModal(BuildContext context) {
+    if (!mounted) return;
+    
     Navigator.of(context).push(
       PageRouteBuilder(
         opaque: false,
@@ -377,6 +386,8 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   }
 
   Future<void> _saveToWallet(BuildContext context) async {
+    if (!mounted) return;
+    
     try {
       // Show loading indicator
       showDialog(
@@ -500,6 +511,8 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   }
 
   Future<void> _deleteSelectedEvents() async {
+    if (!mounted) return;
+    
     if (selectedEventIds.isEmpty) {
       ShowToast().showNormalToast(msg: 'Please select events to delete');
       return;
@@ -728,9 +741,14 @@ class _MyProfileScreenState extends State<MyProfileScreen>
 
   Widget _buildProfileContent(CustomerModel? user) {
     return RefreshIndicator(
-      onRefresh: _loadProfileData,
+      onRefresh: () async {
+        if (mounted) {
+          await _loadProfileData();
+        }
+      },
       color: const Color(0xFF667EEA),
       child: CustomScrollView(
+        key: const PageStorageKey<String>('my_profile_scroll'),
         slivers: [
           // Back Button and Profile Header
           SliverToBoxAdapter(child: _buildProfileHeader(user)),
@@ -917,18 +935,20 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                         if (user?.username != null &&
                             user!.username!.isNotEmpty) ...[
                           const SizedBox(height: 4),
-                          GestureDetector(
+                            GestureDetector(
                             onTap: () {
                               // Navigate to public profile view
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => UserProfileScreen(
-                                    user: user,
-                                    isOwnProfile: true,
+                              if (mounted) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => UserProfileScreen(
+                                      user: user,
+                                      isOwnProfile: true,
+                                    ),
                                   ),
-                                ),
-                              );
+                                );
+                              }
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(
@@ -1230,6 +1250,8 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   }
 
   Future<void> _updateDiscoverability(bool value) async {
+    if (!mounted) return;
+    
     try {
       final user = CustomerController.logeInCustomer;
       if (user != null) {
@@ -1845,6 +1867,8 @@ class _MyProfileScreenState extends State<MyProfileScreen>
 
   // Show filter/sort modal
   void _showFilterSortModal() {
+    if (!mounted) return;
+    
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,

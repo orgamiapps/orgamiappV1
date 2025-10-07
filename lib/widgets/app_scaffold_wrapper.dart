@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:attendus/widgets/app_bottom_navigation.dart';
 
 class AppScaffoldWrapper extends StatefulWidget {
@@ -48,12 +49,17 @@ class _AppScaffoldWrapperState extends State<AppScaffoldWrapper> {
           ? NotificationListener<ScrollNotification>(
               onNotification: (notification) {
                 // Track if any vertical scrollable in the subtree has scrolled from top
-                final bool isVertical = notification.metrics.axis == Axis.vertical;
-                if (isVertical) {
-                  final bool scrolled = notification.metrics.pixels > 0.0;
-                  if (scrolled != _hasScrolledContent) {
-                    setState(() => _hasScrolledContent = scrolled);
+                try {
+                  final bool isVertical = notification.metrics.axis == Axis.vertical;
+                  if (isVertical && mounted) {
+                    final bool scrolled = notification.metrics.pixels > 0.0;
+                    if (scrolled != _hasScrolledContent) {
+                      setState(() => _hasScrolledContent = scrolled);
+                    }
                   }
+                } catch (e) {
+                  // Silently handle any errors during scroll notification
+                  debugPrint('Error in scroll notification: $e');
                 }
                 return false;
               },
