@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
 
 class AboutUsScreen extends StatelessWidget {
   const AboutUsScreen({super.key});
@@ -8,12 +9,16 @@ class AboutUsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('About Us'),
-        elevation: 0,
-      ),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: Column(
+          children: [
+            AppAppBarView.modernHeader(
+              context: context,
+              title: 'About Us',
+              subtitle: 'Your all-in-one events platform',
+            ),
+            Expanded(
+              child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -25,6 +30,10 @@ class AboutUsScreen extends StatelessWidget {
               _FooterNote(),
             ],
           ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
