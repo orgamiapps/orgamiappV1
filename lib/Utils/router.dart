@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:attendus/screens/Home/dashboard_screen.dart';
 import 'package:attendus/main.dart' show appNavigatorKey;
 import 'package:attendus/screens/Splash/second_splash_screen.dart';
+import 'package:attendus/Utils/logger.dart';
 
 class RouterClass {
   static late BuildContext splashContext;

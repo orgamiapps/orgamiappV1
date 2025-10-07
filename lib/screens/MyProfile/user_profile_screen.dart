@@ -265,7 +265,17 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                 children: [
                   // Back button
                   GestureDetector(
-                    onTap: () => Navigator.of(context).maybePop(),
+                    onTap: () {
+                      debugPrint('UserProfileScreen: Back button tapped');
+                      // Safely handle back navigation
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                        debugPrint('UserProfileScreen: Successfully popped');
+                      } else {
+                        debugPrint('UserProfileScreen: Cannot pop, no routes in stack');
+                        // If we can't pop, we might be at the root - do nothing or show message
+                      }
+                    },
                     child: Container(
                       width: buttonSize,
                       height: buttonSize,

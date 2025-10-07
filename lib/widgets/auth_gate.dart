@@ -117,6 +117,7 @@ class _AuthGateState extends State<AuthGate> {
       name: user.displayName ?? '',
       email: user.email ?? '',
       createdAt: DateTime.now(),
+      profilePictureUrl: user.photoURL,
     );
 
     setState(() {
@@ -127,7 +128,24 @@ class _AuthGateState extends State<AuthGate> {
     // Initialize AuthService in background for full functionality
     Future.microtask(() async {
       try {
+        Logger.info('AuthGate: Initializing AuthService in background');
         await AuthService().initialize();
+        
+        // After initialization, try to refresh user data
+        Logger.info('AuthGate: Refreshing user data');
+        final authService = AuthService();
+        await authService.refreshUserData();
+        
+        // If data is still incomplete, try aggressive update
+        final currentUser = CustomerController.logeInCustomer;
+        if (currentUser != null && 
+            (currentUser.name.isEmpty || 
+             currentUser.name == currentUser.email.split('@')[0])) {
+          Logger.info('AuthGate: Running aggressive profile update');
+          await authService.aggressiveProfileUpdate();
+        }
+        
+        Logger.info('AuthGate: Background initialization complete');
       } catch (e) {
         Logger.warning('Background AuthService init failed: $e');
       }
