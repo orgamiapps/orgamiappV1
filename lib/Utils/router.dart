@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:attendus/screens/Home/dashboard_screen.dart';
 import 'package:attendus/main.dart' show appNavigatorKey;
 import 'package:attendus/screens/Splash/second_splash_screen.dart';
+import 'package:attendus/Utils/logger.dart';
 
 class RouterClass {
   static late BuildContext splashContext;
@@ -53,30 +54,68 @@ class RouterClass {
   }
 
   static Future<T?> nextScreenNormal<T>(BuildContext context, Widget page) {
-    return Navigator.push<T>(
-      context,
-      MaterialPageRoute(builder: (context) => page),
-    );
+    try {
+      return Navigator.push<T>(
+        context,
+        MaterialPageRoute(builder: (context) => page),
+      );
+    } catch (e) {
+      Logger.error('Navigation error in nextScreenNormal', e);
+      return Future.value(null);
+    }
   }
 
   static Future<T?> nextScreenAndReplacement<T>(
     BuildContext context,
     Widget page,
   ) {
-    return Navigator.pushReplacement<T, T>(
-      context,
-      MaterialPageRoute(builder: (context) => page),
-    );
+    try {
+      return Navigator.pushReplacement<T, T>(
+        context,
+        MaterialPageRoute(builder: (context) => page),
+      );
+    } catch (e) {
+      Logger.error('Navigation error in nextScreenAndReplacement', e);
+      return Future.value(null);
+    }
   }
 
   static Future<T?> nextScreenAndReplacementAndRemoveUntil<T>({
     required BuildContext context,
     required Widget page,
   }) {
-    return Navigator.pushAndRemoveUntil<T>(
-      context,
-      MaterialPageRoute(builder: (context) => page),
-      (route) => false,
-    );
+    try {
+      return Navigator.pushAndRemoveUntil<T>(
+        context,
+        MaterialPageRoute(builder: (context) => page),
+        (route) => false,
+      );
+    } catch (e) {
+      Logger.error('Navigation error in nextScreenAndReplacementAndRemoveUntil', e);
+      return Future.value(null);
+    }
+  }
+  
+  /// Safely pop the navigation stack
+  static void safelyPop(BuildContext context) {
+    try {
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      } else {
+        Logger.warning('Cannot pop - no routes in navigation stack');
+      }
+    } catch (e) {
+      Logger.error('Error during navigation pop', e);
+    }
+  }
+  
+  /// Safely check if we can pop the navigation stack
+  static bool canPop(BuildContext context) {
+    try {
+      return Navigator.of(context).canPop();
+    } catch (e) {
+      Logger.error('Error checking if can pop', e);
+      return false;
+    }
   }
 }

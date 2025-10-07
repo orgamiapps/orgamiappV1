@@ -29,6 +29,7 @@ import 'package:attendus/screens/Home/help_screen.dart';
 import 'package:attendus/screens/Premium/premium_upgrade_screen.dart';
 import 'package:attendus/screens/Premium/subscription_management_screen.dart';
 import 'package:attendus/Services/subscription_service.dart';
+import 'package:attendus/Utils/logger.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -38,11 +39,71 @@ class AccountScreen extends StatefulWidget {
 }
 
 class _AccountScreenState extends State<AccountScreen> {
+  bool _isLoadingUserData = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    _ensureUserDataLoaded();
+  }
+  
+  /// Ensure user data is fully loaded from Firestore
+  Future<void> _ensureUserDataLoaded() async {
+    // Check if user data needs to be loaded/refreshed
+    final user = CustomerController.logeInCustomer;
+    if (user == null) {
+      Logger.warning('AccountScreen: No logged in user found');
+      return;
+    }
+    
+    // If user name is empty or looks like an email prefix, try to refresh
+    final needsRefresh = user.name.isEmpty || 
+                         user.name == user.email.split('@')[0] ||
+                         user.name.toLowerCase() == 'user';
+    
+    if (needsRefresh) {
+      if (mounted) {
+        setState(() => _isLoadingUserData = true);
+      }
+      
+      try {
+        Logger.info('AccountScreen: Refreshing user data...');
+        final authService = AuthService();
+        await authService.refreshUserData();
+        
+        // If still incomplete, try aggressive update
+        final updatedUser = CustomerController.logeInCustomer;
+        if (updatedUser != null && 
+            (updatedUser.name.isEmpty || updatedUser.name == updatedUser.email.split('@')[0])) {
+          await authService.aggressiveProfileUpdate();
+        }
+      } catch (e) {
+        Logger.warning('AccountScreen: Failed to refresh user data: $e');
+      } finally {
+        if (mounted) {
+          setState(() => _isLoadingUserData = false);
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(child: _bodyView()),
+    return WillPopScope(
+      onWillPop: () async {
+        // Safely handle back button press
+        if (Navigator.of(context).canPop()) {
+          return true; // Allow pop
+        } else {
+          // If can't pop, navigate to dashboard instead
+          Logger.info('AccountScreen: Cannot pop, staying on screen');
+          return false; // Prevent pop
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: SafeArea(child: _bodyView()),
+      ),
     );
   }
 
@@ -54,6 +115,11 @@ class _AccountScreenState extends State<AccountScreen> {
 
   Widget _buildProfileHeader() {
     final user = CustomerController.logeInCustomer;
+    
+    // Show loading indicator if user data is being refreshed
+    if (_isLoadingUserData && user != null) {
+      Logger.debug('AccountScreen: Still loading user data...');
+    }
 
     return Container(
       width: double.infinity,
@@ -67,7 +133,14 @@ class _AccountScreenState extends State<AccountScreen> {
       child: Row(
         children: [
           GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
+            onTap: () {
+              // Safely handle back button press
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              } else {
+                Logger.info('AccountScreen: Cannot pop navigation stack');
+              }
+            },
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -94,13 +167,23 @@ class _AccountScreenState extends State<AccountScreen> {
           const Spacer(),
           GestureDetector(
             onTap: () {
+              if (user == null) {
+                ShowToast().showNormalToast(msg: 'User data not available');
+                return;
+              }
+              
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) =>
-                      UserProfileScreen(user: user!, isOwnProfile: true),
+                      UserProfileScreen(user: user, isOwnProfile: true),
                 ),
-              );
+              ).then((_) {
+                // Refresh user data when returning from profile screen
+                if (mounted) {
+                  _ensureUserDataLoaded();
+                }
+              });
             },
             child: Container(
               width: 44,

@@ -290,8 +290,51 @@ class MyApp extends StatelessWidget {
           ],
           supportedLocales: const [Locale('en')],
           home: homeOverride ?? const AuthGate(),
+          // Add navigation observer for debugging
+          navigatorObservers: [
+            _NavigationLogger(),
+          ],
         );
       },
     );
+  }
+}
+
+/// Navigation observer for logging navigation events and catching errors
+class _NavigationLogger extends NavigatorObserver {
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (kDebugMode) {
+      Logger.debug(
+        'Navigation: Pushed ${route.settings.name ?? 'unnamed route'}',
+      );
+    }
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (kDebugMode) {
+      Logger.debug(
+        'Navigation: Popped ${route.settings.name ?? 'unnamed route'}',
+      );
+    }
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (kDebugMode) {
+      Logger.debug(
+        'Navigation: Removed ${route.settings.name ?? 'unnamed route'}',
+      );
+    }
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    if (kDebugMode) {
+      Logger.debug(
+        'Navigation: Replaced ${oldRoute?.settings.name ?? 'unnamed'} with ${newRoute?.settings.name ?? 'unnamed'}',
+      );
+    }
   }
 }
