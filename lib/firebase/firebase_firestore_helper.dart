@@ -1199,7 +1199,7 @@ class FirebaseFirestoreHelper {
           .collection(AttendanceModel.firebaseKey)
           .where('customerUid', isEqualTo: userId)
           .get()
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 3));
 
       Logger.debug(
         'Found ${attendanceQuery.docs.length} attendance records for user $userId',
@@ -1240,7 +1240,7 @@ class FirebaseFirestoreHelper {
       final results = await Future.wait(
         futures,
         eagerError: false,
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(const Duration(seconds: 5));
 
       for (var result in results) {
         if (result != null) {
@@ -1268,7 +1268,7 @@ class FirebaseFirestoreHelper {
           .collection(EventModel.firebaseKey)
           .doc(eventId)
           .get()
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 2));
 
       if (!eventDoc.exists) {
         Logger.debug('Event document not found for ID: $eventId');
@@ -2934,11 +2934,12 @@ class FirebaseFirestoreHelper {
 
   Future<List<EventModel>> getFavoritedEvents({required String userId}) async {
     try {
-      // Get current user data
+      // Get current user data with timeout
       final userDoc = await _firestore
           .collection(CustomerModel.firebaseKey)
           .doc(userId)
-          .get();
+          .get()
+          .timeout(const Duration(seconds: 2));
 
       if (!userDoc.exists) {
         Logger.debug('User not found: $userId');
@@ -2954,27 +2955,33 @@ class FirebaseFirestoreHelper {
         return [];
       }
 
-      // Get all saved events
-      List<EventModel> favoritedEvents = [];
-      for (String eventId in favoriteEventIds) {
+      Logger.debug('Fetching ${favoriteEventIds.length} saved events in parallel');
+
+      // Fetch all saved events in parallel for better performance
+      final futures = favoriteEventIds.map((eventId) async {
         try {
           final eventDoc = await _firestore
               .collection(EventModel.firebaseKey)
               .doc(eventId)
-              .get();
+              .get()
+              .timeout(const Duration(seconds: 2));
 
           if (eventDoc.exists) {
             final eventData = eventDoc.data()!;
             eventData['id'] = eventId; // Add the document ID
-            favoritedEvents.add(EventModel.fromJson(eventData));
+            return EventModel.fromJson(eventData);
           }
         } catch (e) {
-          Logger.debug('Error fetching saved event: $eventId - $e');
-          // Continue with other events even if one fails
+          Logger.debug('⚠️ Timeout fetching saved event: $eventId');
         }
-      }
+        return null;
+      });
 
-      Logger.debug('Saved events count: ${favoritedEvents.length}');
+      final results = await Future.wait(futures, eagerError: false)
+          .timeout(const Duration(seconds: 3));
+
+      final favoritedEvents = results.whereType<EventModel>().toList();
+      Logger.debug('✅ Saved events count: ${favoritedEvents.length}');
       return favoritedEvents;
     } catch (e) {
       Logger.debug('Error getting saved events: $e');

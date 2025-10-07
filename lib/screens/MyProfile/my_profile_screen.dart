@@ -73,8 +73,15 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   void initState() {
     super.initState();
     _initializeAnimations();
-    _loadProfileData();
-    _ensureProfileDataUpdated();
+    
+    // Defer data loading to prevent blocking app startup
+    // Load data only when widget is actually visible
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadProfileData();
+        // Removed _ensureProfileDataUpdated() - it causes Firebase Auth reload which blocks startup
+      }
+    });
   }
 
   void _initializeAnimations() {
@@ -130,6 +137,8 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   }
 
   Future<void> _loadProfileData() async {
+    if (!mounted) return;
+    
     setState(() {
       isLoading = true;
     });
@@ -138,45 +147,86 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       // Check if user is logged in
       if (CustomerController.logeInCustomer == null) {
         debugPrint('User not logged in');
-        setState(() {
-          isLoading = false;
-        });
-        ShowToast().showNormalToast(msg: 'Please log in to view your profile');
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+          });
+          ShowToast().showNormalToast(msg: 'Please log in to view your profile');
+        }
         return;
-      }
-
-      // Refresh user data from Firestore to get latest updates
-      final latestUserData = await FirebaseFirestoreHelper().getSingleCustomer(
-        customerId: CustomerController.logeInCustomer!.uid,
-      );
-      if (latestUserData != null) {
-        CustomerController.logeInCustomer = latestUserData;
       }
 
       debugPrint(
         'Loading profile data for user: ${CustomerController.logeInCustomer!.uid}',
       );
 
-      // Fetch events created by user
-      final created = await FirebaseFirestoreHelper().getEventsCreatedByUser(
-        CustomerController.logeInCustomer!.uid,
-      );
+      // Load all data in parallel with individual timeouts for faster failure
+      final results = await Future.wait([
+        // User data refresh with timeout
+        FirebaseFirestoreHelper()
+            .getSingleCustomer(
+              customerId: CustomerController.logeInCustomer!.uid,
+            )
+            .timeout(
+              const Duration(seconds: 2),
+              onTimeout: () {
+                debugPrint('⚠️ User data fetch timed out');
+                return null;
+              },
+            ),
+        // Created events with timeout
+        FirebaseFirestoreHelper()
+            .getEventsCreatedByUser(
+              CustomerController.logeInCustomer!.uid,
+            )
+            .timeout(
+              const Duration(seconds: 3),
+              onTimeout: () {
+                debugPrint('⚠️ Created events fetch timed out');
+                return <EventModel>[];
+              },
+            ),
+        // Attended events with timeout
+        FirebaseFirestoreHelper()
+            .getEventsAttendedByUser(
+              CustomerController.logeInCustomer!.uid,
+            )
+            .timeout(
+              const Duration(seconds: 3),
+              onTimeout: () {
+                debugPrint('⚠️ Attended events fetch timed out');
+                return <EventModel>[];
+              },
+            ),
+        // Saved events with timeout
+        FirebaseFirestoreHelper()
+            .getFavoritedEvents(
+              userId: CustomerController.logeInCustomer!.uid,
+            )
+            .timeout(
+              const Duration(seconds: 3),
+              onTimeout: () {
+                debugPrint('⚠️ Saved events fetch timed out');
+                return <EventModel>[];
+              },
+            ),
+      ], eagerError: false);
+
+      // Update user data if fetched successfully
+      if (results[0] != null) {
+        CustomerController.logeInCustomer = results[0] as CustomerModel;
+      }
+
+      final created = results[1] as List<EventModel>;
+      final attended = results[2] as List<EventModel>;
+      final saved = results[3] as List<EventModel>;
+
       debugPrint('Created events count: ${created.length}');
-
-      // Fetch events attended by user
-      final attended = await FirebaseFirestoreHelper().getEventsAttendedByUser(
-        CustomerController.logeInCustomer!.uid,
-      );
       debugPrint('Attended events count: ${attended.length}');
-
-      // Fetch saved events
-      final saved = await FirebaseFirestoreHelper().getFavoritedEvents(
-        userId: CustomerController.logeInCustomer!.uid,
-      );
       debugPrint('Saved events count: ${saved.length}');
 
-      // Load user badge
-      await _loadUserBadge();
+      // Load user badge in background (non-blocking)
+      _loadUserBadge();
 
       if (mounted) {
         setState(() {
@@ -187,7 +237,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
               CustomerController.logeInCustomer?.isDiscoverable ?? true;
           isLoading = false;
         });
-        debugPrint('Profile data loaded successfully');
+        debugPrint('✅ Profile data loaded successfully');
       }
     } catch (e) {
       debugPrint('Error loading profile data: $e');
