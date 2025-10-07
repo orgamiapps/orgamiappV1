@@ -162,27 +162,36 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     debugPrint('Building UserProfileScreen - isLoading: $_isLoading');
 
     if (_isLoading) {
-      return AppScaffoldWrapper(
-        selectedBottomNavIndex: 3, // Profile tab
-        backgroundColor: AppThemeColor.backGroundColor,
-        body: SafeArea(
-          child: Container(
-            color: AppThemeColor.backGroundColor,
-            child: const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: AppThemeColor.darkBlueColor),
-                  SizedBox(height: 16),
-                  Text(
-                    'Loading profile...',
-                    style: TextStyle(
-                      color: AppThemeColor.darkBlueColor,
-                      fontSize: 16,
-                      fontFamily: 'Roboto',
+      return WillPopScope(
+        onWillPop: () async {
+          // Allow pop during loading, but check if possible
+          if (Navigator.of(context).canPop()) {
+            return true;
+          }
+          return false;
+        },
+        child: AppScaffoldWrapper(
+          selectedBottomNavIndex: 3, // Profile tab
+          backgroundColor: AppThemeColor.backGroundColor,
+          body: SafeArea(
+            child: Container(
+              color: AppThemeColor.backGroundColor,
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(color: AppThemeColor.darkBlueColor),
+                    SizedBox(height: 16),
+                    Text(
+                      'Loading profile...',
+                      style: TextStyle(
+                        color: AppThemeColor.darkBlueColor,
+                        fontSize: 16,
+                        fontFamily: 'Roboto',
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -190,24 +199,37 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       );
     }
 
-    return AppScaffoldWrapper(
-      selectedBottomNavIndex: 3, // Profile tab
-      backgroundColor: const Color(0xFFFAFBFC),
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _loadUserData,
-          color: AppThemeColor.darkBlueColor,
-          child: CustomScrollView(
-            slivers: [
-              // Profile header removed – show compact info row directly
-              SliverToBoxAdapter(child: _buildProfileHeaderUser()),
-              // Stats Section
-              SliverToBoxAdapter(child: _buildStatsSection()),
-              // Tab Bar
-              SliverToBoxAdapter(child: _buildTabBar()),
-              // Tab Content
-              SliverToBoxAdapter(child: _buildTabContent()),
-            ],
+    return WillPopScope(
+      onWillPop: () async {
+        // Safely handle back button press
+        debugPrint('UserProfileScreen: Back button pressed');
+        if (Navigator.of(context).canPop()) {
+          debugPrint('UserProfileScreen: Can pop, allowing navigation');
+          return true;
+        } else {
+          debugPrint('UserProfileScreen: Cannot pop, preventing crash');
+          return false;
+        }
+      },
+      child: AppScaffoldWrapper(
+        selectedBottomNavIndex: 3, // Profile tab
+        backgroundColor: const Color(0xFFFAFBFC),
+        body: SafeArea(
+          child: RefreshIndicator(
+            onRefresh: _loadUserData,
+            color: AppThemeColor.darkBlueColor,
+            child: CustomScrollView(
+              slivers: [
+                // Profile header removed – show compact info row directly
+                SliverToBoxAdapter(child: _buildProfileHeaderUser()),
+                // Stats Section
+                SliverToBoxAdapter(child: _buildStatsSection()),
+                // Tab Bar
+                SliverToBoxAdapter(child: _buildTabBar()),
+                // Tab Content
+                SliverToBoxAdapter(child: _buildTabContent()),
+              ],
+            ),
           ),
         ),
       ),
