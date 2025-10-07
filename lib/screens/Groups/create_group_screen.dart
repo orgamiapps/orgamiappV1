@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/firebase/firebase_storage_helper.dart';
 import 'package:flutter/services.dart';
+import 'package:attendus/Services/creation_limit_service.dart';
+import 'package:attendus/widgets/limit_reached_dialog.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   const CreateGroupScreen({super.key});
@@ -129,6 +131,18 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                     ? null
                     : () async {
                         if (!_formKey.currentState!.validate()) return;
+
+                        // Check creation limit
+                        final limitService = CreationLimitService();
+                        if (!limitService.canCreateGroup) {
+                          await LimitReachedDialog.show(
+                            context,
+                            type: 'group',
+                            limit: CreationLimitService.FREE_GROUP_LIMIT,
+                          );
+                          return;
+                        }
+
                         setState(() => _submitting = true);
                         final id = await _helper.createOrganization(
                           name: _nameCtlr.text.trim(),
@@ -138,6 +152,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                         );
 
                         if (id != null) {
+                          // Increment group creation count
+                          await CreationLimitService().incrementGroupCount();
                           String? logoUrl;
                           String? bannerUrl;
                           if (_logoFile != null) {

@@ -17,6 +17,8 @@ class SubscriptionModel {
   final String? stripeCustomerId;
   final bool isTrial;
   final DateTime? trialEndsAt;
+  final String? scheduledPlanId; // Plan ID to switch to after current period
+  final DateTime? scheduledPlanStartDate; // When the scheduled plan starts
 
   SubscriptionModel({
     required this.id,
@@ -35,6 +37,8 @@ class SubscriptionModel {
     this.stripeCustomerId,
     this.isTrial = false,
     this.trialEndsAt,
+    this.scheduledPlanId,
+    this.scheduledPlanStartDate,
   });
 
   /// Check if subscription is currently active
@@ -63,8 +67,61 @@ class SubscriptionModel {
     switch (planId) {
       case 'premium_monthly':
         return 'Premium Monthly';
+      case 'premium_6month':
+        return 'Premium 6-Month';
       case 'premium_yearly':
-        return 'Premium Yearly';
+        return 'Premium Annual';
+      default:
+        return 'Premium';
+    }
+  }
+
+  /// Get billing interval display text
+  String get intervalDisplayText {
+    switch (planId) {
+      case 'premium_monthly':
+        return 'month';
+      case 'premium_6month':
+        return '6 months';
+      case 'premium_yearly':
+        return 'year';
+      default:
+        return interval;
+    }
+  }
+
+  /// Get savings percentage compared to monthly plan
+  String? get savingsPercentage {
+    switch (planId) {
+      case 'premium_6month':
+        return '17%'; // $100 vs $120 (6 months at $20)
+      case 'premium_yearly':
+        return '27%'; // $175 vs $240 (12 months at $20)
+      default:
+        return null;
+    }
+  }
+
+  /// Check if this is a popular/recommended plan
+  bool get isRecommended {
+    return planId == 'premium_6month';
+  }
+
+  /// Check if a plan change is scheduled
+  bool get hasScheduledPlanChange {
+    return scheduledPlanId != null && scheduledPlanStartDate != null;
+  }
+
+  /// Get scheduled plan display name
+  String? get scheduledPlanDisplayName {
+    if (scheduledPlanId == null) return null;
+    switch (scheduledPlanId) {
+      case 'premium_monthly':
+        return 'Premium Monthly';
+      case 'premium_6month':
+        return 'Premium 6-Month';
+      case 'premium_yearly':
+        return 'Premium Annual';
       default:
         return 'Premium';
     }
@@ -95,6 +152,10 @@ class SubscriptionModel {
       trialEndsAt: data['trialEndsAt'] != null
           ? _parseTimestamp(data['trialEndsAt'])
           : null,
+      scheduledPlanId: data['scheduledPlanId'],
+      scheduledPlanStartDate: data['scheduledPlanStartDate'] != null
+          ? _parseTimestamp(data['scheduledPlanStartDate'])
+          : null,
     );
   }
 
@@ -120,6 +181,10 @@ class SubscriptionModel {
       'trialEndsAt': trialEndsAt != null
           ? Timestamp.fromDate(trialEndsAt!)
           : null,
+      'scheduledPlanId': scheduledPlanId,
+      'scheduledPlanStartDate': scheduledPlanStartDate != null
+          ? Timestamp.fromDate(scheduledPlanStartDate!)
+          : null,
     };
   }
 
@@ -141,6 +206,8 @@ class SubscriptionModel {
     String? stripeCustomerId,
     bool? isTrial,
     DateTime? trialEndsAt,
+    String? scheduledPlanId,
+    DateTime? scheduledPlanStartDate,
   }) {
     return SubscriptionModel(
       id: id ?? this.id,
@@ -159,6 +226,8 @@ class SubscriptionModel {
       stripeCustomerId: stripeCustomerId ?? this.stripeCustomerId,
       isTrial: isTrial ?? this.isTrial,
       trialEndsAt: trialEndsAt,
+      scheduledPlanId: scheduledPlanId,
+      scheduledPlanStartDate: scheduledPlanStartDate,
     );
   }
 

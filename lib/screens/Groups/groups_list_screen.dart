@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/firebase/organization_helper.dart';
 import 'package:attendus/screens/Groups/group_profile_screen_v2.dart';
 import 'package:attendus/screens/Groups/create_group_screen.dart';
+import 'package:attendus/widgets/creation_limit_indicator.dart';
 
 class GroupsListScreen extends StatefulWidget {
   const GroupsListScreen({super.key});
@@ -141,6 +142,12 @@ class _GroupsListScreenState extends State<GroupsListScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const SizedBox(height: 12),
+                    // Limit indicator
+                    const CreationLimitIndicator(
+                      type: CreationType.group,
+                      showUpgradeHint: true,
+                    ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _searchCtlr,

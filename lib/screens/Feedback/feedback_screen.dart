@@ -147,79 +147,74 @@ class FeedbackScreenState extends State<FeedbackScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        leading: AppAppBarView.appBarWithOnlyBackButton(
-          context: context,
-          backButtonColor: AppColors.primaryColor,
-        ),
-        title: Text(
-          'Feedback',
-          style: TextStyle(
-            color: AppColors.primaryColor,
-            fontSize: Dimensions.fontSizeLarge,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 20),
-                _buildRatingStars(),
-                // Remove name, contact, email fields
-                AppTextFields.textField2(
-                  controller: _commentsController,
-                  hintText: 'Tell us about your experience...',
-                  titleText: 'Comments',
-                  width: MediaQuery.of(context).size.width,
-                  maxLines: 5,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Please enter your feedback';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 24),
-                CheckboxListTile(
-                  title: const Text('Submit anonymously'),
-                  value: _isAnonymous,
-                  onChanged: (value) {
-                    setState(() {
-                      _isAnonymous = value ?? false;
-                    });
-                  },
-                  activeColor: AppColors.primaryColor,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                const SizedBox(height: 24),
-                RoundedLoadingButton(
-                  animateOnTap: false,
-                  borderRadius: 12,
-                  width: MediaQuery.of(context).size.width,
-                  controller: _btnCtlr,
-                  onPressed: _handleSubmit,
-                  color: AppColors.primaryColor,
-                  elevation: 0,
-                  child: const Text(
-                    'Submit Feedback',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
+        child: Column(
+          children: [
+            AppAppBarView.modernHeader(
+              context: context,
+              title: 'Feedback',
+              subtitle: 'Share your experience with us',
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 20),
+                      _buildRatingStars(),
+                      // Remove name, contact, email fields
+                      AppTextFields.textField2(
+                        controller: _commentsController,
+                        hintText: 'Tell us about your experience...',
+                        titleText: 'Comments',
+                        width: MediaQuery.of(context).size.width,
+                        maxLines: 5,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Please enter your feedback';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      CheckboxListTile(
+                        title: const Text('Submit anonymously'),
+                        value: _isAnonymous,
+                        onChanged: (value) {
+                          setState(() {
+                            _isAnonymous = value ?? false;
+                          });
+                        },
+                        activeColor: AppColors.primaryColor,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      const SizedBox(height: 24),
+                      RoundedLoadingButton(
+                        animateOnTap: false,
+                        borderRadius: 12,
+                        width: MediaQuery.of(context).size.width,
+                        controller: _btnCtlr,
+                        onPressed: _handleSubmit,
+                        color: AppColors.primaryColor,
+                        elevation: 0,
+                        child: const Text(
+                          'Submit Feedback',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

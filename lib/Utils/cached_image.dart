@@ -41,11 +41,24 @@ class SafeNetworkImage extends StatelessWidget {
       width: width,
       height: height,
       fit: fit ?? BoxFit.cover,
+      // Memory optimization: limit cached image size
+      memCacheWidth: width != null ? (width! * 2).toInt() : 600,
+      memCacheHeight: height != null ? (height! * 2).toInt() : 400,
+      // Use lighter fade animation
+      fadeInDuration: const Duration(milliseconds: 200),
+      fadeOutDuration: const Duration(milliseconds: 100),
       placeholder: (context, url) {
         if (kDebugMode) {
           debugPrint('Loading image: $url');
         }
-        return placeholder ?? const Center(child: CircularProgressIndicator());
+        return placeholder ??
+            const Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            );
       },
       errorWidget: (context, url, error) {
         if (kDebugMode) {
@@ -53,6 +66,8 @@ class SafeNetworkImage extends StatelessWidget {
         }
         return errorWidget ?? _buildErrorWidget();
       },
+      // Reduce network calls by using cache-first strategy
+      cacheKey: imageUrl,
     );
 
     if (borderRadius != null) {

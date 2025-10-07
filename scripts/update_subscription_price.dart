@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 
 /// Script to update existing subscription prices from $20 to $5
 /// Run this to update your existing subscription in Firestore
@@ -35,7 +34,7 @@ Future<void> main() async {
     final currentPrice = data?['priceAmount'] as int?;
 
     print(
-      'Current price: ${currentPrice} cents (\$${(currentPrice ?? 0) / 100})',
+      'Current price: $currentPrice cents (\$${(currentPrice ?? 0) / 100})',
     );
 
     if (currentPrice == 2000) {

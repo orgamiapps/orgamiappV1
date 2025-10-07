@@ -29,6 +29,7 @@ import 'package:attendus/screens/Home/help_screen.dart';
 import 'package:attendus/screens/Premium/premium_upgrade_screen.dart';
 import 'package:attendus/screens/Premium/subscription_management_screen.dart';
 import 'package:attendus/Services/subscription_service.dart';
+import 'package:attendus/Utils/logger.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -38,6 +39,94 @@ class AccountScreen extends StatefulWidget {
 }
 
 class _AccountScreenState extends State<AccountScreen> {
+  bool _isLoadingUserData = false;
+  bool _isLoadingSubscription = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeScreenData();
+  }
+
+  /// Initialize all necessary data for the screen
+  Future<void> _initializeScreenData() async {
+    // Run user data and subscription loading in parallel
+    await Future.wait([_ensureUserDataLoaded(), _ensureSubscriptionLoaded()]);
+  }
+
+  /// Ensure subscription data is loaded from Firestore
+  Future<void> _ensureSubscriptionLoaded() async {
+    try {
+      if (mounted) {
+        setState(() => _isLoadingSubscription = true);
+      }
+
+      // Get subscription service and ensure it's initialized
+      final subscriptionService = Provider.of<SubscriptionService>(
+        context,
+        listen: false,
+      );
+
+      // Initialize if not already done
+      await subscriptionService.initialize();
+
+      // Refresh to get latest data
+      await subscriptionService.refresh();
+
+      Logger.info(
+        'AccountScreen: Subscription loaded - hasPremium: ${subscriptionService.hasPremium}',
+      );
+    } catch (e) {
+      Logger.error('AccountScreen: Failed to load subscription data', e);
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingSubscription = false);
+      }
+    }
+  }
+
+  /// Ensure user data is fully loaded from Firestore
+  Future<void> _ensureUserDataLoaded() async {
+    // Check if user data needs to be loaded/refreshed
+    final user = CustomerController.logeInCustomer;
+    if (user == null) {
+      Logger.warning('AccountScreen: No logged in user found');
+      return;
+    }
+
+    // If user name is empty or looks like an email prefix, try to refresh
+    final needsRefresh =
+        user.name.isEmpty ||
+        user.name == user.email.split('@')[0] ||
+        user.name.toLowerCase() == 'user';
+
+    if (needsRefresh) {
+      if (mounted) {
+        setState(() => _isLoadingUserData = true);
+      }
+
+      try {
+        Logger.info('AccountScreen: Refreshing user data...');
+        final authService = AuthService();
+        await authService.refreshUserData();
+
+        // If still incomplete, try aggressive update
+        final updatedUser = CustomerController.logeInCustomer;
+        if (updatedUser != null &&
+            (updatedUser.name.isEmpty ||
+                updatedUser.name == updatedUser.email.split('@')[0])) {
+          await authService.aggressiveProfileUpdate();
+        }
+      } catch (e) {
+        Logger.warning('AccountScreen: Failed to refresh user data: $e');
+      } finally {
+        if (mounted) {
+          setState(() => _isLoadingUserData = false);
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -54,6 +143,12 @@ class _AccountScreenState extends State<AccountScreen> {
 
   Widget _buildProfileHeader() {
     final user = CustomerController.logeInCustomer;
+    final canPop = Navigator.of(context).canPop();
+
+    // Show loading indicator if user data is being refreshed
+    if (_isLoadingUserData && user != null) {
+      Logger.debug('AccountScreen: Still loading user data...');
+    }
 
     return Container(
       width: double.infinity,
@@ -66,22 +161,35 @@ class _AccountScreenState extends State<AccountScreen> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
         children: [
-          GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.arrow_back,
-                color: Theme.of(context).colorScheme.onSurface,
-                size: 20,
+          // Only show back button if there's navigation history
+          if (canPop) ...[
+            GestureDetector(
+              onTap: () {
+                // Always try to pop the navigation stack to go back to previous screen
+                try {
+                  Navigator.of(context).pop();
+                } catch (e) {
+                  Logger.error(
+                    'AccountScreen: Error popping navigation stack',
+                    e,
+                  );
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.arrow_back,
+                  color: Theme.of(context).colorScheme.onSurface,
+                  size: 20,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 16),
+            const SizedBox(width: 16),
+          ],
           Text(
             'Account',
             style: TextStyle(
@@ -94,13 +202,23 @@ class _AccountScreenState extends State<AccountScreen> {
           const Spacer(),
           GestureDetector(
             onTap: () {
+              if (user == null) {
+                ShowToast().showNormalToast(msg: 'User data not available');
+                return;
+              }
+
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) =>
-                      UserProfileScreen(user: user!, isOwnProfile: true),
+                      UserProfileScreen(user: user, isOwnProfile: true),
                 ),
-              );
+              ).then((_) {
+                // Refresh user data when returning from profile screen
+                if (mounted) {
+                  _ensureUserDataLoaded();
+                }
+              });
             },
             child: Container(
               width: 44,
@@ -151,8 +269,21 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Widget _buildSettingsSection() {
+    // Use Consumer instead of Selector for more reliable updates
     return Consumer<SubscriptionService>(
       builder: (context, subscriptionService, child) {
+        // Show loading state while subscription data is being fetched
+        final isLoading =
+            _isLoadingSubscription || subscriptionService.isLoading;
+        final hasPremium = subscriptionService.hasPremium;
+
+        // Log current state for debugging
+        if (isLoading) {
+          Logger.debug('AccountScreen: Loading subscription data...');
+        } else {
+          Logger.debug('AccountScreen: hasPremium = $hasPremium');
+        }
+
         return Container(
           margin: const EdgeInsets.fromLTRB(24, 24, 24, 24),
           decoration: BoxDecoration(
@@ -169,13 +300,18 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
           child: Column(
             children: [
-              // Premium upgrade button at top (only show if not premium)
-              if (!subscriptionService.hasPremium) ...[
+              // Show loading indicator while fetching subscription data
+              if (isLoading) ...[
+                _buildPremiumLoadingItem(),
+                _buildDivider(),
+              ]
+              // Premium upgrade button at top (only show if not premium and not loading)
+              else if (!hasPremium) ...[
                 _buildPremiumUpgradeItem(),
                 _buildDivider(),
-              ],
+              ]
               // If user has premium, show premium management
-              if (subscriptionService.hasPremium) ...[
+              else if (hasPremium) ...[
                 _buildPremiumManageItem(subscriptionService),
                 _buildDivider(),
               ],
@@ -305,14 +441,66 @@ class _AccountScreenState extends State<AccountScreen> {
     );
   }
 
+  Widget _buildPremiumLoadingItem() {
+    // Loading state for subscription data
+    return ListTile(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+        ),
+      ),
+      title: Text(
+        'Loading Subscription',
+        style: TextStyle(
+          color: Theme.of(context).textTheme.titleMedium?.color,
+          fontWeight: FontWeight.w600,
+          fontSize: 16,
+          fontFamily: 'Roboto',
+        ),
+      ),
+      subtitle: Text(
+        'Please wait...',
+        style: TextStyle(
+          color: Theme.of(context).textTheme.bodyMedium?.color,
+          fontSize: 14,
+          fontFamily: 'Roboto',
+        ),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+    );
+  }
+
   Widget _buildPremiumUpgradeItem() {
     // Subtle inline CTA matching settings list style
     return _buildSettingsItem(
       icon: Icons.workspace_premium,
       title: 'Upgrade to Premium',
-      subtitle: 'Unlock unlimited events • \$5/month',
-      onTap: () =>
-          RouterClass.nextScreenNormal(context, const PremiumUpgradeScreen()),
+      subtitle: 'Create unlimited events and groups',
+      onTap: () async {
+        await RouterClass.nextScreenNormal(
+          context,
+          const PremiumUpgradeScreen(),
+        );
+        // Refresh subscription data when returning
+        if (mounted) {
+          await _ensureSubscriptionLoaded();
+        }
+      },
     );
   }
 
@@ -384,11 +572,15 @@ class _AccountScreenState extends State<AccountScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {
-                RouterClass.nextScreenNormal(
+              onPressed: () async {
+                await RouterClass.nextScreenNormal(
                   context,
                   const SubscriptionManagementScreen(),
                 );
+                // Refresh subscription data when returning
+                if (mounted) {
+                  await _ensureSubscriptionLoaded();
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,

@@ -8,6 +8,7 @@ import 'package:attendus/widgets/auth_gate.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Utils/theme_provider.dart';
 import 'package:attendus/Services/subscription_service.dart';
+import 'package:attendus/Services/creation_limit_service.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:attendus/Utils/error_handler.dart';
@@ -44,10 +45,21 @@ void main() async {
   await EmulatorConfig.configureForEmulator();
 
   // Build the app immediately to keep UI responsive
+  // Use lazy initialization for providers to improve startup time
   final Widget appWidget = MultiProvider(
     providers: [
-      ChangeNotifierProvider(create: (context) => ThemeProvider()),
-      ChangeNotifierProvider(create: (context) => SubscriptionService()),
+      ChangeNotifierProvider(
+        create: (context) => ThemeProvider(),
+        lazy: false, // Load immediately as it affects initial render
+      ),
+      ChangeNotifierProvider(
+        create: (context) => SubscriptionService(),
+        lazy: true, // Lazy load - only initialize when first accessed
+      ),
+      ChangeNotifierProvider(
+        create: (context) => CreationLimitService(),
+        lazy: true, // Lazy load - only initialize when first accessed
+      ),
     ],
     child: const MyApp(),
   );
@@ -126,13 +138,39 @@ void main() async {
             }
           });
 
-          // Initialize background services
+          // Initialize background services (non-blocking)
           _initializeBackgroundServices();
 
-          // Initialize subscription service
-          final subscriptionService = SubscriptionService();
-          subscriptionService.initialize().catchError((e) {
-            Logger.warning('Subscription service initialization failed: $e');
+          // Delay subscription service initialization to reduce startup time
+          // It will auto-initialize when first accessed due to lazy: true
+          Future.delayed(const Duration(seconds: 2), () {
+            try {
+              final context = appNavigatorKey.currentContext;
+              if (context != null) {
+                final subscriptionService = Provider.of<SubscriptionService>(
+                  context,
+                  listen: false,
+                );
+                subscriptionService.initialize().catchError((e) {
+                  Logger.warning(
+                    'Subscription service initialization failed: $e',
+                  );
+                });
+
+                // Initialize creation limit service after subscription service
+                final creationLimitService = Provider.of<CreationLimitService>(
+                  context,
+                  listen: false,
+                );
+                creationLimitService.initialize().catchError((e) {
+                  Logger.warning(
+                    'Creation limit service initialization failed: $e',
+                  );
+                });
+              }
+            } catch (e) {
+              Logger.warning('Could not initialize services: $e');
+            }
           });
 
           if (kDebugMode) {
@@ -160,13 +198,15 @@ void main() async {
 /// Initialize background services after app startup
 Future<void> _initializeBackgroundServices() async {
   try {
-    // Configure Firestore settings with memory optimization
+    // Configure Firestore settings with aggressive memory optimization
     FirebaseFirestore.instance.settings = Settings(
       persistenceEnabled: true,
-      // Limit cache size to prevent excessive memory usage (100MB instead of unlimited)
+      // Optimize cache size for better memory management
       cacheSizeBytes: kDebugMode
-          ? 50 * 1024 * 1024
-          : 100 * 1024 * 1024, // 50MB in debug, 100MB in release
+          ? 40 *
+                1024 *
+                1024 // 40MB in debug mode
+          : 80 * 1024 * 1024, // 80MB in release (reduced from 100MB)
     );
 
     // Quick connectivity check without blocking
@@ -226,16 +266,18 @@ Future<void> _initializeBackgroundServices() async {
             });
           }
 
-          // Initialize notifications in background
-          NotificationService.initialize().catchError((e) {
-            Logger.warning('Notification service initialization failed: $e');
-            return;
+          // Initialize notifications in background (delayed for faster startup)
+          Future.delayed(const Duration(milliseconds: 500), () {
+            NotificationService.initialize().catchError((e) {
+              Logger.warning('Notification service initialization failed: $e');
+              return;
+            });
           });
 
-          // Initialize Firebase Messaging in background if online
+          // Initialize Firebase Messaging in background if online (increased delay)
           if (isReachable) {
-            // Delay messaging initialization to avoid blocking
-            Future.delayed(const Duration(seconds: 3), () {
+            // Further delay messaging initialization to prioritize UI
+            Future.delayed(const Duration(seconds: 5), () {
               FirebaseMessagingHelper().initialize().catchError((e) {
                 Logger.warning('Firebase Messaging initialization failed: $e');
               });
@@ -290,8 +332,51 @@ class MyApp extends StatelessWidget {
           ],
           supportedLocales: const [Locale('en')],
           home: homeOverride ?? const AuthGate(),
+          // Add navigation observer for debugging
+          navigatorObservers: [
+            _NavigationLogger(),
+          ],
         );
       },
     );
+  }
+}
+
+/// Navigation observer for logging navigation events and catching errors
+class _NavigationLogger extends NavigatorObserver {
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (kDebugMode) {
+      Logger.debug(
+        'Navigation: Pushed ${route.settings.name ?? 'unnamed route'}',
+      );
+    }
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (kDebugMode) {
+      Logger.debug(
+        'Navigation: Popped ${route.settings.name ?? 'unnamed route'}',
+      );
+    }
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (kDebugMode) {
+      Logger.debug(
+        'Navigation: Removed ${route.settings.name ?? 'unnamed route'}',
+      );
+    }
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    if (kDebugMode) {
+      Logger.debug(
+        'Navigation: Replaced ${oldRoute?.settings.name ?? 'unnamed'} with ${newRoute?.settings.name ?? 'unnamed'}',
+      );
+    }
   }
 }

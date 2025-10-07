@@ -75,7 +75,7 @@ class AuthService extends ChangeNotifier {
 
       // Ensure FirebaseAuth has delivered the initial persisted state
       await _waitForInitialAuthState().timeout(
-        const Duration(seconds: 2),
+        const Duration(seconds: 1),
         onTimeout: () {
           Logger.warning('Initial auth state wait timed out; continuing');
         },
@@ -109,7 +109,7 @@ class AuthService extends ChangeNotifier {
 
       // Attempt to restore session with timeout to prevent hanging
       await _restoreUserSession().timeout(
-        const Duration(seconds: 2),
+        const Duration(seconds: 1),
         onTimeout: () {
           Logger.warning('Session restoration timed out');
           return false;
@@ -469,54 +469,79 @@ class AuthService extends ChangeNotifier {
   }
 
   /// Enhanced method to handle social login with profile data extraction
+  /// Optimized for fast login - defers profile updates to background
   Future<void> handleSocialLoginSuccessWithProfileData(
     Map<String, dynamic> profileData,
   ) async {
     try {
       final user = profileData['user'] as User;
 
-      // Check if user exists in Firestore
-      final userData = await FirebaseFirestoreHelper().getSingleCustomer(
-        customerId: user.uid,
-      );
+      // Check if user exists in Firestore with timeout
+      final userData = await FirebaseFirestoreHelper()
+          .getSingleCustomer(customerId: user.uid)
+          .timeout(
+            const Duration(seconds: 3),
+            onTimeout: () {
+              Logger.warning('User lookup timed out during social login');
+              return null;
+            },
+          );
 
       if (userData != null) {
-        // Existing user - update profile with new information
+        // Existing user - set immediately for fast navigation
         CustomerController.logeInCustomer = userData;
+        Logger.info('Existing user logged in: ${user.uid}');
 
-        // Always attempt to update profile for existing users
-        // This ensures that users who previously had incomplete profiles
-        // get their information updated from their social accounts
-        await _updateExistingUserProfile(userData, profileData);
-
-        // Also run aggressive profile update to catch any additional data
+        // Defer profile updates to background (non-blocking)
         Future.microtask(() async {
           try {
-            await aggressiveProfileUpdate();
+            await _updateExistingUserProfile(userData, profileData);
+            Logger.info('Background profile update completed');
           } catch (e) {
-            Logger.warning(
-              'Aggressive profile update failed during social login: $e',
-            );
+            Logger.warning('Background profile update failed: $e');
+            // Non-critical, don't block login
           }
         });
       } else {
-        // New user - create enhanced profile with extracted information
+        // New user - create minimal profile immediately
         final newCustomerModel = await _createEnhancedUserProfile(
           user,
           profileData,
         );
 
-        await FirebaseFirestore.instance
-            .collection(CustomerModel.firebaseKey)
-            .doc(newCustomerModel.uid)
-            .set(CustomerModel.getMap(newCustomerModel));
-
+        // Set in memory immediately
         CustomerController.logeInCustomer = newCustomerModel;
-        Logger.info('Created new user profile with enhanced data');
+
+        // Save to Firestore in background (non-blocking)
+        Future.microtask(() async {
+          try {
+            await FirebaseFirestore.instance
+                .collection(CustomerModel.firebaseKey)
+                .doc(newCustomerModel.uid)
+                .set(CustomerModel.getMap(newCustomerModel))
+                .timeout(const Duration(seconds: 5));
+            Logger.info('New user profile saved to Firestore');
+          } catch (e) {
+            Logger.error('Error saving new user profile to Firestore: $e');
+            // Retry once
+            try {
+              await Future.delayed(const Duration(seconds: 2));
+              await FirebaseFirestore.instance
+                  .collection(CustomerModel.firebaseKey)
+                  .doc(newCustomerModel.uid)
+                  .set(CustomerModel.getMap(newCustomerModel))
+                  .timeout(const Duration(seconds: 5));
+              Logger.info('New user profile saved on retry');
+            } catch (retryError) {
+              Logger.error('Failed to save user profile on retry: $retryError');
+            }
+          }
+        });
       }
 
       await _saveUserSession(user);
       notifyListeners();
+      Logger.info('Social login completed successfully');
     } catch (e) {
       Logger.error('Error handling social login success with profile data', e);
       rethrow;
@@ -784,6 +809,7 @@ class AuthService extends ChangeNotifier {
   }
 
   /// Update existing user profile with any new information from social login
+  /// Optimized to avoid blocking reload operations
   Future<void> _updateExistingUserProfile(
     CustomerModel existingUser,
     Map<String, dynamic> profileData,
@@ -792,13 +818,8 @@ class AuthService extends ChangeNotifier {
       Map<String, dynamic> updates = {};
       final user = profileData['user'] as User;
 
-      // Force reload Firebase user to get latest data
-      await user.reload();
-      final refreshedUser = FirebaseAuth.instance.currentUser;
-
-      Logger.info('=== AGGRESSIVE PROFILE UPDATE ===');
+      Logger.info('=== PROFILE UPDATE (Background) ===');
       Logger.info('Current customer name: "${existingUser.name}"');
-      Logger.info('Firebase displayName: "${refreshedUser?.displayName}"');
       Logger.info('Profile data fullName: "${profileData['fullName']}"');
       Logger.info('Profile data keys: ${profileData.keys}');
 
@@ -812,17 +833,11 @@ class AuthService extends ChangeNotifier {
         bestName = profileData['fullName'].toString().trim();
         Logger.info('Using fullName from profile data: "$bestName"');
       }
-      // Priority 2: Firebase Auth displayName after reload
-      else if (refreshedUser?.displayName != null &&
-          refreshedUser!.displayName!.trim().isNotEmpty) {
-        bestName = refreshedUser.displayName!.trim();
-        Logger.info('Using Firebase displayName: "$bestName"');
-      }
-      // Priority 3: Original user displayName
+      // Priority 2: Current Firebase Auth displayName (no reload needed)
       else if (user.displayName != null &&
           user.displayName!.trim().isNotEmpty) {
         bestName = user.displayName!.trim();
-        Logger.info('Using original user displayName: "$bestName"');
+        Logger.info('Using Firebase displayName: "$bestName"');
       }
 
       // Update name if we found a better one or current one needs improvement
@@ -860,12 +875,18 @@ class AuthService extends ChangeNotifier {
         existingUser.profilePictureUrl = user.photoURL;
       }
 
-      // Apply updates to Firestore if any
+      // Apply updates to Firestore if any (with timeout)
       if (updates.isNotEmpty) {
         await FirebaseFirestore.instance
             .collection(CustomerModel.firebaseKey)
             .doc(existingUser.uid)
-            .update(updates);
+            .update(updates)
+            .timeout(
+              const Duration(seconds: 5),
+              onTimeout: () {
+                Logger.warning('Profile update to Firestore timed out');
+              },
+            );
 
         Logger.info(
           'Updated existing user profile with: ${updates.keys.join(', ')}',
@@ -876,6 +897,7 @@ class AuthService extends ChangeNotifier {
 
       // Update the controller with the latest data
       CustomerController.logeInCustomer = existingUser;
+      notifyListeners();
     } catch (e) {
       Logger.error('Error updating existing user profile', e);
       // Don't rethrow as this is not critical for login success

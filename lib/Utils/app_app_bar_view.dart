@@ -4,6 +4,133 @@ import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/dimensions.dart';
 
 class AppAppBarView {
+  /// Modern header with title and optional subtitle
+  static Widget modernHeader({
+    required BuildContext context,
+    required String title,
+    String? subtitle,
+    Widget? trailing,
+    bool showBackButton = true,
+  }) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor,
+        border: Border(
+          bottom: BorderSide(
+            color: theme.colorScheme.outline.withValues(alpha: 0.1),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Modern back button
+          if (showBackButton)
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => Navigator.pop(context),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: theme.brightness == Brightness.dark ? 0.6 : 0.8,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: theme.colorScheme.outline.withValues(alpha: 0.15),
+                      width: 1,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.arrow_back_rounded,
+                    size: 22,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ),
+            ),
+          if (showBackButton) const SizedBox(width: 16),
+          // Title with modern typography
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.onSurface,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          // Optional trailing widget
+          if (trailing != null) ...[
+            const SizedBox(width: 12),
+            trailing,
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Modern back button only (for screens with custom headers like Premium)
+  static Widget modernBackButton({
+    required BuildContext context,
+    Color? backgroundColor,
+    Color? iconColor,
+    VoidCallback? onTap,
+  }) {
+    final theme = Theme.of(context);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap ?? () => Navigator.pop(context),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: backgroundColor ??
+                theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: theme.brightness == Brightness.dark ? 0.6 : 0.8,
+                ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: theme.colorScheme.outline.withValues(alpha: 0.15),
+              width: 1,
+            ),
+          ),
+          child: Icon(
+            Icons.arrow_back_rounded,
+            size: 22,
+            color: iconColor ?? theme.colorScheme.onSurface,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ========== Legacy methods (deprecated - use modernHeader instead) ==========
+
+  @deprecated
   static Widget appBarView({
     required BuildContext context,
     required String title,
@@ -34,6 +161,7 @@ class AppAppBarView {
     );
   }
 
+  @deprecated
   static Widget appBarWithOnlyBackButton({
     required BuildContext context,
     Color? backButtonColor,

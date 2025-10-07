@@ -189,23 +189,10 @@ class _AnsQuestionsToSignInEventScreenState
     return Column(
       children: [
         // Modern Header
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                spreadRadius: 0,
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: AppAppBarView.appBarView(
-            context: context,
-            title: 'Event Sign-In',
-          ),
+        AppAppBarView.modernHeader(
+          context: context,
+          title: 'Event Sign-In',
+          subtitle: 'Answer questions to check in',
         ),
 
         // Content Area

@@ -44,24 +44,43 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   int _followingCount = 0;
   bool _isFollowUpdating = false;
 
+  void _handleTabChange() {
+    if (mounted && _tabController.indexIsChanging) {
+      setState(() {});
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+
+    // Add listener to handle tab changes safely
+    _tabController.addListener(_handleTabChange);
+
     _loadUserData();
     _refreshUserDataFromFirestore();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    // Dispose of the tab controller safely
+    try {
+      // Remove all listeners before disposing
+      _tabController.removeListener(_handleTabChange);
+      _tabController.dispose();
+    } catch (e) {
+      debugPrint('Error disposing tab controller: $e');
+    }
     super.dispose();
   }
 
   Future<void> _loadUserData() async {
     if (!mounted) return;
 
-    setState(() => _isLoading = true);
+    if (mounted) {
+      setState(() => _isLoading = true);
+    }
 
     try {
       debugPrint('Loading user data for: ${widget.user.uid}');
@@ -72,7 +91,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         createdEvents = await FirebaseFirestoreHelper().getEventsCreatedByUser(
           widget.user.uid,
         );
-        // Sort by most recent to oldest
+        // Sort created events by creation date (most recent first)
         createdEvents.sort(
           (a, b) => b.eventGenerateTime.compareTo(a.eventGenerateTime),
         );
@@ -87,9 +106,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       try {
         attendedEvents = await FirebaseFirestoreHelper()
             .getEventsAttendedByUser(widget.user.uid);
-        // Sort by most recent to oldest
+        // Sort attended events by event date (most recent first) to match my_profile_screen
         attendedEvents.sort(
-          (a, b) => b.eventGenerateTime.compareTo(a.eventGenerateTime),
+          (a, b) => b.selectedDateTime.compareTo(a.selectedDateTime),
         );
         debugPrint('Loaded ${attendedEvents.length} attended events');
       } catch (e) {
@@ -162,27 +181,38 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     debugPrint('Building UserProfileScreen - isLoading: $_isLoading');
 
     if (_isLoading) {
-      return AppScaffoldWrapper(
-        selectedBottomNavIndex: 3, // Profile tab
-        backgroundColor: AppThemeColor.backGroundColor,
-        body: SafeArea(
-          child: Container(
-            color: AppThemeColor.backGroundColor,
-            child: const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: AppThemeColor.darkBlueColor),
-                  SizedBox(height: 16),
-                  Text(
-                    'Loading profile...',
-                    style: TextStyle(
+      return WillPopScope(
+        onWillPop: () async {
+          // Allow pop during loading, but check if possible
+          if (Navigator.of(context).canPop()) {
+            return true;
+          }
+          return false;
+        },
+        child: AppScaffoldWrapper(
+          selectedBottomNavIndex: 3, // Profile tab
+          backgroundColor: AppThemeColor.backGroundColor,
+          body: SafeArea(
+            child: Container(
+              color: AppThemeColor.backGroundColor,
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
                       color: AppThemeColor.darkBlueColor,
-                      fontSize: 16,
-                      fontFamily: 'Roboto',
                     ),
-                  ),
-                ],
+                    SizedBox(height: 16),
+                    Text(
+                      'Loading profile...',
+                      style: TextStyle(
+                        color: AppThemeColor.darkBlueColor,
+                        fontSize: 16,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -190,24 +220,42 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       );
     }
 
-    return AppScaffoldWrapper(
-      selectedBottomNavIndex: 3, // Profile tab
-      backgroundColor: const Color(0xFFFAFBFC),
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _loadUserData,
-          color: AppThemeColor.darkBlueColor,
-          child: CustomScrollView(
-            slivers: [
-              // Profile header removed – show compact info row directly
-              SliverToBoxAdapter(child: _buildProfileHeaderUser()),
-              // Stats Section
-              SliverToBoxAdapter(child: _buildStatsSection()),
-              // Tab Bar
-              SliverToBoxAdapter(child: _buildTabBar()),
-              // Tab Content
-              SliverToBoxAdapter(child: _buildTabContent()),
-            ],
+    return WillPopScope(
+      onWillPop: () async {
+        // Safely handle back button press
+        debugPrint('UserProfileScreen: Back button pressed');
+        if (Navigator.of(context).canPop()) {
+          debugPrint('UserProfileScreen: Can pop, allowing navigation');
+          return true;
+        } else {
+          debugPrint('UserProfileScreen: Cannot pop, preventing crash');
+          return false;
+        }
+      },
+      child: AppScaffoldWrapper(
+        selectedBottomNavIndex: 3, // Profile tab
+        backgroundColor: const Color(0xFFFAFBFC),
+        body: SafeArea(
+          child: RefreshIndicator(
+            onRefresh: () async {
+              if (mounted) {
+                await _loadUserData();
+              }
+            },
+            color: AppThemeColor.darkBlueColor,
+            child: CustomScrollView(
+              key: PageStorageKey<String>('user_profile_${widget.user.uid}'),
+              slivers: [
+                // Profile header removed – show compact info row directly
+                SliverToBoxAdapter(child: _buildProfileHeaderUser()),
+                // Stats Section
+                SliverToBoxAdapter(child: _buildStatsSection()),
+                // Tab Bar
+                SliverToBoxAdapter(child: _buildTabBar()),
+                // Tab Content
+                SliverToBoxAdapter(child: _buildTabContent()),
+              ],
+            ),
           ),
         ),
       ),
@@ -265,7 +313,19 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                 children: [
                   // Back button
                   GestureDetector(
-                    onTap: () => Navigator.of(context).maybePop(),
+                    onTap: () {
+                      debugPrint('UserProfileScreen: Back button tapped');
+                      // Safely handle back navigation
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                        debugPrint('UserProfileScreen: Successfully popped');
+                      } else {
+                        debugPrint(
+                          'UserProfileScreen: Cannot pop, no routes in stack',
+                        );
+                        // If we can't pop, we might be at the root - do nothing or show message
+                      }
+                    },
                     child: Container(
                       width: buttonSize,
                       height: buttonSize,
@@ -796,6 +856,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   Future<void> _toggleFollow() async {
+    if (!mounted) return;
+
     if (CustomerController.logeInCustomer == null) {
       ShowToast().showNormalToast(msg: 'Please log in to follow users');
       return;
@@ -895,6 +957,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   // (Optional) Helper could be added for shared transient error detection
 
   void _sendMessage() async {
+    if (!mounted) return;
+
     if (CustomerController.logeInCustomer == null) {
       ShowToast().showNormalToast(msg: 'Please log in to send messages');
       return;
@@ -1148,7 +1212,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   Widget _buildTabButton({required String label, required int index}) {
-    final isSelected = _tabController.index == index;
+    // Safe check to prevent index out of bounds
+    final isSelected =
+        _tabController.index == index && index < _tabController.length;
     final fontSize = ResponsiveHelper.getResponsiveFontSize(
       context,
       phone: 14,
@@ -1359,7 +1425,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       if (selectedUser != null && selectedUser is CustomerModel) {
         // Navigate to the selected user's profile
         if (!mounted) return;
-        Navigator.pushReplacement(
+        // Use regular push instead of pushReplacement to avoid disposal issues
+        Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => UserProfileScreen(
@@ -1411,9 +1478,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   void _shareProfile() {
-    Share.share(
-      'Check out ${_getDisplayName()}\'s profile on AttendUs!',
-    );
+    Share.share('Check out ${_getDisplayName()}\'s profile on AttendUs!');
   }
 
   void _showProfileOptions(BuildContext context) {
@@ -1894,9 +1959,11 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     File? stagedAvatarFile,
     File? stagedBannerFile,
   }) async {
+    if (!mounted) return;
+
     final current = CustomerController.logeInCustomer;
     if (current == null) {
-      Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
       return;
     }
 

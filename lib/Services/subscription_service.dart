@@ -28,8 +28,11 @@ class SubscriptionService extends ChangeNotifier {
     if (_auth.currentUser == null) return;
 
     try {
-      _isLoading = true;
-      notifyListeners();
+      // Only notify if state actually changes
+      if (!_isLoading) {
+        _isLoading = true;
+        notifyListeners();
+      }
 
       await _loadUserSubscription();
 
@@ -41,15 +44,21 @@ class SubscriptionService extends ChangeNotifier {
     } catch (e) {
       Logger.error('Failed to initialize subscription service', e);
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (_isLoading) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
   }
 
   /// Load user's current subscription from Firestore
   Future<void> _loadUserSubscription() async {
     final userId = _auth.currentUser?.uid;
-    if (userId == null) return;
+    if (userId == null) {
+      _currentSubscription = null;
+      notifyListeners();
+      return;
+    }
 
     try {
       final doc = await _firestore
@@ -57,46 +66,82 @@ class SubscriptionService extends ChangeNotifier {
           .doc(userId)
           .get();
 
+      final oldSubscription = _currentSubscription;
+      
       if (doc.exists) {
         _currentSubscription = SubscriptionModel.fromFirestore(doc);
-        Logger.info('Loaded subscription: ${_currentSubscription?.status}');
+        Logger.info(
+          'Loaded subscription: ${_currentSubscription?.status} (isActive: ${_currentSubscription?.isActive})',
+        );
       } else {
         _currentSubscription = null;
         Logger.info('No subscription found for user');
       }
+      
+      // Notify listeners if subscription state changed
+      if (oldSubscription?.isActive != _currentSubscription?.isActive) {
+        notifyListeners();
+      }
     } catch (e) {
       Logger.error('Error loading user subscription', e);
       _currentSubscription = null;
+      notifyListeners();
     }
   }
 
-  /// Create a new premium subscription (mock for now)
-  Future<bool> createPremiumSubscription() async {
+  /// Create a new premium subscription
+  Future<bool> createPremiumSubscription({
+    String? planId,
+    bool withTrial = false,
+  }) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return false;
 
     try {
-      _isLoading = true;
-      notifyListeners();
+      if (!_isLoading) {
+        _isLoading = true;
+        notifyListeners();
+      }
 
-      // For now, create a free premium subscription
+      // Determine subscription parameters based on plan
+      final selectedPlanId = planId ?? 'premium_monthly';
+      int billingDays;
+      int priceAmount;
+      String interval;
+
+      switch (selectedPlanId) {
+        case 'premium_6month':
+          billingDays = 180;
+          priceAmount = 10000; // $100.00 in cents
+          interval = '6months';
+          break;
+        case 'premium_yearly':
+          billingDays = 365;
+          priceAmount = 17500; // $175.00 in cents
+          interval = 'year';
+          break;
+        default:
+          billingDays = 30;
+          priceAmount = 2000; // $20.00 in cents
+          interval = 'month';
+      }
+
       final subscription = SubscriptionModel(
         id: userId,
         userId: userId,
-        planId: 'premium_monthly',
+        planId: selectedPlanId,
         status: 'active',
-        priceAmount: 500, // $5.00 in cents
+        priceAmount: priceAmount,
         currency: 'USD',
-        interval: 'month',
+        interval: interval,
         currentPeriodStart: DateTime.now(),
-        currentPeriodEnd: DateTime.now().add(const Duration(days: 30)),
+        currentPeriodEnd: DateTime.now().add(Duration(days: billingDays)),
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
-        // For testing, make it free but still show $5/month
-        isTrial: true,
-        trialEndsAt: DateTime.now().add(
-          const Duration(days: 365),
-        ), // 1 year trial
+        isTrial: withTrial,
+        trialEndsAt: withTrial
+            ? DateTime.now().add(const Duration(days: 30))
+            : null,
       );
 
       await _firestore
@@ -107,14 +152,18 @@ class SubscriptionService extends ChangeNotifier {
       _currentSubscription = subscription;
       Logger.success('Premium subscription created successfully');
 
+      if (_isLoading) {
+        _isLoading = false;
+      }
       notifyListeners();
       return true;
     } catch (e) {
       Logger.error('Error creating premium subscription', e);
+      if (_isLoading) {
+        _isLoading = false;
+        notifyListeners();
+      }
       return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
     }
   }
 
@@ -124,8 +173,10 @@ class SubscriptionService extends ChangeNotifier {
     if (userId == null || _currentSubscription == null) return false;
 
     try {
-      _isLoading = true;
-      notifyListeners();
+      if (!_isLoading) {
+        _isLoading = true;
+        notifyListeners();
+      }
 
       // Update subscription status to cancelled
       final updatedSubscription = _currentSubscription!.copyWith(
@@ -142,14 +193,18 @@ class SubscriptionService extends ChangeNotifier {
       _currentSubscription = updatedSubscription;
       Logger.info('Subscription cancelled successfully');
 
+      if (_isLoading) {
+        _isLoading = false;
+      }
       notifyListeners();
       return true;
     } catch (e) {
       Logger.error('Error cancelling subscription', e);
+      if (_isLoading) {
+        _isLoading = false;
+        notifyListeners();
+      }
       return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
     }
   }
 
@@ -159,8 +214,10 @@ class SubscriptionService extends ChangeNotifier {
     if (userId == null || _currentSubscription == null) return false;
 
     try {
-      _isLoading = true;
-      notifyListeners();
+      if (!_isLoading) {
+        _isLoading = true;
+        notifyListeners();
+      }
 
       // Update subscription status to active
       final updatedSubscription = _currentSubscription!.copyWith(
@@ -179,14 +236,18 @@ class SubscriptionService extends ChangeNotifier {
       _currentSubscription = updatedSubscription;
       Logger.success('Subscription reactivated successfully');
 
+      if (_isLoading) {
+        _isLoading = false;
+      }
       notifyListeners();
       return true;
     } catch (e) {
       Logger.error('Error reactivating subscription', e);
+      if (_isLoading) {
+        _isLoading = false;
+        notifyListeners();
+      }
       return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
     }
   }
 
@@ -228,7 +289,20 @@ class SubscriptionService extends ChangeNotifier {
 
   /// Refresh subscription data
   Future<void> refresh() async {
-    await _loadUserSubscription();
+    try {
+      final oldHasPremium = hasPremium;
+      await _loadUserSubscription();
+      
+      // Force notify listeners if premium status changed
+      if (oldHasPremium != hasPremium) {
+        Logger.info(
+          'Subscription status changed from $oldHasPremium to $hasPremium',
+        );
+        notifyListeners();
+      }
+    } catch (e) {
+      Logger.error('Error refreshing subscription', e);
+    }
   }
 
   /// Clear subscription data (for logout)
@@ -418,6 +492,158 @@ class SubscriptionService extends ChangeNotifier {
       return true;
     } catch (e) {
       Logger.error('Error updating subscription price', e);
+      return false;
+    }
+  }
+
+  /// Schedule a plan change to take effect after current period ends
+  Future<bool> schedulePlanChange(String newPlanId) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null || _currentSubscription == null) return false;
+
+    try {
+      if (!_isLoading) {
+        _isLoading = true;
+        notifyListeners();
+      }
+
+      // Prevent scheduling the same plan
+      if (_currentSubscription!.planId == newPlanId) {
+        Logger.info('Cannot schedule change to the same plan');
+        return false;
+      }
+
+      // Calculate when the scheduled plan should start (at end of current period)
+      final scheduledStartDate = _currentSubscription!.currentPeriodEnd;
+
+      await _firestore.collection('subscriptions').doc(userId).update({
+        'scheduledPlanId': newPlanId,
+        'scheduledPlanStartDate': Timestamp.fromDate(scheduledStartDate),
+        'updatedAt': Timestamp.now(),
+      });
+
+      // Reload the subscription to reflect the change
+      await _loadUserSubscription();
+
+      Logger.success('Plan change scheduled successfully');
+
+      if (_isLoading) {
+        _isLoading = false;
+      }
+      notifyListeners();
+      return true;
+    } catch (e) {
+      Logger.error('Error scheduling plan change', e);
+      if (_isLoading) {
+        _isLoading = false;
+        notifyListeners();
+      }
+      return false;
+    }
+  }
+
+  /// Cancel a scheduled plan change
+  Future<bool> cancelScheduledPlanChange() async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null || _currentSubscription == null) return false;
+
+    try {
+      if (!_isLoading) {
+        _isLoading = true;
+        notifyListeners();
+      }
+
+      await _firestore.collection('subscriptions').doc(userId).update({
+        'scheduledPlanId': null,
+        'scheduledPlanStartDate': null,
+        'updatedAt': Timestamp.now(),
+      });
+
+      // Reload the subscription to reflect the change
+      await _loadUserSubscription();
+
+      Logger.success('Scheduled plan change cancelled');
+
+      if (_isLoading) {
+        _isLoading = false;
+      }
+      notifyListeners();
+      return true;
+    } catch (e) {
+      Logger.error('Error cancelling scheduled plan change', e);
+      if (_isLoading) {
+        _isLoading = false;
+        notifyListeners();
+      }
+      return false;
+    }
+  }
+
+  /// Apply scheduled plan change (called when current period ends)
+  /// This should be called by a cloud function or scheduled task
+  Future<bool> applyScheduledPlanChange() async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null || _currentSubscription == null) return false;
+
+    try {
+      // Check if there's a scheduled plan change
+      if (!_currentSubscription!.hasScheduledPlanChange) {
+        Logger.info('No scheduled plan change to apply');
+        return false;
+      }
+
+      final scheduledPlanId = _currentSubscription!.scheduledPlanId!;
+      final scheduledStartDate = _currentSubscription!.scheduledPlanStartDate!;
+
+      // Only apply if the scheduled start date has passed
+      if (DateTime.now().isBefore(scheduledStartDate)) {
+        Logger.info('Scheduled plan change date has not arrived yet');
+        return false;
+      }
+
+      // Determine new subscription parameters
+      int billingDays;
+      int priceAmount;
+      String interval;
+
+      switch (scheduledPlanId) {
+        case 'premium_6month':
+          billingDays = 180;
+          priceAmount = 10000; // $100.00 in cents
+          interval = '6months';
+          break;
+        case 'premium_yearly':
+          billingDays = 365;
+          priceAmount = 17500; // $175.00 in cents
+          interval = 'year';
+          break;
+        default:
+          billingDays = 30;
+          priceAmount = 2000; // $20.00 in cents
+          interval = 'month';
+      }
+
+      // Update subscription with new plan
+      await _firestore.collection('subscriptions').doc(userId).update({
+        'planId': scheduledPlanId,
+        'priceAmount': priceAmount,
+        'interval': interval,
+        'currentPeriodStart': Timestamp.fromDate(scheduledStartDate),
+        'currentPeriodEnd':
+            Timestamp.fromDate(scheduledStartDate.add(Duration(days: billingDays))),
+        'scheduledPlanId': null,
+        'scheduledPlanStartDate': null,
+        'updatedAt': Timestamp.now(),
+      });
+
+      // Reload the subscription
+      await _loadUserSubscription();
+
+      Logger.success('Scheduled plan change applied successfully');
+      notifyListeners();
+      return true;
+    } catch (e) {
+      Logger.error('Error applying scheduled plan change', e);
       return false;
     }
   }

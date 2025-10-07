@@ -19,6 +19,8 @@ class CustomerModel {
   bool isDiscoverable; // New field for user search privacy
   List<String> favorites; // New field for saved events
   DateTime createdAt;
+  int eventsCreated; // Track number of events created by user
+  int groupsCreated; // Track number of groups created by user
 
   CustomerModel({
     required this.uid,
@@ -39,6 +41,8 @@ class CustomerModel {
     this.isDiscoverable = true, // Default to discoverable
     this.favorites = const [], // Default to empty list for saved events
     required this.createdAt,
+    this.eventsCreated = 0, // Default to 0 events created
+    this.groupsCreated = 0, // Default to 0 groups created
   });
 
   factory CustomerModel.fromFirestore(DocumentSnapshot snap) {
@@ -79,6 +83,8 @@ class CustomerModel {
           true, // Default to true for backward compatibility
       favorites: List<String>.from(d['favorites'] ?? []), // Saved events field
       createdAt: parsedCreatedAt,
+      eventsCreated: d['eventsCreated'] ?? 0, // Default to 0 for backward compatibility
+      groupsCreated: d['groupsCreated'] ?? 0, // Default to 0 for backward compatibility
     );
   }
 
@@ -102,6 +108,8 @@ class CustomerModel {
       'isDiscoverable': d.isDiscoverable,
       'favorites': d.favorites, // Saved events field
       'createdAt': d.createdAt,
+      'eventsCreated': d.eventsCreated, // Track events created
+      'groupsCreated': d.groupsCreated, // Track groups created
     };
   }
 }

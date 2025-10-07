@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:attendus/Utils/logger.dart';
@@ -20,9 +21,9 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
         googleProvider.addScope(
           'profile',
         ); // Add profile scope for better user info
-        final UserCredential userCredential = await _auth.signInWithPopup(
-          googleProvider,
-        );
+        final UserCredential userCredential = await _auth
+            .signInWithPopup(googleProvider)
+            .timeout(const Duration(seconds: 30));
         user = userCredential.user;
       } else {
         // Mobile/desktop: use Firebase Auth's native provider sign-in
@@ -31,9 +32,9 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
         googleProvider.addScope(
           'profile',
         ); // Add profile scope for better user info
-        final UserCredential userCredential = await _auth.signInWithProvider(
-          googleProvider,
-        );
+        final UserCredential userCredential = await _auth
+            .signInWithProvider(googleProvider)
+            .timeout(const Duration(seconds: 30));
         user = userCredential.user;
       }
 
@@ -41,37 +42,34 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
         // Extract profile information from Google user
         Map<String, dynamic> profileData = {'user': user};
 
-        // Force reload to ensure we have the latest data
-        await user.reload();
-        user = _auth.currentUser;
-
-        // Try multiple sources for display name
-        String? displayName = user?.displayName;
-        String? photoUrl = user?.photoURL;
-        String? phoneNumber = user?.phoneNumber;
+        // Try multiple sources for display name (no reload needed)
+        String? displayName = user.displayName;
+        String? photoUrl = user.photoURL;
+        String? phoneNumber = user.phoneNumber;
 
         // Check provider data for additional information
-        if (user != null) {
-          for (final provider in user.providerData) {
-            if (provider.providerId == 'google.com') {
-              displayName = displayName ?? provider.displayName;
-              photoUrl = photoUrl ?? provider.photoURL;
-              phoneNumber = phoneNumber ?? provider.phoneNumber;
+        for (final provider in user.providerData) {
+          if (provider.providerId == 'google.com') {
+            displayName = displayName ?? provider.displayName;
+            photoUrl = photoUrl ?? provider.photoURL;
+            phoneNumber = phoneNumber ?? provider.phoneNumber;
 
-              // If we got a display name from provider, update Firebase user
-              if (displayName != null &&
-                  displayName.isNotEmpty &&
-                  (user.displayName == null || user.displayName!.isEmpty)) {
+            // If we got a display name from provider, update Firebase user in background
+            if (displayName != null &&
+                displayName.isNotEmpty &&
+                (user.displayName == null || user.displayName!.isEmpty)) {
+              // Update display name in background (non-blocking)
+              final userToUpdate = user;
+              Future.microtask(() async {
                 try {
-                  await user.updateDisplayName(displayName);
-                  await user.reload();
+                  await userToUpdate.updateDisplayName(displayName);
                   Logger.info(
                     'Updated Firebase displayName from Google provider',
                   );
                 } catch (e) {
                   Logger.warning('Could not update displayName: $e');
                 }
-              }
+              });
             }
           }
         }
@@ -128,17 +126,26 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
         return null;
       }
 
-      // Request Apple ID credential
-      final appleCredential = await SignInWithApple.getAppleIDCredential(
-        scopes: [
-          AppleIDAuthorizationScopes.email,
-          AppleIDAuthorizationScopes.fullName,
-        ],
-        webAuthenticationOptions: WebAuthenticationOptions(
-          clientId: 'com.stormdeve.orgami',
-          redirectUri: Uri.parse('https://orgamiapp.page.link/apple-signin'),
-        ),
-      );
+      // Request Apple ID credential with timeout
+      final appleCredential =
+          await SignInWithApple.getAppleIDCredential(
+            scopes: [
+              AppleIDAuthorizationScopes.email,
+              AppleIDAuthorizationScopes.fullName,
+            ],
+            webAuthenticationOptions: WebAuthenticationOptions(
+              clientId: 'com.stormdeve.orgami',
+              redirectUri: Uri.parse(
+                'https://orgamiapp.page.link/apple-signin',
+              ),
+            ),
+          ).timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              Logger.error('Apple sign-in timed out');
+              throw TimeoutException('Apple sign-in timed out');
+            },
+          );
 
       // Create OAuth credential for Firebase
       final oauthCredential = OAuthProvider("apple.com").credential(
@@ -147,9 +154,9 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
       );
 
       // Sign in with Firebase
-      final UserCredential userCredential = await _auth.signInWithCredential(
-        oauthCredential,
-      );
+      final UserCredential userCredential = await _auth
+          .signInWithCredential(oauthCredential)
+          .timeout(const Duration(seconds: 10));
       final User? user = userCredential.user;
 
       if (user != null) {
@@ -173,9 +180,16 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
         if (fullName.isNotEmpty) {
           profileData['fullName'] = fullName;
 
-          // Update Firebase Auth display name if not set
+          // Update Firebase Auth display name in background if not set
           if (user.displayName == null || user.displayName!.isEmpty) {
-            await user.updateDisplayName(fullName);
+            Future.microtask(() async {
+              try {
+                await user.updateDisplayName(fullName);
+                Logger.info('Updated Firebase displayName from Apple');
+              } catch (e) {
+                Logger.warning('Could not update displayName: $e');
+              }
+            });
           }
         }
 

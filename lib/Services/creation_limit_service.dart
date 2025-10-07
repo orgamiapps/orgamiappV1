@@ -1,0 +1,281 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:attendus/Utils/logger.dart';
+import 'package:attendus/Services/subscription_service.dart';
+
+/// Service for managing creation limits for free users
+/// Free users can create up to 5 events and 5 groups
+/// Premium users have unlimited creation
+class CreationLimitService extends ChangeNotifier {
+  static final CreationLimitService _instance = CreationLimitService._internal();
+  factory CreationLimitService() => _instance;
+  CreationLimitService._internal();
+
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final SubscriptionService _subscriptionService = SubscriptionService();
+
+  // Free tier limits
+  static const int FREE_EVENT_LIMIT = 5;
+  static const int FREE_GROUP_LIMIT = 5;
+
+  int _eventsCreated = 0;
+  int _groupsCreated = 0;
+  bool _isLoading = false;
+
+  int get eventsCreated => _eventsCreated;
+  int get groupsCreated => _groupsCreated;
+  bool get isLoading => _isLoading;
+
+  // Computed properties for remaining creations
+  int get eventsRemaining {
+    if (_subscriptionService.hasPremium) return -1; // -1 indicates unlimited
+    return (FREE_EVENT_LIMIT - _eventsCreated).clamp(0, FREE_EVENT_LIMIT);
+  }
+
+  int get groupsRemaining {
+    if (_subscriptionService.hasPremium) return -1; // -1 indicates unlimited
+    return (FREE_GROUP_LIMIT - _groupsCreated).clamp(0, FREE_GROUP_LIMIT);
+  }
+
+  // Check if user can create more events
+  bool get canCreateEvent {
+    if (_subscriptionService.hasPremium) return true;
+    return _eventsCreated < FREE_EVENT_LIMIT;
+  }
+
+  // Check if user can create more groups
+  bool get canCreateGroup {
+    if (_subscriptionService.hasPremium) return true;
+    return _groupsCreated < FREE_GROUP_LIMIT;
+  }
+
+  // Check if user is approaching limit (1 remaining)
+  bool get isApproachingEventLimit {
+    if (_subscriptionService.hasPremium) return false;
+    return eventsRemaining == 1;
+  }
+
+  bool get isApproachingGroupLimit {
+    if (_subscriptionService.hasPremium) return false;
+    return groupsRemaining == 1;
+  }
+
+  /// Initialize the service and load user's creation counts
+  Future<void> initialize() async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      await _loadCreationCounts();
+    } catch (e) {
+      Logger.error('Failed to initialize creation limit service', e);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Load user's creation counts from Firestore
+  Future<void> _loadCreationCounts() async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      final doc = await _firestore
+          .collection('Customers')
+          .doc(userId)
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data()!;
+        _eventsCreated = data['eventsCreated'] ?? 0;
+        _groupsCreated = data['groupsCreated'] ?? 0;
+        Logger.info('Loaded creation counts: Events=$_eventsCreated, Groups=$_groupsCreated');
+      }
+    } catch (e) {
+      Logger.error('Error loading creation counts', e);
+    }
+  }
+
+  /// Increment event creation count
+  Future<bool> incrementEventCount() async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return false;
+
+    // Premium users don't need to track counts
+    if (_subscriptionService.hasPremium) {
+      Logger.info('Premium user - skipping event count increment');
+      return true;
+    }
+
+    // Check if limit reached
+    if (!canCreateEvent) {
+      Logger.warning('Event creation limit reached');
+      return false;
+    }
+
+    try {
+      await _firestore
+          .collection('Customers')
+          .doc(userId)
+          .update({
+        'eventsCreated': FieldValue.increment(1),
+      });
+
+      _eventsCreated++;
+      notifyListeners();
+      
+      Logger.success('Event count incremented to $_eventsCreated');
+      return true;
+    } catch (e) {
+      Logger.error('Error incrementing event count', e);
+      return false;
+    }
+  }
+
+  /// Increment group creation count
+  Future<bool> incrementGroupCount() async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return false;
+
+    // Premium users don't need to track counts
+    if (_subscriptionService.hasPremium) {
+      Logger.info('Premium user - skipping group count increment');
+      return true;
+    }
+
+    // Check if limit reached
+    if (!canCreateGroup) {
+      Logger.warning('Group creation limit reached');
+      return false;
+    }
+
+    try {
+      await _firestore
+          .collection('Customers')
+          .doc(userId)
+          .update({
+        'groupsCreated': FieldValue.increment(1),
+      });
+
+      _groupsCreated++;
+      notifyListeners();
+      
+      Logger.success('Group count incremented to $_groupsCreated');
+      return true;
+    } catch (e) {
+      Logger.error('Error incrementing group count', e);
+      return false;
+    }
+  }
+
+  /// Decrement event count (when an event is deleted)
+  Future<void> decrementEventCount() async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
+    // Premium users don't track counts
+    if (_subscriptionService.hasPremium) return;
+
+    if (_eventsCreated <= 0) return;
+
+    try {
+      await _firestore
+          .collection('Customers')
+          .doc(userId)
+          .update({
+        'eventsCreated': FieldValue.increment(-1),
+      });
+
+      _eventsCreated = (_eventsCreated - 1).clamp(0, FREE_EVENT_LIMIT);
+      notifyListeners();
+      
+      Logger.info('Event count decremented to $_eventsCreated');
+    } catch (e) {
+      Logger.error('Error decrementing event count', e);
+    }
+  }
+
+  /// Decrement group count (when a group is deleted)
+  Future<void> decrementGroupCount() async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
+    // Premium users don't track counts
+    if (_subscriptionService.hasPremium) return;
+
+    if (_groupsCreated <= 0) return;
+
+    try {
+      await _firestore
+          .collection('Customers')
+          .doc(userId)
+          .update({
+        'groupsCreated': FieldValue.increment(-1),
+      });
+
+      _groupsCreated = (_groupsCreated - 1).clamp(0, FREE_GROUP_LIMIT);
+      notifyListeners();
+      
+      Logger.info('Group count decremented to $_groupsCreated');
+    } catch (e) {
+      Logger.error('Error decrementing group count', e);
+    }
+  }
+
+  /// Reset counts (typically not needed as premium users aren't tracked)
+  Future<void> resetCounts() async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      await _firestore
+          .collection('Customers')
+          .doc(userId)
+          .update({
+        'eventsCreated': 0,
+        'groupsCreated': 0,
+      });
+
+      _eventsCreated = 0;
+      _groupsCreated = 0;
+      notifyListeners();
+      
+      Logger.info('Creation counts reset');
+    } catch (e) {
+      Logger.error('Error resetting counts', e);
+    }
+  }
+
+  /// Get formatted limit status text
+  String getEventLimitStatus() {
+    if (_subscriptionService.hasPremium) {
+      return 'Unlimited';
+    }
+    return '$_eventsCreated / $FREE_EVENT_LIMIT';
+  }
+
+  String getGroupLimitStatus() {
+    if (_subscriptionService.hasPremium) {
+      return 'Unlimited';
+    }
+    return '$_groupsCreated / $FREE_GROUP_LIMIT';
+  }
+
+  /// Get progress percentage (0.0 to 1.0)
+  double getEventProgress() {
+    if (_subscriptionService.hasPremium) return 0.0;
+    return (_eventsCreated / FREE_EVENT_LIMIT).clamp(0.0, 1.0);
+  }
+
+  double getGroupProgress() {
+    if (_subscriptionService.hasPremium) return 0.0;
+    return (_groupsCreated / FREE_GROUP_LIMIT).clamp(0.0, 1.0);
+  }
+}
+

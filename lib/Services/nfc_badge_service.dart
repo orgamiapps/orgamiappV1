@@ -21,7 +21,9 @@ class NFCBadgeService {
   /// Check if NFC is available on the device
   Future<bool> isNFCAvailable() async {
     try {
-      return await NfcManager.instance.isAvailable();
+      final availability = await NfcManager.instance.checkAvailability();
+      // Check if NFC is available (returns NfcAvailability enum)
+      return availability.toString() == 'NfcAvailability.available';
     } catch (e) {
       debugPrint('Error checking NFC availability: $e');
       return false;

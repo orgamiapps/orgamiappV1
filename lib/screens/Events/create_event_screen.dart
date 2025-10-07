@@ -23,6 +23,8 @@ import 'package:attendus/firebase/organization_helper.dart'; // ignore: unused_i
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/firebase/firebase_messaging_helper.dart';
 import 'package:attendus/screens/Events/location_picker_screen.dart';
+import 'package:attendus/Services/creation_limit_service.dart';
+import 'package:attendus/widgets/limit_reached_dialog.dart';
 
 class CreateEventScreen extends StatefulWidget {
   final DateTime? selectedDateTime;
@@ -279,6 +281,19 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         );
         return;
       }
+
+      // Check creation limit
+      final limitService = CreationLimitService();
+      if (!limitService.canCreateEvent) {
+        if (!mounted) return;
+        await LimitReachedDialog.show(
+          context,
+          type: 'event',
+          limit: CreationLimitService.FREE_EVENT_LIMIT,
+        );
+        return;
+      }
+
       _btnCtlr.start();
       if (_selectedImagePath != null) {
         // Upload local image
@@ -394,6 +409,9 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             .collection(EventModel.firebaseKey)
             .doc(docId)
             .set(data);
+
+        // Increment event creation count
+        await CreationLimitService().incrementEventCount();
 
         // Create notification for event creator
         final messagingHelper = FirebaseMessagingHelper();
