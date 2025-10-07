@@ -4,6 +4,7 @@ import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/Services/auth_service.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
 
 class DeleteAccountScreen extends StatefulWidget {
   const DeleteAccountScreen({super.key});
@@ -43,8 +44,16 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Delete Account')),
-      body: Padding(
+      body: SafeArea(
+        child: Column(
+          children: [
+            AppAppBarView.modernHeader(
+              context: context,
+              title: 'Delete Account',
+              subtitle: 'Permanently delete your account',
+            ),
+            Expanded(
+              child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -110,6 +119,11 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
                   ),
                 ),
               ],
+            ),
+          ],
+        ),
+                ),
+              ),
             ),
           ],
         ),

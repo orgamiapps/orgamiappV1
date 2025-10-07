@@ -7,6 +7,7 @@ import 'package:attendus/Utils/toast.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
 
 class AttendeeNotificationScreen extends StatefulWidget {
   const AttendeeNotificationScreen({super.key});
@@ -218,66 +219,10 @@ class _AttendeeNotificationScreenState extends State<AttendeeNotificationScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // Enhanced App Bar
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: Dimensions.paddingSizeLarge,
-                vertical: Dimensions.paddingSizeLarge,
-              ),
-              decoration: BoxDecoration(
-                color: AppThemeColor.pureWhiteColor,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 15,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppThemeColor.lightBlueColor,
-                      borderRadius: BorderRadius.circular(
-                        Dimensions.radiusDefault,
-                      ),
-                    ),
-                    child: IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new,
-                        color: AppThemeColor.darkBlueColor,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: Dimensions.spaceSizedLarge),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Send Notifications',
-                          style: TextStyle(
-                            fontSize: Dimensions.fontSizeExtraLarge,
-                            fontWeight: FontWeight.bold,
-                            color: AppThemeColor.darkBlueColor,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Send SMS or in-app notifications to previous attendees',
-                          style: TextStyle(
-                            fontSize: Dimensions.fontSizeSmall,
-                            color: AppThemeColor.dullFontColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+            AppAppBarView.modernHeader(
+              context: context,
+              title: 'Send Notifications',
+              subtitle: 'Send SMS or in-app notifications to previous attendees',
             ),
 
             // Tab Bar

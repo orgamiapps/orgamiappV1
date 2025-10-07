@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/app_constants.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
 
 class TermsConditionsScreen extends StatelessWidget {
   const TermsConditionsScreen({super.key});
@@ -9,24 +10,16 @@ class TermsConditionsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text(
-          'Terms & Conditions',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-          ),
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
-      body: SingleChildScrollView(
+      body: SafeArea(
+        child: Column(
+          children: [
+            AppAppBarView.modernHeader(
+              context: context,
+              title: 'Terms & Conditions',
+              subtitle: 'Please read carefully',
+            ),
+            Expanded(
+              child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -229,6 +222,11 @@ class TermsConditionsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
+          ],
+        ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
