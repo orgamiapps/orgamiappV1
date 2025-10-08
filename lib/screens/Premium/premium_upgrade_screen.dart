@@ -1,4 +1,3 @@
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -6,9 +5,7 @@ import 'package:attendus/Services/subscription_service.dart';
 import 'package:attendus/models/subscription_model.dart';
 import 'package:attendus/Utils/app_app_bar_view.dart';
 import 'package:attendus/Utils/toast.dart';
-import 'package:attendus/Utils/router.dart';
 import 'package:attendus/screens/Premium/subscription_management_screen.dart';
-import 'package:intl/intl.dart';
 
 class PremiumUpgradeScreen extends StatefulWidget {
   const PremiumUpgradeScreen({super.key});
@@ -161,9 +158,22 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
           );
         }
 
-        // If user already has premium, show management screen
+        // If user already has premium, navigate to management screen
         if (state.hasPremium) {
-          return _buildManagementView();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && !_isNavigating) {
+              _isNavigating = true;
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SubscriptionManagementScreen(),
+                ),
+              );
+            }
+          });
+          return const Center(
+            child: CircularProgressIndicator(color: Colors.white),
+          );
         }
 
         // Show upgrade options
@@ -201,31 +211,6 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
               const SizedBox(height: 20),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildManagementView() {
-    final theme = Theme.of(context);
-
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            _buildCelebrationHeader(theme),
-            const SizedBox(height: 32),
-            _buildPremiumSpotlight(theme),
-            const SizedBox(height: 32),
-            _buildSubscriptionStatusCard(),
-            const SizedBox(height: 24),
-            _buildPerksGrid(theme),
-            const SizedBox(height: 24),
-            _buildManagementButtons(),
-          ],
         ),
       ),
     );
@@ -280,252 +265,6 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
             color: Color(0xFF8667F2),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildCelebrationHeader(ThemeData theme) {
-    final borderColor = Colors.white.withValues(alpha: 0.32);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 28),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            theme.colorScheme.primary.withValues(alpha: 0.95),
-            theme.colorScheme.secondary.withValues(alpha: 0.9),
-            theme.colorScheme.primary.withValues(alpha: 0.7),
-          ],
-        ),
-        border: Border.all(color: borderColor, width: 1.3),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.primary.withValues(alpha: 0.35),
-            blurRadius: 38,
-            offset: const Offset(0, 22),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            top: -30,
-            right: -18,
-            child: Container(
-              width: 130,
-              height: 130,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.18),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -26,
-            left: -14,
-            child: Container(
-              width: 150,
-              height: 150,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    Colors.white.withValues(alpha: 0.2),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: borderColor, width: 1),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(Icons.stars_rounded, size: 18, color: Colors.white),
-                    SizedBox(width: 8),
-                    Text(
-                      'Premium unlocked',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'You\'re Premium! 🎉',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.3,
-                  height: 1.2,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Your workspace now has unlimited events, deeper insights, and dedicated support.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.92),
-                  height: 1.5,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPremiumSpotlight(ThemeData theme) {
-    final borderColor = Colors.white.withValues(alpha: 0.25);
-
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.25),
-            blurRadius: 40,
-            offset: const Offset(0, 26),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withValues(alpha: 0.22),
-                  Colors.white.withValues(alpha: 0.08),
-                ],
-              ),
-              border: Border.all(color: borderColor, width: 1.1),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Container(
-                      width: 160,
-                      height: 160,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            theme.colorScheme.secondary.withValues(alpha: 0.35),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                    _buildPremiumIcon(),
-                  ],
-                ),
-                const SizedBox(height: 22),
-                Text(
-                  'Welcome to the premium experience',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: theme.colorScheme.onPrimary,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.1,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Launch memorable events faster, delight your attendees, and scale with confidence.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.85),
-                    height: 1.5,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 22),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    _buildInfoChip(
-                      theme,
-                      Icons.event_available_outlined,
-                      'Unlimited events',
-                    ),
-                    _buildInfoChip(
-                      theme,
-                      Icons.insights_outlined,
-                      'Advanced analytics',
-                    ),
-                    _buildInfoChip(
-                      theme,
-                      Icons.headset_mic_outlined,
-                      'Priority support',
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoChip(ThemeData theme, IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.25),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18, color: theme.colorScheme.onPrimary),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onPrimary,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -714,374 +453,6 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
     );
   }
 
-  Widget _buildSubscriptionStatusCard() {
-    final subscriptionService = context.read<SubscriptionService>();
-    final subscription = subscriptionService.currentSubscription!;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.14),
-        gradient: LinearGradient(
-          colors: [
-            Colors.white.withValues(alpha: 0.16),
-            Colors.white.withValues(alpha: 0.06),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.25),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            offset: const Offset(0, 16),
-            blurRadius: 32,
-            spreadRadius: 0,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildStatusHeader(),
-          const SizedBox(height: 20),
-          Text(
-            'Plan: ${subscription.planDisplayName}',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(
-                context,
-              ).colorScheme.onPrimary.withValues(alpha: 0.95),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _buildStatusPill(
-                icon: Icons.calendar_today_outlined,
-                label: subscription.isTrial
-                    ? 'Trial access'
-                    : 'Monthly billing',
-              ),
-              const SizedBox(width: 12),
-              if (subscription.isTrial && subscription.trialEndsAt != null)
-                _buildStatusPill(
-                  icon: Icons.hourglass_top_rounded,
-                  label: 'Ends ${_formatDate(subscription.trialEndsAt!)}',
-                )
-              else if (subscriptionService.getNextBillingDate() != null)
-                _buildStatusPill(
-                  icon: Icons.payments_outlined,
-                  label: 'Next ${subscriptionService.getNextBillingDate()}',
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusPill({required IconData icon, required String label}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.24),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: Colors.white),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusHeader() {
-    final subscriptionService = context.read<SubscriptionService>();
-    final theme = Theme.of(context);
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: [
-                theme.colorScheme.primary.withValues(alpha: 0.9),
-                theme.colorScheme.secondary.withValues(alpha: 0.9),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.35),
-              width: 1.3,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: theme.colorScheme.primary.withValues(alpha: 0.35),
-                blurRadius: 26,
-                offset: const Offset(0, 14),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.verified_rounded,
-            color: Colors.white,
-            size: 26,
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                subscriptionService.getSubscriptionStatusText(),
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: theme.colorScheme.onPrimary,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Your premium benefits are active and ready to use.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: theme.colorScheme.onPrimary.withValues(alpha: 0.78),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPerksGrid(ThemeData theme) {
-    final perks = [
-      {
-        'icon': Icons.auto_graph_rounded,
-        'title': 'Growth analytics',
-        'description':
-            'Spot trends with real-time insights and attendee heatmaps.',
-      },
-      {
-        'icon': Icons.people_alt_rounded,
-        'title': 'Team collaboration',
-        'description': 'Add co-hosts, assign roles, and run events together.',
-      },
-      {
-        'icon': Icons.notifications_active_outlined,
-        'title': 'Smart reminders',
-        'description':
-            'Automated nudges keep your community engaged and informed.',
-      },
-      {
-        'icon': Icons.workspace_premium_outlined,
-        'title': 'Premium badge',
-        'description':
-            'Stand out with a verified badge on every event you publish.',
-      },
-    ];
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
-        color: Colors.white.withValues(alpha: 0.08),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'What’s unlocked for you',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: theme.colorScheme.onPrimary,
-            ),
-          ),
-          const SizedBox(height: 18),
-          Wrap(
-            spacing: 14,
-            runSpacing: 14,
-            children: perks
-                .map(
-                  (perk) => _buildPerkCard(
-                    theme,
-                    icon: perk['icon'] as IconData,
-                    title: perk['title'] as String,
-                    description: perk['description'] as String,
-                  ),
-                )
-                .toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPerkCard(
-    ThemeData theme, {
-    required IconData icon,
-    required String title,
-    required String description,
-  }) {
-    return Container(
-      constraints: const BoxConstraints(minWidth: 150, maxWidth: 220),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withValues(alpha: 0.18),
-            Colors.white.withValues(alpha: 0.08),
-          ],
-        ),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: theme.colorScheme.primary.withValues(alpha: 0.18),
-            ),
-            child: Icon(icon, size: 20, color: theme.colorScheme.onPrimary),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: theme.colorScheme.onPrimary,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            description,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onPrimary.withValues(alpha: 0.75),
-              height: 1.45,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildManagementButtons() {
-    final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                theme.colorScheme.primary.withValues(alpha: 0.95),
-                theme.colorScheme.secondary.withValues(alpha: 0.95),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: theme.colorScheme.primary.withValues(alpha: 0.33),
-                blurRadius: 32,
-                offset: const Offset(0, 18),
-              ),
-            ],
-          ),
-          child: ElevatedButton.icon(
-            onPressed: () {
-              RouterClass.nextScreenNormal(
-                context,
-                const SubscriptionManagementScreen(),
-              );
-            },
-            icon: const Icon(Icons.settings_outlined, color: Colors.white),
-            label: const Text(
-              'Manage Subscription',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.transparent,
-              shadowColor: Colors.transparent,
-              minimumSize: const Size.fromHeight(56),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        TextButton.icon(
-          onPressed: () {
-            Navigator.pop(context);
-          },
-          icon: Icon(
-            Icons.arrow_back_rounded,
-            color: theme.colorScheme.onPrimary.withValues(alpha: 0.85),
-          ),
-          label: Text(
-            'Back to Account',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onPrimary.withValues(alpha: 0.85),
-            ),
-          ),
-          style: TextButton.styleFrom(
-            foregroundColor: theme.colorScheme.onPrimary.withValues(
-              alpha: 0.85,
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Future<void> _handleUpgrade(SubscriptionService subscriptionService) async {
     if (!mounted) return;
 
@@ -1099,9 +470,15 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
           msg: '🎉 Welcome to Premium! You can now create events.',
         );
 
-        // Refresh the UI
+        // Navigate to subscription management screen
         if (mounted) {
-          setState(() {});
+          _isNavigating = true;
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const SubscriptionManagementScreen(),
+            ),
+          );
         }
       } else {
         ShowToast().showNormalToast(
@@ -1121,10 +498,6 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen>
         });
       }
     }
-  }
-
-  String _formatDate(DateTime date) {
-    return DateFormat('MM/dd/yyyy').format(date);
   }
 }
 
