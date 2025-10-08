@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
 // Removed unused web help center imports after UI simplification
 
 class HelpScreen extends StatelessWidget {
@@ -13,20 +14,30 @@ class HelpScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(title: const Text('Help & Support'), elevation: 0),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _Header(),
-              const SizedBox(height: 16),
-              _QuickActions(),
-              const SizedBox(height: 16),
-              _MetaInfo(),
-            ],
-          ),
+        child: Column(
+          children: [
+            AppAppBarView.modernHeader(
+              context: context,
+              title: 'Help & Support',
+              subtitle: 'We\'re here to help you',
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _Header(),
+                    const SizedBox(height: 16),
+                    _QuickActions(),
+                    const SizedBox(height: 16),
+                    _MetaInfo(),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
 
 class BlockedUsersScreen extends StatefulWidget {
   const BlockedUsersScreen({super.key});
@@ -87,48 +88,56 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
   Widget build(BuildContext context) {
     return AppScaffoldWrapper(
       selectedBottomNavIndex: 5, // Account tab
-      appBar: AppBar(
-        title: const Text('Blocked Users'),
-        actions: [
-          IconButton(
-            onPressed: _openBlockUserSearch,
-            icon: const Icon(Icons.add),
-            tooltip: 'Block users',
-          ),
-        ],
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _blocked.isEmpty
-          ? const Center(child: Text('No blocked users'))
-          : ListView.separated(
-              itemBuilder: (context, i) {
-                final u = _blocked[i];
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundImage:
-                        (u.profilePictureUrl != null &&
-                            u.profilePictureUrl!.isNotEmpty)
-                        ? NetworkImage(u.profilePictureUrl!)
-                        : null,
-                    child:
-                        (u.profilePictureUrl == null ||
-                            u.profilePictureUrl!.isEmpty)
-                        ? Text(
-                            u.name.isNotEmpty ? u.name[0].toUpperCase() : '?',
-                          )
-                        : null,
-                  ),
-                  title: Text(u.name),
-                  trailing: TextButton(
-                    onPressed: () => _unblock(u.uid),
-                    child: const Text('Unblock'),
-                  ),
-                );
-              },
-              separatorBuilder: (_, index) => const Divider(height: 0),
-              itemCount: _blocked.length,
+      body: SafeArea(
+        child: Column(
+          children: [
+            AppAppBarView.modernHeader(
+              context: context,
+              title: 'Blocked Users',
+              subtitle: 'Manage your blocked users',
+              trailing: IconButton(
+                onPressed: _openBlockUserSearch,
+                icon: const Icon(Icons.add),
+                tooltip: 'Block users',
+              ),
             ),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _blocked.isEmpty
+                  ? const Center(child: Text('No blocked users'))
+                  : ListView.separated(
+                      itemBuilder: (context, i) {
+                        final u = _blocked[i];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundImage:
+                                (u.profilePictureUrl != null &&
+                                    u.profilePictureUrl!.isNotEmpty)
+                                ? NetworkImage(u.profilePictureUrl!)
+                                : null,
+                            child:
+                                (u.profilePictureUrl == null ||
+                                    u.profilePictureUrl!.isEmpty)
+                                ? Text(
+                                    u.name.isNotEmpty ? u.name[0].toUpperCase() : '?',
+                                  )
+                                : null,
+                          ),
+                          title: Text(u.name),
+                          trailing: TextButton(
+                            onPressed: () => _unblock(u.uid),
+                            child: const Text('Unblock'),
+                          ),
+                        );
+                      },
+                      separatorBuilder: (_, index) => const Divider(height: 0),
+                      itemCount: _blocked.length,
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

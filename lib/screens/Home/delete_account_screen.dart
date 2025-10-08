@@ -4,6 +4,7 @@ import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/Services/auth_service.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
 
 class DeleteAccountScreen extends StatefulWidget {
   const DeleteAccountScreen({super.key});
@@ -43,73 +44,88 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Delete Account')),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
+      body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Are you sure you want to delete your account?',
-              style: Theme.of(context).textTheme.titleLarge,
+            AppAppBarView.modernHeader(
+              context: context,
+              title: 'Delete Account',
+              subtitle: 'Permanently delete your account',
             ),
-            const SizedBox(height: 12),
-            Text(
-              'This will permanently delete your account and associated data. '
-              'This action cannot be undone.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 16),
-            _buildWarningItem(
-              context,
-              icon: Icons.delete_forever,
-              text: 'Your profile, followers, and following will be removed.',
-            ),
-            const SizedBox(height: 8),
-            _buildWarningItem(
-              context,
-              icon: Icons.chat_bubble_outline,
-              text: 'Your messages and comments may be deleted.',
-            ),
-            const SizedBox(height: 8),
-            _buildWarningItem(
-              context,
-              icon: Icons.event,
-              text:
-                  'Tickets, attendance records, and related user data will be deleted.',
-            ),
-            const Spacer(),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _isDeleting
-                        ? null
-                        : () => Navigator.pop(context),
-                    child: const Text('Cancel'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton.tonal(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFEF4444),
-                      foregroundColor: Colors.white,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Are you sure you want to delete your account?',
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    onPressed: _isDeleting ? null : _handleDelete,
-                    child: _isDeleting
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation(Colors.white),
+                    const SizedBox(height: 12),
+                    Text(
+                      'This will permanently delete your account and associated data. '
+                      'This action cannot be undone.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildWarningItem(
+                      context,
+                      icon: Icons.delete_forever,
+                      text:
+                          'Your profile, followers, and following will be removed.',
+                    ),
+                    const SizedBox(height: 8),
+                    _buildWarningItem(
+                      context,
+                      icon: Icons.chat_bubble_outline,
+                      text: 'Your messages and comments may be deleted.',
+                    ),
+                    const SizedBox(height: 8),
+                    _buildWarningItem(
+                      context,
+                      icon: Icons.event,
+                      text:
+                          'Tickets, attendance records, and related user data will be deleted.',
+                    ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _isDeleting
+                                ? null
+                                : () => Navigator.pop(context),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton.tonal(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFFEF4444),
+                              foregroundColor: Colors.white,
                             ),
-                          )
-                        : const Text('Delete Account'),
-                  ),
+                            onPressed: _isDeleting ? null : _handleDelete,
+                            child: _isDeleting
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : const Text('Delete Account'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ],
         ),

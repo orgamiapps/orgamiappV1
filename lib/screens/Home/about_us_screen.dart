@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
 
 class AboutUsScreen extends StatelessWidget {
   const AboutUsScreen({super.key});
@@ -8,23 +9,32 @@ class AboutUsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('About Us'),
-        elevation: 0,
-      ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _Intro(textColor: Theme.of(context).textTheme.titleLarge?.color),
-              const SizedBox(height: 16),
-              _FeatureGrid(),
-              const SizedBox(height: 24),
-              _FooterNote(),
-            ],
-          ),
+        child: Column(
+          children: [
+            AppAppBarView.modernHeader(
+              context: context,
+              title: 'About Us',
+              subtitle: 'Your all-in-one events platform',
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _Intro(
+                      textColor: Theme.of(context).textTheme.titleLarge?.color,
+                    ),
+                    const SizedBox(height: 16),
+                    _FeatureGrid(),
+                    const SizedBox(height: 24),
+                    _FooterNote(),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -73,17 +83,20 @@ class _FeatureGrid extends StatelessWidget {
       _Feature(
         icon: Icons.explore,
         title: 'Explore events',
-        description: 'Find nearby and trending events tailored to your interests.',
+        description:
+            'Find nearby and trending events tailored to your interests.',
       ),
       _Feature(
         icon: Icons.campaign,
         title: 'Promote events',
-        description: 'Boost reach with shareable links, QR codes, and smart reminders.',
+        description:
+            'Boost reach with shareable links, QR codes, and smart reminders.',
       ),
       _Feature(
         icon: Icons.event_note,
         title: 'Manage with ease',
-        description: 'Create listings, set tickets, and handle RSVPs in minutes.',
+        description:
+            'Create listings, set tickets, and handle RSVPs in minutes.',
       ),
       _Feature(
         icon: Icons.qr_code_scanner,
@@ -98,7 +111,8 @@ class _FeatureGrid extends StatelessWidget {
       _Feature(
         icon: CupertinoIcons.chat_bubble_2_fill,
         title: 'Engage attendees',
-        description: 'Send updates, notifications, and offers to your audience.',
+        description:
+            'Send updates, notifications, and offers to your audience.',
       ),
       _Feature(
         icon: Icons.lock_outline,
@@ -108,7 +122,8 @@ class _FeatureGrid extends StatelessWidget {
       _Feature(
         icon: Icons.devices,
         title: 'Works everywhere',
-        description: 'Optimized for mobile and desktop so your team stays in sync.',
+        description:
+            'Optimized for mobile and desktop so your team stays in sync.',
       ),
     ];
 
@@ -130,7 +145,9 @@ class _FeatureCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Color borderColor = Theme.of(context).dividerColor;
-    final Color iconBg = Theme.of(context).colorScheme.primary.withValues(alpha: 0.1);
+    final Color iconBg = Theme.of(
+      context,
+    ).colorScheme.primary.withValues(alpha: 0.1);
     final Color iconColor = Theme.of(context).colorScheme.primary;
 
     return Container(
@@ -218,5 +235,3 @@ class _FooterNote extends StatelessWidget {
     );
   }
 }
-
-

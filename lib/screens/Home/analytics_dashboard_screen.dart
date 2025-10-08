@@ -15,6 +15,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
 
 class AnalyticsDashboardScreen extends StatefulWidget {
   const AnalyticsDashboardScreen({super.key});
@@ -596,153 +597,72 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     return AppScaffoldWrapper(
       selectedBottomNavIndex: 5, // Account tab
       backgroundColor: AppThemeColor.backGroundColor,
-      body: DefaultTabController(
-        length: 4,
-        child: NestedScrollView(
-          headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
-            return <Widget>[
-              SliverAppBar(
-                expandedHeight: 240.0,
-                floating: false,
-                pinned: false,
-                snap: false,
-                backgroundColor: AppThemeColor.backGroundColor,
-                elevation: 0,
-                leading: Container(
-                  margin: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppThemeColor.lightBlueColor,
-                    borderRadius: BorderRadius.circular(
-                      Dimensions.radiusDefault,
-                    ),
-                  ),
-                  child: IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new,
-                      color: AppThemeColor.darkBlueColor,
-                      size: 20,
-                    ),
-                  ),
-                ),
-                actions: [
-                  Container(
-                    margin: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          AppThemeColor.darkBlueColor,
-                          AppThemeColor.dullBlueColor,
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(
-                        Dimensions.radiusDefault,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppThemeColor.darkBlueColor.withValues(
-                            alpha: 0.3,
-                          ),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: IconButton(
-                      onPressed: _exportData,
-                      icon: const Icon(
-                        Icons.download_rounded,
-                        color: AppThemeColor.pureWhiteColor,
-                        size: 20,
-                      ),
-                      tooltip: 'Export Data',
-                    ),
-                  ),
-                ],
-                flexibleSpace: FlexibleSpaceBar(
-                  background: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppThemeColor.backGroundColor,
-                          AppThemeColor.lightBlueColor.withValues(alpha: 0.3),
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
-                    child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          Dimensions.paddingSizeLarge,
-                          Dimensions.paddingSizeLarge * 2,
-                          Dimensions.paddingSizeLarge,
-                          Dimensions.paddingSizeDefault,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Analytics Dashboard',
-                              style: TextStyle(
-                                fontSize: Dimensions.fontSizeOverLarge + 4,
-                                fontWeight: FontWeight.bold,
-                                color: AppThemeColor.darkBlueColor,
-                                height: 1.2,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Comprehensive insights across all your events',
-                              style: TextStyle(
-                                fontSize: Dimensions.fontSizeLarge,
-                                color: AppThemeColor.dullFontColor,
-                                height: 1.4,
-                              ),
-                            ),
-                            const SizedBox(height: Dimensions.spaceSizedLarge),
-                            // Time Period Filters (restored to flexible space)
-                            Text(
-                              'Time Period',
-                              style: TextStyle(
-                                fontSize: Dimensions.fontSizeDefault,
-                                fontWeight: FontWeight.w600,
-                                color: AppThemeColor.darkBlueColor,
-                              ),
-                            ),
-                            const SizedBox(height: Dimensions.spaceSizeSmall),
-                            SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              physics: const BouncingScrollPhysics(),
-                              child: Row(
-                                children: [
-                                  _buildModernFilterChip('All Time', 'all'),
-                                  const SizedBox(
-                                    width: Dimensions.spaceSizeSmall,
-                                  ),
-                                  _buildModernFilterChip('Week', 'week'),
-                                  const SizedBox(
-                                    width: Dimensions.spaceSizeSmall,
-                                  ),
-                                  _buildModernFilterChip('Month', 'month'),
-                                  const SizedBox(
-                                    width: Dimensions.spaceSizeSmall,
-                                  ),
-                                  _buildModernFilterChip('Year', 'year'),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            AppAppBarView.modernHeader(
+              context: context,
+              title: 'Analytics Dashboard',
+              subtitle: 'Comprehensive insights across all your events',
+              trailing: IconButton(
+                onPressed: _exportData,
+                icon: const Icon(Icons.download_rounded),
+                tooltip: 'Export Data',
               ),
-              SliverPersistentHeader(
-                delegate: _SliverAppBarDelegate(
+            ),
+            Expanded(
+              child: DefaultTabController(
+                length: 4,
+                child: NestedScrollView(
+                  headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
+                    return <Widget>[
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            Dimensions.paddingSizeLarge,
+                            Dimensions.paddingSizeLarge,
+                            Dimensions.paddingSizeLarge,
+                            Dimensions.paddingSizeDefault,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Time Period',
+                                style: TextStyle(
+                                  fontSize: Dimensions.fontSizeDefault,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppThemeColor.darkBlueColor,
+                                ),
+                              ),
+                              const SizedBox(height: Dimensions.spaceSizeSmall),
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                physics: const BouncingScrollPhysics(),
+                                child: Row(
+                                  children: [
+                                    _buildModernFilterChip('All Time', 'all'),
+                                    const SizedBox(
+                                      width: Dimensions.spaceSizeSmall,
+                                    ),
+                                    _buildModernFilterChip('Week', 'week'),
+                                    const SizedBox(
+                                      width: Dimensions.spaceSizeSmall,
+                                    ),
+                                    _buildModernFilterChip('Month', 'month'),
+                                    const SizedBox(
+                                      width: Dimensions.spaceSizeSmall,
+                                    ),
+                                    _buildModernFilterChip('Year', 'year'),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      SliverPersistentHeader(
+                        delegate: _SliverAppBarDelegate(
                   Container(
                     margin: const EdgeInsets.fromLTRB(
                       Dimensions.paddingSizeLarge,
@@ -815,15 +735,19 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
               ),
             ];
           },
-          body: TabBarView(
-            controller: _tabController,
-            children: [
-              _overviewTab(),
-              _aiInsightsTab(),
-              _trendsTab(),
-              _eventsTab(),
-            ],
-          ),
+                  body: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _overviewTab(),
+                      _aiInsightsTab(),
+                      _trendsTab(),
+                      _eventsTab(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

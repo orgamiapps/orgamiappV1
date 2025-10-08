@@ -16,6 +16,8 @@ import 'package:attendus/Services/badge_service.dart';
 import 'package:attendus/screens/Home/account_details_screen_v2.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -145,6 +147,43 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     }
   }
 
+  // Diagnostic method to test direct Firebase query
+  Future<void> _testDirectQuery() async {
+    debugPrint('🔬 Starting direct Firebase query test...');
+    try {
+      final userId = CustomerController.logeInCustomer?.uid;
+      if (userId == null) {
+        debugPrint('❌ User not logged in');
+        ShowToast().showNormalToast(msg: 'User not logged in');
+        return;
+      }
+
+      // Test query directly using Firestore
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('Events')
+          .where('customerUid', isEqualTo: userId)
+          .get();
+
+      debugPrint('🔬 Direct query results:');
+      debugPrint('  - Found ${querySnapshot.docs.length} events');
+
+      for (var doc in querySnapshot.docs) {
+        debugPrint('  - Event ID: ${doc.id}');
+        debugPrint('    Title: ${doc.data()['title']}');
+        debugPrint('    CustomerUid: ${doc.data()['customerUid']}');
+      }
+
+      ShowToast().showNormalToast(
+        msg:
+            'Found ${querySnapshot.docs.length} events. Check logs for details.',
+      );
+    } catch (e, stackTrace) {
+      debugPrint('❌ Direct query error: $e');
+      debugPrint('Stack trace: $stackTrace');
+      ShowToast().showNormalToast(msg: 'Query error: $e');
+    }
+  }
+
   Future<void> _loadProfileData() async {
     if (!mounted) return;
 
@@ -173,14 +212,32 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       final userName = CustomerController.logeInCustomer!.name;
       final userEmail = CustomerController.logeInCustomer!.email;
 
+      // Verify Firebase Auth status
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      final firebaseAuthUid = firebaseUser?.uid;
+      final firebaseAuthEmail = firebaseUser?.email;
+
       debugPrint('========================================');
       debugPrint('MY_PROFILE_SCREEN: Starting to load profile data');
-      debugPrint('User ID: $userId');
-      debugPrint('User Name: $userName');
-      debugPrint('User Email: $userEmail');
+      debugPrint('CustomerController User ID: $userId');
+      debugPrint('CustomerController User Name: $userName');
+      debugPrint('CustomerController User Email: $userEmail');
+      debugPrint('Firebase Auth User ID: $firebaseAuthUid');
+      debugPrint('Firebase Auth User Email: $firebaseAuthEmail');
+      debugPrint('UIDs Match: ${userId == firebaseAuthUid}');
       debugPrint('========================================');
 
+      if (userId != firebaseAuthUid) {
+        debugPrint('⚠️⚠️⚠️ WARNING: User ID mismatch!');
+        debugPrint('CustomerController UID: $userId');
+        debugPrint('Firebase Auth UID: $firebaseAuthUid');
+        ShowToast().showNormalToast(
+          msg: 'User ID mismatch detected. Please re-login.',
+        );
+      }
+
       // Load all data in parallel with individual timeouts for faster failure
+      debugPrint('🔵 Starting parallel data fetch...');
       final results = await Future.wait([
         // User data refresh with timeout
         FirebaseFirestoreHelper()
@@ -191,11 +248,14 @@ class _MyProfileScreenState extends State<MyProfileScreen>
               const Duration(seconds: 10),
               onTimeout: () {
                 debugPrint('⚠️ User data fetch timed out after 10 seconds');
+                ShowToast().showNormalToast(msg: 'User data fetch timed out');
                 return null;
               },
             )
-            .catchError((e) {
+            .catchError((e, stackTrace) {
               debugPrint('❌ Error fetching user data: $e');
+              debugPrint('Stack trace: $stackTrace');
+              ShowToast().showNormalToast(msg: 'Error loading user data: $e');
               return null;
             }),
         // Created events with timeout
@@ -207,11 +267,18 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                 debugPrint(
                   '⚠️ Created events fetch timed out after 15 seconds',
                 );
+                ShowToast().showNormalToast(
+                  msg: 'Created events fetch timed out',
+                );
                 return <EventModel>[];
               },
             )
-            .catchError((e) {
+            .catchError((e, stackTrace) {
               debugPrint('❌ Error fetching created events: $e');
+              debugPrint('Stack trace: $stackTrace');
+              ShowToast().showNormalToast(
+                msg: 'Error loading created events: $e',
+              );
               return <EventModel>[];
             }),
         // Attended events with timeout
@@ -223,11 +290,18 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                 debugPrint(
                   '⚠️ Attended events fetch timed out after 15 seconds',
                 );
+                ShowToast().showNormalToast(
+                  msg: 'Attended events fetch timed out',
+                );
                 return <EventModel>[];
               },
             )
-            .catchError((e) {
+            .catchError((e, stackTrace) {
               debugPrint('❌ Error fetching attended events: $e');
+              debugPrint('Stack trace: $stackTrace');
+              ShowToast().showNormalToast(
+                msg: 'Error loading attended events: $e',
+              );
               return <EventModel>[];
             }),
         // Saved events with timeout
@@ -237,14 +311,22 @@ class _MyProfileScreenState extends State<MyProfileScreen>
               const Duration(seconds: 15),
               onTimeout: () {
                 debugPrint('⚠️ Saved events fetch timed out after 15 seconds');
+                ShowToast().showNormalToast(
+                  msg: 'Saved events fetch timed out',
+                );
                 return <EventModel>[];
               },
             )
-            .catchError((e) {
+            .catchError((e, stackTrace) {
               debugPrint('❌ Error fetching saved events: $e');
+              debugPrint('Stack trace: $stackTrace');
+              ShowToast().showNormalToast(
+                msg: 'Error loading saved events: $e',
+              );
               return <EventModel>[];
             }),
       ], eagerError: false);
+      debugPrint('🔵 Parallel data fetch completed');
 
       // Update user data if fetched successfully
       if (results[0] != null) {
@@ -266,12 +348,27 @@ class _MyProfileScreenState extends State<MyProfileScreen>
 
       if (created.isNotEmpty) {
         debugPrint('First created event: ${created.first.title}');
+        for (var event in created) {
+          debugPrint('  - Created event: ${event.title} (ID: ${event.id})');
+        }
+      } else {
+        debugPrint('⚠️ No created events returned from Firebase query');
       }
       if (attended.isNotEmpty) {
         debugPrint('First attended event: ${attended.first.title}');
+        for (var event in attended) {
+          debugPrint('  - Attended event: ${event.title} (ID: ${event.id})');
+        }
+      } else {
+        debugPrint('⚠️ No attended events returned from Firebase query');
       }
       if (saved.isNotEmpty) {
         debugPrint('First saved event: ${saved.first.title}');
+        for (var event in saved) {
+          debugPrint('  - Saved event: ${event.title} (ID: ${event.id})');
+        }
+      } else {
+        debugPrint('⚠️ No saved events returned from Firebase query');
       }
       debugPrint('========================================');
 
@@ -279,6 +376,11 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       _loadUserBadge();
 
       if (mounted) {
+        debugPrint('🔄 About to call setState with:');
+        debugPrint('  - created.length: ${created.length}');
+        debugPrint('  - attended.length: ${attended.length}');
+        debugPrint('  - saved.length: ${saved.length}');
+
         setState(() {
           createdEvents = created;
           attendedEvents = attended;
@@ -287,14 +389,31 @@ class _MyProfileScreenState extends State<MyProfileScreen>
               CustomerController.logeInCustomer?.isDiscoverable ?? true;
           isLoading = false;
         });
+
         debugPrint('========================================');
         debugPrint(
           '✅ MY_PROFILE_SCREEN: Profile data loaded and state updated',
         );
-        debugPrint('State - createdEvents: ${createdEvents.length}');
-        debugPrint('State - attendedEvents: ${attendedEvents.length}');
-        debugPrint('State - savedEvents: ${savedEvents.length}');
+        debugPrint('AFTER setState:');
+        debugPrint('State - createdEvents.length: ${createdEvents.length}');
+        debugPrint('State - attendedEvents.length: ${attendedEvents.length}');
+        debugPrint('State - savedEvents.length: ${savedEvents.length}');
         debugPrint('State - isLoading: $isLoading');
+
+        // Verify the state was actually updated
+        if (createdEvents.isEmpty &&
+            attendedEvents.isEmpty &&
+            savedEvents.isEmpty) {
+          debugPrint(
+            '⚠️⚠️⚠️ WARNING: All event lists are empty after setState!',
+          );
+          debugPrint('This suggests either:');
+          debugPrint('1. Firebase queries returned no results');
+          debugPrint('2. There are no events for this user in the database');
+          debugPrint('Use the Test button to run a direct query.');
+        } else {
+          debugPrint('✅ State updated successfully with events');
+        }
         debugPrint('========================================');
       } else {
         debugPrint(
@@ -1009,13 +1128,17 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(
-                                    '@${user.username}',
-                                    style: const TextStyle(
-                                      color: Color(0xFF1F2937),
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: 16,
-                                      fontFamily: 'Roboto',
+                                  Flexible(
+                                    child: Text(
+                                      '@${user.username}',
+                                      style: const TextStyle(
+                                        color: Color(0xFF1F2937),
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: 16,
+                                        fontFamily: 'Roboto',
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
                                     ),
                                   ),
                                 ],
@@ -1431,22 +1554,49 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                   fontFamily: 'Roboto',
                 ),
               ),
-              const Spacer(),
-              // Action buttons
-              _buildActionButton(
-                icon: Icons.tune,
-                label: 'Filter/Sort',
-                onTap: _showFilterSortModal,
-                isActive:
-                    selectedCategories.isNotEmpty ||
-                    currentSortOption != SortOption.none,
-              ),
               const SizedBox(width: 8),
-              _buildActionButton(
-                icon: Icons.checklist,
-                label: 'Select',
-                onTap: _toggleSelectionMode,
-                isActive: isSelectionMode,
+              // Action buttons in scrollable container
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      _buildActionButton(
+                        icon: Icons.refresh,
+                        label: 'Refresh',
+                        onTap: () {
+                          debugPrint('🔄 Manual refresh triggered');
+                          _loadProfileData();
+                        },
+                        isActive: false,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildActionButton(
+                        icon: Icons.bug_report,
+                        label: 'Test',
+                        onTap: _testDirectQuery,
+                        isActive: false,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildActionButton(
+                        icon: Icons.tune,
+                        label: 'Filter/Sort',
+                        onTap: _showFilterSortModal,
+                        isActive:
+                            selectedCategories.isNotEmpty ||
+                            currentSortOption != SortOption.none,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildActionButton(
+                        icon: Icons.checklist,
+                        label: 'Select',
+                        onTap: _toggleSelectionMode,
+                        isActive: isSelectionMode,
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
