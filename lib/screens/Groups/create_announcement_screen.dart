@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
 
 class CreateAnnouncementScreen extends StatefulWidget {
   final String organizationId;
@@ -132,85 +133,102 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
   Widget build(BuildContext context) {
     if (_checkingPermission) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Create Announcement'),
-          backgroundColor: const Color(0xFF667EEA),
-          foregroundColor: Colors.white,
+        body: SafeArea(
+          child: Column(
+            children: [
+              AppAppBarView.modernHeader(
+                context: context,
+                title: 'Create Announcement',
+                subtitle: 'Share important updates with members',
+              ),
+              const Expanded(
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            ],
+          ),
         ),
-        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (!_isAdmin) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Create Announcement'),
-          backgroundColor: const Color(0xFF667EEA),
-          foregroundColor: Colors.white,
-        ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.lock_outline, size: 64, color: Colors.grey.shade400),
-                const SizedBox(height: 16),
-                const Text(
-                  'Admin Access Required',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Only group admins can create announcements',
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF667EEA),
+        body: SafeArea(
+          child: Column(
+            children: [
+              AppAppBarView.modernHeader(
+                context: context,
+                title: 'Create Announcement',
+                subtitle: 'Share important updates with members',
+              ),
+              Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.lock_outline, size: 64, color: Colors.grey.shade400),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Admin Access Required',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Only group admins can create announcements',
+                          style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 24),
+                        FilledButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF667EEA),
+                          ),
+                          child: const Text('Go Back'),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: const Text('Go Back'),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Announcement'),
-        backgroundColor: const Color(0xFF667EEA),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          TextButton(
-            onPressed: _isPosting ? null : _postAnnouncement,
-            child: _isPosting
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+      body: SafeArea(
+        child: Column(
+          children: [
+            AppAppBarView.modernHeader(
+              context: context,
+              title: 'Create Announcement',
+              subtitle: 'Share important updates with members',
+              trailing: _isPosting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
+                      ),
+                    )
+                  : TextButton(
+                      onPressed: _isPosting ? null : _postAnnouncement,
+                      child: const Text(
+                        'Post',
+                        style: TextStyle(
+                          color: Color(0xFF667EEA),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                      ),
                     ),
-                  )
-                : const Text(
-                    'Post',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                    ),
-                  ),
-          ),
-        ],
-      ),
-      body: Form(
+            ),
+            Expanded(
+              child: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -291,6 +309,10 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+          ],
+        ),
               ),
             ),
           ],

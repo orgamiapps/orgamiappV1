@@ -711,6 +711,10 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                 if (result == true && mounted) {
                   setState(() {});
                 }
+                // Reopen modal after returning
+                if (context.mounted) {
+                  _showCreateOptions(context);
+                }
               },
             ),
             FutureBuilder<bool>(
@@ -742,6 +746,10 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                           if (result == true && mounted) {
                             setState(() {});
                           }
+                          // Reopen modal after returning
+                          if (context.mounted) {
+                            _showCreateOptions(context);
+                          }
                         },
                       ),
                       ListTile(
@@ -765,6 +773,10 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                           );
                           if (result == true && mounted) {
                             setState(() {});
+                          }
+                          // Reopen modal after returning
+                          if (context.mounted) {
+                            _showCreateOptions(context);
                           }
                         },
                       ),

@@ -25,6 +25,7 @@ import 'package:attendus/firebase/firebase_messaging_helper.dart';
 import 'package:attendus/screens/Events/location_picker_screen.dart';
 import 'package:attendus/Services/creation_limit_service.dart';
 import 'package:attendus/widgets/limit_reached_dialog.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
 
 class CreateEventScreen extends StatefulWidget {
   final DateTime? selectedDateTime;
@@ -56,9 +57,6 @@ class CreateEventScreen extends StatefulWidget {
 
 class _CreateEventScreenState extends State<CreateEventScreen>
     with TickerProviderStateMixin {
-  double get _screenWidth => MediaQuery.of(context).size.width;
-  double get _screenHeight => MediaQuery.of(context).size.height;
-
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   bool successMessage = false;
@@ -329,21 +327,23 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         // Check if organization requires approval for member-created events
         String eventStatus = 'scheduled'; // Default status
         bool needsApproval = false;
-        
-        if (_selectedOrganizationId != null && _selectedOrganizationId!.isNotEmpty) {
+
+        if (_selectedOrganizationId != null &&
+            _selectedOrganizationId!.isNotEmpty) {
           try {
             final orgDoc = await FirebaseFirestore.instance
                 .collection('Organizations')
                 .doc(_selectedOrganizationId!)
                 .get();
-            
+
             if (orgDoc.exists) {
               final orgData = orgDoc.data()!;
               final requireApproval = orgData['requireEventApproval'] ?? false;
-              final allowMemberCreation = orgData['allowMemberEventCreation'] ?? true;
+              final allowMemberCreation =
+                  orgData['allowMemberEventCreation'] ?? true;
               final createdBy = orgData['createdBy'];
               final currentUserId = FirebaseAuth.instance.currentUser!.uid;
-              
+
               // Check if current user is admin
               bool isAdmin = createdBy == currentUserId;
               if (!isAdmin) {
@@ -353,18 +353,18 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                     .collection('Members')
                     .doc(currentUserId)
                     .get();
-                
+
                 if (memberDoc.exists) {
                   final role = memberDoc.data()?['role'];
                   isAdmin = role == 'admin' || role == 'owner';
                 }
               }
-              
+
               // If member creation is disabled and user is not admin, show error
               if (!allowMemberCreation && !isAdmin) {
                 throw Exception('Only admins can create events in this group');
               }
-              
+
               // If approval is required and user is not admin, set pending status
               if (requireApproval && !isAdmin) {
                 eventStatus = 'pending_approval';
@@ -600,78 +600,15 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   }
 
   Widget _bodyView() {
-    return SizedBox(
-      width: _screenWidth,
-      height: _screenHeight,
-      child: Column(
-        children: [
-          _headerView(),
-          Expanded(child: _contentView()),
-        ],
-      ),
-    );
-  }
-
-  Widget _headerView() {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+    return Column(
+      children: [
+        AppAppBarView.modernHeader(
+          context: context,
+          title: 'Create Event',
+          subtitle: 'Schedule a new event for this group',
         ),
-      ),
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-      child: Column(
-        children: [
-          // Back button and title
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    Icons.arrow_back_ios_new,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              const Expanded(
-                child: Text(
-                  'Event Details',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          // Subtitle
-          const Text(
-            'Let\'s get started by filling out the form below',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontFamily: 'Roboto',
-              height: 1.4,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+        Expanded(child: _contentView()),
+      ],
     );
   }
 

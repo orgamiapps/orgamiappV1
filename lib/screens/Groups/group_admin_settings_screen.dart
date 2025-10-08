@@ -10,6 +10,7 @@ import 'package:attendus/screens/Groups/manage_feed_posts_screen.dart';
 import 'package:attendus/screens/Groups/group_analytics_dashboard_screen.dart';
 import 'package:attendus/screens/Groups/group_location_settings_screen.dart';
 import 'package:attendus/screens/Groups/pending_events_screen.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
 
 class GroupAdminSettingsScreen extends StatefulWidget {
   final String organizationId;
@@ -93,83 +94,74 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text(
-            'Admin Settings',
-            style: TextStyle(
-              color: Colors.black87,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black87,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.of(context).pop(),
+        body: SafeArea(
+          child: Column(
+            children: [
+              AppAppBarView.modernHeader(
+                context: context,
+                title: 'Admin Settings',
+                subtitle: 'Manage group settings and content',
+              ),
+              const Expanded(
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            ],
           ),
         ),
-        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (!_isAdmin || _organization == null) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text(
-            'Admin Settings',
-            style: TextStyle(
-              color: Colors.black87,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black87,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ),
-        body: const Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.lock_outline, size: 64, color: Colors.grey),
-                SizedBox(height: 16),
-                Text(
-                  'Access Denied',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        body: SafeArea(
+          child: Column(
+            children: [
+              AppAppBarView.modernHeader(
+                context: context,
+                title: 'Admin Settings',
+                subtitle: 'Manage group settings and content',
+              ),
+              const Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.lock_outline, size: 64, color: Colors.grey),
+                        SizedBox(height: 16),
+                        Text(
+                          'Access Denied',
+                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'You need admin privileges to access this page.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                SizedBox(height: 8),
-                Text(
-                  'You need admin privileges to access this page.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Admin Settings',
-          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
-      body: ListView(
+      body: SafeArea(
+        child: Column(
+          children: [
+            AppAppBarView.modernHeader(
+              context: context,
+              title: 'Admin Settings',
+              subtitle: 'Manage group settings and content',
+            ),
+            Expanded(
+              child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           // Group Information Section
@@ -247,6 +239,10 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
           // Danger Zone
           _buildDangerZone(),
         ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

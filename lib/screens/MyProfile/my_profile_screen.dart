@@ -17,7 +17,6 @@ import 'package:attendus/screens/Home/account_details_screen_v2.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -144,43 +143,6 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       }
     } catch (e) {
       debugPrint('Error refreshing saved events: $e');
-    }
-  }
-
-  // Diagnostic method to test direct Firebase query
-  Future<void> _testDirectQuery() async {
-    debugPrint('🔬 Starting direct Firebase query test...');
-    try {
-      final userId = CustomerController.logeInCustomer?.uid;
-      if (userId == null) {
-        debugPrint('❌ User not logged in');
-        ShowToast().showNormalToast(msg: 'User not logged in');
-        return;
-      }
-
-      // Test query directly using Firestore
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('Events')
-          .where('customerUid', isEqualTo: userId)
-          .get();
-
-      debugPrint('🔬 Direct query results:');
-      debugPrint('  - Found ${querySnapshot.docs.length} events');
-
-      for (var doc in querySnapshot.docs) {
-        debugPrint('  - Event ID: ${doc.id}');
-        debugPrint('    Title: ${doc.data()['title']}');
-        debugPrint('    CustomerUid: ${doc.data()['customerUid']}');
-      }
-
-      ShowToast().showNormalToast(
-        msg:
-            'Found ${querySnapshot.docs.length} events. Check logs for details.',
-      );
-    } catch (e, stackTrace) {
-      debugPrint('❌ Direct query error: $e');
-      debugPrint('Stack trace: $stackTrace');
-      ShowToast().showNormalToast(msg: 'Query error: $e');
     }
   }
 
@@ -1562,23 +1524,6 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      _buildActionButton(
-                        icon: Icons.refresh,
-                        label: 'Refresh',
-                        onTap: () {
-                          debugPrint('🔄 Manual refresh triggered');
-                          _loadProfileData();
-                        },
-                        isActive: false,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildActionButton(
-                        icon: Icons.bug_report,
-                        label: 'Test',
-                        onTap: _testDirectQuery,
-                        isActive: false,
-                      ),
-                      const SizedBox(width: 8),
                       _buildActionButton(
                         icon: Icons.tune,
                         label: 'Filter/Sort',

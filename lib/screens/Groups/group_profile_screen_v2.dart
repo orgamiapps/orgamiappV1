@@ -863,6 +863,10 @@ class _FeedTabState extends State<_FeedTab> {
                           ),
                         ),
                       );
+                      // Reopen modal after returning
+                      if (context.mounted) {
+                        _showCreateOptions(context);
+                      }
                     },
                   ),
                   // Admin options are handled in the FAB modal
@@ -2646,6 +2650,10 @@ class _AdminFabState extends State<_AdminFab> {
                           ),
                         ),
                       );
+                      // Reopen modal after returning
+                      if (context.mounted) {
+                        _showCreateOptions(context);
+                      }
                     },
                   ),
                   // Admin-only options
@@ -2671,6 +2679,10 @@ class _AdminFabState extends State<_AdminFab> {
                             ),
                           ),
                         );
+                        // Reopen modal after returning
+                        if (context.mounted) {
+                          _showCreateOptions(context);
+                        }
                       },
                     ),
                     ListTile(
@@ -2695,6 +2707,10 @@ class _AdminFabState extends State<_AdminFab> {
                         if (result == true && context.mounted) {
                           // Feed will auto-refresh via stream
                         }
+                        // Reopen modal after returning
+                        if (context.mounted) {
+                          _showCreateOptions(context);
+                        }
                       },
                     ),
                     ListTile(
@@ -2713,6 +2729,10 @@ class _AdminFabState extends State<_AdminFab> {
                         );
                         if (result == true && context.mounted) {
                           // Feed will auto-refresh via stream
+                        }
+                        // Reopen modal after returning
+                        if (context.mounted) {
+                          _showCreateOptions(context);
                         }
                       },
                     ),
@@ -2734,6 +2754,10 @@ class _AdminFabState extends State<_AdminFab> {
                             ),
                           ),
                         );
+                        // Reopen modal after returning
+                        if (context.mounted) {
+                          _showCreateOptions(context);
+                        }
                       },
                     ),
                   ],

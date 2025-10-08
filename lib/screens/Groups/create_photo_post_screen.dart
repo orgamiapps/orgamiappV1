@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:attendus/Utils/app_app_bar_view.dart';
 
 class CreatePhotoPostScreen extends StatefulWidget {
   final String organizationId;
@@ -71,16 +72,14 @@ class _CreatePhotoPostScreenState extends State<CreatePhotoPostScreen> {
 
         if (pickedFiles.length > 10 - _selectedImages.length) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Maximum 10 photos allowed per post'),
-            ),
+            const SnackBar(content: Text('Maximum 10 photos allowed per post')),
           );
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error picking images: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error picking images: $e')));
     }
   }
 
@@ -99,15 +98,13 @@ class _CreatePhotoPostScreenState extends State<CreatePhotoPostScreen> {
         });
       } else if (_selectedImages.length >= 10) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Maximum 10 photos allowed per post'),
-          ),
+          const SnackBar(content: Text('Maximum 10 photos allowed per post')),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error taking photo: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error taking photo: $e')));
     }
   }
 
@@ -124,15 +121,16 @@ class _CreatePhotoPostScreenState extends State<CreatePhotoPostScreen> {
 
     for (int i = 0; i < _selectedImages.length; i++) {
       final File image = _selectedImages[i];
-      final String fileName = 'groups/${widget.organizationId}/photos/${userId}_${timestamp}_$i.jpg';
-      
+      final String fileName =
+          'groups/${widget.organizationId}/photos/${userId}_${timestamp}_$i.jpg';
+
       try {
         final Reference ref = FirebaseStorage.instance.ref().child(fileName);
         final UploadTask uploadTask = ref.putFile(
           image,
           SettableMetadata(contentType: 'image/jpeg'),
         );
-        
+
         final TaskSnapshot snapshot = await uploadTask;
         final String downloadUrl = await snapshot.ref.getDownloadURL();
         imageUrls.add(downloadUrl);
@@ -200,9 +198,9 @@ class _CreatePhotoPostScreenState extends State<CreatePhotoPostScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error posting photo: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error posting photo: $e')));
       }
     } finally {
       if (mounted) {
@@ -221,287 +219,343 @@ class _CreatePhotoPostScreenState extends State<CreatePhotoPostScreen> {
   Widget build(BuildContext context) {
     if (_checkingPermission) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Share Photo'),
-          backgroundColor: const Color(0xFF667EEA),
-          foregroundColor: Colors.white,
+        body: SafeArea(
+          child: Column(
+            children: [
+              AppAppBarView.modernHeader(
+                context: context,
+                title: 'Share Photo',
+                subtitle: 'Post photos to share with the group',
+              ),
+              const Expanded(child: Center(child: CircularProgressIndicator())),
+            ],
+          ),
         ),
-        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (!_isMember) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Share Photo'),
-          backgroundColor: const Color(0xFF667EEA),
-          foregroundColor: Colors.white,
-        ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.lock_outline, size: 64, color: Colors.grey.shade400),
-                const SizedBox(height: 16),
-                const Text(
-                  'Members Only',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'You need to be a member of this group to share photos',
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF667EEA),
+        body: SafeArea(
+          child: Column(
+            children: [
+              AppAppBarView.modernHeader(
+                context: context,
+                title: 'Share Photo',
+                subtitle: 'Post photos to share with the group',
+              ),
+              Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.lock_outline,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Members Only',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'You need to be a member of this group to share photos',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 24),
+                        FilledButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF667EEA),
+                          ),
+                          child: const Text('Go Back'),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: const Text('Go Back'),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Share Photo'),
-        backgroundColor: const Color(0xFF667EEA),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          TextButton(
-            onPressed: (_isPosting || _selectedImages.isEmpty) ? null : _postPhoto,
-            child: _isPosting
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : Text(
-                    'Share',
-                    style: TextStyle(
-                      color: _selectedImages.isEmpty ? Colors.white54 : Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                    ),
-                  ),
-          ),
-        ],
-      ),
-      body: Form(
-        key: _formKey,
+      body: SafeArea(
         child: Column(
           children: [
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  // Image selection area
-                  if (_selectedImages.isEmpty) ...[
-                    Container(
-                      height: 300,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.grey.shade300,
-                          width: 2,
-                          style: BorderStyle.solid,
+            AppAppBarView.modernHeader(
+              context: context,
+              title: 'Share Photo',
+              subtitle: 'Post photos to share with the group',
+              trailing: _isPosting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFF667EEA),
                         ),
                       ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.add_photo_alternate,
-                            size: 64,
-                            color: Colors.grey.shade400,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Add Photos',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Share up to 10 photos with your group',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade500,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              FilledButton.icon(
-                                onPressed: _pickImages,
-                                icon: const Icon(Icons.photo_library),
-                                label: const Text('Gallery'),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: const Color(0xFF667EEA),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              OutlinedButton.icon(
-                                onPressed: _takePhoto,
-                                icon: const Icon(Icons.camera_alt),
-                                label: const Text('Camera'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFF667EEA),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                    )
+                  : TextButton(
+                      onPressed: (_isPosting || _selectedImages.isEmpty)
+                          ? null
+                          : _postPhoto,
+                      child: Text(
+                        'Share',
+                        style: TextStyle(
+                          color: _selectedImages.isEmpty
+                              ? Colors.grey
+                              : const Color(0xFF667EEA),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
-                  ] else ...[
-                    // Display selected images
-                    SizedBox(
-                      height: _selectedImages.length == 1 ? 400 : 300,
-                      child: _selectedImages.length == 1
-                          ? Stack(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(16),
-                                  child: Image.file(
-                                    _selectedImages[0],
-                                    width: double.infinity,
-                                    height: double.infinity,
-                                    fit: BoxFit.cover,
-                                  ),
+            ),
+            Expanded(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.all(16),
+                        children: [
+                          // Image selection area
+                          if (_selectedImages.isEmpty) ...[
+                            Container(
+                              height: 300,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: Colors.grey.shade300,
+                                  width: 2,
+                                  style: BorderStyle.solid,
                                 ),
-                                Positioned(
-                                  top: 8,
-                                  right: 8,
-                                  child: IconButton(
-                                    onPressed: () => _removeImage(0),
-                                    icon: const Icon(Icons.close),
-                                    style: IconButton.styleFrom(
-                                      backgroundColor: Colors.black54,
-                                      foregroundColor: Colors.white,
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.add_photo_alternate,
+                                    size: 64,
+                                    color: Colors.grey.shade400,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Add Photos',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade600,
                                     ),
                                   ),
-                                ),
-                              ],
-                            )
-                          : ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: _selectedImages.length,
-                              itemBuilder: (context, index) {
-                                return Container(
-                                  width: 200,
-                                  margin: const EdgeInsets.only(right: 8),
-                                  child: Stack(
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Share up to 10 photos with your group',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: Image.file(
-                                          _selectedImages[index],
-                                          width: double.infinity,
-                                          height: double.infinity,
-                                          fit: BoxFit.cover,
+                                      FilledButton.icon(
+                                        onPressed: _pickImages,
+                                        icon: const Icon(Icons.photo_library),
+                                        label: const Text('Gallery'),
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: const Color(
+                                            0xFF667EEA,
+                                          ),
                                         ),
                                       ),
-                                      Positioned(
-                                        top: 4,
-                                        right: 4,
-                                        child: IconButton(
-                                          onPressed: () => _removeImage(index),
-                                          icon: const Icon(Icons.close, size: 20),
-                                          style: IconButton.styleFrom(
-                                            backgroundColor: Colors.black54,
-                                            foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.all(4),
+                                      const SizedBox(width: 16),
+                                      OutlinedButton.icon(
+                                        onPressed: _takePhoto,
+                                        icon: const Icon(Icons.camera_alt),
+                                        label: const Text('Camera'),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: const Color(
+                                            0xFF667EEA,
                                           ),
                                         ),
                                       ),
                                     ],
                                   ),
-                                );
-                              },
+                                ],
+                              ),
                             ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (_selectedImages.length < 10)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          TextButton.icon(
-                            onPressed: _pickImages,
-                            icon: const Icon(Icons.add_photo_alternate),
-                            label: Text('Add More (${10 - _selectedImages.length} left)'),
+                          ] else ...[
+                            // Display selected images
+                            SizedBox(
+                              height: _selectedImages.length == 1 ? 400 : 300,
+                              child: _selectedImages.length == 1
+                                  ? Stack(
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                          child: Image.file(
+                                            _selectedImages[0],
+                                            width: double.infinity,
+                                            height: double.infinity,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
+                                        Positioned(
+                                          top: 8,
+                                          right: 8,
+                                          child: IconButton(
+                                            onPressed: () => _removeImage(0),
+                                            icon: const Icon(Icons.close),
+                                            style: IconButton.styleFrom(
+                                              backgroundColor: Colors.black54,
+                                              foregroundColor: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : ListView.builder(
+                                      scrollDirection: Axis.horizontal,
+                                      itemCount: _selectedImages.length,
+                                      itemBuilder: (context, index) {
+                                        return Container(
+                                          width: 200,
+                                          margin: const EdgeInsets.only(
+                                            right: 8,
+                                          ),
+                                          child: Stack(
+                                            children: [
+                                              ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                child: Image.file(
+                                                  _selectedImages[index],
+                                                  width: double.infinity,
+                                                  height: double.infinity,
+                                                  fit: BoxFit.cover,
+                                                ),
+                                              ),
+                                              Positioned(
+                                                top: 4,
+                                                right: 4,
+                                                child: IconButton(
+                                                  onPressed: () =>
+                                                      _removeImage(index),
+                                                  icon: const Icon(
+                                                    Icons.close,
+                                                    size: 20,
+                                                  ),
+                                                  style: IconButton.styleFrom(
+                                                    backgroundColor:
+                                                        Colors.black54,
+                                                    foregroundColor:
+                                                        Colors.white,
+                                                    padding:
+                                                        const EdgeInsets.all(4),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
+                            ),
+                            const SizedBox(height: 12),
+                            if (_selectedImages.length < 10)
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  TextButton.icon(
+                                    onPressed: _pickImages,
+                                    icon: const Icon(Icons.add_photo_alternate),
+                                    label: Text(
+                                      'Add More (${10 - _selectedImages.length} left)',
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  TextButton.icon(
+                                    onPressed: _takePhoto,
+                                    icon: const Icon(Icons.camera_alt),
+                                    label: const Text('Camera'),
+                                  ),
+                                ],
+                              ),
+                          ],
+
+                          const SizedBox(height: 24),
+
+                          // Caption input
+                          TextFormField(
+                            controller: _captionController,
+                            decoration: InputDecoration(
+                              labelText: 'Caption (optional)',
+                              hintText: 'Write a caption...',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              alignLabelWithHint: true,
+                              prefixIcon: const Icon(Icons.edit),
+                            ),
+                            maxLines: 3,
+                            maxLength: 500,
                           ),
-                          const SizedBox(width: 16),
-                          TextButton.icon(
-                            onPressed: _takePhoto,
-                            icon: const Icon(Icons.camera_alt),
-                            label: const Text('Camera'),
+
+                          const SizedBox(height: 16),
+
+                          // Info message
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  color: Colors.blue.shade700,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'Your photos will be visible to all group members in the Feed.',
+                                    style: TextStyle(
+                                      color: Colors.blue.shade700,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
+                    ),
                   ],
-
-                  const SizedBox(height: 24),
-
-                  // Caption input
-                  TextFormField(
-                    controller: _captionController,
-                    decoration: InputDecoration(
-                      labelText: 'Caption (optional)',
-                      hintText: 'Write a caption...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      alignLabelWithHint: true,
-                      prefixIcon: const Icon(Icons.edit),
-                    ),
-                    maxLines: 3,
-                    maxLength: 500,
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Info message
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline, color: Colors.blue.shade700),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Your photos will be visible to all group members in the Feed.',
-                            style: TextStyle(
-                              color: Colors.blue.shade700,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ],
