@@ -511,103 +511,29 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Widget _buildPremiumManageItem(SubscriptionService subscriptionService) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF667EEA).withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.verified,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      subscriptionService.getSubscriptionStatusText(),
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    Text(
-                      subscriptionService.getNextBillingDate() != null
-                          ? 'Next billing: ${subscriptionService.getNextBillingDate()}'
-                          : 'Premium features active',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white.withValues(alpha: 0.9),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () async {
-                await RouterClass.nextScreenNormal(
-                  context,
-                  const SubscriptionManagementScreen(),
-                );
-                // Refresh subscription data when returning
-                if (mounted) {
-                  await _ensureSubscriptionLoaded();
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: const Color(0xFF667EEA),
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 16,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Manage Subscription',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ),
-        ],
-      ),
+    // Clean, professional design that blends with other settings items
+    // Shows premium status with subtle badge while maintaining consistency
+    final String statusText = subscriptionService.getSubscriptionStatusText();
+    final String? billingDate = subscriptionService.getNextBillingDate();
+
+    final String subtitle = billingDate != null
+        ? 'Next billing: $billingDate'
+        : 'Manage your premium subscription';
+
+    return _buildSettingsItem(
+      icon: Icons.workspace_premium,
+      title: statusText,
+      subtitle: subtitle,
+      onTap: () async {
+        await RouterClass.nextScreenNormal(
+          context,
+          const SubscriptionManagementScreen(),
+        );
+        // Refresh subscription data when returning
+        if (mounted) {
+          await _ensureSubscriptionLoaded();
+        }
+      },
     );
   }
 
