@@ -209,9 +209,7 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
                 title: 'Create Poll',
                 subtitle: 'Get feedback from group members',
               ),
-              const Expanded(
-                child: Center(child: CircularProgressIndicator()),
-              ),
+              const Expanded(child: Center(child: CircularProgressIndicator())),
             ],
           ),
         ),
@@ -235,16 +233,26 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.lock_outline, size: 64, color: Colors.grey.shade400),
+                        Icon(
+                          Icons.lock_outline,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
                         const SizedBox(height: 16),
                         const Text(
                           'Admin Access Required',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           'Only group admins can create polls',
-                          style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 24),
@@ -280,7 +288,9 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFF667EEA),
+                        ),
                       ),
                     )
                   : TextButton(
@@ -297,159 +307,228 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
             ),
             Expanded(
               child: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            TextFormField(
-              controller: _questionController,
-              decoration: InputDecoration(
-                labelText: 'Poll Question',
-                hintText: 'What would you like to ask?',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: const Icon(Icons.help_outline),
-              ),
-              maxLength: 200,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Please enter a question';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                const Icon(Icons.list, color: Color(0xFF667EEA)),
-                const SizedBox(width: 8),
-                const Text(
-                  'Poll Options',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                const Spacer(),
-                if (_optionControllers.length < 6)
-                  TextButton.icon(
-                    onPressed: _addOption,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Option'),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ..._optionControllers.asMap().entries.map((entry) {
-              final index = entry.key;
-              final controller = entry.value;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
+                key: _formKey,
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
                   children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: controller,
-                        decoration: InputDecoration(
-                          labelText: 'Option ${index + 1}',
-                          hintText: 'Enter option ${index + 1}',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                    TextFormField(
+                      controller: _questionController,
+                      decoration: InputDecoration(
+                        labelText: 'Poll Question',
+                        hintText: 'What would you like to ask?',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        prefixIcon: const Icon(Icons.help_outline),
+                      ),
+                      maxLength: 200,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter a question';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        const Icon(Icons.list, color: Color(0xFF667EEA)),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Poll Options',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
                           ),
-                          prefixIcon: CircleAvatar(
-                            radius: 12,
-                            backgroundColor: const Color(0xFF667EEA),
+                        ),
+                        const Spacer(),
+                        if (_optionControllers.length < 6)
+                          TextButton.icon(
+                            onPressed: _addOption,
+                            icon: const Icon(Icons.add),
+                            label: const Text('Add Option'),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ..._optionControllers.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final controller = entry.value;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.grey.shade200,
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // Drag handle and number indicator
+                              Container(
+                                width: 48,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.drag_indicator,
+                                      color: Colors.grey.shade400,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade300,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        '${index + 1}',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade700,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Text field
+                              Expanded(
+                                child: TextFormField(
+                                  controller: controller,
+                                  decoration: InputDecoration(
+                                    hintText: 'Enter option ${index + 1}',
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey.shade400,
+                                      fontSize: 15,
+                                    ),
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    errorBorder: InputBorder.none,
+                                    focusedErrorBorder: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 16,
+                                    ),
+                                    errorStyle: const TextStyle(
+                                      fontSize: 11,
+                                      height: 0.8,
+                                    ),
+                                  ),
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  validator: (value) {
+                                    if (index < 2 &&
+                                        (value == null ||
+                                            value.trim().isEmpty)) {
+                                      return 'Required';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              // Remove button
+                              if (_optionControllers.length > 2)
+                                Container(
+                                  margin: const EdgeInsets.only(right: 8),
+                                  child: IconButton(
+                                    icon: Icon(
+                                      Icons.close,
+                                      color: Colors.grey.shade600,
+                                      size: 20,
+                                    ),
+                                    onPressed: () => _removeOption(index),
+                                    tooltip: 'Remove option',
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                )
+                              else
+                                const SizedBox(width: 8),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 24),
+                    Card(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          SwitchListTile(
+                            title: const Text('Allow multiple votes'),
+                            subtitle: const Text(
+                              'Users can vote for multiple options',
+                            ),
+                            value: _allowMultipleVotes,
+                            onChanged: (value) {
+                              setState(() => _allowMultipleVotes = value);
+                            },
+                            activeThumbColor: const Color(0xFF667EEA),
+                          ),
+                          const Divider(height: 1),
+                          ListTile(
+                            title: const Text('End date (optional)'),
+                            subtitle: Text(
+                              _endDate != null
+                                  ? '${_endDate!.day}/${_endDate!.month}/${_endDate!.year} at ${_endDate!.hour.toString().padLeft(2, '0')}:${_endDate!.minute.toString().padLeft(2, '0')}'
+                                  : 'No end date set',
+                            ),
+                            trailing: IconButton(
+                              icon: Icon(
+                                _endDate != null
+                                    ? Icons.edit_calendar
+                                    : Icons.calendar_today,
+                                color: const Color(0xFF667EEA),
+                              ),
+                              onPressed: _selectEndDate,
+                            ),
+                            onTap: _selectEndDate,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.blue.shade700),
+                          const SizedBox(width: 12),
+                          Expanded(
                             child: Text(
-                              '${index + 1}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
+                              'This poll will be visible to all group members. They can vote directly from the Feed tab.',
+                              style: TextStyle(
+                                color: Colors.blue.shade700,
+                                fontSize: 13,
                               ),
                             ),
                           ),
-                        ),
-                        validator: (value) {
-                          if (index < 2 &&
-                              (value == null || value.trim().isEmpty)) {
-                            return 'This option is required';
-                          }
-                          return null;
-                        },
+                        ],
                       ),
                     ),
-                    if (_optionControllers.length > 2)
-                      IconButton(
-                        icon: const Icon(
-                          Icons.remove_circle_outline,
-                          color: Colors.red,
-                        ),
-                        onPressed: () => _removeOption(index),
-                      ),
                   ],
                 ),
-              );
-            }),
-            const SizedBox(height: 24),
-            Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  SwitchListTile(
-                    title: const Text('Allow multiple votes'),
-                    subtitle: const Text('Users can vote for multiple options'),
-                    value: _allowMultipleVotes,
-                    onChanged: (value) {
-                      setState(() => _allowMultipleVotes = value);
-                    },
-                    activeThumbColor: const Color(0xFF667EEA),
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    title: const Text('End date (optional)'),
-                    subtitle: Text(
-                      _endDate != null
-                          ? '${_endDate!.day}/${_endDate!.month}/${_endDate!.year} at ${_endDate!.hour.toString().padLeft(2, '0')}:${_endDate!.minute.toString().padLeft(2, '0')}'
-                          : 'No end date set',
-                    ),
-                    trailing: IconButton(
-                      icon: Icon(
-                        _endDate != null
-                            ? Icons.edit_calendar
-                            : Icons.calendar_today,
-                        color: const Color(0xFF667EEA),
-                      ),
-                      onPressed: _selectEndDate,
-                    ),
-                    onTap: _selectEndDate,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.blue.shade700),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'This poll will be visible to all group members. They can vote directly from the Feed tab.',
-                      style: TextStyle(
-                        color: Colors.blue.shade700,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
               ),
             ),
           ],

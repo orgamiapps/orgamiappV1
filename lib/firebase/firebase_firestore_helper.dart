@@ -969,9 +969,12 @@ class FirebaseFirestoreHelper {
       final events = query.docs
           .map((doc) {
             try {
-              return EventModel.fromJson(doc.data());
+              // Add document ID to data before parsing
+              final data = doc.data();
+              data['id'] = data['id'] ?? doc.id;
+              return EventModel.fromJson(data);
             } catch (e) {
-              Logger.error('Error parsing event document: $e', e);
+              Logger.error('Error parsing event document ${doc.id}: $e', e);
               return null;
             }
           })
@@ -2955,7 +2958,9 @@ class FirebaseFirestoreHelper {
         return [];
       }
 
-      Logger.debug('Fetching ${favoriteEventIds.length} saved events in parallel');
+      Logger.debug(
+        'Fetching ${favoriteEventIds.length} saved events in parallel',
+      );
 
       // Fetch all saved events in parallel for better performance
       final futures = favoriteEventIds.map((eventId) async {
@@ -2977,8 +2982,10 @@ class FirebaseFirestoreHelper {
         return null;
       });
 
-      final results = await Future.wait(futures, eagerError: false)
-          .timeout(const Duration(seconds: 3));
+      final results = await Future.wait(
+        futures,
+        eagerError: false,
+      ).timeout(const Duration(seconds: 3));
 
       final favoritedEvents = results.whereType<EventModel>().toList();
       Logger.debug('✅ Saved events count: ${favoritedEvents.length}');

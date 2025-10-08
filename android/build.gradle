@@ -26,6 +26,8 @@ subprojects {
 }
 
 // Ensure specific third-party Android library modules compile with SDK 36
+// Disabled flutter_facebook_auth due to SDK initialization issues
+/*
 project(":flutter_facebook_auth") {
     plugins.withId("com.android.library") {
         def androidExt = extensions.findByName("android")
@@ -38,6 +40,7 @@ project(":flutter_facebook_auth") {
         }
     }
 }
+*/
 
 project(":fluttertoast") {
     plugins.withId("com.android.library") {
