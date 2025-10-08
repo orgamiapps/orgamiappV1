@@ -45,7 +45,13 @@ class _AccountScreenState extends State<AccountScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeScreenData();
+    // CRITICAL FIX: Defer initialization to post-frame callback to prevent
+    // setState during build error
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _initializeScreenData();
+      }
+    });
   }
 
   /// Initialize all necessary data for the screen
@@ -67,7 +73,7 @@ class _AccountScreenState extends State<AccountScreen> {
         listen: false,
       );
 
-      // Initialize if not already done
+      // Initialize if not already done (this is safe now as we're in post-frame)
       await subscriptionService.initialize();
 
       // Refresh to get latest data

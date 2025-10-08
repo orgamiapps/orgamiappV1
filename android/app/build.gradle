@@ -61,8 +61,8 @@ android {
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.5"
-    // Facebook SDK
-    implementation 'com.facebook.android:facebook-android-sdk:17.0.2'
+    // Facebook SDK - disabled due to flutter_facebook_auth plugin being unused
+    // implementation 'com.facebook.android:facebook-android-sdk:17.0.2'
     // ONNX Runtime Mobile temporarily disabled due to missing model files
     // TODO: Re-enable after adding model files to assets/models/
     // implementation 'com.microsoft.onnxruntime:onnxruntime-mobile:1.16.3'

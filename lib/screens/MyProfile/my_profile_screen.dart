@@ -62,6 +62,10 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   List<String> selectedCategories = [];
   final List<String> _allCategories = ['Educational', 'Professional', 'Other'];
 
+  // Pagination state - PERFORMANCE OPTIMIZATION
+  int _displayedItemCount = 20; // Show only 20 items initially
+  static const int _itemsPerPage = 20;
+
   // Animation controllers
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
@@ -207,10 +211,10 @@ class _MyProfileScreenState extends State<MyProfileScreen>
               customerId: CustomerController.logeInCustomer!.uid,
             )
             .timeout(
-              const Duration(seconds: 10),
+              const Duration(seconds: 5),
               onTimeout: () {
-                debugPrint('⚠️ User data fetch timed out after 10 seconds');
-                ShowToast().showNormalToast(msg: 'User data fetch timed out');
+                debugPrint('⚠️ User data fetch timed out after 5 seconds');
+                // Don't show toast on timeout to avoid annoying users
                 return null;
               },
             )
@@ -220,17 +224,14 @@ class _MyProfileScreenState extends State<MyProfileScreen>
               ShowToast().showNormalToast(msg: 'Error loading user data: $e');
               return null;
             }),
-        // Created events with timeout
+        // Created events with timeout - reduced for faster startup
         FirebaseFirestoreHelper()
             .getEventsCreatedByUser(CustomerController.logeInCustomer!.uid)
             .timeout(
-              const Duration(seconds: 15),
+              const Duration(seconds: 8),
               onTimeout: () {
                 debugPrint(
-                  '⚠️ Created events fetch timed out after 15 seconds',
-                );
-                ShowToast().showNormalToast(
-                  msg: 'Created events fetch timed out',
+                  '⚠️ Created events fetch timed out after 8 seconds',
                 );
                 return <EventModel>[];
               },
@@ -243,17 +244,14 @@ class _MyProfileScreenState extends State<MyProfileScreen>
               );
               return <EventModel>[];
             }),
-        // Attended events with timeout
+        // Attended events with timeout - reduced for faster startup
         FirebaseFirestoreHelper()
             .getEventsAttendedByUser(CustomerController.logeInCustomer!.uid)
             .timeout(
-              const Duration(seconds: 15),
+              const Duration(seconds: 8),
               onTimeout: () {
                 debugPrint(
-                  '⚠️ Attended events fetch timed out after 15 seconds',
-                );
-                ShowToast().showNormalToast(
-                  msg: 'Attended events fetch timed out',
+                  '⚠️ Attended events fetch timed out after 8 seconds',
                 );
                 return <EventModel>[];
               },
@@ -266,16 +264,13 @@ class _MyProfileScreenState extends State<MyProfileScreen>
               );
               return <EventModel>[];
             }),
-        // Saved events with timeout
+        // Saved events with timeout - reduced for faster startup
         FirebaseFirestoreHelper()
             .getFavoritedEvents(userId: CustomerController.logeInCustomer!.uid)
             .timeout(
-              const Duration(seconds: 15),
+              const Duration(seconds: 8),
               onTimeout: () {
-                debugPrint('⚠️ Saved events fetch timed out after 15 seconds');
-                ShowToast().showNormalToast(
-                  msg: 'Saved events fetch timed out',
-                );
+                debugPrint('⚠️ Saved events fetch timed out after 8 seconds');
                 return <EventModel>[];
               },
             )
@@ -1688,10 +1683,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         ? FontAwesomeIcons.calendarCheck
         : FontAwesomeIcons.bookmark;
 
-    debugPrint('Building tab content - Selected tab: $selectedTab');
-    debugPrint('Created events: ${createdEvents.length}');
-    debugPrint('Attended events: ${attendedEvents.length}');
-    debugPrint('Current events to show: ${events.length}');
+    // Debug logging removed for performance
 
     // Apply category filtering
     List<EventModel> filteredEvents = List<EventModel>.from(events);
@@ -1787,19 +1779,45 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                       ],
                     ),
                   ),
-                // Events list
+                // Events list - PERFORMANCE: Only show limited items initially
                 ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: sortedEvents.length,
+                  itemCount: sortedEvents.length > _displayedItemCount
+                      ? _displayedItemCount
+                      : sortedEvents.length,
                   itemBuilder: (context, index) {
-                    debugPrint('Building event item at index: $index');
+                    // Remove excessive logging for performance
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       child: _buildSelectableEventItem(sortedEvents[index]),
                     );
                   },
                 ),
+                // Load More button if there are more items
+                if (sortedEvents.length > _displayedItemCount)
+                  Container(
+                    margin: const EdgeInsets.only(top: 16),
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _displayedItemCount += _itemsPerPage;
+                        });
+                      },
+                      icon: const Icon(Icons.expand_more),
+                      label: Text(
+                        'Load More (${sortedEvents.length - _displayedItemCount} remaining)',
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF667EEA),
+                        side: const BorderSide(color: Color(0xFF667EEA)),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 24,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
     );
