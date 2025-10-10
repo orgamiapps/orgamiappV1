@@ -265,7 +265,7 @@ class _SubscriptionManagementScreenState
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      subscription.formattedPrice,
+                      _getDisplayPrice(subscription),
                       style: theme.textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                         color: theme.colorScheme.onPrimaryContainer,
@@ -274,7 +274,7 @@ class _SubscriptionManagementScreenState
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'per month',
+                      _getDisplayInterval(subscription),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onPrimaryContainer.withValues(
                           alpha: 0.7,
@@ -1192,5 +1192,33 @@ class _SubscriptionManagementScreenState
       return parts.sublist(1).join(' ');
     }
     return 'Monthly'; // Default fallback
+  }
+
+  /// Get the display price based on the subscription plan
+  String _getDisplayPrice(dynamic subscription) {
+    switch (subscription.planId) {
+      case 'premium_monthly':
+        return '\$20.00';
+      case 'premium_6month':
+        return '\$100.00';
+      case 'premium_yearly':
+        return '\$175.00';
+      default:
+        return subscription.formattedPrice;
+    }
+  }
+
+  /// Get the display interval based on the subscription plan
+  String _getDisplayInterval(dynamic subscription) {
+    switch (subscription.planId) {
+      case 'premium_monthly':
+        return 'per month';
+      case 'premium_6month':
+        return 'every 6 months';
+      case 'premium_yearly':
+        return 'per year';
+      default:
+        return 'per ${subscription.intervalDisplayText}';
+    }
   }
 }

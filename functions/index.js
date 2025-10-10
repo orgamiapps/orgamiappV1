@@ -2372,22 +2372,6 @@ exports.submitUserReport = onCall({region: "us-central1"}, async (request) => {
 });
 
 /**
- * Creator-only function to set admin claim on the creator account
- */
-const CREATOR_EMAIL = "pr@mail.com"; // requested admin email
-
-exports.setSelfAdmin = onCall({ region: "us-central1" }, async (req) => {
-  const uid = req.auth?.uid;
-  if (!uid) throw new Error("UNAUTHENTICATED");
-  const userRecord = await admin.auth().getUser(uid);
-  if (userRecord.email !== CREATOR_EMAIL) {
-    throw new Error("PERMISSION_DENIED: Creator only");
-  }
-  await admin.auth().setCustomUserClaims(uid, { admin: true });
-  return { status: "ok" };
-});
-
-/**
  * Admin-only function: set admin claim by email (call after securing your own admin)
  */
 exports.setAdminByEmail = onCall({ region: "us-central1" }, async (req) => {

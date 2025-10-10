@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -15,7 +14,6 @@ import 'package:attendus/Utils/theme_provider.dart';
 // import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/screens/Home/delete_account_screen.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:attendus/Services/auth_service.dart';
 
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
@@ -413,15 +411,6 @@ class _AccountScreenState extends State<AccountScreen> {
                 ),
               ),
               _buildDivider(),
-              if (FirebaseAuth.instance.currentUser?.email == 'pr@mail.com')
-                _buildSettingsItem(
-                  icon: Icons.admin_panel_settings,
-                  title: 'Grant Admin (Debug)',
-                  subtitle: 'Sets admin claim for this account',
-                  onTap: _setSelfAdmin,
-                ),
-              if (FirebaseAuth.instance.currentUser?.email == 'pr@mail.com')
-                _buildDivider(),
               _buildSettingsItem(
                 icon: Icons.logout,
                 title: 'Logout',
@@ -656,22 +645,6 @@ class _AccountScreenState extends State<AccountScreen> {
 
   String _getThemeModeText(bool isDark) {
     return isDark ? 'Dark mode enabled' : 'Light mode enabled';
-  }
-
-  Future<void> _setSelfAdmin() async {
-    try {
-      final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
-      final callable = functions.httpsCallable('setSelfAdmin');
-      await callable.call(<String, dynamic>{});
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Admin claim set. Please sign out and sign back in.'),
-        ),
-      );
-    } catch (e) {
-      ShowToast().showNormalToast(msg: 'Failed to set admin: $e');
-    }
   }
 
   void _showThemeSelector(BuildContext context, ThemeProvider themeProvider) {
