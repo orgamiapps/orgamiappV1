@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/models/attendance_model.dart';
 import 'package:attendus/models/event_model.dart';
@@ -15,6 +16,8 @@ import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/dimensions.dart';
+import 'package:attendus/Services/subscription_service.dart';
+import 'package:attendus/widgets/upgrade_prompt_dialog.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xcel;
 import 'package:firebase_auth/firebase_auth.dart';
@@ -544,45 +547,102 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
           ),
         ),
 
-        // View Analytics Button
-        Container(
-          margin: const EdgeInsets.all(20),
-          child: SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppThemeColor.darkBlueColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                elevation: 0,
+        // View Analytics Button (Premium only)
+        Consumer<SubscriptionService>(
+          builder: (context, subscriptionService, child) {
+            final canAccessAnalytics = subscriptionService.canAccessAnalytics();
+            final isEventHost =
+                eventModel.customerUid ==
+                FirebaseAuth.instance.currentUser?.uid;
+
+            return Container(
+              margin: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: canAccessAnalytics
+                            ? AppThemeColor.darkBlueColor
+                            : Colors.grey,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        elevation: 0,
+                      ),
+                      onPressed: () {
+                        if (!isEventHost) {
+                          ShowToast().showSnackBar(
+                            'Only event hosts can view analytics',
+                            context,
+                          );
+                          return;
+                        }
+
+                        if (!canAccessAnalytics) {
+                          UpgradePromptDialog.showAnalyticsUpgrade(context);
+                          return;
+                        }
+
+                        RouterClass.nextScreenNormal(
+                          context,
+                          EventAnalyticsScreen(eventId: eventModel.id),
+                        );
+                      },
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text(
+                            'View Analytics',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                          if (!canAccessAnalytics) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.orange,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Text(
+                                'PREMIUM',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (!canAccessAnalytics)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Unlock detailed analytics with Premium',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              onPressed: () {
-                if (eventModel.customerUid ==
-                    FirebaseAuth.instance.currentUser?.uid) {
-                  RouterClass.nextScreenNormal(
-                    context,
-                    EventAnalyticsScreen(eventId: eventModel.id),
-                  );
-                } else {
-                  ShowToast().showSnackBar(
-                    'Only event hosts can view analytics',
-                    context,
-                  );
-                }
-              },
-              child: const Text(
-                'View Analytics',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Roboto',
-                ),
-              ),
-            ),
-          ),
+            );
+          },
         ),
       ],
     );

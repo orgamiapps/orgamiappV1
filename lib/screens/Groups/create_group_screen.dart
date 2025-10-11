@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:attendus/firebase/organization_helper.dart';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/firebase/firebase_storage_helper.dart';
 import 'package:flutter/services.dart';
 import 'package:attendus/Services/creation_limit_service.dart';
+import 'package:attendus/Services/subscription_service.dart';
 import 'package:attendus/widgets/limit_reached_dialog.dart';
+import 'package:attendus/widgets/upgrade_prompt_dialog.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   const CreateGroupScreen({super.key});
@@ -132,7 +135,15 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                     : () async {
                         if (!_formKey.currentState!.validate()) return;
 
-                        // Check creation limit
+                        // Check Premium access for group creation
+                        final subscriptionService = context
+                            .read<SubscriptionService>();
+                        if (!subscriptionService.canCreateGroups()) {
+                          await UpgradePromptDialog.showGroupsUpgrade(context);
+                          return;
+                        }
+
+                        // Check creation limit (Premium only now)
                         final limitService = CreationLimitService();
                         if (!limitService.canCreateGroup) {
                           await LimitReachedDialog.show(

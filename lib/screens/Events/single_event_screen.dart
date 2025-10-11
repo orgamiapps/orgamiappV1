@@ -7,7 +7,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/Services/subscription_service.dart';
+import 'package:attendus/widgets/upgrade_prompt_dialog.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
@@ -1752,28 +1755,54 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                           ],
                         ),
                         const SizedBox(height: 24),
-                        // Analytics Section
+                        // Analytics Section (Premium only)
+                        Consumer<SubscriptionService>(
+                          builder: (context, subscriptionService, child) {
+                            final canAccessAnalytics = subscriptionService
+                                .canAccessAnalytics();
+
+                            return _buildManagementSection(
+                              icon: Icons.analytics,
+                              title: 'Analytics & Insights',
+                              color: const Color(0xFF667EEA),
+                              children: [
+                                _buildManagementOption(
+                                  icon: Icons.analytics,
+                                  title: canAccessAnalytics
+                                      ? 'Event Analytics'
+                                      : 'Event Analytics (Premium)',
+                                  subtitle: canAccessAnalytics
+                                      ? 'View detailed event performance'
+                                      : 'Upgrade to Premium to unlock analytics',
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    if (!canAccessAnalytics) {
+                                      UpgradePromptDialog.showAnalyticsUpgrade(
+                                        context,
+                                      );
+                                      return;
+                                    }
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            EventAnalyticsScreen(
+                                              eventId: eventModel.id,
+                                            ),
+                                      ),
+                                    ).then((_) => _showEventManagementModal());
+                                  },
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 24),
                         _buildManagementSection(
-                          icon: Icons.analytics,
-                          title: 'Analytics & Insights',
+                          icon: Icons.feedback,
+                          title: 'Engagement',
                           color: const Color(0xFF667EEA),
                           children: [
-                            _buildManagementOption(
-                              icon: Icons.analytics,
-                              title: 'Event Analytics',
-                              subtitle: 'View detailed event performance',
-                              onTap: () {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => EventAnalyticsScreen(
-                                      eventId: eventModel.id,
-                                    ),
-                                  ),
-                                ).then((_) => _showEventManagementModal());
-                              },
-                            ),
                             _buildManagementOption(
                               icon: Icons.feedback,
                               title: 'Feedback Management',

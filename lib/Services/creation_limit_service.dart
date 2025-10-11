@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Services/subscription_service.dart';
+import 'package:attendus/models/subscription_model.dart';
 
 /// Service for managing creation limits for free users
 /// Free users can create up to 5 events and 5 groups
@@ -41,14 +42,26 @@ class CreationLimitService extends ChangeNotifier {
 
   // Check if user can create more events
   bool get canCreateEvent {
-    if (_subscriptionService.hasPremium) return true;
+    // Premium: unlimited
+    if (_subscriptionService.hasUnlimitedEvents()) return true;
+    
+    // Basic: check monthly limit (handled by subscription service)
+    if (_subscriptionService.currentTier == SubscriptionTier.basic) {
+      final remaining = _subscriptionService.getRemainingEvents();
+      return remaining != null && remaining > 0;
+    }
+    
+    // Free: check lifetime limit
     return _eventsCreated < FREE_EVENT_LIMIT;
   }
 
   // Check if user can create more groups
   bool get canCreateGroup {
-    if (_subscriptionService.hasPremium) return true;
-    return _groupsCreated < FREE_GROUP_LIMIT;
+    // Premium: unlimited
+    if (_subscriptionService.canCreateGroups()) return true;
+    
+    // Basic and Free: no group creation
+    return false;
   }
 
   // Check if user is approaching limit (1 remaining)
@@ -102,18 +115,40 @@ class CreationLimitService extends ChangeNotifier {
     }
   }
 
+  /// Get event limit description text for UI
+  String getEventLimitText() {
+    final tier = _subscriptionService.currentTier;
+    
+    switch (tier) {
+      case SubscriptionTier.premium:
+        return 'Unlimited events';
+      case SubscriptionTier.basic:
+        final remaining = _subscriptionService.getRemainingEvents();
+        if (remaining == null) return 'No events available';
+        return '$remaining of 5 events remaining this month';
+      case SubscriptionTier.free:
+        return '$eventsRemaining of $FREE_EVENT_LIMIT lifetime events remaining';
+    }
+  }
+
   /// Increment event creation count
   Future<bool> incrementEventCount() async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return false;
 
     // Premium users don't need to track counts
-    if (_subscriptionService.hasPremium) {
+    if (_subscriptionService.hasUnlimitedEvents()) {
       Logger.info('Premium user - skipping event count increment');
       return true;
     }
 
-    // Check if limit reached
+    // Basic users: increment monthly count in subscription service
+    if (_subscriptionService.currentTier == SubscriptionTier.basic) {
+      Logger.info('Basic user - incrementing monthly event count');
+      return await _subscriptionService.incrementMonthlyEventCount();
+    }
+
+    // Free users: check lifetime limit
     if (!canCreateEvent) {
       Logger.warning('Event creation limit reached');
       return false;
@@ -143,35 +178,15 @@ class CreationLimitService extends ChangeNotifier {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return false;
 
+    // Only Premium users can create groups
+    if (!_subscriptionService.canCreateGroups()) {
+      Logger.warning('Group creation requires Premium subscription');
+      return false;
+    }
+
     // Premium users don't need to track counts
-    if (_subscriptionService.hasPremium) {
-      Logger.info('Premium user - skipping group count increment');
-      return true;
-    }
-
-    // Check if limit reached
-    if (!canCreateGroup) {
-      Logger.warning('Group creation limit reached');
-      return false;
-    }
-
-    try {
-      await _firestore
-          .collection('Customers')
-          .doc(userId)
-          .update({
-        'groupsCreated': FieldValue.increment(1),
-      });
-
-      _groupsCreated++;
-      notifyListeners();
-      
-      Logger.success('Group count incremented to $_groupsCreated');
-      return true;
-    } catch (e) {
-      Logger.error('Error incrementing group count', e);
-      return false;
-    }
+    Logger.info('Premium user - group creation allowed');
+    return true;
   }
 
   /// Decrement event count (when an event is deleted)

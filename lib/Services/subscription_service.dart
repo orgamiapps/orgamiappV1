@@ -19,9 +19,76 @@ class SubscriptionService extends ChangeNotifier {
   SubscriptionModel? _currentSubscription;
   bool _isLoading = false;
 
+  // Pricing constants (in cents)
+  static const List<int> BASIC_PRICES = [500, 2500, 4000]; // Monthly, 6-month, Annual
+  static const List<int> PREMIUM_PRICES = [2000, 10000, 17500]; // Monthly, 6-month, Annual
+  static const List<String> BILLING_PERIODS = ['month', '6months', 'year'];
+  static const List<int> BILLING_DAYS = [30, 180, 365];
+
   SubscriptionModel? get currentSubscription => _currentSubscription;
   bool get isLoading => _isLoading;
   bool get hasPremium => _currentSubscription?.isActive ?? false;
+  
+  /// Get current subscription tier
+  SubscriptionTier get currentTier {
+    if (_currentSubscription == null || !_currentSubscription!.isActive) {
+      return SubscriptionTier.free;
+    }
+    return _currentSubscription!.subscriptionTier;
+  }
+
+  /// Check if user can access analytics (Premium only)
+  bool canAccessAnalytics() {
+    return _currentSubscription?.canAccessAnalytics() ?? false;
+  }
+
+  /// Check if user can create groups (Premium only)
+  bool canCreateGroups() {
+    return _currentSubscription?.canCreateGroups() ?? false;
+  }
+
+  /// Check if user has unlimited events
+  bool hasUnlimitedEvents() {
+    return _currentSubscription?.hasUnlimitedEvents() ?? false;
+  }
+
+  /// Check if user can create an event based on their tier
+  Future<bool> canCreateEvent() async {
+    if (_currentSubscription == null || !_currentSubscription!.isActive) {
+      return false; // Free tier handled by CreationLimitService
+    }
+
+    // Premium has unlimited
+    if (_currentSubscription!.subscriptionTier == SubscriptionTier.premium) {
+      return true;
+    }
+
+    // Basic tier: check monthly limit
+    if (_currentSubscription!.subscriptionTier == SubscriptionTier.basic) {
+      // Check if monthly limit needs reset
+      await checkAndResetMonthlyLimit();
+      return _currentSubscription!.eventsCreatedThisMonth < 5;
+    }
+
+    return false;
+  }
+
+  /// Get remaining events for current billing period
+  int? getRemainingEvents() {
+    if (_currentSubscription == null || !_currentSubscription!.isActive) {
+      return null;
+    }
+
+    if (_currentSubscription!.subscriptionTier == SubscriptionTier.premium) {
+      return -1; // Unlimited
+    }
+
+    if (_currentSubscription!.subscriptionTier == SubscriptionTier.basic) {
+      return _currentSubscription!.remainingEventsThisMonth;
+    }
+
+    return null;
+  }
 
   /// Initialize subscription service and load user's subscription
   Future<void> initialize() async {
@@ -89,10 +156,11 @@ class SubscriptionService extends ChangeNotifier {
     }
   }
 
-  /// Create a new premium subscription
+  /// Create a new subscription
   Future<bool> createPremiumSubscription({
     String? planId,
     bool withTrial = false,
+    SubscriptionTier? tier,
   }) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return false;
@@ -104,28 +172,39 @@ class SubscriptionService extends ChangeNotifier {
       }
 
       // Determine subscription parameters based on plan
-      final selectedPlanId = planId ?? 'premium_monthly';
+      final selectedPlanId = planId ?? 'basic_monthly';
+      final subscriptionTier = tier ?? SubscriptionTier.fromString(
+        selectedPlanId.contains('basic') ? 'basic' : 'premium'
+      );
+      
       int billingDays;
       int priceAmount;
       String interval;
 
+      // Determine pricing based on tier and billing period
+      final isBasicTier = subscriptionTier == SubscriptionTier.basic;
+      final prices = isBasicTier ? BASIC_PRICES : PREMIUM_PRICES;
+
       switch (selectedPlanId) {
+        case 'basic_6month':
         case 'premium_6month':
           billingDays = 180;
-          priceAmount = 10000; // $100.00 in cents
+          priceAmount = prices[1]; // 6-month price
           interval = '6months';
           break;
+        case 'basic_yearly':
         case 'premium_yearly':
           billingDays = 365;
-          priceAmount = 17500; // $175.00 in cents
+          priceAmount = prices[2]; // Annual price
           interval = 'year';
           break;
         default:
           billingDays = 30;
-          priceAmount = 2000; // $20.00 in cents
+          priceAmount = prices[0]; // Monthly price
           interval = 'month';
       }
 
+      final now = DateTime.now();
       final subscription = SubscriptionModel(
         id: userId,
         userId: userId,
@@ -134,14 +213,17 @@ class SubscriptionService extends ChangeNotifier {
         priceAmount: priceAmount,
         currency: 'USD',
         interval: interval,
-        currentPeriodStart: DateTime.now(),
-        currentPeriodEnd: DateTime.now().add(Duration(days: billingDays)),
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
+        currentPeriodStart: now,
+        currentPeriodEnd: now.add(Duration(days: billingDays)),
+        createdAt: now,
+        updatedAt: now,
         isTrial: withTrial,
         trialEndsAt: withTrial
-            ? DateTime.now().add(const Duration(days: 30))
+            ? now.add(const Duration(days: 30))
             : null,
+        tier: subscriptionTier.value,
+        eventsCreatedThisMonth: 0,
+        currentMonthStart: now,
       );
 
       await _firestore
@@ -602,30 +684,37 @@ class SubscriptionService extends ChangeNotifier {
       }
 
       // Determine new subscription parameters
+      final isBasic = scheduledPlanId.contains('basic');
+      final prices = isBasic ? BASIC_PRICES : PREMIUM_PRICES;
+      final tier = isBasic ? 'basic' : 'premium';
+      
       int billingDays;
       int priceAmount;
       String interval;
 
       switch (scheduledPlanId) {
+        case 'basic_6month':
         case 'premium_6month':
           billingDays = 180;
-          priceAmount = 10000; // $100.00 in cents
+          priceAmount = prices[1];
           interval = '6months';
           break;
+        case 'basic_yearly':
         case 'premium_yearly':
           billingDays = 365;
-          priceAmount = 17500; // $175.00 in cents
+          priceAmount = prices[2];
           interval = 'year';
           break;
         default:
           billingDays = 30;
-          priceAmount = 2000; // $20.00 in cents
+          priceAmount = prices[0];
           interval = 'month';
       }
 
       // Update subscription with new plan
       await _firestore.collection('subscriptions').doc(userId).update({
         'planId': scheduledPlanId,
+        'tier': tier,
         'priceAmount': priceAmount,
         'interval': interval,
         'currentPeriodStart': Timestamp.fromDate(scheduledStartDate),
@@ -646,5 +735,148 @@ class SubscriptionService extends ChangeNotifier {
       Logger.error('Error applying scheduled plan change', e);
       return false;
     }
+  }
+
+  /// Increment monthly event count for Basic tier
+  Future<bool> incrementMonthlyEventCount() async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null || _currentSubscription == null) return false;
+
+    // Only for Basic tier
+    if (_currentSubscription!.subscriptionTier != SubscriptionTier.basic) {
+      return true; // Not applicable for other tiers
+    }
+
+    try {
+      // Check if reset is needed first
+      await checkAndResetMonthlyLimit();
+
+      await _firestore.collection('subscriptions').doc(userId).update({
+        'eventsCreatedThisMonth': FieldValue.increment(1),
+        'updatedAt': Timestamp.now(),
+      });
+
+      // Update local state
+      _currentSubscription = _currentSubscription!.copyWith(
+        eventsCreatedThisMonth: _currentSubscription!.eventsCreatedThisMonth + 1,
+        updatedAt: DateTime.now(),
+      );
+
+      notifyListeners();
+      Logger.success(
+        'Monthly event count incremented to ${_currentSubscription!.eventsCreatedThisMonth}',
+      );
+      return true;
+    } catch (e) {
+      Logger.error('Error incrementing monthly event count', e);
+      return false;
+    }
+  }
+
+  /// Check and reset monthly limit if new month has started
+  Future<void> checkAndResetMonthlyLimit() async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null || _currentSubscription == null) return;
+
+    // Only for Basic tier
+    if (_currentSubscription!.subscriptionTier != SubscriptionTier.basic) {
+      return;
+    }
+
+    if (_currentSubscription!.needsMonthlyReset()) {
+      try {
+        final now = DateTime.now();
+        await _firestore.collection('subscriptions').doc(userId).update({
+          'eventsCreatedThisMonth': 0,
+          'currentMonthStart': Timestamp.fromDate(now),
+          'updatedAt': Timestamp.now(),
+        });
+
+        _currentSubscription = _currentSubscription!.copyWith(
+          eventsCreatedThisMonth: 0,
+          currentMonthStart: now,
+          updatedAt: now,
+        );
+
+        notifyListeners();
+        Logger.info('Monthly event limit reset for Basic tier');
+      } catch (e) {
+        Logger.error('Error resetting monthly limit', e);
+      }
+    }
+  }
+
+  /// Upgrade from Basic to Premium
+  Future<bool> upgradeTier({required String newPlanId}) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null || _currentSubscription == null) return false;
+
+    try {
+      if (!_isLoading) {
+        _isLoading = true;
+        notifyListeners();
+      }
+
+      // Determine new tier and pricing
+      final isBasic = newPlanId.contains('basic');
+      final newTier = isBasic ? 'basic' : 'premium';
+      final prices = isBasic ? BASIC_PRICES : PREMIUM_PRICES;
+
+      int priceAmount;
+      int billingDays;
+      String interval;
+
+      switch (newPlanId) {
+        case 'basic_6month':
+        case 'premium_6month':
+          priceAmount = prices[1];
+          billingDays = 180;
+          interval = '6months';
+          break;
+        case 'basic_yearly':
+        case 'premium_yearly':
+          priceAmount = prices[2];
+          billingDays = 365;
+          interval = 'year';
+          break;
+        default:
+          priceAmount = prices[0];
+          billingDays = 30;
+          interval = 'month';
+      }
+
+      final now = DateTime.now();
+      await _firestore.collection('subscriptions').doc(userId).update({
+        'planId': newPlanId,
+        'tier': newTier,
+        'priceAmount': priceAmount,
+        'interval': interval,
+        'currentPeriodStart': Timestamp.fromDate(now),
+        'currentPeriodEnd': Timestamp.fromDate(now.add(Duration(days: billingDays))),
+        'updatedAt': Timestamp.now(),
+      });
+
+      await _loadUserSubscription();
+      Logger.success('Tier upgraded successfully to $newTier');
+
+      if (_isLoading) {
+        _isLoading = false;
+      }
+      notifyListeners();
+      return true;
+    } catch (e) {
+      Logger.error('Error upgrading tier', e);
+      if (_isLoading) {
+        _isLoading = false;
+        notifyListeners();
+      }
+      return false;
+    }
+  }
+
+  /// Downgrade tier (schedules for end of current period)
+  Future<bool> downgradeTier({required String newPlanId}) async {
+    // Use the existing schedulePlanChange method
+    return await schedulePlanChange(newPlanId);
   }
 }

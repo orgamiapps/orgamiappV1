@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:attendus/screens/Premium/premium_upgrade_screen.dart';
+import 'package:attendus/screens/Premium/premium_upgrade_screen_v2.dart';
 import 'package:attendus/Utils/router.dart';
 
 /// Beautiful dialog shown when user reaches creation limit
@@ -187,7 +187,7 @@ class LimitReachedDialog extends StatelessWidget {
                         Navigator.pop(context);
                         RouterClass.nextScreenNormal(
                           context,
-                          const PremiumUpgradeScreen(),
+                          const PremiumUpgradeScreenV2(),
                         );
                       },
                       style: ElevatedButton.styleFrom(

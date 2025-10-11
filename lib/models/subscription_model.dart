@@ -1,9 +1,49 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Subscription tier enum
+enum SubscriptionTier {
+  free,
+  basic,
+  premium;
+
+  String get displayName {
+    switch (this) {
+      case SubscriptionTier.free:
+        return 'Free';
+      case SubscriptionTier.basic:
+        return 'Basic';
+      case SubscriptionTier.premium:
+        return 'Premium';
+    }
+  }
+
+  String get value {
+    switch (this) {
+      case SubscriptionTier.free:
+        return 'free';
+      case SubscriptionTier.basic:
+        return 'basic';
+      case SubscriptionTier.premium:
+        return 'premium';
+    }
+  }
+
+  static SubscriptionTier fromString(String? value) {
+    switch (value?.toLowerCase()) {
+      case 'basic':
+        return SubscriptionTier.basic;
+      case 'premium':
+        return SubscriptionTier.premium;
+      default:
+        return SubscriptionTier.free;
+    }
+  }
+}
+
 class SubscriptionModel {
   final String id;
   final String userId;
-  final String planId; // e.g., 'premium_monthly', 'premium_yearly'
+  final String planId; // e.g., 'basic_monthly', 'premium_yearly'
   final String status; // 'active', 'cancelled', 'past_due', 'incomplete'
   final int priceAmount; // Price in cents (e.g., 500 = $5.00)
   final String currency; // 'USD', 'EUR', etc.
@@ -19,6 +59,9 @@ class SubscriptionModel {
   final DateTime? trialEndsAt;
   final String? scheduledPlanId; // Plan ID to switch to after current period
   final DateTime? scheduledPlanStartDate; // When the scheduled plan starts
+  final String tier; // 'free', 'basic', 'premium'
+  final int eventsCreatedThisMonth; // For Basic tier monthly limit tracking
+  final DateTime? currentMonthStart; // Track when current month started
 
   SubscriptionModel({
     required this.id,
@@ -39,6 +82,9 @@ class SubscriptionModel {
     this.trialEndsAt,
     this.scheduledPlanId,
     this.scheduledPlanStartDate,
+    this.tier = 'free',
+    this.eventsCreatedThisMonth = 0,
+    this.currentMonthStart,
   });
 
   /// Check if subscription is currently active
@@ -62,27 +108,37 @@ class SubscriptionModel {
     return '\$${price.toStringAsFixed(2)}';
   }
 
+  /// Get subscription tier
+  SubscriptionTier get subscriptionTier => SubscriptionTier.fromString(tier);
+
   /// Get plan display name
   String get planDisplayName {
+    final tierName = subscriptionTier.displayName;
     switch (planId) {
+      case 'basic_monthly':
       case 'premium_monthly':
-        return 'Premium Monthly';
+        return '$tierName Monthly';
+      case 'basic_6month':
       case 'premium_6month':
-        return 'Premium 6-Month';
+        return '$tierName 6-Month';
+      case 'basic_yearly':
       case 'premium_yearly':
-        return 'Premium Annual';
+        return '$tierName Annual';
       default:
-        return 'Premium';
+        return tierName;
     }
   }
 
   /// Get billing interval display text
   String get intervalDisplayText {
     switch (planId) {
+      case 'basic_monthly':
       case 'premium_monthly':
         return 'month';
+      case 'basic_6month':
       case 'premium_6month':
         return '6 months';
+      case 'basic_yearly':
       case 'premium_yearly':
         return 'year';
       default:
@@ -93,6 +149,10 @@ class SubscriptionModel {
   /// Get savings percentage compared to monthly plan
   String? get savingsPercentage {
     switch (planId) {
+      case 'basic_6month':
+        return '17%'; // $25 vs $30 (6 months at $5)
+      case 'basic_yearly':
+        return '33%'; // $40 vs $60 (12 months at $5)
       case 'premium_6month':
         return '17%'; // $100 vs $120 (6 months at $20)
       case 'premium_yearly':
@@ -100,6 +160,49 @@ class SubscriptionModel {
       default:
         return null;
     }
+  }
+
+  /// Check if user can access analytics (Premium only)
+  bool canAccessAnalytics() {
+    return isActive && subscriptionTier == SubscriptionTier.premium;
+  }
+
+  /// Check if user can create groups (Premium only)
+  bool canCreateGroups() {
+    return isActive && subscriptionTier == SubscriptionTier.premium;
+  }
+
+  /// Check if user has unlimited events
+  bool hasUnlimitedEvents() {
+    return isActive && subscriptionTier == SubscriptionTier.premium;
+  }
+
+  /// Get monthly event limit (0 = unlimited, null = no access)
+  int? get monthlyEventLimit {
+    if (!isActive) return null;
+    if (subscriptionTier == SubscriptionTier.premium) return 0; // Unlimited
+    if (subscriptionTier == SubscriptionTier.basic) return 5;
+    return null; // Free tier
+  }
+
+  /// Get remaining events this month for Basic tier
+  int? get remainingEventsThisMonth {
+    if (subscriptionTier != SubscriptionTier.basic) return null;
+    final limit = monthlyEventLimit ?? 0;
+    return (limit - eventsCreatedThisMonth).clamp(0, limit);
+  }
+
+  /// Check if monthly limit needs reset
+  bool needsMonthlyReset() {
+    if (subscriptionTier != SubscriptionTier.basic) return false;
+    if (currentMonthStart == null) return true;
+
+    final now = DateTime.now();
+    final monthStart = currentMonthStart!;
+
+    // Check if we're in a new month
+    return now.year > monthStart.year ||
+        (now.year == monthStart.year && now.month > monthStart.month);
   }
 
   /// Check if this is a popular/recommended plan
@@ -156,7 +259,21 @@ class SubscriptionModel {
       scheduledPlanStartDate: data['scheduledPlanStartDate'] != null
           ? _parseTimestamp(data['scheduledPlanStartDate'])
           : null,
+      tier: data['tier'] ?? _inferTierFromPlanId(data['planId']),
+      eventsCreatedThisMonth: data['eventsCreatedThisMonth'] ?? 0,
+      currentMonthStart: data['currentMonthStart'] != null
+          ? _parseTimestamp(data['currentMonthStart'])
+          : null,
     );
+  }
+
+  /// Infer tier from legacy plan IDs
+  static String _inferTierFromPlanId(String? planId) {
+    if (planId == null) return 'free';
+    if (planId.startsWith('basic_')) return 'basic';
+    if (planId.startsWith('premium_')) return 'premium';
+    // Legacy: assume premium for old 'premium_*' plans
+    return 'premium';
   }
 
   /// Convert to map for Firestore
@@ -185,6 +302,11 @@ class SubscriptionModel {
       'scheduledPlanStartDate': scheduledPlanStartDate != null
           ? Timestamp.fromDate(scheduledPlanStartDate!)
           : null,
+      'tier': tier,
+      'eventsCreatedThisMonth': eventsCreatedThisMonth,
+      'currentMonthStart': currentMonthStart != null
+          ? Timestamp.fromDate(currentMonthStart!)
+          : null,
     };
   }
 
@@ -208,6 +330,9 @@ class SubscriptionModel {
     DateTime? trialEndsAt,
     String? scheduledPlanId,
     DateTime? scheduledPlanStartDate,
+    String? tier,
+    int? eventsCreatedThisMonth,
+    DateTime? currentMonthStart,
   }) {
     return SubscriptionModel(
       id: id ?? this.id,
@@ -228,6 +353,9 @@ class SubscriptionModel {
       trialEndsAt: trialEndsAt,
       scheduledPlanId: scheduledPlanId,
       scheduledPlanStartDate: scheduledPlanStartDate,
+      tier: tier ?? this.tier,
+      eventsCreatedThisMonth: eventsCreatedThisMonth ?? this.eventsCreatedThisMonth,
+      currentMonthStart: currentMonthStart,
     );
   }
 

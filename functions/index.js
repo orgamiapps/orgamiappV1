@@ -3048,3 +3048,238 @@ exports.confirmFeaturePayment = onCall({ region: "us-central1" }, async (req) =>
     throw new Error(`INTERNAL: ${error.message}`);
   }
 });
+
+// ============================================================================
+// SUBSCRIPTION TIER MANAGEMENT FUNCTIONS
+// ============================================================================
+
+/**
+ * Reset Monthly Event Limits for Basic Tier Users
+ * Runs on the 1st day of each month at midnight UTC
+ */
+exports.resetMonthlyEventLimits = onSchedule({
+  schedule: '0 0 1 * *', // First day of each month at midnight UTC
+  timeZone: 'UTC',
+  region: 'us-central1',
+}, async (event) => {
+  logger.info('🔄 Starting monthly event limit reset for Basic tier users...');
+  
+  try {
+    const db = admin.firestore();
+    const now = admin.firestore.Timestamp.now();
+    
+    // Get all Basic tier subscriptions
+    const subscriptionsSnapshot = await db
+      .collection('subscriptions')
+      .where('tier', '==', 'basic')
+      .where('status', '==', 'active')
+      .get();
+    
+    if (subscriptionsSnapshot.empty) {
+      logger.info('No active Basic tier subscriptions found');
+      return null;
+    }
+    
+    logger.info(`Found ${subscriptionsSnapshot.docs.length} Basic tier subscriptions to reset`);
+    
+    const batch = db.batch();
+    let resetCount = 0;
+    
+    subscriptionsSnapshot.forEach(doc => {
+      batch.update(doc.ref, {
+        eventsCreatedThisMonth: 0,
+        currentMonthStart: now,
+        updatedAt: now,
+      });
+      resetCount++;
+    });
+    
+    await batch.commit();
+    
+    logger.info(`✅ Successfully reset monthly event limits for ${resetCount} Basic tier users`);
+    return { success: true, count: resetCount, timestamp: now };
+  } catch (error) {
+    logger.error('❌ Error resetting monthly limits:', error);
+    throw error;
+  }
+});
+
+/**
+ * Apply Scheduled Plan Changes
+ * Runs every 6 hours to check for and apply scheduled tier changes
+ */
+exports.applyScheduledPlanChanges = onSchedule({
+  schedule: '0 */6 * * *', // Every 6 hours
+  timeZone: 'UTC',
+  region: 'us-central1',
+}, async (event) => {
+  logger.info('🔄 Checking for scheduled plan changes...');
+  
+  try {
+    const db = admin.firestore();
+    const now = new Date();
+    
+    // Get all subscriptions with scheduled plan changes
+    const subscriptionsSnapshot = await db
+      .collection('subscriptions')
+      .where('scheduledPlanId', '!=', null)
+      .get();
+    
+    if (subscriptionsSnapshot.empty) {
+      logger.info('No scheduled plan changes found');
+      return null;
+    }
+    
+    logger.info(`Found ${subscriptionsSnapshot.docs.length} subscriptions with scheduled changes`);
+    
+    let appliedCount = 0;
+    const batch = db.batch();
+    
+    for (const doc of subscriptionsSnapshot.docs) {
+      const data = doc.data();
+      const scheduledStartDate = data.scheduledPlanStartDate?.toDate();
+      
+      // Check if scheduled date has passed
+      if (scheduledStartDate && now >= scheduledStartDate) {
+        const scheduledPlanId = data.scheduledPlanId;
+        
+        // Determine new tier and pricing
+        const isBasic = scheduledPlanId.includes('basic');
+        const tier = isBasic ? 'basic' : 'premium';
+        
+        // Price determination
+        const BASIC_PRICES = [500, 2500, 4000];
+        const PREMIUM_PRICES = [2000, 10000, 17500];
+        const prices = isBasic ? BASIC_PRICES : PREMIUM_PRICES;
+        
+        let priceAmount, billingDays, interval;
+        
+        if (scheduledPlanId.includes('6month')) {
+          priceAmount = prices[1];
+          billingDays = 180;
+          interval = '6months';
+        } else if (scheduledPlanId.includes('yearly')) {
+          priceAmount = prices[2];
+          billingDays = 365;
+          interval = 'year';
+        } else {
+          priceAmount = prices[0];
+          billingDays = 30;
+          interval = 'month';
+        }
+        
+        // Update subscription
+        batch.update(doc.ref, {
+          planId: scheduledPlanId,
+          tier: tier,
+          priceAmount: priceAmount,
+          interval: interval,
+          currentPeriodStart: admin.firestore.Timestamp.fromDate(scheduledStartDate),
+          currentPeriodEnd: admin.firestore.Timestamp.fromDate(
+            new Date(scheduledStartDate.getTime() + billingDays * 24 * 60 * 60 * 1000)
+          ),
+          scheduledPlanId: null,
+          scheduledPlanStartDate: null,
+          updatedAt: admin.firestore.Timestamp.now(),
+        });
+        
+        appliedCount++;
+        logger.info(`✓ Applied scheduled plan change for user: ${doc.id} to ${tier} tier`);
+      }
+    }
+    
+    if (appliedCount > 0) {
+      await batch.commit();
+    }
+    
+    logger.info(`✅ Applied ${appliedCount} scheduled plan changes`);
+    return { success: true, count: appliedCount, timestamp: admin.firestore.Timestamp.now() };
+  } catch (error) {
+    logger.error('❌ Error applying scheduled plan changes:', error);
+    throw error;
+  }
+});
+
+/**
+ * Send Monthly Usage Reminder to Basic Users
+ * Runs on the 25th of each month at 10 AM UTC
+ * Reminds users who have used 4+ events about upcoming reset
+ */
+exports.sendBasicTierUsageReminder = onSchedule({
+  schedule: '0 10 25 * *', // 10 AM UTC on the 25th
+  timeZone: 'UTC',
+  region: 'us-central1',
+}, async (event) => {
+  logger.info('📢 Sending monthly usage reminders to Basic tier users...');
+  
+  try {
+    const db = admin.firestore();
+    const now = admin.firestore.Timestamp.now();
+    
+    // Get Basic tier users who have used 4+ events (approaching limit)
+    const subscriptionsSnapshot = await db
+      .collection('subscriptions')
+      .where('tier', '==', 'basic')
+      .where('status', '==', 'active')
+      .where('eventsCreatedThisMonth', '>=', 4)
+      .get();
+    
+    if (subscriptionsSnapshot.empty) {
+      logger.info('No users approaching event limit');
+      return null;
+    }
+    
+    logger.info(`Found ${subscriptionsSnapshot.docs.length} users to remind`);
+    
+    let reminderCount = 0;
+    
+    // Create notifications for users
+    for (const doc of subscriptionsSnapshot.docs) {
+      const userId = doc.data().userId;
+      const eventsUsed = doc.data().eventsCreatedThisMonth;
+      const remaining = 5 - eventsUsed;
+      
+      try {
+        // Create notification in Firestore
+        await db.collection('notifications').add({
+          userId: userId,
+          title: remaining === 0 ? 'Monthly Event Limit Reached' : 'Event Limit Almost Reached',
+          message: remaining === 0
+            ? 'Your 5-event monthly limit has been reached. It will reset on the 1st. Upgrade to Premium for unlimited events!'
+            : `You have ${remaining} event${remaining !== 1 ? 's' : ''} remaining this month. Your limit resets on the 1st.`,
+          type: 'usage_reminder',
+          read: false,
+          createdAt: now,
+          data: {
+            eventsUsed: eventsUsed,
+            remaining: remaining,
+            upgradeUrl: '/premium-upgrade',
+          },
+        });
+        
+        // Send push notification if user has FCM token
+        await sendNotificationToUser(userId, {
+          type: 'usage_reminder',
+          title: remaining === 0 ? 'Monthly Event Limit Reached' : 'Event Limit Almost Reached',
+          body: remaining === 0
+            ? 'Your 5-event monthly limit has been reached. It will reset on the 1st.'
+            : `You have ${remaining} event${remaining !== 1 ? 's' : ''} remaining this month.`,
+          data: {
+            eventsUsed: eventsUsed,
+            remaining: remaining,
+          },
+        }, db);
+        
+        reminderCount++;
+      } catch (error) {
+        logger.error(`Error sending reminder to user ${userId}:`, error);
+      }
+    }
+    
+    logger.info(`✅ Sent reminders to ${reminderCount} users`);
+    return { success: true, count: reminderCount, timestamp: now };
+  } catch (error) {
+    logger.error('❌ Error sending usage reminders:', error);
+    throw error;
+  }
+});

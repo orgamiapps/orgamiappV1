@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 // import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:provider/provider.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/firebase/ai_analytics_helper.dart';
 import 'package:attendus/models/attendance_model.dart';
@@ -14,6 +15,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
+import 'package:attendus/Services/subscription_service.dart';
+import 'package:attendus/widgets/upgrade_prompt_dialog.dart';
 
 class EventAnalyticsScreen extends StatefulWidget {
   final String eventId;
@@ -45,7 +48,27 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    _loadEventData();
+    
+    // Check Premium access before loading data
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPremiumAccess();
+    });
+  }
+
+  void _checkPremiumAccess() {
+    final subscriptionService = context.read<SubscriptionService>();
+    
+    if (!subscriptionService.canAccessAnalytics()) {
+      // Show upgrade dialog and navigate back
+      UpgradePromptDialog.showAnalyticsUpgrade(context).then((_) {
+        if (mounted) {
+          Navigator.pop(context);
+        }
+      });
+    } else {
+      // Has Premium access, load data
+      _loadEventData();
+    }
   }
 
   String _getEventStatusLabel() {
