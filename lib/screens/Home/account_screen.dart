@@ -496,392 +496,198 @@ class _AccountScreenState extends State<AccountScreen> {
         final subscription = subscriptionService.currentSubscription;
         final theme = Theme.of(context);
 
-        // Free tier
+        // Free tier - blend in with other items but with subtle upgrade hint
         if (tier == SubscriptionTier.free) {
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.03),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.grey.shade100,
-                    Colors.grey.shade50,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+            child: ListTile(
+              onTap: () async {
+                await RouterClass.nextScreenNormal(
+                  context,
+                  const PremiumUpgradeScreenV2(),
+                );
+                if (mounted) {
+                  await _ensureSubscriptionLoaded();
+                }
+              },
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                borderRadius: BorderRadius.circular(16),
+                child: Icon(
+                  Icons.workspace_premium,
+                  color: theme.colorScheme.primary,
+                  size: 20,
+                ),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.account_circle,
-                            color: Colors.grey.shade700,
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Free Plan',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey.shade800,
-                                ),
-                              ),
-                              Text(
-                                '5 lifetime events available',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.blue.shade200),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.lightbulb_outline, color: Colors.blue.shade700, size: 20),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Upgrade to create more events and unlock analytics',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.blue.shade900,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          await RouterClass.nextScreenNormal(
-                            context,
-                            const PremiumUpgradeScreenV2(),
-                          );
-                          if (mounted) {
-                            await _ensureSubscriptionLoaded();
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.colorScheme.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.upgrade, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              'View Plans',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              title: const Text(
+                'Upgrade to Premium',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: const Text(
+                'Create more events and unlock analytics',
+                style: TextStyle(fontSize: 13),
+              ),
+              trailing: Icon(
+                Icons.chevron_right,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 8,
               ),
             ),
           );
         }
 
-        // Basic or Premium tier
+        // Basic or Premium tier - blend in with other items
         if (subscription == null) return const SizedBox.shrink();
 
         final isBasic = tier == SubscriptionTier.basic;
         final tierColor = isBasic ? Colors.blue : theme.colorScheme.primary;
         final String? billingDate = subscriptionService.getNextBillingDate();
 
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          elevation: 3,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+        // Build subtitle based on tier
+        String subtitle = subscription.planDisplayName;
+        if (isBasic) {
+          final remaining = subscription.remainingEventsThisMonth ?? 0;
+          subtitle = '$remaining of 5 events remaining this month';
+        } else {
+          subtitle = 'Unlimited events • Active';
+        }
+
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+          decoration: BoxDecoration(
+            color: tierColor.withValues(alpha: 0.03),
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  tierColor.withValues(alpha: 0.15),
-                  tierColor.withValues(alpha: 0.05),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: tierColor.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              isBasic ? Icons.star : Icons.workspace_premium,
-                              color: tierColor,
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${tier.displayName} Plan',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: tierColor,
-                                ),
-                              ),
-                              Text(
-                                subscription.planDisplayName,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+          child: Column(
+            children: [
+              ListTile(
+                onTap: () async {
+                  await RouterClass.nextScreenNormal(
+                    context,
+                    const SubscriptionManagementScreen(),
+                  );
+                  if (mounted) {
+                    await _ensureSubscriptionLoaded();
+                  }
+                },
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: tierColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    isBasic ? Icons.star : Icons.workspace_premium,
+                    color: tierColor,
+                    size: 20,
+                  ),
+                ),
+                title: Row(
+                  children: [
+                    Text(
+                      '${tier.displayName} Plan',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'ACTIVE',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
                         ),
-                        decoration: BoxDecoration(
-                          color: Colors.green,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'ACTIVE',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(subtitle, style: const TextStyle(fontSize: 13)),
+                    if (billingDate != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Renews $billingDate',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.7,
                           ),
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Usage stats
-                  if (isBasic) ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: tierColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Events This Month',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: theme.colorScheme.onSurface,
-                                ),
-                              ),
-                              Text(
-                                '${subscription.remainingEventsThisMonth ?? 0} of 5 remaining',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: tierColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: (subscription.eventsCreatedThisMonth / 5).clamp(0.0, 1.0),
-                              minHeight: 6,
-                              backgroundColor: Colors.grey.shade200,
-                              valueColor: AlwaysStoppedAnimation<Color>(tierColor),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ] else ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: tierColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.all_inclusive, color: tierColor, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Unlimited Events',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: theme.colorScheme.onSurface,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
-                  
-                  const SizedBox(height: 12),
-                  
-                  // Billing info
-                  if (billingDate != null)
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.calendar_today,
-                          size: 16,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Renews $billingDate',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Action buttons
-                  Row(
+                ),
+                trailing: Icon(
+                  Icons.chevron_right,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+              ),
+
+              // Optional: Show upgrade option for Basic users inline
+              if (isBasic)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                  child: Row(
                     children: [
                       Expanded(
-                        child: OutlinedButton(
+                        child: TextButton.icon(
                           onPressed: () async {
                             await RouterClass.nextScreenNormal(
                               context,
-                              const SubscriptionManagementScreen(),
+                              const PremiumUpgradeScreenV2(),
                             );
                             if (mounted) {
                               await _ensureSubscriptionLoaded();
                             }
                           },
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: tierColor),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                          icon: Icon(
+                            Icons.upgrade,
+                            size: 16,
+                            color: theme.colorScheme.primary,
+                          ),
+                          label: Text(
+                            'Upgrade to Premium',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.primary,
                             ),
                           ),
-                          child: Text(
-                            'Manage',
-                            style: TextStyle(
-                              color: tierColor,
-                              fontWeight: FontWeight.w600,
-                            ),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
                         ),
                       ),
-                      if (isBasic) ...[
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () async {
-                              await RouterClass.nextScreenNormal(
-                                context,
-                                const PremiumUpgradeScreenV2(),
-                              );
-                              if (mounted) {
-                                await _ensureSubscriptionLoaded();
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: theme.colorScheme.primary,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.upgrade, size: 18),
-                                SizedBox(width: 6),
-                                Text(
-                                  'Upgrade',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
-                ],
-              ),
-            ),
+                ),
+            ],
           ),
         );
       },
