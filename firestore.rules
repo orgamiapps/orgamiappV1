@@ -75,6 +75,22 @@ service cloud.firestore {
       }
     }
     
+    // User Analytics collection - optimized aggregated analytics per user
+    match /user_analytics/{userId} {
+      // Users can read their own analytics
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      // Only Cloud Functions can write (via admin SDK)
+      allow write: if false;
+    }
+    
+    // Event Analytics collection
+    match /event_analytics/{eventId} {
+      // Users can read analytics for events they have access to
+      allow read: if isAuthenticated();
+      // Only Cloud Functions can write (via admin SDK)
+      allow write: if false;
+    }
+    
     // Temporary catch-all for development
     match /{document=**} {
       allow read: if isAuthenticated();

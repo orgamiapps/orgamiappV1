@@ -287,7 +287,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         await LimitReachedDialog.show(
           context,
           type: 'event',
-          limit: CreationLimitService.FREE_EVENT_LIMIT,
+          limit: CreationLimitService.freeEventLimit,
         );
         return;
       }

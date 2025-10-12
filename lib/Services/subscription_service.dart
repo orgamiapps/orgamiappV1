@@ -20,10 +20,10 @@ class SubscriptionService extends ChangeNotifier {
   bool _isLoading = false;
 
   // Pricing constants (in cents)
-  static const List<int> BASIC_PRICES = [500, 2500, 4000]; // Monthly, 6-month, Annual
-  static const List<int> PREMIUM_PRICES = [2000, 10000, 17500]; // Monthly, 6-month, Annual
-  static const List<String> BILLING_PERIODS = ['month', '6months', 'year'];
-  static const List<int> BILLING_DAYS = [30, 180, 365];
+  static const List<int> basicPrices = [500, 2500, 4000]; // Monthly, 6-month, Annual
+  static const List<int> premiumPrices = [2000, 10000, 17500]; // Monthly, 6-month, Annual
+  static const List<String> billingPeriods = ['month', '6months', 'year'];
+  static const List<int> billingDays = [30, 180, 365];
 
   SubscriptionModel? get currentSubscription => _currentSubscription;
   bool get isLoading => _isLoading;
@@ -183,7 +183,7 @@ class SubscriptionService extends ChangeNotifier {
 
       // Determine pricing based on tier and billing period
       final isBasicTier = subscriptionTier == SubscriptionTier.basic;
-      final prices = isBasicTier ? BASIC_PRICES : PREMIUM_PRICES;
+      final prices = isBasicTier ? basicPrices : premiumPrices;
 
       switch (selectedPlanId) {
         case 'basic_6month':
@@ -685,7 +685,7 @@ class SubscriptionService extends ChangeNotifier {
 
       // Determine new subscription parameters
       final isBasic = scheduledPlanId.contains('basic');
-      final prices = isBasic ? BASIC_PRICES : PREMIUM_PRICES;
+      final prices = isBasic ? basicPrices : premiumPrices;
       final tier = isBasic ? 'basic' : 'premium';
       
       int billingDays;
@@ -820,7 +820,7 @@ class SubscriptionService extends ChangeNotifier {
       // Determine new tier and pricing
       final isBasic = newPlanId.contains('basic');
       final newTier = isBasic ? 'basic' : 'premium';
-      final prices = isBasic ? BASIC_PRICES : PREMIUM_PRICES;
+      final prices = isBasic ? basicPrices : premiumPrices;
 
       int priceAmount;
       int billingDays;

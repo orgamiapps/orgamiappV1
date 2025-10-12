@@ -18,8 +18,8 @@ class CreationLimitService extends ChangeNotifier {
   final SubscriptionService _subscriptionService = SubscriptionService();
 
   // Free tier limits
-  static const int FREE_EVENT_LIMIT = 5;
-  static const int FREE_GROUP_LIMIT = 5;
+  static const int freeEventLimit = 5;
+  static const int freeGroupLimit = 5;
 
   int _eventsCreated = 0;
   int _groupsCreated = 0;
@@ -32,12 +32,12 @@ class CreationLimitService extends ChangeNotifier {
   // Computed properties for remaining creations
   int get eventsRemaining {
     if (_subscriptionService.hasPremium) return -1; // -1 indicates unlimited
-    return (FREE_EVENT_LIMIT - _eventsCreated).clamp(0, FREE_EVENT_LIMIT);
+    return (freeEventLimit - _eventsCreated).clamp(0, freeEventLimit);
   }
 
   int get groupsRemaining {
     if (_subscriptionService.hasPremium) return -1; // -1 indicates unlimited
-    return (FREE_GROUP_LIMIT - _groupsCreated).clamp(0, FREE_GROUP_LIMIT);
+    return (freeGroupLimit - _groupsCreated).clamp(0, freeGroupLimit);
   }
 
   // Check if user can create more events
@@ -52,7 +52,7 @@ class CreationLimitService extends ChangeNotifier {
     }
     
     // Free: check lifetime limit
-    return _eventsCreated < FREE_EVENT_LIMIT;
+    return _eventsCreated < freeEventLimit;
   }
 
   // Check if user can create more groups
@@ -127,7 +127,7 @@ class CreationLimitService extends ChangeNotifier {
         if (remaining == null) return 'No events available';
         return '$remaining of 5 events remaining this month';
       case SubscriptionTier.free:
-        return '$eventsRemaining of $FREE_EVENT_LIMIT lifetime events remaining';
+        return '$eventsRemaining of $freeEventLimit lifetime events remaining';
     }
   }
 
@@ -207,7 +207,7 @@ class CreationLimitService extends ChangeNotifier {
         'eventsCreated': FieldValue.increment(-1),
       });
 
-      _eventsCreated = (_eventsCreated - 1).clamp(0, FREE_EVENT_LIMIT);
+      _eventsCreated = (_eventsCreated - 1).clamp(0, freeEventLimit);
       notifyListeners();
       
       Logger.info('Event count decremented to $_eventsCreated');
@@ -234,7 +234,7 @@ class CreationLimitService extends ChangeNotifier {
         'groupsCreated': FieldValue.increment(-1),
       });
 
-      _groupsCreated = (_groupsCreated - 1).clamp(0, FREE_GROUP_LIMIT);
+      _groupsCreated = (_groupsCreated - 1).clamp(0, freeGroupLimit);
       notifyListeners();
       
       Logger.info('Group count decremented to $_groupsCreated');
@@ -272,25 +272,25 @@ class CreationLimitService extends ChangeNotifier {
     if (_subscriptionService.hasPremium) {
       return 'Unlimited';
     }
-    return '$_eventsCreated / $FREE_EVENT_LIMIT';
+    return '$_eventsCreated / $freeEventLimit';
   }
 
   String getGroupLimitStatus() {
     if (_subscriptionService.hasPremium) {
       return 'Unlimited';
     }
-    return '$_groupsCreated / $FREE_GROUP_LIMIT';
+    return '$_groupsCreated / $freeGroupLimit';
   }
 
   /// Get progress percentage (0.0 to 1.0)
   double getEventProgress() {
     if (_subscriptionService.hasPremium) return 0.0;
-    return (_eventsCreated / FREE_EVENT_LIMIT).clamp(0.0, 1.0);
+    return (_eventsCreated / freeEventLimit).clamp(0.0, 1.0);
   }
 
   double getGroupProgress() {
     if (_subscriptionService.hasPremium) return 0.0;
-    return (_groupsCreated / FREE_GROUP_LIMIT).clamp(0.0, 1.0);
+    return (_groupsCreated / freeGroupLimit).clamp(0.0, 1.0);
   }
 }
 

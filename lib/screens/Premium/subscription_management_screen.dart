@@ -812,8 +812,8 @@ class _SubscriptionManagementScreenState
         : theme.colorScheme.primary;
     final tierPrefix = tier == SubscriptionTier.basic ? 'basic' : 'premium';
     final prices = tier == SubscriptionTier.basic
-        ? SubscriptionService.BASIC_PRICES
-        : SubscriptionService.PREMIUM_PRICES;
+        ? SubscriptionService.basicPrices
+        : SubscriptionService.premiumPrices;
 
     // Define billing options
     final billingOptions = [

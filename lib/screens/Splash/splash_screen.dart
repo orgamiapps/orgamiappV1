@@ -42,8 +42,8 @@ class _SplashScreenState extends State<SplashScreen>
       _startLoadingSequence();
     });
 
-    // Fail-safe: navigate if we haven't moved within 8 seconds (cold start tolerance)
-    _timeoutTimer = Timer(const Duration(seconds: 8), () {
+    // Fail-safe: navigate if we haven't moved within 5 seconds (reduced from 8s)
+    _timeoutTimer = Timer(const Duration(seconds: 5), () {
       if (mounted && !_hasNavigated) {
         debugPrint('⏰ Global timeout - forcing navigation to prevent hanging');
         _navigateToSecondSplash();
@@ -113,11 +113,11 @@ class _SplashScreenState extends State<SplashScreen>
       });
 
       // Ensure Firebase is ready before auth logic to avoid races
-      // Kick both tasks; whichever completes first decides navigation
+      // Firebase should already be initialized in main.dart, so this is mainly a safety check
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted || _hasNavigated) return;
         final initFuture = FirebaseInitializer.initializeOnce()
-            .timeout(const Duration(seconds: 6))
+            .timeout(const Duration(seconds: 3))
             .catchError((_) {});
         // Don't block on init; start auth check with slight delay
         Future.delayed(const Duration(milliseconds: 150), () async {
@@ -146,11 +146,14 @@ class _SplashScreenState extends State<SplashScreen>
       debugPrint('🔄 Checking Firebase Auth state directly...');
 
       // Ensure Firebase is initialized before accessing FirebaseAuth
+      // Firebase should already be initialized in main.dart, so this is mainly a safety check
       try {
         await FirebaseInitializer.initializeOnce().timeout(
-          const Duration(seconds: 4),
+          const Duration(seconds: 2),
           onTimeout: () {
-            debugPrint('⚠️ Firebase init timeout in Splash; continuing');
+            debugPrint(
+              '⚠️ Firebase init timeout in Splash; continuing (likely already initialized)',
+            );
             throw TimeoutException('firebase-init-timeout');
           },
         );
@@ -198,9 +201,9 @@ class _SplashScreenState extends State<SplashScreen>
 
       debugPrint('🔄 No direct Firebase user, initializing AuthService...');
 
-      // Initialize AuthService with timeout to prevent hanging
+      // Initialize AuthService with reduced timeout to prevent hanging
       await AuthService().initialize().timeout(
-        const Duration(seconds: 3),
+        const Duration(seconds: 2),
         onTimeout: () {
           debugPrint('⚠️ AuthService initialization timed out');
           // Continue without auth service if it times out

@@ -11,11 +11,6 @@ import UserNotifications
     UNUserNotificationCenter.current().delegate = self
     application.registerForRemoteNotifications()
     
-    // Register ONNX NLP Plugin
-    if let registrar = self.registrar(forPlugin: "OnnxNlpPlugin") {
-      OnnxNlpPlugin.register(with: registrar)
-    }
-    
     GeneratedPluginRegistrant.register(with: self)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }

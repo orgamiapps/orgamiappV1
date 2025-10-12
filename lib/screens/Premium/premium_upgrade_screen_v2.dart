@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:attendus/Services/subscription_service.dart';
+import 'package:attendus/Services/payment_placeholder_service.dart';
 import 'package:attendus/models/subscription_model.dart';
 import 'package:attendus/Utils/app_app_bar_view.dart';
 import 'package:attendus/Utils/toast.dart';
@@ -307,8 +308,8 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
   }) {
     final isBasic = tier == SubscriptionTier.basic;
     final prices = isBasic
-        ? SubscriptionService.BASIC_PRICES
-        : SubscriptionService.PREMIUM_PRICES;
+        ? SubscriptionService.basicPrices
+        : SubscriptionService.premiumPrices;
     final price = prices[_selectedBillingIndex] / 100;
 
     final features = isBasic
@@ -583,6 +584,35 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
     });
 
     try {
+      // Calculate price based on tier and billing period
+      final double basePrice = tier == SubscriptionTier.basic ? 2.99 : 4.99;
+      final double amount = _selectedBillingIndex == 0
+          ? basePrice
+          : _selectedBillingIndex == 1
+              ? basePrice * 6 * 0.9 // 10% discount for 6 months
+              : basePrice * 12 * 0.8; // 20% discount for annual
+
+      final String productName = '${tier.displayName} ${billingPeriods[_selectedBillingIndex]}';
+
+      // Show Apple Pay placeholder UI
+      final paymentSuccess = await PaymentPlaceholderService().showApplePayPlaceholder(
+        context: context,
+        productName: productName,
+        amount: amount,
+        currency: 'USD',
+      );
+
+      if (!mounted) return;
+
+      if (!paymentSuccess) {
+        // User cancelled payment
+        setState(() {
+          _isProcessing = false;
+        });
+        return;
+      }
+
+      // Payment successful, create subscription
       final subscriptionService = context.read<SubscriptionService>();
 
       // Determine plan ID based on tier and billing period

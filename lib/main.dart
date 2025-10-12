@@ -1,9 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'firebase_options.dart';
 import 'package:attendus/widgets/auth_gate.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Utils/theme_provider.dart';
@@ -13,7 +11,6 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:attendus/Utils/error_handler.dart';
 import 'package:firebase_messaging/firebase_messaging.dart' as fcm;
-import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart'
     show kIsWeb, kDebugMode, defaultTargetPlatform, TargetPlatform;
@@ -24,6 +21,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:attendus/Utils/platform_helper.dart';
 import 'package:attendus/Utils/emulator_config.dart';
+import 'package:attendus/Services/firebase_initializer.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -42,9 +40,42 @@ void main() async {
   }
 
   // Configure for emulator if needed (prevents Geolocator hanging)
-  await EmulatorConfig.configureForEmulator();
+  // Made non-blocking to prevent startup delay
+  EmulatorConfig.configureForEmulator();
 
-  // Build the app immediately to keep UI responsive
+  // Initialize Firebase BEFORE runApp to ensure it's ready when AuthGate loads
+  // This prevents race conditions and ANR issues
+  final Stopwatch startupStopwatch = Stopwatch()..start();
+  Logger.info('Initializing Firebase before app startup...');
+
+  try {
+    await FirebaseInitializer.initializeOnce().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {
+        Logger.warning(
+          'Firebase initialization timed out after 5 seconds, continuing anyway',
+        );
+      },
+    );
+
+    if (kDebugMode) {
+      Logger.success('Firebase initialized successfully');
+      Logger.info(
+        'T+${startupStopwatch.elapsed.inMilliseconds}ms: Firebase ready',
+      );
+    }
+
+    // Initialize Stripe after Firebase
+    Stripe.publishableKey = 'pk_test_YOUR_PUBLISHABLE_KEY';
+    if (kDebugMode) {
+      Logger.info('Stripe initialized');
+    }
+  } catch (e) {
+    Logger.warning('Firebase initialization failed, app will continue: $e');
+    // Continue even if Firebase fails - app will handle gracefully
+  }
+
+  // Build the app after Firebase is ready
   // Use lazy initialization for providers to improve startup time
   final Widget appWidget = MultiProvider(
     providers: [
@@ -65,133 +96,64 @@ void main() async {
   );
   runApp(appWidget);
 
-  // Initialize Firebase and services after first frame to avoid ANR
+  // Initialize background services and theme after first frame
   WidgetsBinding.instance.addPostFrameCallback((_) async {
-    final Stopwatch startupStopwatch = Stopwatch()..start();
-    Logger.info('Starting Firebase initialization with timeout...');
-    await PlatformHelper.isEmulator();
-
-    Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)
-        .timeout(
-          PlatformHelper.getFirebaseTimeout(),
-          onTimeout: () {
-            Logger.warning(
-              'Firebase initialization timed out, continuing anyway',
-            );
-            throw TimeoutException('Firebase initialization timeout');
-          },
-        )
-        .then((_) async {
+    // Load theme preference
+    SharedPreferences.getInstance().then((prefs) {
+      final isDarkMode = prefs.getBool('isDarkMode') ?? false;
+      final context = appNavigatorKey.currentContext;
+      if (context != null) {
+        try {
+          final themeProvider = Provider.of<ThemeProvider>(
+            context,
+            listen: false,
+          );
+          themeProvider.loadTheme(isDarkMode);
+        } catch (e) {
           if (kDebugMode) {
-            Logger.success('Firebase core initialized');
-            Logger.info(
-              'T+${startupStopwatch.elapsed.inMilliseconds}ms: Firebase init done',
-            );
+            Logger.warning('Failed to apply saved theme: $e');
           }
+        }
+      }
+    });
 
-          // Activate Firebase App Check deterministically
-          try {
-            final AndroidProvider androidProvider = kDebugMode
-                ? AndroidProvider.debug
-                : AndroidProvider.playIntegrity;
-            final AppleProvider appleProvider = kDebugMode
-                ? AppleProvider.debug
-                : AppleProvider.deviceCheck;
+    // Initialize background services (non-blocking)
+    _initializeBackgroundServices();
 
-            await FirebaseAppCheck.instance.activate(
-              androidProvider: androidProvider,
-              appleProvider: appleProvider,
-              providerWeb: kDebugMode
-                  ? ReCaptchaV3Provider('recaptcha-v3-site-key')
-                  : ReCaptchaV3Provider('recaptcha-v3-site-key'),
-            );
-
-            Logger.info(
-              'Firebase App Check activated (${kDebugMode ? 'debug' : 'playIntegrity'})',
-            );
-          } catch (e) {
-            Logger.warning('App Check activation failed: $e');
-          }
-
-          // Initialize Stripe
-          Stripe.publishableKey = 'pk_test_YOUR_PUBLISHABLE_KEY';
-          if (kDebugMode) {
-            Logger.info('Stripe initialized');
-          }
-
-          // Load theme preference
-          SharedPreferences.getInstance().then((prefs) {
-            final isDarkMode = prefs.getBool('isDarkMode') ?? false;
-            final context = appNavigatorKey.currentContext;
-            if (context != null) {
-              try {
-                final themeProvider = Provider.of<ThemeProvider>(
-                  context,
-                  listen: false,
-                );
-                themeProvider.loadTheme(isDarkMode);
-              } catch (e) {
-                if (kDebugMode) {
-                  Logger.warning('Failed to apply saved theme: $e');
-                }
-              }
-            }
+    // Delay subscription service initialization to reduce startup time
+    // Reduced from 2s to 1s for faster service availability
+    Future.delayed(const Duration(seconds: 1), () {
+      try {
+        final context = appNavigatorKey.currentContext;
+        if (context != null) {
+          final subscriptionService = Provider.of<SubscriptionService>(
+            context,
+            listen: false,
+          );
+          subscriptionService.initialize().catchError((e) {
+            Logger.warning('Subscription service initialization failed: $e');
           });
 
-          // Initialize background services (non-blocking)
-          _initializeBackgroundServices();
-
-          // Delay subscription service initialization to reduce startup time
-          // It will auto-initialize when first accessed due to lazy: true
-          Future.delayed(const Duration(seconds: 2), () {
-            try {
-              final context = appNavigatorKey.currentContext;
-              if (context != null) {
-                final subscriptionService = Provider.of<SubscriptionService>(
-                  context,
-                  listen: false,
-                );
-                subscriptionService.initialize().catchError((e) {
-                  Logger.warning(
-                    'Subscription service initialization failed: $e',
-                  );
-                });
-
-                // Initialize creation limit service after subscription service
-                final creationLimitService = Provider.of<CreationLimitService>(
-                  context,
-                  listen: false,
-                );
-                creationLimitService.initialize().catchError((e) {
-                  Logger.warning(
-                    'Creation limit service initialization failed: $e',
-                  );
-                });
-              }
-            } catch (e) {
-              Logger.warning('Could not initialize services: $e');
-            }
+          // Initialize creation limit service after subscription service
+          final creationLimitService = Provider.of<CreationLimitService>(
+            context,
+            listen: false,
+          );
+          creationLimitService.initialize().catchError((e) {
+            Logger.warning('Creation limit service initialization failed: $e');
           });
+        }
+      } catch (e) {
+        Logger.warning('Could not initialize services: $e');
+      }
+    });
 
-          if (kDebugMode) {
-            Logger.success('App initialization complete');
-            Logger.info(
-              'T+${startupStopwatch.elapsed.inMilliseconds}ms: All services initialized',
-            );
-          }
-        })
-        .catchError((e, st) {
-          if (kDebugMode) {
-            if (e is TimeoutException) {
-              Logger.warning(
-                'Firebase initialization timed out, app will continue',
-              );
-            } else {
-              Logger.error('Firebase initialization failed', e, st);
-            }
-          }
-          Logger.error('Stack trace context: ${st.toString()}');
-        });
+    if (kDebugMode) {
+      Logger.success('Background services initialization started');
+      Logger.info(
+        'T+${startupStopwatch.elapsed.inMilliseconds}ms: App fully rendered',
+      );
+    }
   });
 }
 
@@ -266,18 +228,18 @@ Future<void> _initializeBackgroundServices() async {
             });
           }
 
-          // Initialize notifications in background (delayed for faster startup)
-          Future.delayed(const Duration(milliseconds: 500), () {
+          // Initialize notifications in background (reduced delay for faster startup)
+          Future.delayed(const Duration(milliseconds: 200), () {
             NotificationService.initialize().catchError((e) {
               Logger.warning('Notification service initialization failed: $e');
               return;
             });
           });
 
-          // Initialize Firebase Messaging in background if online (increased delay)
+          // Initialize Firebase Messaging in background if online (reduced delay)
           if (isReachable) {
-            // Further delay messaging initialization to prioritize UI
-            Future.delayed(const Duration(seconds: 5), () {
+            // Reduced delay from 5s to 2s for faster messaging availability
+            Future.delayed(const Duration(seconds: 2), () {
               FirebaseMessagingHelper().initialize().catchError((e) {
                 Logger.warning('Firebase Messaging initialization failed: $e');
               });
@@ -333,9 +295,7 @@ class MyApp extends StatelessWidget {
           supportedLocales: const [Locale('en')],
           home: homeOverride ?? const AuthGate(),
           // Add navigation observer for debugging
-          navigatorObservers: [
-            _NavigationLogger(),
-          ],
+          navigatorObservers: [_NavigationLogger()],
         );
       },
     );

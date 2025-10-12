@@ -130,7 +130,7 @@ class AppAppBarView {
 
   // ========== Legacy methods (deprecated - use modernHeader instead) ==========
 
-  @deprecated
+  @Deprecated('Use modernHeader instead. This method will be removed in a future version.')
   static Widget appBarView({
     required BuildContext context,
     required String title,
@@ -161,7 +161,7 @@ class AppAppBarView {
     );
   }
 
-  @deprecated
+  @Deprecated('Use modernBackButton instead. This method will be removed in a future version.')
   static Widget appBarWithOnlyBackButton({
     required BuildContext context,
     Color? backButtonColor,

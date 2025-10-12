@@ -539,12 +539,12 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     bool eventIsAfter = eventTimeHourBefore.isBefore(nowTime);
 
     if (kDebugMode) {
-      print('$eventTimeHourBefore.isAfter($nowTime)');
+      debugPrint('$eventTimeHourBefore.isAfter($nowTime)');
     }
     bool eventIsBefore = eventTimeHourAfter.isAfter(nowTime);
 
     if (kDebugMode) {
-      print('$eventTimeHourAfter.isBefore($nowTime)');
+      debugPrint('$eventTimeHourAfter.isBefore($nowTime)');
     }
     bool eventIsNow = eventTime.isAtSameMomentAs(nowTime);
 
@@ -554,7 +554,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     }
 
     if (kDebugMode) {
-      print(
+      debugPrint(
         'answer Is $answer  $eventIsNow || ($eventIsBefore && $eventIsAfter $nowTime -- $eventTimeHourBefore -- $eventTimeHourAfter)',
       );
     }

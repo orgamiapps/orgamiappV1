@@ -181,14 +181,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     debugPrint('Building UserProfileScreen - isLoading: $_isLoading');
 
     if (_isLoading) {
-      return WillPopScope(
-        onWillPop: () async {
-          // Allow pop during loading, but check if possible
-          if (Navigator.of(context).canPop()) {
-            return true;
-          }
-          return false;
-        },
+      return PopScope(
+        canPop: Navigator.of(context).canPop(),
         child: AppScaffoldWrapper(
           selectedBottomNavIndex: 3, // Profile tab
           backgroundColor: AppThemeColor.backGroundColor,
@@ -220,16 +214,15 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       );
     }
 
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      canPop: Navigator.of(context).canPop(),
+      onPopInvokedWithResult: (didPop, result) {
         // Safely handle back button press
-        debugPrint('UserProfileScreen: Back button pressed');
-        if (Navigator.of(context).canPop()) {
-          debugPrint('UserProfileScreen: Can pop, allowing navigation');
-          return true;
+        debugPrint('UserProfileScreen: Back button pressed - didPop: $didPop');
+        if (didPop) {
+          debugPrint('UserProfileScreen: Successfully popped');
         } else {
-          debugPrint('UserProfileScreen: Cannot pop, preventing crash');
-          return false;
+          debugPrint('UserProfileScreen: Cannot pop, prevented crash');
         }
       },
       child: AppScaffoldWrapper(

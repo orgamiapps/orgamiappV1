@@ -135,8 +135,8 @@ class CreationLimitIndicator extends StatelessWidget {
         : limitService.getGroupProgress();
     
     final total = type == CreationType.event
-        ? CreationLimitService.FREE_EVENT_LIMIT
-        : CreationLimitService.FREE_GROUP_LIMIT;
+        ? CreationLimitService.freeEventLimit
+        : CreationLimitService.freeGroupLimit;
     
     final created = total - remaining;
     final isLow = remaining <= 1;

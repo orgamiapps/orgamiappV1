@@ -9,6 +9,11 @@ import 'package:attendus/screens/Events/ticket_scanner_screen.dart';
 import 'package:attendus/Services/ticket_payment_service.dart';
 import 'package:attendus/screens/Events/ticket_revenue_screen.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:share_plus/share_plus.dart';
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart';
+import 'package:path_provider/path_provider.dart';
 
 class TicketManagementScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -36,6 +41,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
   double? ticketPrice;
   bool isUpgradeEnabled = false;
   double? upgradePrice;
+  final GlobalKey ticketShareKey = GlobalKey();
 
   @override
   void initState() {
@@ -781,7 +787,11 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
           ] else ...[
             Row(
               children: [
-                Icon(Icons.check_circle, color: const Color(0xFF667EEA), size: 20),
+                Icon(
+                  Icons.check_circle,
+                  color: const Color(0xFF667EEA),
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 const Text(
                   'Tickets are enabled',
@@ -982,7 +992,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+            colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
           ),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
@@ -1507,81 +1517,594 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
     );
   }
 
+  Future<void> _shareTicket(TicketModel ticket) async {
+    try {
+      // Ensure the event image is cached before rendering
+      await precacheImage(
+        CachedNetworkImageProvider(ticket.eventImageUrl),
+        context,
+      );
+
+      if (!mounted) return;
+      final overlay = Overlay.maybeOf(context);
+      if (overlay == null) throw Exception('Overlay not available');
+
+      late OverlayEntry entry;
+      entry = OverlayEntry(
+        builder: (context) => Material(
+          type: MaterialType.transparency,
+          child: Center(
+            child: RepaintBoundary(
+              key: ticketShareKey,
+              child: _buildShareableTicketCard(ticket),
+            ),
+          ),
+        ),
+      );
+
+      overlay.insert(entry);
+      // Wait for the frame to paint
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      final boundary =
+          ticketShareKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
+      if (boundary == null) throw Exception('Share boundary not found');
+
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) throw Exception('Failed to encode image');
+      final bytes = byteData.buffer.asUint8List();
+
+      // Remove the overlay entry as soon as we have the bytes
+      entry.remove();
+
+      final tempDir = await getTemporaryDirectory();
+      final file = File(
+        '${tempDir.path}/orgami_ticket_${ticket.ticketCode}.png',
+      );
+      await file.writeAsBytes(bytes);
+
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text:
+            'AttendUs Ticket • ${ticket.eventTitle} • Code: ${ticket.ticketCode}',
+      );
+    } catch (e) {
+      debugPrint('Error sharing ticket: $e');
+      ShowToast().showNormalToast(msg: 'Failed to share ticket');
+    }
+  }
+
+  Widget _buildShareableTicketCard(TicketModel ticket) {
+    // Fixed width for consistent image output
+    const double cardWidth = 360; // logical pixels before pixelRatio scaling
+    return Container(
+      width: cardWidth,
+      margin: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header image
+            CachedNetworkImage(
+              imageUrl: ticket.eventImageUrl,
+              height: 160,
+              fit: BoxFit.cover,
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          ticket.eventTitle,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF111827),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              (ticket.isUsed
+                                      ? Colors.red
+                                      : const Color(0xFF667EEA))
+                                  .withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          ticket.isUsed ? 'USED' : 'ACTIVE',
+                          style: TextStyle(
+                            color: ticket.isUsed
+                                ? Colors.red
+                                : const Color(0xFF667EEA),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today,
+                        size: 16,
+                        color: Color(0xFF6B7280),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        DateFormat(
+                          'EEE, MMM dd • h:mm a',
+                        ).format(ticket.eventDateTime),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF374151),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on,
+                        size: 16,
+                        color: Color(0xFF6B7280),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          ticket.eventLocation,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF374151),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Ticket Code',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF6B7280),
+                              ),
+                            ),
+                            Text(
+                              ticket.ticketCode,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.5,
+                                color: Color(0xFF111827),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.white,
+                        ),
+                        padding: const EdgeInsets.all(6),
+                        child: QrImageView(
+                          data: ticket.qrCodeData,
+                          version: QrVersions.auto,
+                          size: 88,
+                          gapless: false,
+                          backgroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Divider(height: 20),
+                  const Center(
+                    child: Text(
+                      'Powered by AttendUs',
+                      style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTicketDetailDialog(TicketModel ticket) {
     return Dialog(
       backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
       child: Container(
-        width: double.infinity,
-        constraints: const BoxConstraints(maxWidth: 400),
+        constraints: const BoxConstraints(maxWidth: 380),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.2),
-              spreadRadius: 0,
-              blurRadius: 20,
-              offset: const Offset(0, 10),
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 40,
+              offset: const Offset(0, 20),
             ),
           ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header with close button
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Color(0xFF667EEA),
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(24),
-                  topRight: Radius.circular(24),
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.confirmation_number,
-                    color: Colors.white,
-                    size: 24,
+            // Elegant header with image and gradient overlay
+            Stack(
+              children: [
+                // Event image with gradient overlay
+                ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(28),
+                    topRight: Radius.circular(28),
                   ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Event Ticket',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Roboto',
+                  child: Stack(
+                    children: [
+                      CachedNetworkImage(
+                        imageUrl: ticket.eventImageUrl,
+                        height: 160,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
                       ),
-                    ),
+                      // Dark gradient overlay for better text readability
+                      Container(
+                        height: 160,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.black.withValues(alpha: 0.3),
+                              Colors.black.withValues(alpha: 0.7),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Title and status overlay on image
+                      Positioned(
+                        left: 20,
+                        right: 20,
+                        bottom: 16,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              ticket.eventTitle,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black45,
+                                    offset: Offset(0, 2),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                if (ticket.isSkipTheLine) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFFFFD700),
+                                          Color(0xFFFFA500),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.flash_on,
+                                          color: Colors.white,
+                                          size: 14,
+                                        ),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          'VIP',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: ticket.isUsed
+                                        ? const Color(0xFFEF4444)
+                                        : const Color(0xFF10B981),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    ticket.isUsed ? 'USED' : 'ACTIVE',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(
-                      Icons.close,
-                      color: Colors.white,
-                      size: 24,
-                    ),
+                ),
+                // Action buttons with better visibility
+                Positioned(
+                  right: 12,
+                  top: 12,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.ios_share,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _shareTicket(ticket);
+                          },
+                          tooltip: 'Share',
+                          padding: const EdgeInsets.all(8),
+                          constraints: const BoxConstraints(
+                            minWidth: 40,
+                            minHeight: 40,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.close,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          onPressed: () => Navigator.pop(context),
+                          tooltip: 'Close',
+                          padding: const EdgeInsets.all(8),
+                          constraints: const BoxConstraints(
+                            minWidth: 40,
+                            minHeight: 40,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
 
-            // Ticket content
+            // Ticket details section
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(24),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Event details with modern icons
+                    _buildModernDetailRow(
+                      Icons.calendar_month_rounded,
+                      'Date & Time',
+                      DateFormat(
+                        'EEE, MMM dd, yyyy • h:mm a',
+                      ).format(ticket.eventDateTime),
+                    ),
+                    const SizedBox(height: 14),
+                    _buildModernDetailRow(
+                      Icons.location_on_rounded,
+                      'Location',
+                      ticket.eventLocation,
+                    ),
+                    const SizedBox(height: 14),
+                    _buildModernDetailRow(
+                      Icons.person_rounded,
+                      'Attendee',
+                      ticket.customerName,
+                    ),
+
+                    // Divider
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Divider(height: 1, thickness: 1),
+                    ),
+
+                    // QR Code section
+                    if (!ticket.isUsed) ...[
+                      Center(
+                        child: Column(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF9FAFB),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: const Color(0xFFE5E7EB),
+                                  width: 1,
+                                ),
+                              ),
+                              child: QrImageView(
+                                data: ticket.qrCodeData,
+                                version: QrVersions.auto,
+                                size: 180,
+                                backgroundColor: const Color(0xFFF9FAFB),
+                                eyeStyle: const QrEyeStyle(
+                                  eyeShape: QrEyeShape.square,
+                                  color: Color(0xFF1F2937),
+                                ),
+                                dataModuleStyle: const QrDataModuleStyle(
+                                  dataModuleShape: QrDataModuleShape.square,
+                                  color: Color(0xFF1F2937),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Ticket Code: ${ticket.ticketCode}',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1F2937),
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Show this QR code to scan at entry',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF6B7280),
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
+                      Center(
+                        child: Column(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF2F2),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: const Color(
+                                    0xFFEF4444,
+                                  ).withValues(alpha: 0.3),
+                                  width: 2,
+                                ),
+                              ),
+                              child: const Column(
+                                children: [
+                                  Icon(
+                                    Icons.check_circle_rounded,
+                                    size: 64,
+                                    color: Color(0xFFEF4444),
+                                  ),
+                                  SizedBox(height: 12),
+                                  Text(
+                                    'Ticket Already Used',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      color: Color(0xFFEF4444),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            if (ticket.usedDateTime != null)
+                              Text(
+                                'Used on ${DateFormat('MMM dd, yyyy • h:mm a').format(ticket.usedDateTime!)}',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF6B7280),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    // Upgrade button for eligible tickets
                     if (!ticket.isUsed &&
                         !ticket.isSkipTheLine &&
                         (ticket.price ?? 0) > 0 &&
                         widget.eventModel.ticketUpgradeEnabled &&
                         widget.eventModel.ticketUpgradePrice != null) ...[
-                      _buildInlineUpgradeBanner(ticket),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 20),
                       SizedBox(
                         width: double.infinity,
                         height: 48,
@@ -1607,199 +2130,18 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
-                    ],
-                    // Event image and title
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: CachedNetworkImage(
-                        imageUrl: ticket.eventImageUrl,
-                        height: 120,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          height: 120,
-                          color: const Color(0xFFF5F7FA),
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              color: Color(0xFF667EEA),
-                            ),
-                          ),
-                        ),
-                        errorWidget: (context, url, error) => Container(
-                          height: 120,
-                          color: const Color(0xFFF5F7FA),
-                          child: const Center(
-                            child: Icon(
-                              Icons.image_not_supported,
-                              color: Color(0xFF667EEA),
-                              size: 32,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Event title
-                    Text(
-                      ticket.eventTitle,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A1A1A),
-                        fontFamily: 'Roboto',
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Event details
-                    _buildTicketDetailRow(
-                      icon: Icons.location_on,
-                      label: 'Location',
-                      value: ticket.eventLocation,
-                    ),
-                    _buildTicketDetailRow(
-                      icon: Icons.calendar_today,
-                      label: 'Date & Time',
-                      value: DateFormat(
-                        'EEEE, MMMM dd, yyyy\nh:mm a',
-                      ).format(ticket.eventDateTime),
-                    ),
-                    _buildTicketDetailRow(
-                      icon: Icons.person,
-                      label: 'Attendee',
-                      value: ticket.customerName,
-                    ),
-                    _buildTicketDetailRow(
-                      icon: Icons.confirmation_number,
-                      label: 'Ticket Code',
-                      value: ticket.ticketCode,
-                    ),
-                    _buildTicketDetailRow(
-                      icon: Icons.schedule,
-                      label: 'Issued',
-                      value: DateFormat(
-                        'MMM dd, yyyy',
-                      ).format(ticket.issuedDateTime),
-                    ),
-
-                    if (ticket.isUsed) ...[
-                      _buildTicketDetailRow(
-                        icon: Icons.check_circle,
-                        label: 'Used',
-                        value: DateFormat(
-                          'MMM dd, yyyy',
-                        ).format(ticket.usedDateTime!),
-                        color: const Color(0xFFEF4444),
-                      ),
                     ],
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
 
-                    // QR Code section (only for active tickets)
-                    if (!ticket.isUsed) ...[
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: const Color(
-                            0xFF667EEA,
-                          ).withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: const Color(
-                              0xFF667EEA,
-                            ).withValues(alpha: 0.2),
-                          ),
+                    // Footer
+                    Center(
+                      child: Text(
+                        'Issued: ${DateFormat('MMMM dd, yyyy').format(ticket.issuedDateTime)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF9CA3AF),
                         ),
-                        child: Column(
-                          children: [
-                            const Text(
-                              'Show this QR code to the event host',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF6B7280),
-                                fontFamily: 'Roboto',
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 16),
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: const Color(
-                                    0xFF667EEA,
-                                  ).withValues(alpha: 0.3),
-                                ),
-                              ),
-                              child: QrImageView(
-                                data: ticket.qrCodeData,
-                                version: QrVersions.auto,
-                                size: 150,
-                                backgroundColor: Colors.white,
-                                eyeStyle: const QrEyeStyle(
-                                  eyeShape: QrEyeShape.square,
-                                  color: Color(0xFF1A1A1A),
-                                ),
-                                dataModuleStyle: const QrDataModuleStyle(
-                                  dataModuleShape: QrDataModuleShape.square,
-                                  color: Color(0xFF1A1A1A),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-
-                    const SizedBox(height: 20),
-
-                    // Status indicator
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: ticket.isUsed
-                            ? const Color(0xFFEF4444).withValues(alpha: 0.1)
-                            : const Color(0xFF10B981).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: ticket.isUsed
-                              ? const Color(0xFFEF4444)
-                              : const Color(0xFF10B981),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            ticket.isUsed
-                                ? Icons.check_circle
-                                : Icons.confirmation_number,
-                            color: ticket.isUsed
-                                ? const Color(0xFFEF4444)
-                                : const Color(0xFF667EEA),
-                            size: 16,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            ticket.isUsed ? 'Ticket Used' : 'Active Ticket',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: ticket.isUsed
-                                  ? const Color(0xFFEF4444)
-                                  : const Color(0xFF667EEA),
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
-                        ],
                       ),
                     ),
                   ],
@@ -1983,57 +2325,44 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
     }
   }
 
-  Widget _buildTicketDetailRow({
-    required IconData icon,
-    required String label,
-    required String value,
-    Color? color,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: (color ?? const Color(0xFF667EEA)).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              icon,
-              color: color ?? const Color(0xFF667EEA),
-              size: 16,
-            ),
+  Widget _buildModernDetailRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF6B7280),
-                    fontFamily: 'Roboto',
-                  ),
+          child: Icon(icon, size: 20, color: const Color(0xFF667EEA)),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF6B7280),
+                  fontWeight: FontWeight.w500,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: color ?? const Color(0xFF1A1A1A),
-                    fontFamily: 'Roboto',
-                  ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: Color(0xFF1F2937),
+                  fontWeight: FontWeight.w600,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

@@ -83,10 +83,10 @@ class PlatformHelper {
   /// Get Firebase initialization timeout
   static Duration getFirebaseTimeout() {
     if (_isEmulator == true) {
-      // Longer timeout for emulators as they might be slower
-      return const Duration(seconds: 20);
+      // Reduced timeout to prevent app from appearing frozen
+      return const Duration(seconds: 5);
     }
-    // Normal timeout for real devices
-    return const Duration(seconds: 10);
+    // Reduced timeout for faster failure recovery
+    return const Duration(seconds: 5);
   }
 }

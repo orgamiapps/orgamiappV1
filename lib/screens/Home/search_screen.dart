@@ -789,7 +789,7 @@ class _EventsListState extends State<EventsList>
                   'view',
                 ).catchError((e) {
                   if (kDebugMode) {
-                    print('Error tracking engagement: $e');
+                    debugPrint('Error tracking engagement: $e');
                   }
                 });
                 RecommendationAnalytics.trackRecommendationInteraction(
@@ -798,7 +798,7 @@ class _EventsListState extends State<EventsList>
                   position: index + 1,
                 ).catchError((e) {
                   if (kDebugMode) {
-                    print('Error tracking recommendation interaction: $e');
+                    debugPrint('Error tracking recommendation interaction: $e');
                   }
                 });
               },
@@ -1281,7 +1281,7 @@ class _UsersListState extends State<UsersList>
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error loading users: $e');
+        debugPrint('Error loading users: $e');
       }
       if (mounted) {
         setState(() {

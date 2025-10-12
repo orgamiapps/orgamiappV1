@@ -374,14 +374,14 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
     if (_hasAutoUpdated) return;
 
     try {
-      print('🔄 Auto-enhancing profile on account details screen load...');
+      debugPrint('🔄 Auto-enhancing profile on account details screen load...');
 
       // Run comprehensive profile enhancement
       await _performComprehensiveProfileUpdate();
 
       _hasAutoUpdated = true;
     } catch (e) {
-      print('❌ Auto profile enhancement failed: $e');
+      debugPrint('❌ Auto profile enhancement failed: $e');
     }
   }
 
@@ -390,17 +390,17 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
     final customer = CustomerController.logeInCustomer;
     if (customer == null) return;
 
-    print('📊 Analyzing profile completeness...');
-    print('Current name: "${customer.name}"');
-    print('Current email: "${customer.email}"');
-    print('Current phone: "${customer.phoneNumber}"');
+    debugPrint('📊 Analyzing profile completeness...');
+    debugPrint('Current name: "${customer.name}"');
+    debugPrint('Current email: "${customer.email}"');
+    debugPrint('Current phone: "${customer.phoneNumber}"');
 
     // Check if profile needs enhancement
     bool needsUpdate = _profileNeedsEnhancement(customer);
-    print('Profile needs update: $needsUpdate');
+    debugPrint('Profile needs update: $needsUpdate');
 
     if (!needsUpdate) {
-      print('✅ Profile already complete');
+      debugPrint('✅ Profile already complete');
       return;
     }
 
@@ -418,11 +418,11 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
     }
 
     if (success) {
-      print('✅ Profile successfully enhanced');
+      debugPrint('✅ Profile successfully enhanced');
       // Reload UI with updated data
       await _loadUserData();
     } else {
-      print('⚠️ Could not enhance profile - no additional data available');
+      debugPrint('⚠️ Could not enhance profile - no additional data available');
     }
   }
 
@@ -445,7 +445,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
   /// Strategy 1: Fresh social authentication
   Future<bool> _tryFreshSocialAuthentication() async {
     try {
-      print('🔄 Trying fresh social authentication...');
+      debugPrint('🔄 Trying fresh social authentication...');
 
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) return false;
@@ -458,28 +458,28 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
         (p) => p.providerId == 'apple.com',
       );
 
-      print('Has Google provider: $hasGoogle');
-      print('Has Apple provider: $hasApple');
+      debugPrint('Has Google provider: $hasGoogle');
+      debugPrint('Has Apple provider: $hasApple');
 
       if (hasGoogle) {
-        print('🔄 Performing fresh Google authentication...');
+        debugPrint('🔄 Performing fresh Google authentication...');
         final helper = FirebaseGoogleAuthHelper();
         final profileData = await helper.loginWithGoogle();
 
         if (profileData != null) {
-          print('✅ Got fresh Google data');
+          debugPrint('✅ Got fresh Google data');
           await AuthService().handleSocialLoginSuccessWithProfileData(
             profileData,
           );
           return true;
         }
       } else if (hasApple) {
-        print('🔄 Performing fresh Apple authentication...');
+        debugPrint('🔄 Performing fresh Apple authentication...');
         final helper = FirebaseGoogleAuthHelper();
         final profileData = await helper.loginWithApple();
 
         if (profileData != null) {
-          print('✅ Got fresh Apple data');
+          debugPrint('✅ Got fresh Apple data');
           await AuthService().handleSocialLoginSuccessWithProfileData(
             profileData,
           );
@@ -489,7 +489,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
 
       return false;
     } catch (e) {
-      print('❌ Fresh social authentication failed: $e');
+      debugPrint('❌ Fresh social authentication failed: $e');
       return false;
     }
   }
@@ -497,10 +497,10 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
   /// Strategy 2: Update from existing Firebase Auth data
   Future<bool> _tryUpdateFromFirebaseAuth() async {
     try {
-      print('🔄 Trying update from Firebase Auth...');
+      debugPrint('🔄 Trying update from Firebase Auth...');
       return await AuthService().updateCurrentUserProfileFromAuth();
     } catch (e) {
-      print('❌ Firebase Auth update failed: $e');
+      debugPrint('❌ Firebase Auth update failed: $e');
       return false;
     }
   }
@@ -508,7 +508,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
   /// Strategy 3: Force token refresh and retry
   Future<bool> _tryForceTokenRefreshAndUpdate() async {
     try {
-      print('🔄 Forcing token refresh...');
+      debugPrint('🔄 Forcing token refresh...');
 
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) return false;
@@ -518,10 +518,10 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
       final refreshedUser = FirebaseAuth.instance.currentUser;
 
       if (refreshedUser != null) {
-        print(
+        debugPrint(
           'Current displayName after reload: "${refreshedUser.displayName}"',
         );
-        print('Current email after reload: "${refreshedUser.email}"');
+        debugPrint('Current email after reload: "${refreshedUser.email}"');
 
         // Try to update with refreshed data
         return await AuthService().updateCurrentUserProfileFromAuth();
@@ -529,7 +529,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
 
       return false;
     } catch (e) {
-      print('❌ Token refresh failed: $e');
+      debugPrint('❌ Token refresh failed: $e');
       return false;
     }
   }

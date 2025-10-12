@@ -149,7 +149,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                           await LimitReachedDialog.show(
                             context,
                             type: 'group',
-                            limit: CreationLimitService.FREE_GROUP_LIMIT,
+                            limit: CreationLimitService.freeGroupLimit,
                           );
                           return;
                         }

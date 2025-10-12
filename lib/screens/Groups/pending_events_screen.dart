@@ -96,8 +96,8 @@ class _PendingEventsScreenState extends State<PendingEventsScreen> {
               // Debug: Print error details
               if (snapshot.hasError) {
                 if (kDebugMode) {
-                  print('Pending events query error: ${snapshot.error}');
-                  print('Organization ID: ${widget.organizationId}');
+                  debugPrint('Pending events query error: ${snapshot.error}');
+                  debugPrint('Organization ID: ${widget.organizationId}');
                 }
                 return Center(
                   child: Padding(
@@ -182,7 +182,7 @@ class _PendingEventsScreenState extends State<PendingEventsScreen> {
       return false;
     } catch (e) {
       if (kDebugMode) {
-        print('Error checking approval settings: $e');
+        debugPrint('Error checking approval settings: $e');
       }
       return false;
     }
@@ -197,7 +197,7 @@ class _PendingEventsScreenState extends State<PendingEventsScreen> {
           .snapshots();
     } catch (e) {
       if (kDebugMode) {
-        print('Error creating pending events stream: $e');
+        debugPrint('Error creating pending events stream: $e');
       }
       // Return empty stream in case of error
       return const Stream.empty();

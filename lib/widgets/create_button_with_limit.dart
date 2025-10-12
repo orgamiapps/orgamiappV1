@@ -46,8 +46,8 @@ class CreateButtonWithLimit extends StatelessWidget {
             ? limitService.canCreateEvent
             : limitService.canCreateGroup;
         final limit = isEvent
-            ? CreationLimitService.FREE_EVENT_LIMIT
-            : CreationLimitService.FREE_GROUP_LIMIT;
+            ? CreationLimitService.freeEventLimit
+            : CreationLimitService.freeGroupLimit;
 
         return GestureDetector(
           onTap: canCreate

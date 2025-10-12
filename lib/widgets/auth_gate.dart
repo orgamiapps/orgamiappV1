@@ -40,8 +40,16 @@ class _AuthGateState extends State<AuthGate> {
       Logger.debug('🔄 AuthGate: Checking Firebase Auth state...');
 
       // Ensure Firebase is initialized first (centralized + idempotent)
+      // Firebase should already be initialized in main.dart, so this is a safety check
       try {
-        await FirebaseInitializer.initializeOnce();
+        await FirebaseInitializer.initializeOnce().timeout(
+          const Duration(seconds: 2),
+          onTimeout: () {
+            Logger.debug(
+              '⏰ AuthGate: Firebase init timeout, assuming already initialized',
+            );
+          },
+        );
         Logger.debug('✅ AuthGate: Firebase initialized');
       } catch (e) {
         Logger.debug(
@@ -90,8 +98,8 @@ class _AuthGateState extends State<AuthGate> {
         }
       });
 
-      // Timeout after 3 seconds to prevent hanging
-      Timer(const Duration(seconds: 3), () {
+      // Timeout after 2 seconds to prevent hanging (reduced from 3s)
+      Timer(const Duration(seconds: 2), () {
         if (mounted && _isChecking) {
           Logger.warning('⏰ AuthGate: Timeout waiting for Firebase Auth state');
           _authStateSubscription?.cancel();
@@ -132,21 +140,21 @@ class _AuthGateState extends State<AuthGate> {
       try {
         Logger.info('AuthGate: Initializing AuthService in background');
         await AuthService().initialize();
-        
+
         // After initialization, try to refresh user data
         Logger.info('AuthGate: Refreshing user data');
         final authService = AuthService();
         await authService.refreshUserData();
-        
+
         // If data is still incomplete, try aggressive update
         final currentUser = CustomerController.logeInCustomer;
-        if (currentUser != null && 
-            (currentUser.name.isEmpty || 
-             currentUser.name == currentUser.email.split('@')[0])) {
+        if (currentUser != null &&
+            (currentUser.name.isEmpty ||
+                currentUser.name == currentUser.email.split('@')[0])) {
           Logger.info('AuthGate: Running aggressive profile update');
           await authService.aggressiveProfileUpdate();
         }
-        
+
         // Initialize SubscriptionService to load subscription data early
         if (mounted) {
           try {
@@ -160,10 +168,12 @@ class _AuthGateState extends State<AuthGate> {
               'AuthGate: SubscriptionService initialized - hasPremium: ${subscriptionService.hasPremium}',
             );
           } catch (e) {
-            Logger.warning('AuthGate: Failed to initialize SubscriptionService: $e');
+            Logger.warning(
+              'AuthGate: Failed to initialize SubscriptionService: $e',
+            );
           }
         }
-        
+
         Logger.info('AuthGate: Background initialization complete');
       } catch (e) {
         Logger.warning('Background AuthService init failed: $e');

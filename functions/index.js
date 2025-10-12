@@ -1185,6 +1185,301 @@ function analyzeRepeatAttendees(analyticsData, attendees) {
 }
 
 /**
+ * Aggregate user analytics when event_analytics changes
+ * This maintains a single user_analytics/{userId} document with all aggregated data
+ * Dramatically reduces client-side queries from N+1 to 1
+ */
+exports.aggregateUserAnalytics = onDocumentWritten("event_analytics/{eventId}",
+    async (event) => {
+      try {
+        const eventId = event.params.eventId;
+        const db = admin.firestore();
+
+        // Get the event to find the creator
+        const eventDoc = await db.collection("Events").doc(eventId).get();
+        if (!eventDoc.exists) {
+          logger.info("Event not found, skipping user analytics update:", eventId);
+          return;
+        }
+
+        const eventData = eventDoc.data();
+        const userId = eventData.customerUid;
+        if (!userId) {
+          logger.info("No userId found for event:", eventId);
+          return;
+        }
+
+        logger.info("Updating user analytics for user:", userId);
+
+        // Get all events by this user
+        const userEventsQuery = await db.collection("Events")
+            .where("customerUid", "==", userId)
+            .get();
+
+        const userEvents = userEventsQuery.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
+        // Get analytics for all user events in parallel
+        const eventAnalyticsPromises = userEvents.map(evt => 
+          db.collection("event_analytics").doc(evt.id).get()
+        );
+        const eventAnalyticsDocs = await Promise.all(eventAnalyticsPromises);
+
+        // Build aggregated analytics
+        let totalAttendees = 0;
+        let topPerformingEvent = null;
+        let maxAttendees = -1;
+        const eventCategories = {};
+        const monthlyTrends = {};
+        const eventAnalytics = {};
+
+        userEvents.forEach((evt, index) => {
+          const analyticsDoc = eventAnalyticsDocs[index];
+          const analytics = analyticsDoc.exists ? analyticsDoc.data() : {};
+          
+          const attendees = analytics.totalAttendees || 0;
+          const repeatAttendees = analytics.repeatAttendees || 0;
+
+          totalAttendees += attendees;
+
+          // Store individual event analytics
+          eventAnalytics[evt.id] = {
+            attendees: attendees,
+            repeatAttendees: repeatAttendees,
+          };
+
+          // Track top performing event
+          if (attendees > maxAttendees) {
+            maxAttendees = attendees;
+            topPerformingEvent = {
+              id: evt.id,
+              title: evt.title || "Untitled Event",
+              attendees: attendees,
+              date: evt.selectedDateTime || null,
+            };
+          }
+
+          // Track event categories
+          const category = (evt.categories && evt.categories.length > 0) 
+              ? evt.categories[0] 
+              : "Other";
+          eventCategories[category] = (eventCategories[category] || 0) + 1;
+
+          // Track monthly trends
+          if (evt.selectedDateTime) {
+            const date = evt.selectedDateTime.toDate ? evt.selectedDateTime.toDate() : new Date(evt.selectedDateTime);
+            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            monthlyTrends[monthKey] = (monthlyTrends[monthKey] || 0) + attendees;
+          }
+        });
+
+        // Calculate retention rate across all user's events
+        let retentionRate = 0;
+        try {
+          // Get attendance records for up to 60 most recent events
+          const recentEvents = userEvents
+              .sort((a, b) => {
+                const dateA = a.selectedDateTime?.toDate ? a.selectedDateTime.toDate() : new Date(a.selectedDateTime);
+                const dateB = b.selectedDateTime?.toDate ? b.selectedDateTime.toDate() : new Date(b.selectedDateTime);
+                return dateB - dateA;
+              })
+              .slice(0, 60);
+
+          const eventIds = recentEvents.map(evt => evt.id);
+          
+          if (eventIds.length > 0) {
+            // Use batched queries (Firestore allows 10 items per 'in' query)
+            const batchSize = 10;
+            const attendanceSnapshots = [];
+            
+            for (let i = 0; i < eventIds.length; i += batchSize) {
+              const batch = eventIds.slice(i, i + batchSize);
+              const snapshot = await db.collection("Attendance")
+                  .where("eventId", "in", batch)
+                  .get();
+              attendanceSnapshots.push(...snapshot.docs);
+            }
+
+            // Count unique attendees and repeat attendees
+            const attendeeCountsByUser = {};
+            attendanceSnapshots.forEach(doc => {
+              const data = doc.data();
+              const uid = data.customerUid;
+              if (uid && uid !== "manual") {
+                attendeeCountsByUser[uid] = (attendeeCountsByUser[uid] || 0) + 1;
+              }
+            });
+
+            const uniqueAttendeeCount = Object.keys(attendeeCountsByUser).length;
+            const repeatAttendeeCount = Object.values(attendeeCountsByUser)
+                .filter(count => count > 1)
+                .length;
+
+            retentionRate = uniqueAttendeeCount > 0 
+                ? (repeatAttendeeCount / uniqueAttendeeCount) * 100.0 
+                : 0.0;
+          }
+        } catch (retentionError) {
+          logger.error("Error calculating retention rate:", retentionError);
+          retentionRate = 0;
+        }
+
+        // Calculate average attendance
+        const averageAttendance = userEvents.length > 0 
+            ? totalAttendees / userEvents.length 
+            : 0;
+
+        // Build the user analytics document
+        const userAnalytics = {
+          totalEvents: userEvents.length,
+          totalAttendees: totalAttendees,
+          averageAttendance: averageAttendance,
+          topPerformingEvent: topPerformingEvent,
+          eventCategories: eventCategories,
+          monthlyTrends: monthlyTrends,
+          retentionRate: retentionRate,
+          eventAnalytics: eventAnalytics,
+          lastUpdated: admin.firestore.Timestamp.now(),
+        };
+
+        // Save to user_analytics collection
+        await db.collection("user_analytics").doc(userId).set(userAnalytics);
+
+        logger.info("User analytics updated successfully for user:", userId);
+      } catch (error) {
+        logger.error("Error in aggregateUserAnalytics:", error);
+        // Don't throw - we don't want to fail the triggering write
+      }
+    });
+
+/**
+ * Initialize user analytics when a new event is created
+ */
+exports.updateUserAnalyticsOnEventCreate = onDocumentCreated("Events/{eventId}",
+    async (event) => {
+      try {
+        const eventData = event.data.data();
+        const userId = eventData.customerUid;
+        
+        if (!userId) {
+          return;
+        }
+
+        logger.info("Initializing user analytics for new event, user:", userId);
+
+        const db = admin.firestore();
+        
+        // Check if user analytics already exists
+        const userAnalyticsDoc = await db.collection("user_analytics").doc(userId).get();
+        
+        if (!userAnalyticsDoc.exists) {
+          // Initialize with minimal data
+          const eventId = event.params.eventId;
+          const category = (eventData.categories && eventData.categories.length > 0)
+              ? eventData.categories[0]
+              : "Other";
+          
+          const monthKey = eventData.selectedDateTime 
+              ? (() => {
+                const date = eventData.selectedDateTime.toDate ? eventData.selectedDateTime.toDate() : new Date(eventData.selectedDateTime);
+                return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+              })()
+              : null;
+
+          const initialAnalytics = {
+            totalEvents: 1,
+            totalAttendees: 0,
+            averageAttendance: 0,
+            topPerformingEvent: {
+              id: eventId,
+              title: eventData.title || "Untitled Event",
+              attendees: 0,
+              date: eventData.selectedDateTime || null,
+            },
+            eventCategories: { [category]: 1 },
+            monthlyTrends: monthKey ? { [monthKey]: 0 } : {},
+            retentionRate: 0,
+            eventAnalytics: {
+              [eventId]: {
+                attendees: 0,
+                repeatAttendees: 0,
+              },
+            },
+            lastUpdated: admin.firestore.Timestamp.now(),
+          };
+
+          await db.collection("user_analytics").doc(userId).set(initialAnalytics);
+          logger.info("User analytics initialized for user:", userId);
+        } else {
+          // User analytics exists, trigger a full recalculation
+          // Create a temporary event_analytics document to trigger aggregation
+          await db.collection("event_analytics").doc(event.params.eventId).set({
+            totalAttendees: 0,
+            lastUpdated: admin.firestore.Timestamp.now(),
+          }, { merge: true });
+        }
+      } catch (error) {
+        logger.error("Error in updateUserAnalyticsOnEventCreate:", error);
+        // Don't throw - we don't want to fail event creation
+      }
+    });
+
+/**
+ * Update user analytics when an event is deleted
+ */
+exports.updateUserAnalyticsOnEventDelete = onDocumentWritten("Events/{eventId}",
+    async (event) => {
+      try {
+        // Only handle deletions
+        if (event.data.after.exists) {
+          return;
+        }
+
+        const eventData = event.data.before.data();
+        const userId = eventData.customerUid;
+        const eventId = event.params.eventId;
+
+        if (!userId) {
+          return;
+        }
+
+        logger.info("Updating user analytics after event deletion, user:", userId);
+
+        const db = admin.firestore();
+
+        // Delete the event analytics document
+        await db.collection("event_analytics").doc(eventId).delete().catch(() => {
+          // Ignore if doesn't exist
+        });
+
+        // Recalculate user analytics
+        const userEventsQuery = await db.collection("Events")
+            .where("customerUid", "==", userId)
+            .get();
+
+        if (userEventsQuery.empty) {
+          // No more events, delete user analytics
+          await db.collection("user_analytics").doc(userId).delete();
+          logger.info("User analytics deleted (no events remaining) for user:", userId);
+          return;
+        }
+
+        // Trigger recalculation by updating one of the remaining event analytics
+        const firstEventId = userEventsQuery.docs[0].id;
+        await db.collection("event_analytics").doc(firstEventId).set({
+          lastUpdated: admin.firestore.Timestamp.now(),
+        }, { merge: true });
+
+        logger.info("User analytics update triggered after event deletion");
+      } catch (error) {
+        logger.error("Error in updateUserAnalyticsOnEventDelete:", error);
+        // Don't throw
+      }
+    });
+
+/**
  * Send scheduled notifications
  * Runs every minute to check for notifications that need to be sent
  */
@@ -3280,6 +3575,206 @@ exports.sendBasicTierUsageReminder = onSchedule({
     return { success: true, count: reminderCount, timestamp: now };
   } catch (error) {
     logger.error('❌ Error sending usage reminders:', error);
+    throw error;
+  }
+});
+
+/**
+ * Backfill User Analytics
+ * Callable function to migrate existing users to the new user_analytics system
+ * Run once to populate user_analytics for all users with events
+ */
+exports.backfillUserAnalytics = onCall({ region: "us-central1" }, async (req) => {
+  try {
+    // Require admin auth (check if caller has admin custom claim)
+    if (!req.auth) {
+      throw new Error("Authentication required");
+    }
+
+    logger.info("Starting user analytics backfill...");
+    const db = admin.firestore();
+
+    // Get all unique event creators
+    const eventsSnapshot = await db.collection("Events").get();
+    const userIds = new Set();
+    
+    eventsSnapshot.docs.forEach((doc) => {
+      const customerUid = doc.data().customerUid;
+      if (customerUid) {
+        userIds.add(customerUid);
+      }
+    });
+
+    logger.info(`Found ${userIds.size} unique event creators to process`);
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    // Process each user
+    for (const userId of userIds) {
+      try {
+        logger.info(`Processing user: ${userId}`);
+
+        // Get all events by this user
+        const userEventsQuery = await db.collection("Events")
+            .where("customerUid", "==", userId)
+            .get();
+
+        const userEvents = userEventsQuery.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
+        if (userEvents.length === 0) {
+          logger.info(`User ${userId} has no events, skipping`);
+          continue;
+        }
+
+        // Get analytics for all user events in parallel
+        const eventAnalyticsPromises = userEvents.map(evt => 
+          db.collection("event_analytics").doc(evt.id).get()
+        );
+        const eventAnalyticsDocs = await Promise.all(eventAnalyticsPromises);
+
+        // Build aggregated analytics
+        let totalAttendees = 0;
+        let topPerformingEvent = null;
+        let maxAttendees = -1;
+        const eventCategories = {};
+        const monthlyTrends = {};
+        const eventAnalytics = {};
+
+        userEvents.forEach((evt, index) => {
+          const analyticsDoc = eventAnalyticsDocs[index];
+          const analytics = analyticsDoc.exists ? analyticsDoc.data() : {};
+          
+          const attendees = analytics.totalAttendees || 0;
+          const repeatAttendees = analytics.repeatAttendees || 0;
+
+          totalAttendees += attendees;
+
+          // Store individual event analytics
+          eventAnalytics[evt.id] = {
+            attendees: attendees,
+            repeatAttendees: repeatAttendees,
+          };
+
+          // Track top performing event
+          if (attendees > maxAttendees) {
+            maxAttendees = attendees;
+            topPerformingEvent = {
+              id: evt.id,
+              title: evt.title || "Untitled Event",
+              attendees: attendees,
+              date: evt.selectedDateTime || null,
+            };
+          }
+
+          // Track event categories
+          const category = (evt.categories && evt.categories.length > 0) 
+              ? evt.categories[0] 
+              : "Other";
+          eventCategories[category] = (eventCategories[category] || 0) + 1;
+
+          // Track monthly trends
+          if (evt.selectedDateTime) {
+            const date = evt.selectedDateTime.toDate ? evt.selectedDateTime.toDate() : new Date(evt.selectedDateTime);
+            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            monthlyTrends[monthKey] = (monthlyTrends[monthKey] || 0) + attendees;
+          }
+        });
+
+        // Calculate retention rate
+        let retentionRate = 0;
+        try {
+          const recentEvents = userEvents
+              .sort((a, b) => {
+                const dateA = a.selectedDateTime?.toDate ? a.selectedDateTime.toDate() : new Date(a.selectedDateTime);
+                const dateB = b.selectedDateTime?.toDate ? b.selectedDateTime.toDate() : new Date(b.selectedDateTime);
+                return dateB - dateA;
+              })
+              .slice(0, 60);
+
+          const eventIds = recentEvents.map(evt => evt.id);
+          
+          if (eventIds.length > 0) {
+            const batchSize = 10;
+            const attendanceSnapshots = [];
+            
+            for (let i = 0; i < eventIds.length; i += batchSize) {
+              const batch = eventIds.slice(i, i + batchSize);
+              const snapshot = await db.collection("Attendance")
+                  .where("eventId", "in", batch)
+                  .get();
+              attendanceSnapshots.push(...snapshot.docs);
+            }
+
+            const attendeeCountsByUser = {};
+            attendanceSnapshots.forEach(doc => {
+              const data = doc.data();
+              const uid = data.customerUid;
+              if (uid && uid !== "manual") {
+                attendeeCountsByUser[uid] = (attendeeCountsByUser[uid] || 0) + 1;
+              }
+            });
+
+            const uniqueAttendeeCount = Object.keys(attendeeCountsByUser).length;
+            const repeatAttendeeCount = Object.values(attendeeCountsByUser)
+                .filter(count => count > 1)
+                .length;
+
+            retentionRate = uniqueAttendeeCount > 0 
+                ? (repeatAttendeeCount / uniqueAttendeeCount) * 100.0 
+                : 0.0;
+          }
+        } catch (retentionError) {
+          logger.error(`Error calculating retention for user ${userId}:`, retentionError);
+        }
+
+        // Calculate average attendance
+        const averageAttendance = userEvents.length > 0 
+            ? totalAttendees / userEvents.length 
+            : 0;
+
+        // Build the user analytics document
+        const userAnalytics = {
+          totalEvents: userEvents.length,
+          totalAttendees: totalAttendees,
+          averageAttendance: averageAttendance,
+          topPerformingEvent: topPerformingEvent,
+          eventCategories: eventCategories,
+          monthlyTrends: monthlyTrends,
+          retentionRate: retentionRate,
+          eventAnalytics: eventAnalytics,
+          lastUpdated: admin.firestore.Timestamp.now(),
+          backfilled: true,
+        };
+
+        // Save to user_analytics collection
+        await db.collection("user_analytics").doc(userId).set(userAnalytics);
+
+        logger.info(`✓ Backfilled analytics for user ${userId}: ${userEvents.length} events`);
+        successCount++;
+
+      } catch (userError) {
+        logger.error(`Error processing user ${userId}:`, userError);
+        errorCount++;
+      }
+    }
+
+    const result = {
+      success: true,
+      totalUsers: userIds.size,
+      successCount: successCount,
+      errorCount: errorCount,
+      timestamp: admin.firestore.Timestamp.now(),
+    };
+
+    logger.info(`✅ Backfill complete: ${successCount} succeeded, ${errorCount} failed`);
+    return result;
+
+  } catch (error) {
+    logger.error("❌ Error in backfillUserAnalytics:", error);
     throw error;
   }
 });
