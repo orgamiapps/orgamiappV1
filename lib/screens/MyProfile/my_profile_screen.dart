@@ -207,93 +207,77 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       debugPrint('🔵 Starting parallel data fetch...');
       debugPrint('🔵 User ID: ${CustomerController.logeInCustomer!.uid}');
       debugPrint('🔵 User Email: ${CustomerController.logeInCustomer!.email}');
+      // PERFORMANCE: Load only initial batch of events with pagination support
+      // Initial load shows 20 items, "Load More" button loads additional items
+      const int initialLimit = 20;
+      
       final results = await Future.wait([
-        // User data refresh with timeout - increased for reliability
+        // User data refresh with timeout
         FirebaseFirestoreHelper()
             .getSingleCustomer(
               customerId: CustomerController.logeInCustomer!.uid,
             )
             .timeout(
-              const Duration(seconds: 15),
+              const Duration(seconds: 8), // Reduced from 15
               onTimeout: () {
-                debugPrint('⚠️ User data fetch timed out after 15 seconds');
-                ShowToast().showNormalToast(
-                  msg: 'Profile data loading timed out',
-                );
+                debugPrint('⚠️ User data fetch timed out after 8 seconds');
                 return null;
               },
             )
             .catchError((e, stackTrace) {
               debugPrint('❌ Error fetching user data: $e');
-              debugPrint('Stack trace: $stackTrace');
-              ShowToast().showNormalToast(msg: 'Error loading user data: $e');
               return null;
             }),
-        // Created events with timeout - increased to 20 seconds for reliability
+        // PERFORMANCE: Created events with LIMIT for faster initial load
         FirebaseFirestoreHelper()
-            .getEventsCreatedByUser(CustomerController.logeInCustomer!.uid)
+            .getEventsCreatedByUser(
+              CustomerController.logeInCustomer!.uid,
+              limit: initialLimit, // Only load first 20
+            )
             .timeout(
-              const Duration(seconds: 20),
+              const Duration(seconds: 10), // Reduced from 20
               onTimeout: () {
                 debugPrint(
-                  '⚠️ Created events fetch timed out after 20 seconds',
-                );
-                ShowToast().showNormalToast(
-                  msg: 'Created events loading timed out',
+                  '⚠️ Created events fetch timed out after 10 seconds',
                 );
                 return <EventModel>[];
               },
             )
             .catchError((e, stackTrace) {
               debugPrint('❌ Error fetching created events: $e');
-              debugPrint('Stack trace: $stackTrace');
-              ShowToast().showNormalToast(
-                msg: 'Error loading created events: $e',
-              );
               return <EventModel>[];
             }),
-        // Attended events with timeout - increased to 20 seconds for reliability
+        // Attended events with timeout
         FirebaseFirestoreHelper()
             .getEventsAttendedByUser(CustomerController.logeInCustomer!.uid)
             .timeout(
-              const Duration(seconds: 20),
+              const Duration(seconds: 10), // Reduced from 20
               onTimeout: () {
                 debugPrint(
-                  '⚠️ Attended events fetch timed out after 20 seconds',
-                );
-                ShowToast().showNormalToast(
-                  msg: 'Attended events loading timed out',
+                  '⚠️ Attended events fetch timed out after 10 seconds',
                 );
                 return <EventModel>[];
               },
             )
             .catchError((e, stackTrace) {
               debugPrint('❌ Error fetching attended events: $e');
-              debugPrint('Stack trace: $stackTrace');
-              ShowToast().showNormalToast(
-                msg: 'Error loading attended events: $e',
-              );
               return <EventModel>[];
             }),
-        // Saved events with timeout - increased to 20 seconds for reliability
+        // PERFORMANCE: Saved events with LIMIT for faster initial load
         FirebaseFirestoreHelper()
-            .getFavoritedEvents(userId: CustomerController.logeInCustomer!.uid)
+            .getFavoritedEvents(
+              userId: CustomerController.logeInCustomer!.uid,
+              limit: initialLimit, // Only load first 20
+            )
             .timeout(
-              const Duration(seconds: 20),
+              const Duration(seconds: 10), // Reduced from 20
               onTimeout: () {
-                debugPrint('⚠️ Saved events fetch timed out after 20 seconds');
-                ShowToast().showNormalToast(
-                  msg: 'Saved events loading timed out',
-                );
+                debugPrint('⚠️ Saved events fetch timed out after 10 seconds');
                 return <EventModel>[];
               },
             )
             .catchError((e, stackTrace) {
               debugPrint('❌ Error fetching saved events: $e');
-              debugPrint('Stack trace: $stackTrace');
-              ShowToast().showNormalToast(
-                msg: 'Error loading saved events: $e',
-              );
               return <EventModel>[];
             }),
       ], eagerError: false);

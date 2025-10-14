@@ -41,23 +41,21 @@ class SafeNetworkImage extends StatelessWidget {
       width: width,
       height: height,
       fit: fit ?? BoxFit.cover,
-      // Memory optimization: limit cached image size
+      // PERFORMANCE: Aggressive memory optimization - limit cached image size
       memCacheWidth: width != null ? (width! * 2).toInt() : 600,
       memCacheHeight: height != null ? (height! * 2).toInt() : 400,
-      // Use lighter fade animation
-      fadeInDuration: const Duration(milliseconds: 200),
-      fadeOutDuration: const Duration(milliseconds: 100),
+      // PERFORMANCE: Limit disk cache size as well
+      maxWidthDiskCache: width != null ? (width! * 3).toInt() : 1200,
+      maxHeightDiskCache: height != null ? (height! * 3).toInt() : 900,
+      // Use lighter fade animation for better perceived performance
+      fadeInDuration: const Duration(milliseconds: 150), // Reduced from 200
+      fadeOutDuration: const Duration(milliseconds: 50), // Reduced from 100
       placeholder: (context, url) {
-        if (kDebugMode) {
-          debugPrint('Loading image: $url');
-        }
+        // PERFORMANCE: Simplified placeholder - no debug logging in production
         return placeholder ??
-            const Center(
-              child: SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
+            Container(
+              color: Colors.grey[200],
+              child: const SizedBox.shrink(), // Minimal placeholder
             );
       },
       errorWidget: (context, url, error) {
