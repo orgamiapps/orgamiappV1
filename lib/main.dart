@@ -120,9 +120,9 @@ void main() async {
     // Initialize background services (non-blocking)
     _initializeBackgroundServices();
 
-    // Delay subscription service initialization to reduce startup time
-    // Reduced from 2s to 1s for faster service availability
-    Future.delayed(const Duration(seconds: 1), () {
+    // PERFORMANCE: Delay subscription service initialization to reduce startup time
+    // Increased from 1s to 2s to prioritize UI rendering
+    Future.delayed(const Duration(seconds: 2), () {
       try {
         final context = appNavigatorKey.currentContext;
         if (context != null) {
@@ -134,13 +134,15 @@ void main() async {
             Logger.warning('Subscription service initialization failed: $e');
           });
 
-          // Initialize creation limit service after subscription service
-          final creationLimitService = Provider.of<CreationLimitService>(
-            context,
-            listen: false,
-          );
-          creationLimitService.initialize().catchError((e) {
-            Logger.warning('Creation limit service initialization failed: $e');
+          // PERFORMANCE: Initialize creation limit service with additional delay
+          Future.delayed(const Duration(milliseconds: 500), () {
+            final creationLimitService = Provider.of<CreationLimitService>(
+              context,
+              listen: false,
+            );
+            creationLimitService.initialize().catchError((e) {
+              Logger.warning('Creation limit service initialization failed: $e');
+            });
           });
         }
       } catch (e) {
@@ -160,15 +162,16 @@ void main() async {
 /// Initialize background services after app startup
 Future<void> _initializeBackgroundServices() async {
   try {
-    // Configure Firestore settings with aggressive memory optimization
+    // PERFORMANCE: Configure Firestore settings with aggressive memory optimization
+    // Reduced cache size for faster startup and less memory pressure
     FirebaseFirestore.instance.settings = Settings(
       persistenceEnabled: true,
-      // Optimize cache size for better memory management
+      // PERFORMANCE: Reduced cache size dramatically for faster app startup
       cacheSizeBytes: kDebugMode
-          ? 40 *
+          ? 20 *
                 1024 *
-                1024 // 40MB in debug mode
-          : 80 * 1024 * 1024, // 80MB in release (reduced from 100MB)
+                1024 // 20MB in debug mode (reduced from 40MB)
+          : 40 * 1024 * 1024, // 40MB in release (reduced from 80MB)
     );
 
     // Quick connectivity check without blocking
@@ -228,18 +231,18 @@ Future<void> _initializeBackgroundServices() async {
             });
           }
 
-          // Initialize notifications in background (reduced delay for faster startup)
-          Future.delayed(const Duration(milliseconds: 200), () {
+          // PERFORMANCE: Initialize notifications in background with minimal delay
+          Future.delayed(const Duration(milliseconds: 500), () {
             NotificationService.initialize().catchError((e) {
               Logger.warning('Notification service initialization failed: $e');
               return;
             });
           });
 
-          // Initialize Firebase Messaging in background if online (reduced delay)
+          // PERFORMANCE: Initialize Firebase Messaging in background if online
+          // Delayed further to reduce startup load
           if (isReachable) {
-            // Reduced delay from 5s to 2s for faster messaging availability
-            Future.delayed(const Duration(seconds: 2), () {
+            Future.delayed(const Duration(seconds: 3), () {
               FirebaseMessagingHelper().initialize().catchError((e) {
                 Logger.warning('Firebase Messaging initialization failed: $e');
               });

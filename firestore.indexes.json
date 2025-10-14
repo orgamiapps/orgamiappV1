@@ -1,152 +1,71 @@
 {
   "indexes": [
     {
-      "collectionGroup": "Conversations",
+      "collectionGroup": "Events",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "participantIds", "arrayConfig": "CONTAINS" },
-        { "fieldPath": "lastMessageTime", "order": "DESCENDING" }
+        {
+          "fieldPath": "customerUid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
-      "collectionGroup": "Messages",
+      "collectionGroup": "Events",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "conversationId", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "ASCENDING" }
+        {
+          "fieldPath": "start_date",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "Attendance",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "eventId", "order": "ASCENDING" },
-        { "fieldPath": "attendanceDateTime", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "Events",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "customerUid", "order": "ASCENDING" },
-        { "fieldPath": "eventDateTime", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "Events",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "private", "order": "ASCENDING" },
-        { "fieldPath": "selectedDateTime", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "Events",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "customerUid", "order": "ASCENDING" },
-        { "fieldPath": "selectedDateTime", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "Comments",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "eventId", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "Tickets",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "customerUid", "order": "ASCENDING" },
-        { "fieldPath": "issuedDateTime", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "Tickets",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "eventId", "order": "ASCENDING" },
-        { "fieldPath": "issuedDateTime", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "Tickets",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "eventId", "order": "ASCENDING" },
-        { "fieldPath": "customerUid", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "Customers",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "isDiscoverable", "order": "ASCENDING" },
-        { "fieldPath": "name", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "Customers",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "username", "order": "ASCENDING" },
-        { "fieldPath": "isDiscoverable", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "Messages",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "senderId", "order": "ASCENDING" },
-        { "fieldPath": "receiverId", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "Messages",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "receiverId", "order": "ASCENDING" },
-        { "fieldPath": "senderId", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "Messages",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "senderId", "order": "ASCENDING" },
-        { "fieldPath": "receiverId", "order": "ASCENDING" },
-        { "fieldPath": "isRead", "order": "ASCENDING" }
+        {
+          "fieldPath": "customerUid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "attendanceDateTime",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "Organizations",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "category_lowercase", "order": "ASCENDING" },
-        { "fieldPath": "name_lowercase", "order": "ASCENDING" }
+        {
+          "fieldPath": "category_lowercase",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "name_lowercase",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
-      "collectionGroup": "Events",
+      "collectionGroup": "Organizations",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "organizationId", "order": "ASCENDING" },
-        { "fieldPath": "selectedDateTime", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "Events",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "organizationId", "order": "ASCENDING" },
-        { "fieldPath": "selectedDateTime", "order": "DESCENDING" }
+        {
+          "fieldPath": "name_lowercase",
+          "order": "ASCENDING"
+        }
       ]
     }
   ],
   "fieldOverrides": []
-} 
+}

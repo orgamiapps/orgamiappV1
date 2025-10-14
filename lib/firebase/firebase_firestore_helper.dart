@@ -957,16 +957,43 @@ class FirebaseFirestoreHelper {
     }
   }
 
-  // Get events created by a user
-  Future<List<EventModel>> getEventsCreatedByUser(String userId) async {
+  // Get events created by a user - OPTIMIZED with pagination support
+  Future<List<EventModel>> getEventsCreatedByUser(
+    String userId, {
+    int? limit,
+    DocumentSnapshot? startAfter,
+  }) async {
     try {
-      Logger.debug('Fetching events created by user: $userId');
-      final query = await _firestore
+      Logger.debug(
+        'Fetching events created by user: $userId (limit: ${limit ?? "none"})',
+      );
+      
+      // PERFORMANCE: Add limit and ordering for faster queries
+      Query query = _firestore
           .collection(EventModel.firebaseKey)
           .where('customerUid', isEqualTo: userId)
-          .get();
-      Logger.debug('Found ${query.docs.length} events created by user');
-      final events = query.docs
+          .orderBy('created_at', descending: true); // Most recent first
+      
+      if (limit != null) {
+        query = query.limit(limit);
+      }
+      
+      if (startAfter != null) {
+        query = query.startAfterDocument(startAfter);
+      }
+      
+      // PERFORMANCE: Add timeout to prevent hanging
+      final querySnapshot = await query.get().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          Logger.warning('Query timed out, returning empty results');
+          throw TimeoutException('getEventsCreatedByUser timed out');
+        },
+      );
+      
+      Logger.debug('Found ${querySnapshot.docs.length} events created by user');
+      
+      final events = querySnapshot.docs
           .map((doc) {
             try {
               // Add document ID to data before parsing
@@ -2935,7 +2962,10 @@ class FirebaseFirestoreHelper {
     }
   }
 
-  Future<List<EventModel>> getFavoritedEvents({required String userId}) async {
+  Future<List<EventModel>> getFavoritedEvents({
+    required String userId,
+    int? limit,
+  }) async {
     try {
       // Get current user data with timeout
       final userDoc = await _firestore
@@ -2958,38 +2988,47 @@ class FirebaseFirestoreHelper {
         return [];
       }
 
+      // PERFORMANCE: Apply limit before fetching
+      if (limit != null && favoriteEventIds.length > limit) {
+        favoriteEventIds = favoriteEventIds.sublist(0, limit);
+      }
+
       Logger.debug(
-        'Fetching ${favoriteEventIds.length} saved events in parallel',
+        'Fetching ${favoriteEventIds.length} saved events using batch query',
       );
 
-      // Fetch all saved events in parallel for better performance
-      final futures = favoriteEventIds.map((eventId) async {
+      // PERFORMANCE OPTIMIZATION: Use whereIn batch query instead of individual fetches
+      // Firestore whereIn supports up to 10 items per query, so batch in chunks of 10
+      final List<EventModel> allEvents = [];
+      
+      for (int i = 0; i < favoriteEventIds.length; i += 10) {
+        final batchIds = favoriteEventIds.skip(i).take(10).toList();
+        
         try {
-          final eventDoc = await _firestore
+          final querySnapshot = await _firestore
               .collection(EventModel.firebaseKey)
-              .doc(eventId)
+              .where(FieldPath.documentId, whereIn: batchIds)
               .get()
-              .timeout(const Duration(seconds: 2));
+              .timeout(const Duration(seconds: 5));
 
-          if (eventDoc.exists) {
-            final eventData = eventDoc.data()!;
-            eventData['id'] = eventId; // Add the document ID
-            return EventModel.fromJson(eventData);
+          // Parse all events from this batch
+          for (final doc in querySnapshot.docs) {
+            try {
+              final eventData = doc.data();
+              eventData['id'] = eventData['id'] ?? doc.id;
+              final event = EventModel.fromJson(eventData);
+              allEvents.add(event);
+            } catch (e) {
+              Logger.error('Error parsing event ${doc.id}: $e', e);
+            }
           }
         } catch (e) {
-          Logger.debug('⚠️ Timeout fetching saved event: $eventId');
+          Logger.warning('Batch query timeout for batch starting at $i: $e');
         }
-        return null;
-      });
+      }
 
-      final results = await Future.wait(
-        futures,
-        eagerError: false,
-      ).timeout(const Duration(seconds: 3));
-
-      final favoritedEvents = results.whereType<EventModel>().toList();
-      Logger.debug('✅ Saved events count: ${favoritedEvents.length}');
-      return favoritedEvents;
+      Logger.debug('✅ Saved events count: ${allEvents.length}');
+      return allEvents;
     } catch (e) {
       Logger.debug('Error getting saved events: $e');
       return [];
