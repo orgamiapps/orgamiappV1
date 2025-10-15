@@ -55,11 +55,11 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
 
     _slideAnimation =
         Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeOutCubic,
-      ),
-    );
+          CurvedAnimation(
+            parent: _animationController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
 
     _animationController.forward();
   }
@@ -232,9 +232,7 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: isSelected
-                      ? Colors.white
-                      : Colors.transparent,
+                  color: isSelected ? Colors.white : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: isSelected
                       ? [
@@ -285,27 +283,14 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
   Widget _buildPlanCards() {
     return Row(
       children: [
-        Expanded(
-          child: _buildPlanCard(
-            tier: SubscriptionTier.basic,
-            isPopular: false,
-          ),
-        ),
+        Expanded(child: _buildPlanCard(tier: SubscriptionTier.basic)),
         const SizedBox(width: 16),
-        Expanded(
-          child: _buildPlanCard(
-            tier: SubscriptionTier.premium,
-            isPopular: true,
-          ),
-        ),
+        Expanded(child: _buildPlanCard(tier: SubscriptionTier.premium)),
       ],
     );
   }
 
-  Widget _buildPlanCard({
-    required SubscriptionTier tier,
-    required bool isPopular,
-  }) {
+  Widget _buildPlanCard({required SubscriptionTier tier}) {
     final isBasic = tier == SubscriptionTier.basic;
     final prices = isBasic
         ? SubscriptionService.basicPrices
@@ -330,12 +315,6 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: isPopular
-            ? Border.all(
-                color: Theme.of(context).colorScheme.primary,
-                width: 3,
-              )
-            : null,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.1),
@@ -347,32 +326,6 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (isPopular)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Theme.of(context).colorScheme.primary,
-                    Theme.of(context).colorScheme.secondary,
-                  ],
-                ),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(17),
-                  topRight: Radius.circular(17),
-                ),
-              ),
-              child: const Text(
-                'MOST POPULAR',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
           Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -418,27 +371,29 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 20),
-                ...features.map((feature) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.check_circle,
-                            color: isBasic
-                                ? Colors.blue
-                                : Theme.of(context).colorScheme.primary,
-                            size: 18,
+                ...features.map(
+                  (feature) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          color: isBasic
+                              ? Colors.blue
+                              : Theme.of(context).colorScheme.primary,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            feature,
+                            style: const TextStyle(fontSize: 14),
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              feature,
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          ),
-                        ],
-                      ),
-                    )),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
@@ -447,9 +402,9 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
                         ? null
                         : () => _handlePlanSelection(tier),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isPopular
-                          ? Theme.of(context).colorScheme.primary
-                          : Colors.blue,
+                      backgroundColor: isBasic
+                          ? Colors.blue
+                          : Theme.of(context).colorScheme.primary,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -508,7 +463,12 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
           const SizedBox(height: 16),
           _buildComparisonRow('Browse & RSVP to events', true, true, true),
           _buildComparisonRow('Create events', true, true, true),
-          _buildComparisonRow('Event limit', '5 lifetime', '5/month', 'Unlimited'),
+          _buildComparisonRow(
+            'Event limit',
+            '5 lifetime',
+            '5/month',
+            'Unlimited',
+          ),
           _buildComparisonRow('Attendance tracking', true, true, true),
           _buildComparisonRow('Event analytics', false, false, true),
           _buildComparisonRow('Create groups', false, false, true),
@@ -518,7 +478,12 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
     );
   }
 
-  Widget _buildComparisonRow(String feature, dynamic free, dynamic basic, dynamic premium) {
+  Widget _buildComparisonRow(
+    String feature,
+    dynamic free,
+    dynamic basic,
+    dynamic premium,
+  ) {
     Widget buildCell(dynamic value) {
       if (value is bool) {
         return value
@@ -527,10 +492,7 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
       } else {
         return Text(
           value.toString(),
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 11,
-          ),
+          style: const TextStyle(color: Colors.white70, fontSize: 11),
           textAlign: TextAlign.center,
         );
       }
@@ -544,21 +506,12 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
             flex: 2,
             child: Text(
               feature,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-              ),
+              style: const TextStyle(color: Colors.white, fontSize: 13),
             ),
           ),
-          Expanded(
-            child: Center(child: buildCell(free)),
-          ),
-          Expanded(
-            child: Center(child: buildCell(basic)),
-          ),
-          Expanded(
-            child: Center(child: buildCell(premium)),
-          ),
+          Expanded(child: Center(child: buildCell(free))),
+          Expanded(child: Center(child: buildCell(basic))),
+          Expanded(child: Center(child: buildCell(premium))),
         ],
       ),
     );
@@ -589,18 +542,22 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
       final double amount = _selectedBillingIndex == 0
           ? basePrice
           : _selectedBillingIndex == 1
-              ? basePrice * 6 * 0.9 // 10% discount for 6 months
-              : basePrice * 12 * 0.8; // 20% discount for annual
+          ? basePrice *
+                6 *
+                0.9 // 10% discount for 6 months
+          : basePrice * 12 * 0.8; // 20% discount for annual
 
-      final String productName = '${tier.displayName} ${billingPeriods[_selectedBillingIndex]}';
+      final String productName =
+          '${tier.displayName} ${billingPeriods[_selectedBillingIndex]}';
 
       // Show Apple Pay placeholder UI
-      final paymentSuccess = await PaymentPlaceholderService().showApplePayPlaceholder(
-        context: context,
-        productName: productName,
-        amount: amount,
-        currency: 'USD',
-      );
+      final paymentSuccess = await PaymentPlaceholderService()
+          .showApplePayPlaceholder(
+            context: context,
+            productName: productName,
+            amount: amount,
+            currency: 'USD',
+          );
 
       if (!mounted) return;
 
@@ -620,8 +577,8 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
       final billingSuffix = _selectedBillingIndex == 0
           ? 'monthly'
           : _selectedBillingIndex == 1
-              ? '6month'
-              : 'yearly';
+          ? '6month'
+          : 'yearly';
       final planId = '${tierPrefix}_$billingSuffix';
 
       final success = await subscriptionService.createPremiumSubscription(
@@ -633,7 +590,8 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
 
       if (success) {
         ShowToast().showNormalToast(
-          msg: '🎉 Welcome to ${tier.displayName}! You can now enjoy your benefits.',
+          msg:
+              '🎉 Welcome to ${tier.displayName}! You can now enjoy your benefits.',
         );
 
         if (mounted) {
@@ -665,4 +623,3 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
     }
   }
 }
-
