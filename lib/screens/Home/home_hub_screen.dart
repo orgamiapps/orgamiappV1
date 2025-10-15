@@ -139,12 +139,12 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
 
       Logger.debug('🏠 HomeHubScreen: Executing Firestore query...');
       final snap = await query.get().timeout(
-        const Duration(seconds: 2),
+        const Duration(seconds: 10),
         onTimeout: () {
           Logger.warning('⚠️ Organizations discovery timed out');
           throw TimeoutException(
             'Organizations query timed out',
-            const Duration(seconds: 2),
+            const Duration(seconds: 10),
           );
         },
       );

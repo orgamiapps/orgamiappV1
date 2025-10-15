@@ -5,14 +5,18 @@ import 'package:attendus/Utils/logger.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:attendus/Utils/app_constants.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+// Using FirebaseAuth provider flow for Google on mobile to avoid analyzer issues
 // import 'package:flutter_facebook_auth/flutter_facebook_auth.dart'; // Temporarily disabled
 // import 'package:twitter_login/twitter_login.dart'; // Disabled due to namespace issues
 
 class FirebaseGoogleAuthHelper extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  static bool lastGoogleCancelled = false;
+  static bool lastAppleCancelled = false;
 
   Future<Map<String, dynamic>?> loginWithGoogle() async {
     try {
+      lastGoogleCancelled = false;
       User? user;
       if (kIsWeb) {
         // Web uses popup auth flow
@@ -26,16 +30,39 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
             .timeout(const Duration(seconds: 30));
         user = userCredential.user;
       } else {
-        // Mobile/desktop: use Firebase Auth's native provider sign-in
-        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
-        googleProvider.addScope('email');
-        googleProvider.addScope(
-          'profile',
-        ); // Add profile scope for better user info
-        final UserCredential userCredential = await _auth
-            .signInWithProvider(googleProvider)
-            .timeout(const Duration(seconds: 30));
-        user = userCredential.user;
+        // Mobile/desktop: use Firebase Auth's native provider sign-in with robust cancellation handling
+        try {
+          final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+          googleProvider.addScope('email');
+          googleProvider.addScope('profile');
+
+          final UserCredential userCredential = await _auth
+              .signInWithProvider(googleProvider)
+              .timeout(const Duration(seconds: 20));
+          user = userCredential.user;
+        } on TimeoutException catch (e) {
+          Logger.error('Google sign-in timed out: $e');
+          return null;
+        } on FirebaseAuthException catch (e) {
+          // Heuristics for cancellation/back from provider UI on mobile
+          final String code = e.code.toLowerCase();
+          final String message = e.message?.toLowerCase() ?? '';
+          if (code.contains('canceled') ||
+              code.contains('cancelled') ||
+              code.contains('aborted') ||
+              message.contains('canceled') ||
+              message.contains('cancelled') ||
+              message.contains('aborted')) {
+            Logger.info('Google sign-in cancelled by user: $e');
+            lastGoogleCancelled = true;
+            return null;
+          }
+          Logger.error('Google sign-in FirebaseAuthException: $e', e);
+          return null;
+        } catch (e) {
+          Logger.error('Google sign-in error (mobile provider flow): $e', e);
+          return null;
+        }
       }
 
       if (user != null) {
@@ -107,7 +134,19 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
       }
 
       return null;
+    } on TimeoutException catch (error) {
+      Logger.error('Google sign-in error: $error', error);
+      return null;
     } catch (error) {
+      final String message = error.toString().toLowerCase();
+      if (message.contains('popup-closed-by-user') ||
+          message.contains('canceled') ||
+          message.contains('cancelled') ||
+          message.contains('aborted')) {
+        lastGoogleCancelled = true;
+        Logger.info('Google sign-in cancelled (web or provider popup): $error');
+        return null;
+      }
       Logger.error('Google sign-in error: $error', error);
       return null;
     }
@@ -120,6 +159,7 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
     }
 
     try {
+      lastAppleCancelled = false;
       // Check if Apple Sign In is available
       if (!await SignInWithApple.isAvailable()) {
         Logger.warning('Apple Sign-In is not available on this device');
@@ -200,6 +240,17 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
         return profileData;
       }
 
+      return null;
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        Logger.info('Apple sign-in cancelled by user');
+        lastAppleCancelled = true;
+        return null;
+      }
+      Logger.error('Apple sign-in auth exception: $e', e);
+      return null;
+    } on TimeoutException catch (e) {
+      Logger.error('Apple sign-in timeout: $e', e);
       return null;
     } catch (error) {
       Logger.error('Apple sign-in error: $error', error);

@@ -34,6 +34,7 @@ class _SocialLoginViewState extends State<SocialLoginView> {
                   profileData,
                 );
                 if (!mounted) return;
+                await AuthService().ensureInMemoryUserModel();
                 RouterClass().homeScreenRoute(context: navigator.context);
               } catch (e) {
                 ShowToast().showNormalToast(
@@ -41,7 +42,9 @@ class _SocialLoginViewState extends State<SocialLoginView> {
                 );
               }
             } else {
-              ShowToast().showNormalToast(msg: 'Google sign-in failed');
+              if (!FirebaseGoogleAuthHelper.lastGoogleCancelled) {
+                ShowToast().showNormalToast(msg: 'Google sign-in failed');
+              }
             }
             setState(() {
               _googleBtnLoading = false;

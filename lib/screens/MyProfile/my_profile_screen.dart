@@ -63,9 +63,9 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   List<String> selectedCategories = [];
   final List<String> _allCategories = ['Educational', 'Professional', 'Other'];
 
-  // Pagination state - PERFORMANCE OPTIMIZATION
-  int _displayedItemCount = 20; // Show only 20 items initially
-  static const int _itemsPerPage = 20;
+  // Pagination state - Show more items by default
+  int _displayedItemCount = 100; // Show up to 100 items initially
+  static const int _itemsPerPage = 50;
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -207,93 +207,75 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       debugPrint('🔵 Starting parallel data fetch...');
       debugPrint('🔵 User ID: ${CustomerController.logeInCustomer!.uid}');
       debugPrint('🔵 User Email: ${CustomerController.logeInCustomer!.email}');
+      // Load all events without limits to ensure complete data
+
       final results = await Future.wait([
-        // User data refresh with timeout - increased for reliability
+        // User data refresh with timeout
         FirebaseFirestoreHelper()
             .getSingleCustomer(
               customerId: CustomerController.logeInCustomer!.uid,
             )
             .timeout(
-              const Duration(seconds: 15),
+              const Duration(seconds: 8), // Reduced from 15
               onTimeout: () {
-                debugPrint('⚠️ User data fetch timed out after 15 seconds');
-                ShowToast().showNormalToast(
-                  msg: 'Profile data loading timed out',
-                );
+                debugPrint('⚠️ User data fetch timed out after 8 seconds');
                 return null;
               },
             )
             .catchError((e, stackTrace) {
               debugPrint('❌ Error fetching user data: $e');
-              debugPrint('Stack trace: $stackTrace');
-              ShowToast().showNormalToast(msg: 'Error loading user data: $e');
               return null;
             }),
-        // Created events with timeout - increased to 20 seconds for reliability
+        // Created events - fetch ALL events without limit
         FirebaseFirestoreHelper()
-            .getEventsCreatedByUser(CustomerController.logeInCustomer!.uid)
+            .getEventsCreatedByUser(
+              CustomerController.logeInCustomer!.uid,
+              // No limit - fetch all events
+            )
             .timeout(
-              const Duration(seconds: 20),
+              const Duration(seconds: 15), // Increased timeout for more data
               onTimeout: () {
                 debugPrint(
-                  '⚠️ Created events fetch timed out after 20 seconds',
-                );
-                ShowToast().showNormalToast(
-                  msg: 'Created events loading timed out',
+                  '⚠️ Created events fetch timed out after 15 seconds',
                 );
                 return <EventModel>[];
               },
             )
             .catchError((e, stackTrace) {
               debugPrint('❌ Error fetching created events: $e');
-              debugPrint('Stack trace: $stackTrace');
-              ShowToast().showNormalToast(
-                msg: 'Error loading created events: $e',
-              );
               return <EventModel>[];
             }),
-        // Attended events with timeout - increased to 20 seconds for reliability
+        // Attended events - already fetches all without limit
         FirebaseFirestoreHelper()
             .getEventsAttendedByUser(CustomerController.logeInCustomer!.uid)
             .timeout(
-              const Duration(seconds: 20),
+              const Duration(seconds: 15), // Increased timeout for more data
               onTimeout: () {
                 debugPrint(
-                  '⚠️ Attended events fetch timed out after 20 seconds',
-                );
-                ShowToast().showNormalToast(
-                  msg: 'Attended events loading timed out',
+                  '⚠️ Attended events fetch timed out after 15 seconds',
                 );
                 return <EventModel>[];
               },
             )
             .catchError((e, stackTrace) {
               debugPrint('❌ Error fetching attended events: $e');
-              debugPrint('Stack trace: $stackTrace');
-              ShowToast().showNormalToast(
-                msg: 'Error loading attended events: $e',
-              );
               return <EventModel>[];
             }),
-        // Saved events with timeout - increased to 20 seconds for reliability
+        // Saved events - fetch ALL events without limit
         FirebaseFirestoreHelper()
-            .getFavoritedEvents(userId: CustomerController.logeInCustomer!.uid)
+            .getFavoritedEvents(
+              userId: CustomerController.logeInCustomer!.uid,
+              // No limit - fetch all events
+            )
             .timeout(
-              const Duration(seconds: 20),
+              const Duration(seconds: 15), // Increased timeout for more data
               onTimeout: () {
-                debugPrint('⚠️ Saved events fetch timed out after 20 seconds');
-                ShowToast().showNormalToast(
-                  msg: 'Saved events loading timed out',
-                );
+                debugPrint('⚠️ Saved events fetch timed out after 15 seconds');
                 return <EventModel>[];
               },
             )
             .catchError((e, stackTrace) {
               debugPrint('❌ Error fetching saved events: $e');
-              debugPrint('Stack trace: $stackTrace');
-              ShowToast().showNormalToast(
-                msg: 'Error loading saved events: $e',
-              );
               return <EventModel>[];
             }),
       ], eagerError: false);
@@ -370,6 +352,16 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         debugPrint('State - attendedEvents.length: ${attendedEvents.length}');
         debugPrint('State - savedEvents.length: ${savedEvents.length}');
         debugPrint('State - isLoading: $isLoading');
+
+        // Force a rebuild to ensure UI reflects the new data
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {
+              // Trigger rebuild
+            });
+            debugPrint('🔄 Forced UI rebuild after data load');
+          }
+        });
 
         // Verify the state was actually updated
         if (createdEvents.isEmpty &&
@@ -752,6 +744,15 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   @override
   Widget build(BuildContext context) {
     final user = CustomerController.logeInCustomer;
+
+    // Log build state for debugging
+    debugPrint('🏗️ MY_PROFILE_SCREEN build() called');
+    debugPrint('🏗️ isLoading: $isLoading');
+    debugPrint('🏗️ createdEvents: ${createdEvents.length}');
+    debugPrint('🏗️ attendedEvents: ${attendedEvents.length}');
+    debugPrint('🏗️ savedEvents: ${savedEvents.length}');
+    debugPrint('🏗️ user: ${user?.email ?? "null"}');
+
     return Scaffold(
       backgroundColor: const Color(0xFFFAFBFC),
       body: SafeArea(
@@ -1540,6 +1541,18 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       _buildActionButton(
+                        icon: Icons.refresh,
+                        label: 'Refresh',
+                        onTap: () async {
+                          setState(() {
+                            isLoading = true;
+                          });
+                          await _loadProfileData();
+                        },
+                        isActive: false,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildActionButton(
                         icon: Icons.tune,
                         label: 'Filter/Sort',
                         onTap: _showFilterSortModal,
@@ -1703,7 +1716,14 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         ? FontAwesomeIcons.calendarCheck
         : FontAwesomeIcons.bookmark;
 
-    // Debug logging removed for performance
+    // Debug logging for troubleshooting
+    debugPrint('🔍 _buildTabContent called');
+    debugPrint('🔍 selectedTab: $selectedTab (1=Created, 2=Attended, 3=Saved)');
+    debugPrint('🔍 Raw events count: ${events.length}');
+    debugPrint('🔍 createdEvents.length: ${createdEvents.length}');
+    debugPrint('🔍 attendedEvents.length: ${attendedEvents.length}');
+    debugPrint('🔍 savedEvents.length: ${savedEvents.length}');
+    debugPrint('🔍 selectedCategories: $selectedCategories');
 
     // Apply category filtering
     List<EventModel> filteredEvents = List<EventModel>.from(events);
@@ -1715,10 +1735,12 @@ class _MyProfileScreenState extends State<MyProfileScreen>
             ),
           )
           .toList();
+      debugPrint('🔍 After category filter: ${filteredEvents.length} events');
     }
 
     // Apply sorting
     final sortedEvents = _sortEvents(filteredEvents);
+    debugPrint('🔍 After sorting: ${sortedEvents.length} events');
 
     return Container(
       margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
@@ -1814,28 +1836,51 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                     );
                   },
                 ),
-                // Load More button if there are more items
+                // Load More / Show All buttons if there are more items
                 if (sortedEvents.length > _displayedItemCount)
                   Container(
                     margin: const EdgeInsets.only(top: 16),
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _displayedItemCount += _itemsPerPage;
-                        });
-                      },
-                      icon: const Icon(Icons.expand_more),
-                      label: Text(
-                        'Load More (${sortedEvents.length - _displayedItemCount} remaining)',
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF667EEA),
-                        side: const BorderSide(color: Color(0xFF667EEA)),
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 24,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _displayedItemCount += _itemsPerPage;
+                            });
+                          },
+                          icon: const Icon(Icons.expand_more),
+                          label: Text(
+                            'Load More (${sortedEvents.length - _displayedItemCount} remaining)',
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF667EEA),
+                            side: const BorderSide(color: Color(0xFF667EEA)),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 24,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        // Show All button - displays all events at once
+                        TextButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _displayedItemCount = sortedEvents.length;
+                            });
+                          },
+                          icon: const Icon(Icons.visibility),
+                          label: const Text('Show All'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFF667EEA),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 16,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
               ],
@@ -1844,6 +1889,10 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   }
 
   Widget _buildEmptyState(String message, IconData icon) {
+    final user = CustomerController.logeInCustomer;
+    final userId = user?.uid ?? 'No User ID';
+    final userEmail = user?.email ?? 'No Email';
+
     return Container(
       padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
@@ -1884,25 +1933,98 @@ class _MyProfileScreenState extends State<MyProfileScreen>
             ),
             textAlign: TextAlign.center,
           ),
+          const SizedBox(height: 24),
+          // Debug info section
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Color(0xFFE5E7EB)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Debug Info:',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF6B7280),
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'User ID: ${userId.substring(0, userId.length > 20 ? 20 : userId.length)}...',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF9CA3AF),
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+                Text(
+                  'Email: $userEmail',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF9CA3AF),
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+                Text(
+                  'Created: ${createdEvents.length}, Attended: ${attendedEvents.length}, Saved: ${savedEvents.length}',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF9CA3AF),
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _loadProfileData,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF667EEA),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton.icon(
+                onPressed: _loadProfileData,
+                icon: Icon(Icons.refresh, size: 18),
+                label: Text('Refresh'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF667EEA),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                ),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            ),
-            child: const Text(
-              'Retry',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-                fontFamily: 'Roboto',
+              SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await ProfileDiagnostics.runDiagnostics();
+                  ShowToast().showNormalToast(
+                    msg: 'Check console logs for diagnostic results',
+                  );
+                },
+                icon: Icon(Icons.bug_report, size: 18),
+                label: Text('Run Diagnostics'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF667EEA),
+                  side: BorderSide(color: Color(0xFF667EEA)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ],
       ),

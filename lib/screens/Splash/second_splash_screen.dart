@@ -159,8 +159,11 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
 
       if (profileData != null) {
         await _handleSuccessfulLoginWithProfileData(profileData);
+        await AuthService().ensureInMemoryUserModel();
       } else {
-        ShowToast().showNormalToast(msg: 'Google sign-in failed');
+        if (!FirebaseGoogleAuthHelper.lastGoogleCancelled) {
+          ShowToast().showNormalToast(msg: 'Google sign-in failed');
+        }
       }
     } catch (e) {
       ShowToast().showNormalToast(msg: 'Google sign-in error: ${e.toString()}');
@@ -191,10 +194,13 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
 
       if (profileData != null) {
         await _handleSuccessfulLoginWithProfileData(profileData);
+        await AuthService().ensureInMemoryUserModel();
       } else {
-        ShowToast().showNormalToast(
-          msg: 'Apple sign-in is not available on this device',
-        );
+        if (!FirebaseGoogleAuthHelper.lastAppleCancelled) {
+          ShowToast().showNormalToast(
+            msg: 'Apple sign-in is not available on this device',
+          );
+        }
       }
     } catch (e) {
       String errorMessage = 'Apple sign-in failed';
@@ -213,7 +219,9 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
     }
   }
 
-  Future<void> _handleSuccessfulLoginWithProfileData(Map<String, dynamic> profileData) async {
+  Future<void> _handleSuccessfulLoginWithProfileData(
+    Map<String, dynamic> profileData,
+  ) async {
     try {
       await AuthService().handleSocialLoginSuccessWithProfileData(profileData);
       if (!mounted) return;

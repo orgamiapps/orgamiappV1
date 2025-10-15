@@ -186,13 +186,16 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                   profileData,
                 );
                 if (!mounted) return;
+                await AuthService().ensureInMemoryUserModel();
                 await Future.delayed(const Duration(milliseconds: 120));
                 RouterClass().homeScreenRoute(context: context);
               } catch (e) {
                 ShowToast().showNormalToast(msg: 'Login error');
               }
             } else {
-              ShowToast().showNormalToast(msg: 'Google sign-in failed');
+              if (!FirebaseGoogleAuthHelper.lastGoogleCancelled) {
+                ShowToast().showNormalToast(msg: 'Google sign-in failed');
+              }
             }
           } finally {
             if (mounted) setState(() => _socialSigningIn = false);
@@ -240,13 +243,16 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                   profileData,
                 );
                 if (!mounted) return;
+                await AuthService().ensureInMemoryUserModel();
                 await Future.delayed(const Duration(milliseconds: 120));
                 RouterClass().homeScreenRoute(context: context);
               } catch (e) {
                 ShowToast().showNormalToast(msg: 'Login error');
               }
             } else {
-              ShowToast().showNormalToast(msg: 'Apple sign-in failed');
+              if (!FirebaseGoogleAuthHelper.lastAppleCancelled) {
+                ShowToast().showNormalToast(msg: 'Apple sign-in failed');
+              }
             }
           } finally {
             if (mounted) setState(() => _socialSigningIn = false);
