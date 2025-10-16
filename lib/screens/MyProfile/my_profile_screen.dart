@@ -16,8 +16,8 @@ import 'package:attendus/Services/badge_service.dart';
 import 'package:attendus/screens/Home/account_details_screen_v2.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/Utils/profile_diagnostics.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -48,6 +48,11 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   int selectedTab = 1; // 1 = Created, 2 = Attended, 3 = Saved
   bool isDiscoverable = true; // User discoverability setting
 
+  // Pagination state for each tab
+  Map<int, DocumentSnapshot?> _lastDocuments = {};
+  Map<int, bool> _hasMore = {1: true, 2: true, 3: true};
+  Map<int, bool> _isFetchingMore = {1: false, 2: false, 3: false};
+
   // Badge related fields
   UserBadgeModel? _userBadge;
   bool _isBadgeLoading = false;
@@ -62,10 +67,6 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   SortOption currentSortOption = SortOption.none;
   List<String> selectedCategories = [];
   final List<String> _allCategories = ['Educational', 'Professional', 'Other'];
-
-  // Pagination state - Show more items by default
-  int _displayedItemCount = 100; // Show up to 100 items initially
-  static const int _itemsPerPage = 50;
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -89,7 +90,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         debugPrint(
           'MY_PROFILE_SCREEN: Widget is mounted, calling _loadProfileData()',
         );
-        _loadProfileData();
+        _loadProfileData(isRefresh: true);
         // Removed _ensureProfileDataUpdated() - it causes Firebase Auth reload which blocks startup
       } else {
         debugPrint(
@@ -134,40 +135,36 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       if (CustomerController.logeInCustomer == null) {
         return;
       }
-
-      // Fetch only saved events
-      final saved = await FirebaseFirestoreHelper().getFavoritedEvents(
-        userId: CustomerController.logeInCustomer!.uid,
-      );
-      debugPrint('Updated saved events count: ${saved.length}');
-
-      if (mounted) {
-        setState(() {
-          savedEvents = saved;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _hasMore[3] = true;
+        _lastDocuments[3] = null;
+        savedEvents.clear();
+      });
+      await _fetchMoreEvents(3);
     } catch (e) {
       debugPrint('Error refreshing saved events: $e');
     }
   }
 
-  Future<void> _loadProfileData() async {
-    if (!mounted) return;
+  Future<void> _loadProfileData({bool isRefresh = false}) async {
+    if (!mounted || (isLoading && !isRefresh)) return;
 
     setState(() {
       isLoading = true;
+      if (isRefresh) {
+        createdEvents.clear();
+        attendedEvents.clear();
+        savedEvents.clear();
+        _lastDocuments = {};
+        _hasMore = {1: true, 2: true, 3: true};
+      }
     });
 
     try {
-      // Check if user is logged in
       if (CustomerController.logeInCustomer == null) {
-        debugPrint(
-          '❌ MY_PROFILE_SCREEN: User not logged in - CustomerController.logeInCustomer is null',
-        );
         if (mounted) {
-          setState(() {
-            isLoading = false;
-          });
+          setState(() => isLoading = false);
           ShowToast().showNormalToast(
             msg: 'Please log in to view your profile',
           );
@@ -176,229 +173,37 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       }
 
       final userId = CustomerController.logeInCustomer!.uid;
-      final userName = CustomerController.logeInCustomer!.name;
-      final userEmail = CustomerController.logeInCustomer!.email;
 
-      // Verify Firebase Auth status
-      final firebaseUser = FirebaseAuth.instance.currentUser;
-      final firebaseAuthUid = firebaseUser?.uid;
-      final firebaseAuthEmail = firebaseUser?.email;
-
-      debugPrint('========================================');
-      debugPrint('MY_PROFILE_SCREEN: Starting to load profile data');
+      // Print user info for diagnostics
       debugPrint('CustomerController User ID: $userId');
-      debugPrint('CustomerController User Name: $userName');
-      debugPrint('CustomerController User Email: $userEmail');
-      debugPrint('Firebase Auth User ID: $firebaseAuthUid');
-      debugPrint('Firebase Auth User Email: $firebaseAuthEmail');
-      debugPrint('UIDs Match: ${userId == firebaseAuthUid}');
-      debugPrint('========================================');
+      debugPrint(
+        'CustomerController User Email: ${CustomerController.logeInCustomer!.email}',
+      );
 
-      if (userId != firebaseAuthUid) {
-        debugPrint('⚠️⚠️⚠️ WARNING: User ID mismatch!');
-        debugPrint('CustomerController UID: $userId');
-        debugPrint('Firebase Auth UID: $firebaseAuthUid');
-        ShowToast().showNormalToast(
-          msg: 'User ID mismatch detected. Please re-login.',
-        );
-      }
+      // Load events for ALL tabs initially to ensure data is available
+      debugPrint('🔄 Loading events for all tabs...');
+      await Future.wait([
+        _fetchMoreEvents(1), // Created
+        _fetchMoreEvents(2), // Attended
+        _fetchMoreEvents(3), // Saved
+      ]);
 
-      // Load all data in parallel with individual timeouts for faster failure
-      debugPrint('🔵 Starting parallel data fetch...');
-      debugPrint('🔵 User ID: ${CustomerController.logeInCustomer!.uid}');
-      debugPrint('🔵 User Email: ${CustomerController.logeInCustomer!.email}');
-      // Load all events without limits to ensure complete data
-
-      final results = await Future.wait([
-        // User data refresh with timeout
-        FirebaseFirestoreHelper()
-            .getSingleCustomer(
-              customerId: CustomerController.logeInCustomer!.uid,
-            )
-            .timeout(
-              const Duration(seconds: 8), // Reduced from 15
-              onTimeout: () {
-                debugPrint('⚠️ User data fetch timed out after 8 seconds');
-                return null;
-              },
-            )
-            .catchError((e, stackTrace) {
-              debugPrint('❌ Error fetching user data: $e');
-              return null;
-            }),
-        // Created events - fetch ALL events without limit
-        FirebaseFirestoreHelper()
-            .getEventsCreatedByUser(
-              CustomerController.logeInCustomer!.uid,
-              // No limit - fetch all events
-            )
-            .timeout(
-              const Duration(seconds: 15), // Increased timeout for more data
-              onTimeout: () {
-                debugPrint(
-                  '⚠️ Created events fetch timed out after 15 seconds',
-                );
-                return <EventModel>[];
-              },
-            )
-            .catchError((e, stackTrace) {
-              debugPrint('❌ Error fetching created events: $e');
-              return <EventModel>[];
-            }),
-        // Attended events - already fetches all without limit
-        FirebaseFirestoreHelper()
-            .getEventsAttendedByUser(CustomerController.logeInCustomer!.uid)
-            .timeout(
-              const Duration(seconds: 15), // Increased timeout for more data
-              onTimeout: () {
-                debugPrint(
-                  '⚠️ Attended events fetch timed out after 15 seconds',
-                );
-                return <EventModel>[];
-              },
-            )
-            .catchError((e, stackTrace) {
-              debugPrint('❌ Error fetching attended events: $e');
-              return <EventModel>[];
-            }),
-        // Saved events - fetch ALL events without limit
-        FirebaseFirestoreHelper()
-            .getFavoritedEvents(
-              userId: CustomerController.logeInCustomer!.uid,
-              // No limit - fetch all events
-            )
-            .timeout(
-              const Duration(seconds: 15), // Increased timeout for more data
-              onTimeout: () {
-                debugPrint('⚠️ Saved events fetch timed out after 15 seconds');
-                return <EventModel>[];
-              },
-            )
-            .catchError((e, stackTrace) {
-              debugPrint('❌ Error fetching saved events: $e');
-              return <EventModel>[];
-            }),
-      ], eagerError: false);
-      debugPrint('🔵 Parallel data fetch completed');
-
-      // Update user data if fetched successfully
-      if (results[0] != null) {
-        CustomerController.logeInCustomer = results[0] as CustomerModel;
-        debugPrint('✅ User data refreshed successfully');
-      } else {
-        debugPrint('⚠️ User data refresh returned null');
-      }
-
-      final created = results[1] as List<EventModel>;
-      final attended = results[2] as List<EventModel>;
-      final saved = results[3] as List<EventModel>;
-
-      debugPrint('========================================');
-      debugPrint('MY_PROFILE_SCREEN: Events fetched results:');
-      debugPrint('✅ Created events count: ${created.length}');
-      debugPrint('✅ Attended events count: ${attended.length}');
-      debugPrint('✅ Saved events count: ${saved.length}');
-
-      if (created.isNotEmpty) {
-        debugPrint('First created event: ${created.first.title}');
-        for (var event in created) {
-          debugPrint('  - Created event: ${event.title} (ID: ${event.id})');
-        }
-      } else {
-        debugPrint('⚠️ No created events returned from Firebase query');
-      }
-      if (attended.isNotEmpty) {
-        debugPrint('First attended event: ${attended.first.title}');
-        for (var event in attended) {
-          debugPrint('  - Attended event: ${event.title} (ID: ${event.id})');
-        }
-      } else {
-        debugPrint('⚠️ No attended events returned from Firebase query');
-      }
-      if (saved.isNotEmpty) {
-        debugPrint('First saved event: ${saved.first.title}');
-        for (var event in saved) {
-          debugPrint('  - Saved event: ${event.title} (ID: ${event.id})');
-        }
-      } else {
-        debugPrint('⚠️ No saved events returned from Firebase query');
-      }
-      debugPrint('========================================');
-
-      // Load user badge in background (non-blocking)
+      // Non-blocking background fetches
       _loadUserBadge();
+      _refreshUserDataInBackground();
 
       if (mounted) {
-        debugPrint('🔄 About to call setState with:');
-        debugPrint('  - created.length: ${created.length}');
-        debugPrint('  - attended.length: ${attended.length}');
-        debugPrint('  - saved.length: ${saved.length}');
-
         setState(() {
-          createdEvents = created;
-          attendedEvents = attended;
-          savedEvents = saved;
-          isDiscoverable =
-              CustomerController.logeInCustomer?.isDiscoverable ?? true;
           isLoading = false;
         });
-
-        debugPrint('========================================');
-        debugPrint(
-          '✅ MY_PROFILE_SCREEN: Profile data loaded and state updated',
-        );
-        debugPrint('AFTER setState:');
-        debugPrint('State - createdEvents.length: ${createdEvents.length}');
-        debugPrint('State - attendedEvents.length: ${attendedEvents.length}');
-        debugPrint('State - savedEvents.length: ${savedEvents.length}');
-        debugPrint('State - isLoading: $isLoading');
-
-        // Force a rebuild to ensure UI reflects the new data
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            setState(() {
-              // Trigger rebuild
-            });
-            debugPrint('🔄 Forced UI rebuild after data load');
-          }
-        });
-
-        // Verify the state was actually updated
-        if (createdEvents.isEmpty &&
-            attendedEvents.isEmpty &&
-            savedEvents.isEmpty) {
-          debugPrint(
-            '⚠️⚠️⚠️ WARNING: All event lists are empty after setState!',
-          );
-          debugPrint('This suggests either:');
-          debugPrint('1. Firebase queries returned no results');
-          debugPrint('2. There are no events for this user in the database');
-          debugPrint('3. Timeout occurred before data could be fetched');
-          debugPrint('Running diagnostics to verify...');
-
-          // Run diagnostics to help identify the issue
-          ProfileDiagnostics.runDiagnostics().then((_) {
-            debugPrint('Diagnostics completed. Check logs above for details.');
-          });
-        } else {
-          debugPrint('✅ State updated successfully with events');
-        }
-        debugPrint('========================================');
-      } else {
-        debugPrint(
-          '❌ MY_PROFILE_SCREEN: Widget not mounted, skipping setState',
-        );
+        debugPrint('✅ MY_PROFILE_SCREEN: Initial data loaded.');
       }
     } catch (e, stackTrace) {
-      debugPrint('========================================');
-      debugPrint('❌ MY_PROFILE_SCREEN: Error loading profile data');
-      debugPrint('Error: $e');
-      debugPrint('Stack trace: $stackTrace');
-      debugPrint('========================================');
+      debugPrint(
+        '❌ MY_PROFILE_SCREEN: Error in _loadProfileData: $e\n$stackTrace',
+      );
       if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
+        setState(() => isLoading = false);
         ShowToast().showNormalToast(
           msg: 'Failed to load profile data: ${e.toString()}',
         );
@@ -406,338 +211,237 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     }
   }
 
-  // Bio section and related state removed to avoid duplication with UserProfileScreen
-
-  // Badge related methods
-  Future<void> _loadUserBadge() async {
-    try {
-      final userId = CustomerController.logeInCustomer?.uid;
-      if (userId == null) return;
-
-      setState(() {
-        _isBadgeLoading = true;
-      });
-
-      final badge = await _badgeService.getOrGenerateBadge(userId);
-
-      if (mounted) {
-        setState(() {
-          _userBadge = badge;
-          _isBadgeLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading user badge: $e');
-      if (mounted) {
-        setState(() {
-          _isBadgeLoading = false;
-        });
-      }
-    }
-  }
-
-  void _showBadgeWalletModal(BuildContext context) {
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        opaque: false,
-        barrierColor: Colors.black.withValues(alpha: 0.9),
-        pageBuilder: (context, animation, secondaryAnimation) {
-          return Scaffold(
-            backgroundColor: Colors.black.withValues(alpha: 0.9),
-            body: SafeArea(
-              child: Stack(
-                children: [
-                  // Full screen badge
-                  Center(
-                    child: Hero(
-                      tag: 'badge_photo_view',
-                      child: Container(
-                        margin: const EdgeInsets.all(32),
-                        child: ProfessionalBadgeWidget(
-                          badge: _userBadge!,
-                          width: MediaQuery.of(context).size.width - 64,
-                          height:
-                              (MediaQuery.of(context).size.width - 64) *
-                              (180 / 280),
-                          showActions: false,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Close button
-                  Positioned(
-                    top: 16,
-                    right: 16,
-                    child: IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(
-                        Icons.close,
-                        color: Colors.white,
-                        size: 28,
-                      ),
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.black.withValues(alpha: 0.5),
-                        shape: const CircleBorder(),
-                      ),
-                    ),
-                  ),
-
-                  // Save to Wallet button at bottom
-                  Positioned(
-                    left: 24,
-                    right: 24,
-                    bottom: 32,
-                    child: ElevatedButton(
-                      onPressed: () => _saveToWallet(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF667EEA),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        elevation: 8,
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.account_balance_wallet_outlined, size: 24),
-                          SizedBox(width: 12),
-                          Text(
-                            'Save to Wallet',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-      ),
+  Future<void> _fetchMoreEvents(int tabIndex) async {
+    debugPrint("🔍 _fetchMoreEvents called for tab $tabIndex");
+    debugPrint(
+      "🔍 _isFetchingMore[$tabIndex]: ${_isFetchingMore[tabIndex]}, _hasMore[$tabIndex]: ${_hasMore[tabIndex]}",
     );
-  }
 
-  Future<void> _saveToWallet(BuildContext context) async {
-    try {
-      // Show loading indicator
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
-          ),
-        ),
+    if ((_isFetchingMore[tabIndex] ?? false) || !(_hasMore[tabIndex] ?? true)) {
+      debugPrint(
+        "🚫 Skipping fetch for tab $tabIndex - already fetching or no more data",
       );
-
-      // Determine platform for backend processing
-      final platform = Theme.of(context).platform;
-      final isApple =
-          platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
-
-      final callable = FirebaseFunctions.instance.httpsCallable(
-        'generateUserBadgePass',
-      );
-
-      final result = await callable.call({
-        'uid': CustomerController.logeInCustomer?.uid ?? '',
-        'platform': isApple ? 'apple' : 'google',
-      });
-
-      final urlString = result.data['url'] as String;
-
-      // Dismiss loading indicator
-      if (context.mounted) {
-        Navigator.pop(context);
-      }
-
-      if (urlString.startsWith('data:text/plain,')) {
-        // Handle error messages
-        final message = urlString.substring('data:text/plain,'.length);
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(Uri.decodeComponent(message)),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      final url = Uri.parse(urlString);
-
-      if (await canLaunchUrl(url)) {
-        await launchUrl(
-          url,
-          mode: urlString.startsWith('data:')
-              ? LaunchMode.inAppWebView
-              : LaunchMode.externalApplication,
-        );
-
-        if (!context.mounted) return;
-        Navigator.pop(context);
-
-        // Show success message
-        const successMessage =
-            'Badge generated successfully! You can now add it to your wallet.';
-
-        ShowToast().showNormalToast(msg: successMessage);
-      } else {
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Unable to open wallet pass. Please try again.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (error) {
-      // Dismiss loading indicator if still showing
-      if (context.mounted && ModalRoute.of(context)?.isCurrent == false) {
-        Navigator.pop(context);
-      }
-
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Unable to add to wallet: ${error.toString()}'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 5),
-        ),
-      );
-    }
-  }
-
-  // Selection methods
-  void _toggleSelectionMode() {
-    setState(() {
-      isSelectionMode = !isSelectionMode;
-      if (!isSelectionMode) {
-        selectedEventIds.clear();
-      }
-    });
-  }
-
-  void _toggleEventSelection(String eventId) {
-    setState(() {
-      if (selectedEventIds.contains(eventId)) {
-        selectedEventIds.remove(eventId);
-      } else {
-        selectedEventIds.add(eventId);
-      }
-    });
-  }
-
-  void _toggleSelectAll(List<EventModel> events) {
-    setState(() {
-      if (selectedEventIds.length == events.length) {
-        // If all are selected, deselect all
-        selectedEventIds.clear();
-      } else {
-        // Select all
-        selectedEventIds = events.map((e) => e.id).toSet();
-      }
-    });
-  }
-
-  Future<void> _deleteSelectedEvents() async {
-    if (selectedEventIds.isEmpty) {
-      ShowToast().showNormalToast(msg: 'Please select events to delete');
       return;
     }
 
-    // Show confirmation dialog
-    final bool? confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Delete Events',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'Roboto',
-          ),
-        ),
-        content: Text(
-          'Are you sure you want to delete ${selectedEventIds.length} selected event${selectedEventIds.length == 1 ? '' : 's'}? This action cannot be undone.',
-          style: const TextStyle(fontSize: 16, fontFamily: 'Roboto'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(
-                color: Color(0xFF6B7280),
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Roboto',
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text(
-              'Delete',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Roboto',
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
     setState(() {
-      isLoading = true;
+      _isFetchingMore[tabIndex] = true;
     });
 
     try {
-      // Delete events from Firebase
-      for (String eventId in selectedEventIds) {
-        await FirebaseFirestoreHelper().deleteEvent(eventId);
+      final userId = CustomerController.logeInCustomer!.uid;
+      List<EventModel> newEvents;
+      DocumentSnapshot? lastDoc = _lastDocuments[tabIndex];
+
+      debugPrint(
+        "🔄 Fetching events for tab $tabIndex (userId: $userId), lastDoc: $lastDoc",
+      );
+
+      switch (tabIndex) {
+        case 1: // Created
+          final result = await FirebaseFirestoreHelper().getEventsCreatedByUser(
+            userId,
+            limit: 50, // Increased limit to match comprehensive approach
+            lastDocument: lastDoc,
+          );
+          newEvents = result['events'];
+          _lastDocuments[tabIndex] = result['lastDoc'];
+          break;
+        case 2: // Attended
+          final result = await FirebaseFirestoreHelper()
+              .getEventsAttendedByUser(
+                userId,
+                limit: 50, // Increased limit to match comprehensive approach
+                lastDocument: lastDoc,
+              );
+          newEvents = result['events'];
+          _lastDocuments[tabIndex] = result['lastDoc'];
+          break;
+        case 3: // Saved
+          final result = await FirebaseFirestoreHelper().getFavoritedEvents(
+            userId: userId,
+            limit: 50, // Increased limit to match comprehensive approach
+            lastDocument: lastDoc,
+          );
+          newEvents = result['events'];
+          _lastDocuments[tabIndex] = result['lastDoc'];
+          break;
+        default:
+          newEvents = [];
+      }
+
+      debugPrint("📊 Received ${newEvents.length} events for tab $tabIndex");
+      for (int i = 0; i < newEvents.take(3).length; i++) {
+        debugPrint(
+          "📝 Event $i: ${newEvents[i].title} (ID: ${newEvents[i].id})",
+        );
       }
 
       if (mounted) {
         setState(() {
-          selectedEventIds.clear();
-          isSelectionMode = false;
-          isLoading = false;
+          if (tabIndex == 1) {
+            createdEvents.addAll(newEvents);
+            debugPrint(
+              "✅ Added to createdEvents. Total: ${createdEvents.length}",
+            );
+          }
+          if (tabIndex == 2) {
+            attendedEvents.addAll(newEvents);
+            debugPrint(
+              "✅ Added to attendedEvents. Total: ${attendedEvents.length}",
+            );
+          }
+          if (tabIndex == 3) {
+            savedEvents.addAll(newEvents);
+            debugPrint("✅ Added to savedEvents. Total: ${savedEvents.length}");
+          }
+          // For created events, we get all on first fetch. For others, check if we need more.
+          _hasMore[tabIndex] = (tabIndex != 1) && (newEvents.length >= 50);
+          _isFetchingMore[tabIndex] = false;
+
+          debugPrint(
+            "📈 Tab $tabIndex final state: _hasMore[${tabIndex}] = ${_hasMore[tabIndex]}",
+          );
         });
-        ShowToast().showNormalToast(
-          msg:
-              '${selectedEventIds.length} event${selectedEventIds.length == 1 ? '' : 's'} deleted successfully',
-        );
-        // Reload profile data to refresh the lists
-        _loadProfileData();
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          isLoading = false;
+          _isFetchingMore[tabIndex] = false;
         });
-        ShowToast().showNormalToast(msg: 'Failed to delete events: $e');
+        ShowToast().showNormalToast(
+          msg: 'Error loading events. Please try again.',
+        );
       }
+      debugPrint("❌ Error fetching more events for tab $tabIndex: $e");
+    }
+  }
+
+  Future<void> _refreshUserDataInBackground() async {
+    try {
+      final user = await FirebaseFirestoreHelper()
+          .getSingleCustomer(customerId: CustomerController.logeInCustomer!.uid)
+          .timeout(const Duration(seconds: 8));
+      if (user != null && mounted) {
+        setState(() {
+          CustomerController.logeInCustomer = user;
+          isDiscoverable = user.isDiscoverable;
+        });
+        debugPrint('✅ User data refreshed in background.');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Background user data refresh failed: $e');
+    }
+  }
+
+  void _onTabChanged(int newIndex) {
+    if (selectedTab == newIndex) return;
+
+    setState(() {
+      selectedTab = newIndex;
+      // If the list for the new tab is empty and there's more to load, fetch it.
+      final events = newIndex == 1
+          ? createdEvents
+          : (newIndex == 2 ? attendedEvents : savedEvents);
+      if (events.isEmpty && (_hasMore[newIndex] ?? true)) {
+        _fetchMoreEvents(newIndex);
+      }
+    });
+  }
+
+  Future<void> _runComprehensiveDiagnostics() async {
+    try {
+      debugPrint(
+        '🔬 ============== MY PROFILE COMPREHENSIVE DEBUG STARTED ==============',
+      );
+
+      final user = CustomerController.logeInCustomer;
+      if (user == null) {
+        debugPrint('🔬 ❌ No logged in user found');
+        return;
+      }
+
+      debugPrint('🔬 User ID: ${user.uid}');
+      debugPrint('🔬 User Email: ${user.email}');
+      debugPrint('🔬 User Name: ${user.name}');
+      debugPrint(
+        '🔬 Current state - Created: ${createdEvents.length}, Attended: ${attendedEvents.length}, Saved: ${savedEvents.length}',
+      );
+
+      // Test each Firebase method individually
+      debugPrint('🔬 Testing Created Events...');
+      try {
+        final createdResult = await FirebaseFirestoreHelper()
+            .getEventsCreatedByUser(user.uid, limit: 50);
+        final createdEvents = createdResult['events'] as List;
+        debugPrint('🔬 ✅ Created Events: ${createdEvents.length}');
+        for (int i = 0; i < createdEvents.take(3).length; i++) {
+          debugPrint(
+            '🔬   - ${createdEvents[i].title} (${createdEvents[i].id})',
+          );
+        }
+      } catch (e) {
+        debugPrint('🔬 ❌ Created Events Error: $e');
+      }
+
+      debugPrint('🔬 Testing Attended Events...');
+      try {
+        final attendedResult = await FirebaseFirestoreHelper()
+            .getEventsAttendedByUser(user.uid, limit: 50);
+        final attendedEvents = attendedResult['events'] as List;
+        debugPrint('🔬 ✅ Attended Events: ${attendedEvents.length}');
+        for (int i = 0; i < attendedEvents.take(3).length; i++) {
+          debugPrint(
+            '🔬   - ${attendedEvents[i].title} (${attendedEvents[i].id})',
+          );
+        }
+      } catch (e) {
+        debugPrint('🔬 ❌ Attended Events Error: $e');
+      }
+
+      debugPrint('🔬 Testing Saved Events...');
+      try {
+        final savedResult = await FirebaseFirestoreHelper().getFavoritedEvents(
+          userId: user.uid,
+          limit: 50,
+        );
+        final savedEvents = savedResult['events'] as List;
+        debugPrint('🔬 ✅ Saved Events: ${savedEvents.length}');
+        for (int i = 0; i < savedEvents.take(3).length; i++) {
+          debugPrint('🔬   - ${savedEvents[i].title} (${savedEvents[i].id})');
+        }
+      } catch (e) {
+        debugPrint('🔬 ❌ Saved Events Error: $e');
+      }
+
+      // Test direct Firebase queries
+      debugPrint('🔬 Testing Direct Firebase Queries...');
+      final directQuery = FirebaseFirestore.instance
+          .collection('Events')
+          .where('customerUid', isEqualTo: user.uid);
+      final directResult = await directQuery.get();
+      debugPrint('🔬 Direct query found ${directResult.docs.length} events');
+
+      // Run ProfileDiagnostics as well
+      debugPrint('🔬 Running ProfileDiagnostics...');
+      await ProfileDiagnostics.runFullDiagnostics();
+
+      debugPrint(
+        '🔬 ============== MY PROFILE COMPREHENSIVE DEBUG FINISHED ==============',
+      );
+
+      // Automatically reload data after diagnostics to show any fixes
+      debugPrint('🔬 Reloading profile data after diagnostics...');
+      await _loadProfileData(isRefresh: true);
+
+      // Final comparison
+      debugPrint('🔬 FINAL COMPARISON:');
+      debugPrint('🔬   My Profile Created Events: ${createdEvents.length}');
+      debugPrint('🔬   My Profile Attended Events: ${attendedEvents.length}');
+      debugPrint('🔬   My Profile Saved Events: ${savedEvents.length}');
+    } catch (e, stackTrace) {
+      debugPrint('🔬 ❌ Comprehensive diagnostics failed: $e');
+      debugPrint('🔬 ❌ Stack trace: $stackTrace');
     }
   }
 
@@ -888,7 +592,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
 
   Widget _buildProfileContent(CustomerModel? user) {
     return RefreshIndicator(
-      onRefresh: _loadProfileData,
+      onRefresh: () => _loadProfileData(isRefresh: true),
       color: const Color(0xFF667EEA),
       child: CustomScrollView(
         slivers: [
@@ -1672,11 +1376,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
 
     return Expanded(
       child: GestureDetector(
-        onTap: () {
-          setState(() {
-            selectedTab = index;
-          });
-        },
+        onTap: () => _onTabChanged(index),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1705,6 +1405,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         : selectedTab == 2
         ? attendedEvents
         : savedEvents;
+    final hasMore = _hasMore[selectedTab] ?? false;
     final emptyMessage = selectedTab == 1
         ? 'You haven\'t created any events yet'
         : selectedTab == 2
@@ -1744,7 +1445,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
 
     return Container(
       margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-      child: sortedEvents.isEmpty
+      child: (sortedEvents.isEmpty && !(_isFetchingMore[selectedTab] ?? false))
           ? _buildEmptyState(emptyMessage, emptyIcon)
           : Column(
               children: [
@@ -1825,10 +1526,25 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                 ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: sortedEvents.length > _displayedItemCount
-                      ? _displayedItemCount
-                      : sortedEvents.length,
+                  itemCount: sortedEvents.length + (hasMore ? 1 : 0),
                   itemBuilder: (context, index) {
+                    if (index == sortedEvents.length) {
+                      // This is the "Load More" item
+                      return (_isFetchingMore[selectedTab] ?? false)
+                          ? const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: CircularProgressIndicator(),
+                              ),
+                            )
+                          : Container(
+                              margin: const EdgeInsets.only(top: 16),
+                              child: OutlinedButton(
+                                onPressed: () => _fetchMoreEvents(selectedTab),
+                                child: const Text('Load More'),
+                              ),
+                            );
+                    }
                     // Remove excessive logging for performance
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
@@ -1836,53 +1552,6 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                     );
                   },
                 ),
-                // Load More / Show All buttons if there are more items
-                if (sortedEvents.length > _displayedItemCount)
-                  Container(
-                    margin: const EdgeInsets.only(top: 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: () {
-                            setState(() {
-                              _displayedItemCount += _itemsPerPage;
-                            });
-                          },
-                          icon: const Icon(Icons.expand_more),
-                          label: Text(
-                            'Load More (${sortedEvents.length - _displayedItemCount} remaining)',
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF667EEA),
-                            side: const BorderSide(color: Color(0xFF667EEA)),
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 12,
-                              horizontal: 24,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        // Show All button - displays all events at once
-                        TextButton.icon(
-                          onPressed: () {
-                            setState(() {
-                              _displayedItemCount = sortedEvents.length;
-                            });
-                          },
-                          icon: const Icon(Icons.visibility),
-                          label: const Text('Show All'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: const Color(0xFF667EEA),
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 12,
-                              horizontal: 16,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
               ],
             ),
     );
@@ -1987,9 +1656,14 @@ class _MyProfileScreenState extends State<MyProfileScreen>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               ElevatedButton.icon(
-                onPressed: _loadProfileData,
+                onPressed: () async {
+                  debugPrint(
+                    '🔄 Manual refresh requested from My Profile empty state',
+                  );
+                  await _loadProfileData(isRefresh: true);
+                },
                 icon: Icon(Icons.refresh, size: 18),
-                label: Text('Refresh'),
+                label: Text('Refresh All'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF667EEA),
                   foregroundColor: Colors.white,
@@ -2005,13 +1679,13 @@ class _MyProfileScreenState extends State<MyProfileScreen>
               SizedBox(width: 12),
               OutlinedButton.icon(
                 onPressed: () async {
-                  await ProfileDiagnostics.runDiagnostics();
+                  await _runComprehensiveDiagnostics();
                   ShowToast().showNormalToast(
                     msg: 'Check console logs for diagnostic results',
                   );
                 },
                 icon: Icon(Icons.bug_report, size: 18),
-                label: Text('Run Diagnostics'),
+                label: Text('Run Full Diagnostics'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF667EEA),
                   side: BorderSide(color: Color(0xFF667EEA)),
@@ -2184,6 +1858,341 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         },
       ),
     );
+  }
+
+  // Selection methods
+  void _toggleSelectionMode() {
+    setState(() {
+      isSelectionMode = !isSelectionMode;
+      if (!isSelectionMode) {
+        selectedEventIds.clear();
+      }
+    });
+  }
+
+  void _toggleEventSelection(String eventId) {
+    setState(() {
+      if (selectedEventIds.contains(eventId)) {
+        selectedEventIds.remove(eventId);
+      } else {
+        selectedEventIds.add(eventId);
+      }
+    });
+  }
+
+  void _toggleSelectAll(List<EventModel> events) {
+    setState(() {
+      if (selectedEventIds.length == events.length) {
+        // If all are selected, deselect all
+        selectedEventIds.clear();
+      } else {
+        // Select all
+        selectedEventIds = events.map((e) => e.id).toSet();
+      }
+    });
+  }
+
+  Future<void> _deleteSelectedEvents() async {
+    if (selectedEventIds.isEmpty) {
+      ShowToast().showNormalToast(msg: 'Please select events to delete');
+      return;
+    }
+
+    // Show confirmation dialog
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Delete Events',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Roboto',
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to delete ${selectedEventIds.length} selected event${selectedEventIds.length == 1 ? '' : 's'}? This action cannot be undone.',
+          style: const TextStyle(fontSize: 16, fontFamily: 'Roboto'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                color: Color(0xFF6B7280),
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Delete',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // Delete events from Firebase
+      for (String eventId in selectedEventIds) {
+        await FirebaseFirestoreHelper().deleteEvent(eventId);
+      }
+
+      if (mounted) {
+        setState(() {
+          selectedEventIds.clear();
+          isSelectionMode = false;
+          isLoading = false;
+        });
+        ShowToast().showNormalToast(
+          msg:
+              '${selectedEventIds.length} event${selectedEventIds.length == 1 ? '' : 's'} deleted successfully',
+        );
+        // Reload profile data to refresh the lists
+        _loadProfileData();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+        ShowToast().showNormalToast(msg: 'Failed to delete events: $e');
+      }
+    }
+  }
+
+  // Bio section and related state removed to avoid duplication with UserProfileScreen
+
+  // Badge related methods
+  Future<void> _loadUserBadge() async {
+    try {
+      final userId = CustomerController.logeInCustomer?.uid;
+      if (userId == null) return;
+
+      setState(() {
+        _isBadgeLoading = true;
+      });
+
+      final badge = await _badgeService.getOrGenerateBadge(userId);
+
+      if (mounted) {
+        setState(() {
+          _userBadge = badge;
+          _isBadgeLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading user badge: $e');
+      if (mounted) {
+        setState(() {
+          _isBadgeLoading = false;
+        });
+      }
+    }
+  }
+
+  void _showBadgeWalletModal(BuildContext context) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black.withValues(alpha: 0.9),
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return Scaffold(
+            backgroundColor: Colors.black.withValues(alpha: 0.9),
+            body: SafeArea(
+              child: Stack(
+                children: [
+                  // Full screen badge
+                  Center(
+                    child: Hero(
+                      tag: 'badge_photo_view',
+                      child: Container(
+                        margin: const EdgeInsets.all(32),
+                        child: ProfessionalBadgeWidget(
+                          badge: _userBadge!,
+                          width: MediaQuery.of(context).size.width - 64,
+                          height:
+                              (MediaQuery.of(context).size.width - 64) *
+                              (180 / 280),
+                          showActions: false,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Close button
+                  Positioned(
+                    top: 16,
+                    right: 16,
+                    child: IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.black.withValues(alpha: 0.5),
+                        shape: const CircleBorder(),
+                      ),
+                    ),
+                  ),
+
+                  // Save to Wallet button at bottom
+                  Positioned(
+                    left: 24,
+                    right: 24,
+                    bottom: 32,
+                    child: ElevatedButton(
+                      onPressed: () => _saveToWallet(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF667EEA),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        elevation: 8,
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.account_balance_wallet_outlined, size: 24),
+                          SizedBox(width: 12),
+                          Text(
+                            'Save to Wallet',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+      ),
+    );
+  }
+
+  Future<void> _saveToWallet(BuildContext context) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
+          ),
+        ),
+      );
+
+      // Determine platform for backend processing
+      final platform = Theme.of(context).platform;
+      final isApple =
+          platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
+
+      final callable = FirebaseFunctions.instance.httpsCallable(
+        'generateUserBadgePass',
+      );
+
+      final result = await callable.call({
+        'uid': CustomerController.logeInCustomer?.uid ?? '',
+        'platform': isApple ? 'apple' : 'google',
+      });
+
+      final urlString = result.data['url'] as String;
+
+      // Dismiss loading indicator
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+
+      if (urlString.startsWith('data:text/plain,')) {
+        // Handle error messages
+        final message = urlString.substring('data:text/plain,'.length);
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(Uri.decodeComponent(message)),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final url = Uri.parse(urlString);
+
+      if (await canLaunchUrl(url)) {
+        await launchUrl(
+          url,
+          mode: urlString.startsWith('data:')
+              ? LaunchMode.inAppWebView
+              : LaunchMode.externalApplication,
+        );
+
+        if (!context.mounted) return;
+        Navigator.pop(context);
+
+        // Show success message
+        const successMessage =
+            'Badge generated successfully! You can now add it to your wallet.';
+
+        ShowToast().showNormalToast(msg: successMessage);
+      } else {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to open wallet pass. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (error) {
+      // Dismiss loading indicator if still showing
+      if (context.mounted && ModalRoute.of(context)?.isCurrent == false) {
+        Navigator.pop(context);
+      }
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to add to wallet: ${error.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
   }
 }
 

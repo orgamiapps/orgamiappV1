@@ -20,7 +20,8 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
-  int _selectedBillingIndex = 0; // 0 = Monthly, 1 = 6-month, 2 = Annual
+  int _selectedBillingIndex =
+      2; // 0 = Monthly, 1 = 6-month, 2 = Annual (default to best value)
   bool _isProcessing = false;
   bool _isNavigating = false;
 
@@ -80,7 +81,6 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
         }
       },
       child: Scaffold(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Stack(
           children: [
             _buildGradientBackground(),
@@ -90,10 +90,10 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
                   Align(
                     alignment: Alignment.topLeft,
                     child: Padding(
-                      padding: const EdgeInsets.only(left: 8.0),
+                      padding: const EdgeInsets.only(left: 16.0, top: 8.0),
                       child: AppAppBarView.modernBackButton(
                         context: context,
-                        backgroundColor: Colors.white.withValues(alpha: 0.15),
+                        backgroundColor: Colors.white.withAlpha(38),
                         iconColor: Colors.white,
                       ),
                     ),
@@ -114,12 +114,7 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            Theme.of(context).colorScheme.primary,
-            Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
-            Theme.of(context).scaffoldBackgroundColor,
-          ],
-          stops: const [0.0, 0.3, 1.0],
+          colors: [Colors.indigo.shade900, Colors.purple.shade900],
         ),
       ),
     );
@@ -167,19 +162,17 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 20),
-              _buildTitle(),
               const SizedBox(height: 16),
+              _buildTitle(),
+              const SizedBox(height: 12),
               _buildSubtitle(),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               _buildPricingToggle(),
               const SizedBox(height: 24),
               _buildPlanCards(),
-              const SizedBox(height: 32),
-              _buildFeatureComparison(),
               const SizedBox(height: 24),
               _buildDisclaimer(),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -189,11 +182,12 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
 
   Widget _buildTitle() {
     return Text(
-      'Choose Your Plan',
+      'Unlock Your Potential',
       style: TextStyle(
-        fontSize: 32,
+        fontSize: 34,
         fontWeight: FontWeight.bold,
-        color: Theme.of(context).colorScheme.onPrimary,
+        color: Colors.white,
+        letterSpacing: 0.5,
       ),
       textAlign: TextAlign.center,
     );
@@ -201,10 +195,11 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
 
   Widget _buildSubtitle() {
     return Text(
-      'Unlock powerful features to grow your events',
+      'Choose the plan that fits your needs.\nCancel anytime.',
       style: TextStyle(
         fontSize: 16,
-        color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.9),
+        height: 1.5,
+        color: Colors.white.withAlpha(217),
       ),
       textAlign: TextAlign.center,
     );
@@ -214,13 +209,13 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.black.withAlpha(64),
+        borderRadius: BorderRadius.circular(30),
       ),
       child: Row(
         children: List.generate(3, (index) {
           final isSelected = _selectedBillingIndex == index;
-          final hasSavings = index > 0;
+          final isBestValue = index == 2;
 
           return Expanded(
             child: GestureDetector(
@@ -233,18 +228,19 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
                   color: isSelected ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(30),
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
+                            color: Colors.black.withAlpha(38),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
                           ),
                         ]
                       : null,
                 ),
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
                       billingPeriods[index],
@@ -257,16 +253,16 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    if (hasSavings) ...[
+                    if (isBestValue) ...[
                       const SizedBox(height: 4),
                       Text(
-                        index == 1 ? 'Save 17%' : 'Save 27%',
+                        'Best Value',
                         style: TextStyle(
                           fontSize: 11,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.bold,
                           color: isSelected
-                              ? Colors.green.shade700
-                              : Colors.green.shade200,
+                              ? Colors.deepOrange.shade600
+                              : Colors.orangeAccent.shade100,
                         ),
                       ),
                     ],
@@ -281,17 +277,21 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
   }
 
   Widget _buildPlanCards() {
-    return Row(
-      children: [
-        Expanded(child: _buildPlanCard(tier: SubscriptionTier.basic)),
-        const SizedBox(width: 16),
-        Expanded(child: _buildPlanCard(tier: SubscriptionTier.premium)),
-      ],
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: _buildPlanCard(tier: SubscriptionTier.basic)),
+          const SizedBox(width: 16),
+          Expanded(child: _buildPlanCard(tier: SubscriptionTier.premium)),
+        ],
+      ),
     );
   }
 
   Widget _buildPlanCard({required SubscriptionTier tier}) {
     final isBasic = tier == SubscriptionTier.basic;
+    final isPremium = !isBasic;
     final prices = isBasic
         ? SubscriptionService.basicPrices
         : SubscriptionService.premiumPrices;
@@ -299,232 +299,184 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
 
     final features = isBasic
         ? [
-            '5 events/month',
-            'RSVP tracking',
-            'Attendance sheet',
-            'Event sharing',
+            '5 events per month',
+            'Track RSVPs easily',
+            'Manage attendance',
+            'Share events',
           ]
         : [
             'Unlimited events',
-            'Event analytics',
-            'Create groups',
-            'Priority support',
+            'Deep analytics & insights',
+            'Create & manage groups',
+            'Priority support 24/7',
           ];
+
+    final ctaText = isBasic ? 'Choose Basic' : 'Choose Premium';
+    final cardColor = isBasic ? Colors.white : Colors.blue.shade800;
+    final textColor = isBasic ? Colors.black87 : Colors.white;
+    final priceColor = isBasic
+        ? Theme.of(context).colorScheme.primary
+        : Colors.white;
+    final buttonStyle = isPremium
+        ? ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.blue.shade800,
+          )
+        : ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            foregroundColor: Theme.of(context).colorScheme.primary,
+            side: BorderSide(
+              color: Theme.of(context).colorScheme.primary,
+              width: 1.5,
+            ),
+          );
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        color: cardColor,
+        borderRadius: BorderRadius.circular(24),
+        border: isPremium
+            ? Border.all(color: Colors.white.withAlpha(128), width: 1.5)
+            : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: Colors.black.withAlpha(38),
+            blurRadius: 25,
+            offset: const Offset(0, 12),
           ),
         ],
+        gradient: isPremium
+            ? LinearGradient(
+                colors: [Colors.blue.shade700, Colors.blue.shade900],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              tier.displayName,
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: isPremium
+                    ? Colors.white
+                    : Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 4.0),
+                  child: Text(
+                    '\$',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: priceColor,
+                    ),
+                  ),
+                ),
                 Text(
-                  tier.displayName,
+                  price.toStringAsFixed(0),
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: 48,
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '\$',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    Text(
-                      price.toStringAsFixed(0),
-                      style: TextStyle(
-                        fontSize: 40,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  billingDescriptions[_selectedBillingIndex],
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 20),
-                ...features.map(
-                  (feature) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.check_circle,
-                          color: isBasic
-                              ? Colors.blue
-                              : Theme.of(context).colorScheme.primary,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            feature,
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isProcessing
-                        ? null
-                        : () => _handlePlanSelection(tier),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isBasic
-                          ? Colors.blue
-                          : Theme.of(context).colorScheme.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: _isProcessing
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text(
-                            'Choose Plan',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                    color: priceColor,
+                    height: 1.0,
                   ),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFeatureComparison() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.2),
-          width: 1,
+            Text(
+              billingDescriptions[_selectedBillingIndex],
+              style: TextStyle(
+                fontSize: 12,
+                color: textColor.withAlpha(179),
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ...features.map(
+              (feature) => Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.check,
+                      color: isPremium ? Colors.white : Colors.blue.shade600,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        feature,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: textColor,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const Spacer(),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _isProcessing
+                    ? null
+                    : () => _handlePlanSelection(tier),
+                style: ElevatedButton.styleFrom(
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ).merge(buttonStyle),
+                child: _isProcessing
+                    ? SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: isPremium
+                              ? Colors.blue.shade800
+                              : Colors.white,
+                        ),
+                      )
+                    : Text(
+                        ctaText,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+              ),
+            ),
+          ],
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Feature Comparison',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.onPrimary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildComparisonRow('Browse & RSVP to events', true, true, true),
-          _buildComparisonRow('Create events', true, true, true),
-          _buildComparisonRow(
-            'Event limit',
-            '5 lifetime',
-            '5/month',
-            'Unlimited',
-          ),
-          _buildComparisonRow('Attendance tracking', true, true, true),
-          _buildComparisonRow('Event analytics', false, false, true),
-          _buildComparisonRow('Create groups', false, false, true),
-          _buildComparisonRow('Priority support', false, false, true),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildComparisonRow(
-    String feature,
-    dynamic free,
-    dynamic basic,
-    dynamic premium,
-  ) {
-    Widget buildCell(dynamic value) {
-      if (value is bool) {
-        return value
-            ? const Icon(Icons.check, color: Colors.green, size: 18)
-            : const Icon(Icons.close, color: Colors.red, size: 18);
-      } else {
-        return Text(
-          value.toString(),
-          style: const TextStyle(color: Colors.white70, fontSize: 11),
-          textAlign: TextAlign.center,
-        );
-      }
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              feature,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
-            ),
-          ),
-          Expanded(child: Center(child: buildCell(free))),
-          Expanded(child: Center(child: buildCell(basic))),
-          Expanded(child: Center(child: buildCell(premium))),
-        ],
       ),
     );
   }
 
   Widget _buildDisclaimer() {
     return Text(
-      'For testing purposes, this will activate a free subscription. Payment integration will be added later.',
-      style: TextStyle(
-        fontSize: 12,
-        color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7),
-        fontStyle: FontStyle.italic,
-      ),
+      '🔒 Secure Payments • Cancel Anytime',
+      style: TextStyle(fontSize: 12, color: Colors.white.withAlpha(179)),
       textAlign: TextAlign.center,
     );
   }

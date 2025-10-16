@@ -958,97 +958,6 @@ class FirebaseFirestoreHelper {
     }
   }
 
-  // Get events created by a user - OPTIMIZED with pagination support
-  Future<List<EventModel>> getEventsCreatedByUser(
-    String userId, {
-    int? limit,
-    DocumentSnapshot? startAfter,
-  }) async {
-    try {
-      Logger.debug(
-        'Fetching events created by user: $userId (limit: ${limit ?? "none"})',
-      );
-
-      Query query = _firestore
-          .collection(EventModel.firebaseKey)
-          .where('customerUid', isEqualTo: userId);
-
-      // Try with orderBy first, fallback to without if it fails (likely due to missing index)
-      QuerySnapshot? querySnapshot;
-      try {
-        // PERFORMANCE: Add limit and ordering for faster queries
-        Query orderedQuery = query.orderBy(
-          'eventGenerateTime',
-          descending: true,
-        ); // Most recent first
-
-        if (limit != null) {
-          orderedQuery = orderedQuery.limit(limit);
-        }
-
-        if (startAfter != null) {
-          orderedQuery = orderedQuery.startAfterDocument(startAfter);
-        }
-
-        // PERFORMANCE: Add timeout to prevent hanging
-        querySnapshot = await orderedQuery.get().timeout(
-          const Duration(seconds: 10),
-        );
-      } catch (e) {
-        // If the ordered query fails (possibly due to missing index), try without ordering
-        Logger.warning('Ordered query failed (possibly missing index): $e');
-        Logger.debug('Falling back to query without orderBy');
-      }
-
-      // If ordered query failed, try without orderBy
-      if (querySnapshot == null || querySnapshot.docs.isEmpty) {
-        Logger.debug('Attempting query without orderBy...');
-        if (limit != null) {
-          query = query.limit(limit);
-        }
-
-        querySnapshot = await query.get().timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            Logger.warning('Query timed out, returning empty results');
-            throw TimeoutException('getEventsCreatedByUser timed out');
-          },
-        );
-      }
-
-      Logger.debug('Found ${querySnapshot.docs.length} events created by user');
-
-      final events = querySnapshot.docs
-          .map((doc) {
-            try {
-              // Add document ID to data before parsing
-              final data = doc.data() as Map<String, dynamic>;
-              data['id'] = data['id'] ?? doc.id;
-              return EventModel.fromJson(data);
-            } catch (e) {
-              Logger.error('Error parsing event document ${doc.id}: $e', e);
-              return null;
-            }
-          })
-          .where((event) => event != null)
-          .cast<EventModel>()
-          .toList();
-
-      // If we couldn't use orderBy due to missing index, sort in memory
-      if (events.isNotEmpty) {
-        events.sort(
-          (a, b) => b.eventGenerateTime.compareTo(a.eventGenerateTime),
-        );
-      }
-
-      Logger.debug('Successfully parsed ${events.length} events');
-      return events;
-    } catch (e) {
-      Logger.error('Error fetching created events: $e', e);
-      return [];
-    }
-  }
-
   // Test method to manually add attendance for debugging
   Future<void> addTestAttendance(String eventId, String userId) async {
     try {
@@ -1239,7 +1148,8 @@ class FirebaseFirestoreHelper {
 
       // Test the getEventsAttendedByUser method
       Logger.debug('=== Testing getEventsAttendedByUser method ===');
-      List<EventModel> attendedEvents = await getEventsAttendedByUser(userId);
+      final result = await getEventsAttendedByUser(userId);
+      final attendedEvents = result['events'] as List<EventModel>;
       Logger.debug(
         'Found ${attendedEvents.length} attended events for user $userId',
       );
@@ -1249,159 +1159,6 @@ class FirebaseFirestoreHelper {
       }
     } catch (e) {
       Logger.debug('Error creating past event and attendance: $e');
-    }
-  }
-
-  // Get events attended by a user - Optimized version
-  Future<List<EventModel>> getEventsAttendedByUser(String userId) async {
-    try {
-      Logger.debug('=== DEBUG: Fetching events attended by user: $userId ===');
-
-      Set<String> allEventIds = {};
-
-      // Method 1: Get attendance records for this user
-      try {
-        final attendanceQuery = await _firestore
-            .collection(AttendanceModel.firebaseKey)
-            .where('customerUid', isEqualTo: userId)
-            .get()
-            .timeout(const Duration(seconds: 5));
-
-        Logger.debug(
-          'Found ${attendanceQuery.docs.length} attendance records for user $userId',
-        );
-
-        // Extract event IDs from attendance records
-        for (var doc in attendanceQuery.docs) {
-          try {
-            String rawEventId = doc['eventId'] as String;
-            // Trim whitespace to prevent lookup failures from trailing spaces
-            String cleanedEventId = _cleanEventId(rawEventId.trim());
-            allEventIds.add(cleanedEventId);
-          } catch (e) {
-            Logger.debug('Error processing attendance record: $e');
-            continue;
-          }
-        }
-      } catch (e) {
-        Logger.debug('Error fetching attendance records: $e');
-      }
-
-      // Method 2: Get events from user's tickets (both used and unused)
-      try {
-        final ticketsQuery = await _firestore
-            .collection(TicketModel.firebaseKey)
-            .where('customerUid', isEqualTo: userId)
-            // Get all tickets, not just used ones - user has "attended" if they have a ticket
-            .get()
-            .timeout(const Duration(seconds: 5));
-
-        Logger.debug(
-          'Found ${ticketsQuery.docs.length} tickets for user $userId',
-        );
-
-        // Extract event IDs from tickets
-        for (var doc in ticketsQuery.docs) {
-          try {
-            String eventId = doc['eventId'] as String;
-            String cleanedEventId = _cleanEventId(eventId.trim());
-            allEventIds.add(cleanedEventId);
-
-            // Log ticket status for debugging
-            bool isUsed = doc['isUsed'] ?? false;
-            Logger.debug('Ticket for event $eventId: isUsed=$isUsed');
-          } catch (e) {
-            Logger.debug('Error processing ticket record: $e');
-            continue;
-          }
-        }
-      } catch (e) {
-        Logger.debug('Error fetching tickets: $e');
-      }
-
-      final eventIds = allEventIds.toList();
-      Logger.debug(
-        'Unique event IDs from attendance + tickets: ${eventIds.length}',
-      );
-
-      if (eventIds.isEmpty) {
-        Logger.debug('No valid event IDs found for user $userId');
-        return [];
-      }
-
-      // Fetch events in parallel with timeout
-      List<EventModel> allEvents = [];
-      final futures = eventIds.map(
-        (eventId) => _fetchEventSafely(eventId, userId),
-      );
-
-      final results = await Future.wait(
-        futures,
-        eagerError: false,
-      ).timeout(const Duration(seconds: 10));
-
-      for (var result in results) {
-        if (result != null) {
-          allEvents.add(result);
-        }
-      }
-
-      Logger.debug(
-        '=== FINAL RESULT: Successfully parsed ${allEvents.length} total attended events ===',
-      );
-      return allEvents;
-    } catch (e) {
-      Logger.debug('Error fetching attended events: $e');
-      if (e.toString().contains('PERMISSION_DENIED')) {
-        Logger.debug('PERMISSION_DENIED error - check Firestore rules');
-      }
-      return [];
-    }
-  }
-
-  // Safely fetch a single event with error handling
-  Future<EventModel?> _fetchEventSafely(String eventId, String userId) async {
-    try {
-      final eventDoc = await _firestore
-          .collection(EventModel.firebaseKey)
-          .doc(eventId)
-          .get()
-          .timeout(const Duration(seconds: 2));
-
-      if (!eventDoc.exists) {
-        Logger.debug('Event document not found for ID: $eventId');
-        return null;
-      }
-
-      final eventData = eventDoc.data() as Map<String, dynamic>;
-
-      // Check if the event is accessible to the user
-      bool canAccessEvent = false;
-      if (eventData.containsKey('customerUid')) {
-        String eventOwnerId = eventData['customerUid'] as String;
-        bool isPrivate = eventData['private'] ?? false;
-        canAccessEvent = (eventOwnerId == userId) || !isPrivate;
-      } else {
-        canAccessEvent = true;
-      }
-
-      if (!canAccessEvent) {
-        Logger.debug(
-          'Skipping private event $eventId - user does not have access',
-        );
-        return null;
-      }
-
-      // Ensure the document has an 'id' field
-      if (!eventData.containsKey('id')) {
-        eventData['id'] = eventId;
-      }
-
-      final event = EventModel.fromJson(eventData);
-      return event;
-    } catch (e) {
-      Logger.debug('Error fetching event $eventId: $e');
-      return null;
     }
   }
 
@@ -1925,52 +1682,8 @@ class FirebaseFirestoreHelper {
   /// This method deletes the event document and all related data
   Future<void> deleteEvent(String eventId) async {
     try {
-      // Delete the event document
       await _firestore.collection(EventModel.firebaseKey).doc(eventId).delete();
-
-      // Delete related attendance records
-      final attendanceQuery = await _firestore
-          .collection(AttendanceModel.firebaseKey)
-          .where('eventId', isEqualTo: eventId)
-          .get();
-
-      for (var doc in attendanceQuery.docs) {
-        await doc.reference.delete();
-      }
-
-      // Delete related pre-registration records
-      final preRegistrationQuery = await _firestore
-          .collection(AttendanceModel.registerFirebaseKey)
-          .where('eventId', isEqualTo: eventId)
-          .get();
-
-      for (var doc in preRegistrationQuery.docs) {
-        await doc.reference.delete();
-      }
-
-      // Delete related tickets
-      final ticketsQuery = await _firestore
-          .collection(TicketModel.firebaseKey)
-          .where('eventId', isEqualTo: eventId)
-          .get();
-
-      for (var doc in ticketsQuery.docs) {
-        await doc.reference.delete();
-      }
-
-      // Delete related comments
-      final commentsQuery = await _firestore
-          .collection(CommentModel.firebaseKey)
-          .where('eventId', isEqualTo: eventId)
-          .get();
-
-      for (var doc in commentsQuery.docs) {
-        await doc.reference.delete();
-      }
-
-      Logger.debug('Successfully deleted event: $eventId');
     } catch (e) {
-      Logger.debug('Error deleting event: $e');
       rethrow;
     }
   }
@@ -3030,143 +2743,6 @@ class FirebaseFirestoreHelper {
     }
   }
 
-  Future<List<EventModel>> getFavoritedEvents({
-    required String userId,
-    int? limit,
-  }) async {
-    try {
-      Logger.debug('=== Fetching saved events for user: $userId ===');
-
-      // Get current user data with timeout
-      final userDoc = await _firestore
-          .collection(CustomerModel.firebaseKey)
-          .doc(userId)
-          .get()
-          .timeout(const Duration(seconds: 5));
-
-      if (!userDoc.exists) {
-        Logger.debug('User not found: $userId');
-        return [];
-      }
-
-      final userData = userDoc.data()!;
-      List<String> favoriteEventIds = List<String>.from(
-        userData['favorites'] ?? [],
-      );
-
-      Logger.debug(
-        'User has ${favoriteEventIds.length} events in favorites array',
-      );
-
-      if (favoriteEventIds.isEmpty) {
-        Logger.debug('No saved events found in user favorites');
-        return [];
-      }
-
-      // PERFORMANCE: Apply limit before fetching (if specified)
-      if (limit != null && favoriteEventIds.length > limit) {
-        favoriteEventIds = favoriteEventIds.sublist(0, limit);
-      }
-
-      Logger.debug(
-        'Fetching ${favoriteEventIds.length} saved events using batch query',
-      );
-
-      // Fetch events with improved error handling
-      final List<EventModel> allEvents = [];
-
-      // Process in batches of 10 (Firestore whereIn limit)
-      for (int i = 0; i < favoriteEventIds.length; i += 10) {
-        final batchIds = favoriteEventIds.skip(i).take(10).toList();
-        Logger.debug('Processing batch ${i ~/ 10 + 1}: ${batchIds.join(", ")}');
-
-        try {
-          // Try whereIn batch query first
-          final querySnapshot = await _firestore
-              .collection(EventModel.firebaseKey)
-              .where(FieldPath.documentId, whereIn: batchIds)
-              .get()
-              .timeout(const Duration(seconds: 5));
-
-          Logger.debug(
-            'Batch query returned ${querySnapshot.docs.length} of ${batchIds.length} events',
-          );
-
-          // Parse all events from this batch
-          for (final doc in querySnapshot.docs) {
-            try {
-              final eventData = doc.data();
-              eventData['id'] = eventData['id'] ?? doc.id;
-              final event = EventModel.fromJson(eventData);
-              allEvents.add(event);
-            } catch (e) {
-              Logger.error('Error parsing event ${doc.id}: $e', e);
-            }
-          }
-
-          // If batch returned fewer events, try fetching missing ones individually
-          if (querySnapshot.docs.length < batchIds.length) {
-            final foundIds = querySnapshot.docs.map((d) => d.id).toSet();
-            final missingIds = batchIds.where((id) => !foundIds.contains(id));
-
-            Logger.debug('Missing events in batch: ${missingIds.join(", ")}');
-
-            for (final eventId in missingIds) {
-              try {
-                final eventDoc = await _firestore
-                    .collection(EventModel.firebaseKey)
-                    .doc(eventId)
-                    .get()
-                    .timeout(const Duration(seconds: 2));
-
-                if (eventDoc.exists) {
-                  final eventData = eventDoc.data()!;
-                  eventData['id'] = eventData['id'] ?? eventDoc.id;
-                  final event = EventModel.fromJson(eventData);
-                  allEvents.add(event);
-                  Logger.debug('Found event individually: $eventId');
-                } else {
-                  Logger.debug('Event not found: $eventId (might be deleted)');
-                }
-              } catch (e) {
-                Logger.debug('Error fetching individual event $eventId: $e');
-              }
-            }
-          }
-        } catch (e) {
-          Logger.warning('Batch query failed for batch starting at $i: $e');
-
-          // Fallback: Try fetching events individually
-          for (final eventId in batchIds) {
-            try {
-              final eventDoc = await _firestore
-                  .collection(EventModel.firebaseKey)
-                  .doc(eventId)
-                  .get()
-                  .timeout(const Duration(seconds: 2));
-
-              if (eventDoc.exists) {
-                final eventData = eventDoc.data()!;
-                eventData['id'] = eventData['id'] ?? eventDoc.id;
-                final event = EventModel.fromJson(eventData);
-                allEvents.add(event);
-                Logger.debug('Fetched event individually (fallback): $eventId');
-              }
-            } catch (e) {
-              Logger.debug('Error fetching individual event $eventId: $e');
-            }
-          }
-        }
-      }
-
-      Logger.debug('✅ Successfully fetched ${allEvents.length} saved events');
-      return allEvents;
-    } catch (e) {
-      Logger.error('Error getting saved events: $e', e);
-      return [];
-    }
-  }
-
   // ====== Private Event Access Request Workflow ======
   Future<void> requestEventAccess({
     required String eventId,
@@ -3248,6 +2824,293 @@ class FirebaseFirestoreHelper {
       Logger.debug('App feedback submitted successfully');
     } catch (e) {
       Logger.debug('Error submitting app feedback: $e');
+      rethrow;
+    }
+  }
+
+  // Get events created by a user with pagination
+  Future<Map<String, dynamic>> getEventsCreatedByUser(
+    String userId, {
+    int limit = 20,
+    DocumentSnapshot? lastDocument,
+  }) async {
+    debugPrint(
+      '🔍 getEventsCreatedByUser called for userId: $userId, limit: $limit',
+    );
+    debugPrint('🔍 EventModel.firebaseKey: ${EventModel.firebaseKey}');
+    try {
+      Query query = _firestore
+          .collection(EventModel.firebaseKey)
+          .where('customerUid', isEqualTo: userId);
+
+      debugPrint(
+        '🔍 Base query created for collection: ${EventModel.firebaseKey}',
+      );
+      debugPrint('🔍 Filtering by customerUid == $userId');
+
+      // Note: Removed orderBy to avoid composite index requirement
+      // We'll sort in memory instead to avoid Firebase index dependency
+
+      // For created events, we'll fetch more to ensure we get all user events
+      // since we can't use efficient Firebase ordering without an index
+      final fetchLimit = lastDocument == null
+          ? 100
+          : limit; // Get more on first fetch
+
+      debugPrint(
+        '🔍 Executing query with limit: $fetchLimit (no ordering to avoid index requirement)',
+      );
+      final QuerySnapshot querySnapshot = await query.limit(fetchLimit).get();
+
+      debugPrint(
+        '🔍 Query executed. Raw docs count: ${querySnapshot.docs.length}',
+      );
+
+      if (querySnapshot.docs.isEmpty) {
+        debugPrint('⚠️ No documents found for userId: $userId');
+        // Let's also try a broader search to see what's in the collection
+        debugPrint('🔍 Attempting broader search to debug...');
+        final allEventsQuery = _firestore
+            .collection(EventModel.firebaseKey)
+            .limit(5);
+        final allEventsSnapshot = await allEventsQuery.get();
+        debugPrint(
+          '🔍 Total events in collection (sample of 5): ${allEventsSnapshot.docs.length}',
+        );
+        for (var doc in allEventsSnapshot.docs) {
+          final data = doc.data();
+          debugPrint(
+            '🔍 Sample event: customerUid=${data['customerUid']}, title=${data['title']}',
+          );
+        }
+      }
+
+      final List<EventModel> events = querySnapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        debugPrint(
+          '🔍 Processing doc ${doc.id}: customerUid=${data['customerUid']}, title=${data['title']}',
+        );
+        data['id'] = data['id'] ?? doc.id; // Ensure ID is set
+        return EventModel.fromJson(data);
+      }).toList();
+
+      // Sort in memory by creation time (most recent first)
+      // This avoids the composite index requirement
+      events.sort((a, b) => b.eventGenerateTime.compareTo(a.eventGenerateTime));
+
+      debugPrint(
+        '✅ getEventsCreatedByUser: Found ${events.length} events for user $userId (sorted in memory)',
+      );
+
+      // Since we're doing in-memory sorting anyway, return all events on first fetch
+      // This ensures both My Profile and User Profile screens show the same data
+      if (lastDocument == null) {
+        // First fetch - return ALL events (no artificial limit)
+        // Both screens should show the same complete data for the user
+        debugPrint(
+          '🔍 First fetch - returning all ${events.length} sorted events',
+        );
+        return {
+          'events': events, // Return all events
+          'lastDoc': null, // No pagination needed since we got all events
+        };
+      } else {
+        // Subsequent fetches - not needed since we return all events on first fetch
+        return {'events': <EventModel>[], 'lastDoc': null};
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error in getEventsCreatedByUser: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
+      Logger.error('Failed to fetch created events for user $userId', e);
+      return {'events': <EventModel>[], 'lastDoc': null};
+    }
+  }
+
+  // Get events a user has attended with pagination
+  Future<Map<String, dynamic>> getEventsAttendedByUser(
+    String userId, {
+    int limit = 20,
+    DocumentSnapshot? lastDocument,
+  }) async {
+    debugPrint(
+      '🔍 getEventsAttendedByUser called for userId: $userId, limit: $limit',
+    );
+    try {
+      // Step 1: Get all ticket documents for the user
+      final ticketsSnapshot = await _firestore
+          .collection(TicketModel.firebaseKey)
+          .where('customerUid', isEqualTo: userId)
+          .get();
+
+      if (ticketsSnapshot.docs.isEmpty) {
+        return {'events': <EventModel>[], 'lastDoc': null};
+      }
+
+      // Step 2: Extract all unique event IDs from the tickets
+      final eventIds = ticketsSnapshot.docs
+          .map((doc) => doc['eventId'] as String)
+          .toSet()
+          .toList();
+
+      // Step 3: Fetch the event details for those IDs
+      if (eventIds.isEmpty) {
+        return {'events': <EventModel>[], 'lastDoc': null};
+      }
+
+      Query query = _firestore
+          .collection(EventModel.firebaseKey)
+          .where(FieldPath.documentId, whereIn: eventIds);
+
+      // We cannot easily paginate a `whereIn` query with another `orderBy`.
+      // For now, we fetch all and paginate manually.
+      // For larger scales, a dedicated "attendedEvents" subcollection would be better.
+      final querySnapshot = await query.get();
+
+      final List<EventModel> events = querySnapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = data['id'] ?? doc.id; // Ensure ID is set
+        return EventModel.fromJson(data);
+      }).toList();
+
+      // Manual pagination
+      int startIndex = 0;
+      if (lastDocument != null) {
+        // This is a simplified way to paginate; not efficient for large datasets
+        // A proper implementation would need a different data model.
+        startIndex = events.indexWhere((e) => e.id == lastDocument.id) + 1;
+      }
+
+      final paginatedEvents = events.skip(startIndex).take(limit).toList();
+      DocumentSnapshot? newLastDoc;
+      if (paginatedEvents.isNotEmpty) {
+        final lastId = paginatedEvents.last.id;
+        final originalDoc = querySnapshot.docs.firstWhere(
+          (d) => d.id == lastId,
+        );
+        newLastDoc = originalDoc;
+      }
+
+      debugPrint(
+        '✅ getEventsAttendedByUser: Found ${paginatedEvents.length} events for user $userId (${events.length} total)',
+      );
+
+      return {'events': paginatedEvents, 'lastDoc': newLastDoc};
+    } catch (e) {
+      debugPrint("❌ Error in getEventsAttendedByUser: $e");
+      Logger.error('Failed to fetch attended events for user $userId', e);
+      return {'events': <EventModel>[], 'lastDoc': null};
+    }
+  }
+
+  // Get favorited events for a user with pagination
+  Future<Map<String, dynamic>> getFavoritedEvents({
+    required String userId,
+    int limit = 20,
+    DocumentSnapshot? lastDocument,
+  }) async {
+    debugPrint(
+      '🔍 getFavoritedEvents called for userId: $userId, limit: $limit',
+    );
+    try {
+      final userDoc = await getSingleCustomer(customerId: userId);
+      if (userDoc == null || userDoc.favorites.isEmpty) {
+        return {'events': [], 'lastDoc': null};
+      }
+      final favoriteIds = userDoc.favorites;
+
+      if (favoriteIds.isEmpty) {
+        return {'events': [], 'lastDoc': null};
+      }
+
+      Query query = _firestore
+          .collection(EventModel.firebaseKey)
+          .where(FieldPath.documentId, whereIn: favoriteIds);
+
+      // Similar to attended events, paginating `whereIn` is tricky.
+      // Fetching all matching IDs then paginating manually.
+      final querySnapshot = await query.get();
+
+      final List<EventModel> events = querySnapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = data['id'] ?? doc.id; // Ensure ID is set
+        return EventModel.fromJson(data);
+      }).toList();
+
+      // Manual pagination
+      int startIndex = 0;
+      if (lastDocument != null) {
+        startIndex = events.indexWhere((e) => e.id == lastDocument.id) + 1;
+      }
+
+      final paginatedEvents = events.skip(startIndex).take(limit).toList();
+      DocumentSnapshot? newLastDoc;
+      if (paginatedEvents.isNotEmpty) {
+        final lastId = paginatedEvents.last.id;
+        final originalDoc = querySnapshot.docs.firstWhere(
+          (d) => d.id == lastId,
+        );
+        newLastDoc = originalDoc;
+      }
+
+      debugPrint(
+        '✅ getFavoritedEvents: Found ${paginatedEvents.length} events for user $userId (${events.length} total)',
+      );
+
+      return {'events': paginatedEvents, 'lastDoc': newLastDoc};
+    } catch (e) {
+      debugPrint("❌ Error in getFavoritedEvents: $e");
+      Logger.error('Failed to fetch favorited events for user $userId', e);
+      return {'events': <EventModel>[], 'lastDoc': null};
+    }
+  }
+
+  Future<void> addEventToFavorites({
+    required String userId,
+    required String eventId,
+  }) async {
+    try {
+      // Get current user data
+      final userDoc = await _firestore
+          .collection(CustomerModel.firebaseKey)
+          .doc(userId)
+          .get();
+
+      if (!userDoc.exists) {
+        Logger.debug('User not found: $userId');
+        return;
+      }
+
+      final userData = userDoc.data()!;
+      List<String> favorites = List<String>.from(userData['favorites'] ?? []);
+
+      // Check if event is already saved
+      if (favorites.contains(eventId)) {
+        Logger.debug('Event already saved: $eventId');
+        return;
+      }
+
+      // Add event to saved events
+      favorites.add(eventId);
+
+      // Update user document
+      await _firestore.collection(CustomerModel.firebaseKey).doc(userId).update(
+        {'favorites': favorites},
+      );
+
+      Logger.debug('Event added to saved events: $eventId for user: $userId');
+    } catch (e) {
+      Logger.debug('Error adding event to saved events: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateEvent(EventModel event) async {
+    try {
+      await _firestore
+          .collection(EventModel.firebaseKey)
+          .doc(event.id)
+          .update(event.toJson());
+    } catch (e) {
       rethrow;
     }
   }

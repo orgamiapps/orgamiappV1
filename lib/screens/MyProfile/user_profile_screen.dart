@@ -11,6 +11,7 @@ import 'package:attendus/Utils/responsive_helper.dart';
 import 'package:attendus/firebase/firebase_storage_helper.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:attendus/controller/customer_controller.dart';
@@ -88,32 +89,86 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       // Load user's created events
       List<EventModel> createdEvents = [];
       try {
-        createdEvents = await FirebaseFirestoreHelper().getEventsCreatedByUser(
-          widget.user.uid,
+        debugPrint('🔄 Loading created events for user: ${widget.user.uid}');
+        debugPrint('🔄 User email: ${widget.user.email}');
+        debugPrint('🔄 User name: ${widget.user.name}');
+
+        final createdResult = await FirebaseFirestoreHelper()
+            .getEventsCreatedByUser(
+              widget.user.uid,
+              limit: 50,
+            ); // Consistent with My Profile screen
+
+        debugPrint('🔍 Raw createdResult: $createdResult');
+        debugPrint('🔍 createdResult type: ${createdResult.runtimeType}');
+        debugPrint('🔍 createdResult keys: ${createdResult.keys.toList()}');
+
+        createdEvents = createdResult['events'] as List<EventModel>;
+        debugPrint('🔍 Parsed createdEvents length: ${createdEvents.length}');
+        debugPrint('🔍 createdEvents type: ${createdEvents.runtimeType}');
+
+        // Events are already sorted by the Firebase helper method
+        debugPrint(
+          '✅ Loaded ${createdEvents.length} created events after sorting',
         );
-        // Sort created events by creation date (most recent first)
-        createdEvents.sort(
-          (a, b) => b.eventGenerateTime.compareTo(a.eventGenerateTime),
-        );
-        debugPrint('Loaded ${createdEvents.length} created events');
-      } catch (e) {
-        debugPrint('Error loading created events: $e');
+        for (int i = 0; i < createdEvents.take(5).length; i++) {
+          final event = createdEvents[i];
+          debugPrint('📝 Created Event $i: ${event.title} (ID: ${event.id})');
+          debugPrint('    📅 Date: ${event.selectedDateTime}');
+          debugPrint('    👤 Creator: ${event.customerUid}');
+        }
+        // Save created events immediately
+        if (mounted) {
+          setState(() {
+            _createdEvents = createdEvents;
+          });
+          debugPrint(
+            '💾 Saved ${createdEvents.length} created events to _createdEvents',
+          );
+        }
+      } catch (e, stackTrace) {
+        debugPrint('❌ Error loading created events: $e');
+        debugPrint('❌ Stack trace: $stackTrace');
         createdEvents = [];
+        if (mounted) {
+          setState(() {
+            _createdEvents = [];
+          });
+        }
       }
 
       // Load user's attended events
       List<EventModel> attendedEvents = [];
       try {
-        attendedEvents = await FirebaseFirestoreHelper()
-            .getEventsAttendedByUser(widget.user.uid);
+        debugPrint('🔄 Loading attended events for user: ${widget.user.uid}');
+        final attendedResult = await FirebaseFirestoreHelper()
+            .getEventsAttendedByUser(
+              widget.user.uid,
+              limit: 50,
+            ); // Consistent with My Profile screen
+        attendedEvents = attendedResult['events'] as List<EventModel>;
         // Sort attended events by event date (most recent first) to match my_profile_screen
         attendedEvents.sort(
           (a, b) => b.selectedDateTime.compareTo(a.selectedDateTime),
         );
-        debugPrint('Loaded ${attendedEvents.length} attended events');
+        debugPrint('✅ Loaded ${attendedEvents.length} attended events');
+        for (int i = 0; i < attendedEvents.take(3).length; i++) {
+          debugPrint('📝 Attended Event $i: ${attendedEvents[i].title}');
+        }
+        // Save attended events immediately
+        if (mounted) {
+          setState(() {
+            _attendedEvents = attendedEvents;
+          });
+        }
       } catch (e) {
-        debugPrint('Error loading attended events: $e');
+        debugPrint('❌ Error loading attended events: $e');
         attendedEvents = [];
+        if (mounted) {
+          setState(() {
+            _attendedEvents = [];
+          });
+        }
       }
 
       // Load follower/following counts
@@ -153,8 +208,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
       if (mounted) {
         setState(() {
-          _createdEvents = createdEvents;
-          _attendedEvents = attendedEvents;
+          // Events are already set individually above
           _followersCount = followersCount;
           _followingCount = followingCount;
           _isFollowing = isFollowing;
@@ -163,22 +217,28 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         debugPrint('User data loaded successfully');
       }
     } catch (e) {
-      debugPrint('Error loading user data: $e');
+      debugPrint('❌ Error loading user data: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _createdEvents = [];
-          _attendedEvents = [];
+          // Don't reset events here as they are handled individually above
+          // Only reset follower counts as they're less critical
           _followersCount = 0;
           _followingCount = 0;
+          _isFollowing = false;
         });
+        ShowToast().showNormalToast(
+          msg: 'Some profile data may not be available. Please try refreshing.',
+        );
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('Building UserProfileScreen - isLoading: $_isLoading');
+    debugPrint('🏗️ Building UserProfileScreen - isLoading: $_isLoading');
+    debugPrint('🏗️ _createdEvents.length: ${_createdEvents.length}');
+    debugPrint('🏗️ _attendedEvents.length: ${_attendedEvents.length}');
 
     if (_isLoading) {
       return PopScope(
@@ -1259,14 +1319,78 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   Widget _buildCreatedEventsTab() {
     debugPrint(
-      'Building created events tab with ${_createdEvents.length} events',
+      '🎭 Building created events tab with ${_createdEvents.length} events',
     );
 
+    // Debug: Print first few event titles if available
+    if (_createdEvents.isNotEmpty) {
+      for (int i = 0; i < _createdEvents.take(3).length; i++) {
+        debugPrint(
+          '🎭 Created Event $i: ${_createdEvents[i].title} (ID: ${_createdEvents[i].id})',
+        );
+      }
+    }
+
     if (_createdEvents.isEmpty) {
-      return _buildEmptyState(
-        'No Created Events',
-        'This user hasn\'t created any events yet.',
-        Icons.event_outlined,
+      debugPrint('🎭 Created events list is empty - showing empty state');
+      return Column(
+        children: [
+          _buildEmptyState(
+            'No Created Events',
+            'This user hasn\'t created any events yet.',
+            Icons.event_outlined,
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    debugPrint(
+                      '🔄 Manual refresh requested for Created Events',
+                    );
+                    await _loadUserData();
+                  },
+                  icon: Icon(Icons.refresh, size: 18),
+                  label: Text('Refresh'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF667EEA),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    debugPrint('🔬 Deep debug requested for Created Events');
+                    await _debugUserEvents();
+                  },
+                  icon: Icon(Icons.bug_report, size: 18),
+                  label: Text('Debug'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF9800),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       );
     }
 
@@ -1291,10 +1415,37 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     );
 
     if (_attendedEvents.isEmpty) {
-      return _buildEmptyState(
-        'No Attended Events',
-        'This user hasn\'t attended any events yet.',
-        Icons.check_circle_outline,
+      return Column(
+        children: [
+          _buildEmptyState(
+            'No Attended Events',
+            'This user hasn\'t attended any events yet.',
+            Icons.check_circle_outline,
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                debugPrint('🔄 Manual refresh requested for Attended Events');
+                await _loadUserData();
+              },
+              icon: Icon(Icons.refresh, size: 18),
+              label: Text('Refresh Events'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF667EEA),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ),
+        ],
       );
     }
 
@@ -1589,6 +1740,86 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       ClipboardData(text: 'https://orgami.app/profile/${widget.user.uid}'),
     );
     ShowToast().showNormalToast(msg: 'Profile link copied to clipboard');
+  }
+
+  Future<void> _debugUserEvents() async {
+    try {
+      debugPrint('🔬 ============== DEEP DEBUG STARTED ==============');
+      debugPrint('🔬 User ID: ${widget.user.uid}');
+      debugPrint('🔬 User Email: ${widget.user.email}');
+      debugPrint('🔬 User Name: ${widget.user.name}');
+      debugPrint('🔬 Current _createdEvents length: ${_createdEvents.length}');
+      debugPrint(
+        '🔬 Current _attendedEvents length: ${_attendedEvents.length}',
+      );
+
+      // Test Firebase connection
+      debugPrint('🔬 Testing Firebase connection...');
+      final testQuery = FirebaseFirestore.instance
+          .collection('Events')
+          .limit(1);
+      final testSnapshot = await testQuery.get();
+      debugPrint(
+        '🔬 Firebase connection test: ${testSnapshot.docs.length > 0 ? "SUCCESS" : "FAILED"}',
+      );
+
+      if (testSnapshot.docs.isNotEmpty) {
+        final testDoc = testSnapshot.docs.first;
+        final testData = testDoc.data();
+        debugPrint('🔬 Sample event structure: ${testData.keys.toList()}');
+        debugPrint('🔬 Sample event customerUid: ${testData['customerUid']}');
+      }
+
+      // Test direct query for this user
+      debugPrint('🔬 Testing direct query for user events...');
+      final userQuery = FirebaseFirestore.instance
+          .collection('Events')
+          .where('customerUid', isEqualTo: widget.user.uid)
+          .limit(10);
+      final userSnapshot = await userQuery.get();
+      debugPrint(
+        '🔬 Direct user query result: ${userSnapshot.docs.length} events',
+      );
+
+      for (var doc in userSnapshot.docs) {
+        final data = doc.data();
+        debugPrint('🔬 Found event: ${data['title']} (ID: ${doc.id})');
+        debugPrint('🔬   customerUid: ${data['customerUid']}');
+        debugPrint('🔬   eventGenerateTime: ${data['eventGenerateTime']}');
+      }
+
+      // Test with FirebaseFirestoreHelper
+      debugPrint(
+        '🔬 Testing with FirebaseFirestoreHelper (after index fix)...',
+      );
+      final helperResult = await FirebaseFirestoreHelper()
+          .getEventsCreatedByUser(widget.user.uid, limit: 50);
+      debugPrint('🔬 FirebaseFirestoreHelper result: ${helperResult}');
+
+      final helperEvents = helperResult['events'] as List<dynamic>;
+      debugPrint(
+        '🔬 FirebaseFirestoreHelper events count: ${helperEvents.length}',
+      );
+      for (int i = 0; i < helperEvents.take(3).length; i++) {
+        final event = helperEvents[i];
+        debugPrint('🔬 Helper Event $i: ${event.title} (ID: ${event.id})');
+      }
+
+      debugPrint('🔬 ============== DEEP DEBUG FINISHED ==============');
+
+      // Final comparison
+      debugPrint('🔬 FINAL COMPARISON:');
+      debugPrint('🔬   User Profile Created Events: ${_createdEvents.length}');
+      debugPrint(
+        '🔬   User Profile Attended Events: ${_attendedEvents.length}',
+      );
+
+      ShowToast().showNormalToast(msg: 'Debug complete - check console logs');
+    } catch (e, stackTrace) {
+      debugPrint('🔬 ❌ Debug failed: $e');
+      debugPrint('🔬 ❌ Stack trace: $stackTrace');
+      ShowToast().showNormalToast(msg: 'Debug failed: $e');
+    }
   }
 
   void _showEditProfileModal() {
