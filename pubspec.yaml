@@ -98,6 +98,10 @@ dependencies:
   # On-device AI/ML
   sqflite: ^2.3.3  # For SQLite database caching
   
+  # Facial Recognition ML Kit
+  google_mlkit_face_detection: ^0.12.0  # Face detection for attendance
+  camera: ^0.11.0+2  # Camera access for face scanning
+  
   # NFC functionality for badge activation (temporarily disabled due to plugin registration issue)
   # nfc_manager: ^4.1.1
 

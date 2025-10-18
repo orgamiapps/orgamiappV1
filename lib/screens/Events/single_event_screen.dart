@@ -43,6 +43,7 @@ import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Services/ticket_payment_service.dart';
+import 'package:attendus/Services/face_recognition_service.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
@@ -56,6 +57,8 @@ import 'package:attendus/screens/Events/Widget/qr_dialogue.dart';
 import 'package:attendus/screens/Events/Widget/access_list_management_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:attendus/screens/Events/Widget/pre_registered_horizontal_list.dart';
+import 'package:attendus/screens/FaceRecognition/face_recognition_scanner_screen.dart';
+import 'package:attendus/screens/FaceRecognition/face_enrollment_screen.dart';
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 
 class SingleEventScreen extends StatefulWidget {
@@ -2245,11 +2248,310 @@ Join us at: $eventUrl
       return;
     }
 
-    // Navigate to QR Scanner Flow Screen
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const QRScannerFlowScreen()),
+    // Show sign-in method selector
+    _showSignInMethodSelector();
+  }
+
+  void _showSignInMethodSelector() {
+    final availableMethods = eventModel.signInMethods;
+
+    if (availableMethods.length == 1) {
+      // Only one method available, use it directly
+      _handleSignInMethod(availableMethods.first);
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Choose Sign-In Method',
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A1A1A),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              eventModel.title,
+              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ...availableMethods.map((method) => _buildSignInMethodTile(method)),
+            const SizedBox(height: 20),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      ),
     );
+  }
+
+  Widget _buildSignInMethodTile(String method) {
+    Map<String, dynamic> methodInfo = _getMethodInfo(method);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () {
+            Navigator.pop(context);
+            _handleSignInMethod(method);
+          },
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: methodInfo['color'].withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: methodInfo['color'], width: 1),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: methodInfo['color'],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    methodInfo['icon'],
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        methodInfo['title'],
+                        style: TextStyle(
+                          color: methodInfo['color'],
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        methodInfo['description'],
+                        style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  color: methodInfo['color'],
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Map<String, dynamic> _getMethodInfo(String method) {
+    switch (method) {
+      case 'facial_recognition':
+        return {
+          'title': 'Facial Recognition',
+          'description': 'Sign in with face scan',
+          'icon': Icons.face,
+          'color': const Color(0xFFFF6B6B),
+        };
+      case 'qr_code':
+        return {
+          'title': 'QR Code',
+          'description': 'Scan QR codes for quick sign-in',
+          'icon': Icons.qr_code_scanner,
+          'color': const Color(0xFF667EEA),
+        };
+      case 'manual_code':
+        return {
+          'title': 'Manual Code',
+          'description': 'Enter event code manually',
+          'icon': Icons.keyboard,
+          'color': const Color(0xFF764BA2),
+        };
+      case 'geofence':
+        return {
+          'title': 'Geofence',
+          'description': 'Auto-sign-in when near event',
+          'icon': Icons.location_on,
+          'color': const Color(0xFFF093FB),
+        };
+      default:
+        return {
+          'title': 'Sign In',
+          'description': 'Sign in to event',
+          'icon': Icons.login,
+          'color': const Color(0xFF667EEA),
+        };
+    }
+  }
+
+  void _handleSignInMethod(String method) {
+    switch (method) {
+      case 'facial_recognition':
+        _handleFacialRecognitionSignIn();
+        break;
+      case 'qr_code':
+      case 'manual_code':
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const QRScannerFlowScreen()),
+        );
+        break;
+      case 'geofence':
+        // Geofence is handled automatically by location services
+        ShowToast().showNormalToast(
+          msg:
+              'Geofence sign-in is automatic when you\'re near the event location.',
+        );
+        break;
+    }
+  }
+
+  void _handleFacialRecognitionSignIn() async {
+    if (CustomerController.logeInCustomer == null) {
+      ShowToast().showNormalToast(
+        msg: 'Please log in to use facial recognition.',
+      );
+      return;
+    }
+
+    // Check if user is enrolled for facial recognition
+    final faceService = FaceRecognitionService();
+    final isEnrolled = await faceService.isUserEnrolled(
+      userId: CustomerController.logeInCustomer!.uid,
+      eventId: eventModel.id,
+    );
+
+    if (!mounted) return;
+
+    if (isEnrolled) {
+      // Navigate to face recognition scanner
+      final result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              FaceRecognitionScannerScreen(eventModel: eventModel),
+        ),
+      );
+
+      if (result == true) {
+        // Successful sign-in, refresh attendance status
+        getAttendance();
+      }
+    } else {
+      // Show enrollment dialog
+      _showFaceEnrollmentDialog();
+    }
+  }
+
+  void _showFaceEnrollmentDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Face Recognition Setup'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.face, size: 64, color: Color(0xFFFF6B6B)),
+            const SizedBox(height: 16),
+            const Text(
+              'To use facial recognition sign-in, you need to enroll your face first. This is a one-time setup for this event.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info, color: Colors.blue, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Your face data is stored securely and only used for this event.',
+                      style: TextStyle(color: Colors.blue[800], fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Not Now'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _navigateToFaceEnrollment();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF6B6B),
+            ),
+            child: const Text(
+              'Enroll Face',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _navigateToFaceEnrollment() async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FaceEnrollmentScreen(eventModel: eventModel),
+      ),
+    );
+
+    if (result == true && mounted) {
+      // After successful enrollment, refresh attendance status
+      getAttendance();
+    }
   }
 
   void _addToCalendar() async {

@@ -21,11 +21,13 @@ class EventModel {
   int issuedTickets;
   double? ticketPrice; // Price per ticket in USD
   bool ticketUpgradeEnabled; // Whether skip-the-line upgrades are available
-  double? ticketUpgradePrice; // Price to upgrade to skip-the-line (total price, not additional)
+  double?
+  ticketUpgradePrice; // Price to upgrade to skip-the-line (total price, not additional)
   int eventDuration; // Duration in hours
   List<String> coHosts; // Array of user IDs who are co-hosts
   String? organizationId; // Optional organization context for the event
-  List<String> accessList; // For private events outside org or additional invitees
+  List<String>
+  accessList; // For private events outside org or additional invitees
 
   // Sign-in methods configuration
   List<String> signInMethods; // ['qr_code', 'manual_code', 'geofence']
@@ -64,7 +66,11 @@ class EventModel {
     this.coHosts = const [],
     this.organizationId,
     this.accessList = const [],
-    this.signInMethods = const ['qr_code', 'manual_code'], // Default methods
+    this.signInMethods = const [
+      'facial_recognition',
+      'qr_code',
+      'manual_code',
+    ], // Default methods
     this.manualCode,
   });
 
@@ -121,7 +127,7 @@ class EventModel {
       signInMethods:
           (data.containsKey('signInMethods') && data['signInMethods'] != null)
           ? List<String>.from(data['signInMethods'])
-          : ['qr_code', 'manual_code'],
+          : ['facial_recognition', 'qr_code', 'manual_code'],
       manualCode: data['manualCode'],
     );
   }
@@ -209,7 +215,8 @@ class EventModel {
     data['issuedTickets'] = issuedTickets;
     if (ticketPrice != null) data['ticketPrice'] = ticketPrice;
     data['ticketUpgradeEnabled'] = ticketUpgradeEnabled;
-    if (ticketUpgradePrice != null) data['ticketUpgradePrice'] = ticketUpgradePrice;
+    if (ticketUpgradePrice != null)
+      data['ticketUpgradePrice'] = ticketUpgradePrice;
     data['eventDuration'] = eventDuration;
     data['coHosts'] = coHosts;
     if (organizationId != null) data['organizationId'] = organizationId;

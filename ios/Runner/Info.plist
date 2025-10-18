@@ -50,7 +50,9 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>AttendUs needs camera access to scan QR codes for event check-ins, ticket verification, and activating NFC badges at events you attend.</string>
+	<string>AttendUs needs camera access to scan QR codes for event check-ins, ticket verification, facial recognition sign-in, and activating NFC badges at events you attend.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>AttendUs uses facial recognition to provide secure and convenient sign-in to events you attend. Your biometric data is processed locally and stored securely.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>AttendUs uses your location to help you discover nearby events, show event locations on the map, and provide location-based event recommendations.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

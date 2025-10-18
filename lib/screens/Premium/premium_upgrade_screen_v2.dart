@@ -24,6 +24,7 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
       2; // 0 = Monthly, 1 = 6-month, 2 = Annual (default to best value)
   bool _isProcessing = false;
   bool _isNavigating = false;
+  SubscriptionTier _selectedTier = SubscriptionTier.basic; // Default to Basic
 
   static const List<String> billingPeriods = ['Monthly', '6 Months', 'Annual'];
   static const List<String> billingDescriptions = [
@@ -268,6 +269,7 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
   Widget _buildPlanCard({required SubscriptionTier tier}) {
     final isBasic = tier == SubscriptionTier.basic;
     final isPremium = !isBasic;
+    final isSelected = _selectedTier == tier;
     final prices = isBasic
         ? SubscriptionService.basicPrices
         : SubscriptionService.premiumPrices;
@@ -291,7 +293,7 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
     final cardColor = Colors.white;
     final textColor = Colors.grey.shade800;
     final priceColor = Theme.of(context).colorScheme.primary;
-    final buttonStyle = isPremium
+    final buttonStyle = isSelected
         ? ElevatedButton.styleFrom(
             backgroundColor: Theme.of(context).colorScheme.primary,
             foregroundColor: Colors.white,
@@ -305,136 +307,143 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
             ),
           );
 
-    return Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(24),
-        border: isPremium
-            ? Border.all(
-                color: Theme.of(context).colorScheme.primary,
-                width: 2.0,
-              )
-            : Border.all(color: Colors.grey.shade200, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(13),
-            blurRadius: 25,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              tier.displayName,
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-                color: isPremium
-                    ? Theme.of(context).colorScheme.primary
-                    : Colors.grey.shade900,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 4.0),
-                  child: Text(
-                    '\$',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: priceColor,
-                    ),
-                  ),
-                ),
-                Text(
-                  price.toStringAsFixed(0),
-                  style: TextStyle(
-                    fontSize: 48,
-                    fontWeight: FontWeight.bold,
-                    color: priceColor,
-                    height: 1.0,
-                  ),
-                ),
-              ],
-            ),
-            Text(
-              billingDescriptions[_selectedBillingIndex],
-              style: TextStyle(
-                fontSize: 12,
-                color: textColor.withAlpha(179),
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ...features.map(
-              (feature) => Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.check, color: Colors.blue.shade600, size: 20),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        feature,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: textColor,
-                          height: 1.3,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const Spacer(),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isProcessing
-                    ? null
-                    : () => _handlePlanSelection(tier),
-                style: ElevatedButton.styleFrom(
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ).merge(buttonStyle),
-                child: _isProcessing
-                    ? SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: isPremium
-                              ? Colors.white
-                              : Theme.of(context).colorScheme.primary,
-                        ),
-                      )
-                    : Text(
-                        ctaText,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-              ),
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedTier = tier;
+        });
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(24),
+          border: isSelected
+              ? Border.all(
+                  color: Theme.of(context).colorScheme.primary,
+                  width: 2.0,
+                )
+              : Border.all(color: Colors.grey.shade200, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(13),
+              blurRadius: 25,
+              offset: const Offset(0, 12),
             ),
           ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                tier.displayName,
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.grey.shade900,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4.0),
+                    child: Text(
+                      '\$',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: priceColor,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    price.toStringAsFixed(0),
+                    style: TextStyle(
+                      fontSize: 48,
+                      fontWeight: FontWeight.bold,
+                      color: priceColor,
+                      height: 1.0,
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                billingDescriptions[_selectedBillingIndex],
+                style: TextStyle(
+                  fontSize: 12,
+                  color: textColor.withAlpha(179),
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ...features.map(
+                (feature) => Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.check, color: Colors.blue.shade600, size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          feature,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: textColor,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const Spacer(),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isProcessing
+                      ? null
+                      : () => _handlePlanSelection(tier),
+                  style: ElevatedButton.styleFrom(
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ).merge(buttonStyle),
+                  child: _isProcessing
+                      ? SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: isPremium
+                                ? Colors.white
+                                : Theme.of(context).colorScheme.primary,
+                          ),
+                        )
+                      : Text(
+                          ctaText,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

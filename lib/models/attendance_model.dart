@@ -19,6 +19,10 @@ class AttendanceModel {
   dwellStatus; // 'active', 'completed', 'auto-stopped', 'manual-stopped'
   String? dwellNotes; // For notes like 'Auto-stopped', 'Manual check-out', etc.
 
+  // Sign-in method tracking
+  String?
+  signInMethod; // 'facial_recognition', 'qr_code', 'manual_code', 'geofence'
+
   AttendanceModel({
     required this.id,
     required this.userName,
@@ -33,6 +37,7 @@ class AttendanceModel {
     this.dwellTime,
     this.dwellStatus,
     this.dwellNotes,
+    this.signInMethod,
   });
 
   factory AttendanceModel.fromJson(dynamic parsedJson) {
@@ -61,6 +66,7 @@ class AttendanceModel {
           : null,
       dwellStatus: data['dwellStatus'],
       dwellNotes: data['dwellNotes'],
+      signInMethod: data['signInMethod'],
     );
   }
 
@@ -86,6 +92,7 @@ class AttendanceModel {
     if (dwellTime != null) data['dwellTime'] = dwellTime!.inMilliseconds;
     if (dwellStatus != null) data['dwellStatus'] = dwellStatus;
     if (dwellNotes != null) data['dwellNotes'] = dwellNotes;
+    if (signInMethod != null) data['signInMethod'] = signInMethod;
 
     return data;
   }

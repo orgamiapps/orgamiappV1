@@ -25,8 +25,13 @@ class ChoseSignInMethodsScreen extends StatefulWidget {
 
 class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
     with TickerProviderStateMixin {
-  // Default to all three methods selected
-  List<String> _selectedSignInMethods = ['geofence', 'qr_code', 'manual_code'];
+  // Default to all four methods selected
+  List<String> _selectedSignInMethods = [
+    'facial_recognition',
+    'geofence',
+    'qr_code',
+    'manual_code',
+  ];
   String? _manualCode;
 
   // Animation controllers

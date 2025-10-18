@@ -28,6 +28,15 @@ class _SignInMethodsSelectorState extends State<SignInMethodsSelector>
 
   final List<Map<String, dynamic>> _availableMethods = [
     {
+      'id': 'facial_recognition',
+      'title': 'Facial Recognition',
+      'subtitle': 'Sign in with face scan',
+      'icon': Icons.face,
+      'color': const Color(0xFFFF6B6B),
+      'description':
+          'Secure biometric sign-in using facial recognition technology',
+    },
+    {
       'id': 'geofence',
       'title': 'Geofence',
       'subtitle': 'Auto-sign-in when near event',
