@@ -81,40 +81,24 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
         }
       },
       child: Scaffold(
-        body: Stack(
-          children: [
-            _buildGradientBackground(),
-            SafeArea(
-              child: Column(
-                children: [
-                  Align(
-                    alignment: Alignment.topLeft,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 16.0, top: 8.0),
-                      child: AppAppBarView.modernBackButton(
-                        context: context,
-                        backgroundColor: Colors.white.withAlpha(38),
-                        iconColor: Colors.white,
-                      ),
-                    ),
+        backgroundColor: const Color(0xFFF8F9FA),
+        body: SafeArea(
+          child: Column(
+            children: [
+              Align(
+                alignment: Alignment.topLeft,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 16.0, top: 8.0),
+                  child: AppAppBarView.modernBackButton(
+                    context: context,
+                    backgroundColor: Colors.white,
+                    iconColor: Colors.grey.shade800,
                   ),
-                  Expanded(child: _buildBody()),
-                ],
+                ),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGradientBackground() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Colors.indigo.shade900, Colors.purple.shade900],
+              Expanded(child: _buildBody()),
+            ],
+          ),
         ),
       ),
     );
@@ -124,9 +108,7 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
     return Consumer<SubscriptionService>(
       builder: (context, subscriptionService, child) {
         if (subscriptionService.isLoading) {
-          return const Center(
-            child: CircularProgressIndicator(color: Colors.white),
-          );
+          return const Center(child: CircularProgressIndicator());
         }
 
         // If user already has an active subscription, redirect to management
@@ -142,9 +124,7 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
               );
             }
           });
-          return const Center(
-            child: CircularProgressIndicator(color: Colors.white),
-          );
+          return const Center(child: CircularProgressIndicator());
         }
 
         return _buildUpgradeView();
@@ -186,7 +166,7 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
       style: TextStyle(
         fontSize: 34,
         fontWeight: FontWeight.bold,
-        color: Colors.white,
+        color: Colors.grey.shade900,
         letterSpacing: 0.5,
       ),
       textAlign: TextAlign.center,
@@ -196,11 +176,7 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
   Widget _buildSubtitle() {
     return Text(
       'Choose the plan that fits your needs.\nCancel anytime.',
-      style: TextStyle(
-        fontSize: 16,
-        height: 1.5,
-        color: Colors.white.withAlpha(217),
-      ),
+      style: TextStyle(fontSize: 16, height: 1.5, color: Colors.grey.shade600),
       textAlign: TextAlign.center,
     );
   }
@@ -209,7 +185,7 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Colors.black.withAlpha(64),
+        color: Colors.grey.shade200,
         borderRadius: BorderRadius.circular(30),
       ),
       child: Row(
@@ -232,7 +208,7 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: Colors.black.withAlpha(38),
+                            color: Colors.black.withAlpha(26),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -249,7 +225,7 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
                         fontWeight: FontWeight.w600,
                         color: isSelected
                             ? Theme.of(context).colorScheme.primary
-                            : Colors.white,
+                            : Colors.grey.shade700,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -262,7 +238,7 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
                           fontWeight: FontWeight.bold,
                           color: isSelected
                               ? Colors.deepOrange.shade600
-                              : Colors.orangeAccent.shade100,
+                              : Colors.orange.shade700,
                         ),
                       ),
                     ],
@@ -312,21 +288,19 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
           ];
 
     final ctaText = isBasic ? 'Choose Basic' : 'Choose Premium';
-    final cardColor = isBasic ? Colors.white : Colors.blue.shade800;
-    final textColor = isBasic ? Colors.black87 : Colors.white;
-    final priceColor = isBasic
-        ? Theme.of(context).colorScheme.primary
-        : Colors.white;
+    final cardColor = Colors.white;
+    final textColor = Colors.grey.shade800;
+    final priceColor = Theme.of(context).colorScheme.primary;
     final buttonStyle = isPremium
         ? ElevatedButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.blue.shade800,
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Colors.white,
           )
         : ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
+            backgroundColor: Colors.white,
             foregroundColor: Theme.of(context).colorScheme.primary,
             side: BorderSide(
-              color: Theme.of(context).colorScheme.primary,
+              color: Theme.of(context).colorScheme.primary.withAlpha(128),
               width: 1.5,
             ),
           );
@@ -336,22 +310,18 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
         color: cardColor,
         borderRadius: BorderRadius.circular(24),
         border: isPremium
-            ? Border.all(color: Colors.white.withAlpha(128), width: 1.5)
-            : null,
+            ? Border.all(
+                color: Theme.of(context).colorScheme.primary,
+                width: 2.0,
+              )
+            : Border.all(color: Colors.grey.shade200, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(38),
+            color: Colors.black.withAlpha(13),
             blurRadius: 25,
             offset: const Offset(0, 12),
           ),
         ],
-        gradient: isPremium
-            ? LinearGradient(
-                colors: [Colors.blue.shade700, Colors.blue.shade900],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              )
-            : null,
       ),
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -364,8 +334,8 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
                 fontSize: 26,
                 fontWeight: FontWeight.bold,
                 color: isPremium
-                    ? Colors.white
-                    : Theme.of(context).colorScheme.primary,
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.grey.shade900,
               ),
             ),
             const SizedBox(height: 16),
@@ -411,11 +381,7 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.check,
-                      color: isPremium ? Colors.white : Colors.blue.shade600,
-                      size: 20,
-                    ),
+                    Icon(Icons.check, color: Colors.blue.shade600, size: 20),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -453,12 +419,13 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           color: isPremium
-                              ? Colors.blue.shade800
-                              : Colors.white,
+                              ? Colors.white
+                              : Theme.of(context).colorScheme.primary,
                         ),
                       )
                     : Text(
                         ctaText,
+                        textAlign: TextAlign.center,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -476,7 +443,7 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
   Widget _buildDisclaimer() {
     return Text(
       '🔒 Secure Payments • Cancel Anytime',
-      style: TextStyle(fontSize: 12, color: Colors.white.withAlpha(179)),
+      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
       textAlign: TextAlign.center,
     );
   }

@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/firebase/organization_helper.dart';
 import 'package:attendus/screens/Groups/group_profile_screen_v2.dart';
 import 'package:attendus/screens/Groups/create_group_screen.dart';
+import 'package:attendus/Utils/cached_image.dart';
 import 'dart:async';
 
 class GroupsScreen extends StatefulWidget {
@@ -328,14 +329,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
                         return Container(
                           decoration: _cardDeco(),
                           child: ListTile(
-                            leading: logoUrl.isNotEmpty
-                                ? CircleAvatar(
-                                    foregroundImage: NetworkImage(logoUrl),
-                                    onForegroundImageError: (exception, stackTrace) {},
-                                  )
-                                : const CircleAvatar(
-                                    child: Icon(Icons.apartment),
-                                  ),
+                            leading: _orgAvatar(logoUrl, size: 40, icon: Icons.apartment),
                             title: Text(o['name']?.toString() ?? ''),
                             subtitle: Text(
                               o['category']?.toString() ?? 'Other',
@@ -411,12 +405,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (imageUrl != null && imageUrl.isNotEmpty) ...[
-            CircleAvatar(
-              radius: 10,
-              foregroundImage: NetworkImage(imageUrl),
-              onForegroundImageError: (exception, stackTrace) {},
-              child: Icon(icon ?? Icons.apartment, size: 14),
-            ),
+            _orgAvatar(imageUrl, size: 20, icon: icon ?? Icons.apartment),
             const SizedBox(width: 6),
           ] else if (icon != null) ...[
             Icon(icon, size: 16),
@@ -424,6 +413,29 @@ class _GroupsScreenState extends State<GroupsScreen> {
           ],
           Text(text),
         ],
+      ),
+    );
+  }
+
+  Widget _orgAvatar(String imageUrl, {double size = 24, IconData icon = Icons.apartment}) {
+    if (imageUrl.isEmpty) {
+      return CircleAvatar(
+        radius: size / 2,
+        child: Icon(icon, size: size * 0.6),
+      );
+    }
+    return ClipOval(
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: SafeNetworkImage(
+          imageUrl: imageUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          placeholder: Icon(icon, size: size * 0.6),
+          errorWidget: Icon(icon, size: size * 0.6),
+        ),
       ),
     );
   }

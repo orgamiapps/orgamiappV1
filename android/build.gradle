@@ -55,18 +55,19 @@ project(":fluttertoast") {
     }
 }
 
-project(":nfc_manager") {
-    plugins.withId("com.android.library") {
-        def androidExt = extensions.findByName("android")
-        if (androidExt != null) {
-            if (androidExt.hasProperty("compileSdk")) {
-                androidExt.compileSdk = 36
-            } else if (androidExt.hasProperty("compileSdkVersion")) {
-                androidExt.compileSdkVersion 36
-            }
-        }
-    }
-}
+// NFC manager project removed due to plugin registration issues
+// project(":nfc_manager") {
+//     plugins.withId("com.android.library") {
+//         def androidExt = extensions.findByName("android")
+//         if (androidExt != null) {
+//             if (androidExt.hasProperty("compileSdk")) {
+//                 androidExt.compileSdk = 36
+//             } else if (androidExt.hasProperty("compileSdkVersion")) {
+//                 androidExt.compileSdkVersion 36
+//             }
+//         }
+//     }
+// }
 
 // Force plugins and library modules to build with the same SDK/Java levels
 subprojects {

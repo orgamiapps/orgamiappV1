@@ -526,34 +526,38 @@ class _NewMessageScreenState extends State<NewMessageScreen>
       selectedBottomNavIndex: 2, // Messages tab
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: theme.appBarTheme.backgroundColor,
-        foregroundColor: theme.appBarTheme.foregroundColor,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        iconTheme: const IconThemeData(color: Colors.black87),
+        actionsIconTheme: const IconThemeData(color: Colors.black87),
         leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: theme.appBarTheme.foregroundColor,
-          ),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => Navigator.pop(context),
           tooltip: 'Back',
         ),
-        titleTextStyle: theme.appBarTheme.titleTextStyle,
+        titleTextStyle: const TextStyle(
+          color: Colors.black87,
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+        ),
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
         title: Row(
           children: [
             Icon(
               _groupMode ? Icons.group_rounded : Icons.person_rounded,
-              color: theme.appBarTheme.foregroundColor,
+              color: Colors.black87,
               size: 24,
             ),
             const SizedBox(width: 8),
             Text(_groupMode ? _t('newGroupMessage') : _t('newMessage')),
           ],
         ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: theme.dividerColor),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
         ),
       ),
       body: Column(

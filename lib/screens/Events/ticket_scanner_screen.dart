@@ -119,15 +119,17 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
           nfcStatus = 'Ready to scan';
         });
 
-        if (result.isSuccess && result.ticket != null) {
+        if (result.isSuccess && result.ticketId != null) {
+          // NFC functionality is temporarily disabled, this branch won't execute
           setState(() {
-            scannedTicket = result.ticket;
+            // scannedTicket = result.ticket; // Property doesn't exist in stub
           });
 
           _showScanResult(
             success: true,
             title: 'Ticket Activated!',
-            message: result.message ?? 'Ticket activated successfully via NFC',
+            message:
+                'Ticket activated successfully via NFC', // Removed result.message reference
           );
         } else {
           _showScanResult(
@@ -155,7 +157,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
 
   Future<void> _stopNFCScanning() async {
     if (isNFCScanning) {
-      await _nfcService.stopNFCSession(message: 'NFC scanning stopped');
+      await _nfcService.stopNFCSession(); // Removed message parameter
       if (mounted) {
         setState(() {
           isNFCScanning = false;

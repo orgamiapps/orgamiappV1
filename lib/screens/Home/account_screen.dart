@@ -29,6 +29,8 @@ import 'package:attendus/screens/Premium/subscription_management_screen.dart';
 import 'package:attendus/models/subscription_model.dart';
 import 'package:attendus/Services/subscription_service.dart';
 import 'package:attendus/Utils/logger.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:attendus/Utils/cached_image.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -100,10 +102,16 @@ class _AccountScreenState extends State<AccountScreen> {
     }
 
     // If user name is empty or looks like an email prefix, try to refresh
-    final needsRefresh =
+    final isNameIncomplete =
         user.name.isEmpty ||
         user.name == user.email.split('@')[0] ||
         user.name.toLowerCase() == 'user';
+
+    // Also refresh if profile picture is missing
+    final isProfilePictureMissing =
+        user.profilePictureUrl == null || user.profilePictureUrl!.isEmpty;
+
+    final needsRefresh = isNameIncomplete || isProfilePictureMissing;
 
     if (needsRefresh) {
       if (mounted) {
@@ -115,12 +123,20 @@ class _AccountScreenState extends State<AccountScreen> {
         final authService = AuthService();
         await authService.refreshUserData();
 
-        // If still incomplete, try aggressive update
+        // If still incomplete or photo missing, try aggressive update
         final updatedUser = CustomerController.logeInCustomer;
-        if (updatedUser != null &&
+        final stillNameIncomplete =
+            updatedUser != null &&
             (updatedUser.name.isEmpty ||
-                updatedUser.name == updatedUser.email.split('@')[0])) {
+                updatedUser.name == updatedUser.email.split('@')[0]);
+        final stillMissingPhoto =
+            updatedUser != null &&
+            (updatedUser.profilePictureUrl == null ||
+                updatedUser.profilePictureUrl!.isEmpty);
+
+        if (stillNameIncomplete || stillMissingPhoto) {
           await authService.aggressiveProfileUpdate();
+          await authService.refreshUserData();
         }
       } catch (e) {
         Logger.warning('AccountScreen: Failed to refresh user data: $e');
@@ -245,15 +261,19 @@ class _AccountScreenState extends State<AccountScreen> {
                 ],
               ),
               child: ClipOval(
-                child: user?.profilePictureUrl != null
-                    ? Image.network(
-                        user!.profilePictureUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return _buildDefaultProfilePicture();
-                        },
-                      )
-                    : _buildDefaultProfilePicture(),
+                child: (() {
+                  final imageUrl = _getUserProfileImageUrl();
+                  if (imageUrl != null && imageUrl.isNotEmpty) {
+                    return SafeNetworkImage(
+                      imageUrl: imageUrl,
+                      width: 44,
+                      height: 44,
+                      fit: BoxFit.cover,
+                      errorWidget: _buildDefaultProfilePicture(),
+                    );
+                  }
+                  return _buildDefaultProfilePicture();
+                })(),
               ),
             ),
           ),
@@ -263,14 +283,43 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Widget _buildDefaultProfilePicture() {
+    final initial = _getUserInitial();
     return Container(
       color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      child: Icon(
-        Icons.person,
-        size: 25,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      child: Center(
+        child: Text(
+          initial,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
       ),
     );
+  }
+
+  String? _getUserProfileImageUrl() {
+    final model = CustomerController.logeInCustomer;
+    final modelUrl = model?.profilePictureUrl;
+    if (modelUrl != null && modelUrl.isNotEmpty) return modelUrl;
+
+    final authUrl = FirebaseAuth.instance.currentUser?.photoURL;
+    if (authUrl != null && authUrl.isNotEmpty) return authUrl;
+    return null;
+  }
+
+  String _getUserInitial() {
+    final model = CustomerController.logeInCustomer;
+    final name = model?.name.trim();
+    if (name != null && name.isNotEmpty) {
+      return name.characters.first.toUpperCase();
+    }
+    final email = model?.email.trim();
+    if (email != null && email.isNotEmpty) {
+      return email.characters.first.toUpperCase();
+    }
+    return '?';
   }
 
   Widget _buildSettingsSection() {

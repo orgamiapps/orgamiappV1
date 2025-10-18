@@ -50,7 +50,8 @@ class OrganizationHelper {
         if (!doc.exists) continue;
         final data = doc.data()!;
         final String name = (data['name'] ?? data['title'] ?? '').toString();
-        final String? logo = data['logoUrl']?.toString();
+        // Be tolerant to different logo field names that may exist in DB
+        final String? logo = (data['logoUrl'] ?? data['logo_url'] ?? data['logo'] ?? data['profileImage'] ?? data['imageUrl'])?.toString();
         list.add({'id': doc.id, 'name': name, 'logoUrl': logo ?? ''});
       }
       list.sort(
@@ -109,7 +110,8 @@ class OrganizationHelper {
           if (orgSnap.exists) {
             final data = orgSnap.data()!;
             final String name = data['name']?.toString() ?? '';
-            final String logo = data['logoUrl']?.toString() ?? '';
+            // Support multiple possible logo fields
+            final String logo = (data['logoUrl'] ?? data['logo_url'] ?? data['logo'] ?? data['profileImage'] ?? data['imageUrl'])?.toString() ?? '';
             result.add({'id': orgSnap.id, 'name': name, 'logoUrl': logo});
           }
         }
