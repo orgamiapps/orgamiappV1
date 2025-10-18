@@ -159,7 +159,6 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
     final eventsStream = _db
         .collection('Events')
         .where('organizationId', isEqualTo: widget.organizationId)
-        .orderBy('selectedDateTime', descending: true)
         .snapshots();
 
     return StreamBuilder<QuerySnapshot>(

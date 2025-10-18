@@ -1632,8 +1632,7 @@ class _MembersTabState extends State<_MembersTab> {
     final membersQuery = FirebaseFirestore.instance
         .collection('Organizations')
         .doc(widget.organizationId)
-        .collection('Members')
-        .orderBy('joinedAt', descending: true);
+        .collection('Members');
 
     return StreamBuilder<QuerySnapshot>(
       stream: membersQuery.snapshots(),
@@ -1649,12 +1648,36 @@ class _MembersTabState extends State<_MembersTab> {
             subtitle: 'Invite people to grow your community.',
           );
         }
+        
+        // Sort members: owner/admin first, then by joinedAt (most recent first)
+        final sortedDocs = List.from(docs);
+        sortedDocs.sort((a, b) {
+          final aData = a.data() as Map<String, dynamic>;
+          final bData = b.data() as Map<String, dynamic>;
+          final aRole = (aData['role'] ?? 'Member').toString().toLowerCase();
+          final bRole = (bData['role'] ?? 'Member').toString().toLowerCase();
+          
+          // Owner comes first
+          if (aRole == 'owner' && bRole != 'owner') return -1;
+          if (bRole == 'owner' && aRole != 'owner') return 1;
+          
+          // Admin comes second
+          if (aRole == 'admin' && bRole != 'admin' && bRole != 'owner') return -1;
+          if (bRole == 'admin' && aRole != 'admin' && aRole != 'owner') return 1;
+          
+          // Sort by joinedAt (most recent first)
+          final aJoined = aData['joinedAt'] as Timestamp?;
+          final bJoined = bData['joinedAt'] as Timestamp?;
+          if (aJoined == null || bJoined == null) return 0;
+          return bJoined.compareTo(aJoined);
+        });
+        
         return ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: docs.length,
+          itemCount: sortedDocs.length,
           itemBuilder: (context, i) {
-            final memberData = docs[i].data() as Map<String, dynamic>;
-            final userId = memberData['userId'] ?? docs[i].id;
+            final memberData = sortedDocs[i].data() as Map<String, dynamic>;
+            final userId = memberData['userId'] ?? sortedDocs[i].id;
             final role = (memberData['role'] ?? 'Member').toString();
             final joinedAt = memberData['joinedAt'] as Timestamp?;
 
@@ -2041,7 +2064,8 @@ class _AboutTab extends StatelessWidget {
                       final adminData =
                           adminSnapshot.data!.data() as Map<String, dynamic>;
                       final adminName = adminData['name'] ?? 'Unknown';
-                      final adminProfileUrl = adminData['profilePictureUrl'];
+                      final adminProfileUrl = adminData['profileImageUrl'] ?? 
+                          adminData['profilePictureUrl'];
 
                       return _buildAdminCard(
                         context,
