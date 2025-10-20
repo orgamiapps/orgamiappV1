@@ -34,9 +34,11 @@ class _FaceRecognitionScannerScreenState
     with TickerProviderStateMixin {
   // Camera and face detection
   CameraController? _cameraController;
+  CameraDescription? _camera;
   List<CameraDescription>? _cameras;
   bool _isCameraInitialized = false;
   bool _isProcessing = false;
+  bool _isStreamActive = false;
 
   // Services
   final FaceRecognitionService _faceService = FaceRecognitionService();
@@ -52,13 +54,17 @@ class _FaceRecognitionScannerScreenState
   late Animation<double> _scanAnimation;
   late Animation<double> _pulseAnimation;
 
-  // Timers
-  Timer? _processingTimer;
+  // Timers and throttling
   Timer? _messageTimer;
+  DateTime? _lastProcessTime;
+  Map<String, List<double>>? _cachedEnrollments;
 
   // Constants
-  static const Duration _processingInterval = Duration(milliseconds: 500);
+  static const Duration _processingInterval = Duration(
+    milliseconds: 1500,
+  ); // Reduced frequency
   static const Duration _successDelay = Duration(seconds: 2);
+  static const Duration _enrollmentCacheExpiry = Duration(minutes: 5);
 
   @override
   void initState() {
@@ -117,9 +123,10 @@ class _FaceRecognitionScannerScreenState
         orElse: () => _cameras!.first,
       );
 
+      _camera = frontCamera;
       _cameraController = CameraController(
         frontCamera,
-        ResolutionPreset.medium,
+        ResolutionPreset.low, // Lower resolution for faster processing
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.nv21, // Better for ML processing
       );
@@ -131,8 +138,8 @@ class _FaceRecognitionScannerScreenState
           _isCameraInitialized = true;
         });
 
-        // Start face detection
-        _startFaceDetection();
+        // Start face detection with image streaming
+        _startImageStream();
       }
     } catch (e) {
       Logger.error('Camera initialization failed: $e');
@@ -140,27 +147,45 @@ class _FaceRecognitionScannerScreenState
     }
   }
 
-  void _startFaceDetection() {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+  void _startImageStream() {
+    if (_cameraController == null ||
+        !_cameraController!.value.isInitialized ||
+        _isStreamActive) {
       return;
     }
 
-    _processingTimer = Timer.periodic(_processingInterval, (timer) {
-      if (!_isProcessing && mounted) {
-        _processNextFrame();
-      }
-    });
+    _isStreamActive = true;
+    _cameraController!.startImageStream(_processCameraImage);
   }
 
-  Future<void> _processNextFrame() async {
-    if (_isProcessing || _cameraController == null) return;
+  void _stopImageStream() {
+    if (_isStreamActive && _cameraController != null) {
+      _cameraController!.stopImageStream();
+      _isStreamActive = false;
+    }
+  }
+
+  Future<void> _processCameraImage(CameraImage cameraImage) async {
+    // Throttle processing - skip frames if processing or too soon
+    if (_isProcessing || _camera == null) return;
+
+    final now = DateTime.now();
+    if (_lastProcessTime != null &&
+        now.difference(_lastProcessTime!) < _processingInterval) {
+      return; // Skip this frame
+    }
 
     _isProcessing = true;
+    _lastProcessTime = now;
 
     try {
-      // Capture image
-      final image = await _cameraController!.takePicture();
-      final inputImage = InputImage.fromFilePath(image.path);
+      // Convert camera image to ML Kit input image
+      final inputImage = _faceService.convertCameraImage(cameraImage, _camera!);
+
+      if (inputImage == null) {
+        _isProcessing = false;
+        return;
+      }
 
       // Detect faces
       final faces = await _faceService.detectFaces(inputImage);
@@ -199,15 +224,18 @@ class _FaceRecognitionScannerScreenState
       return;
     }
 
-    // Face is good - attempt matching
+    // Face is good - attempt matching with cached enrollments
     _updateDetectionState(FaceDetectionState.processing, 'Analyzing face...');
     _pulseAnimationController.forward();
 
     try {
-      final matchResult = await _faceService.matchFace(
-        detectedFace: face,
-        eventId: widget.eventModel.id,
-      );
+      // Load enrollments into cache if not already cached
+      if (_cachedEnrollments == null) {
+        await _loadEnrollmentsCache();
+      }
+
+      // Perform matching using cached data
+      final matchResult = await _matchFaceWithCache(face);
 
       if (matchResult != null && matchResult.matched) {
         await _handleSuccessfulMatch(matchResult);
@@ -215,7 +243,8 @@ class _FaceRecognitionScannerScreenState
         await _handleNoMatch(matchResult);
       }
     } catch (e) {
-      _updateDetectionState(FaceDetectionState.error, 'Recognition failed: $e');
+      Logger.error('Recognition failed: $e');
+      _updateDetectionState(FaceDetectionState.error, 'Recognition failed');
     }
   }
 
@@ -225,8 +254,8 @@ class _FaceRecognitionScannerScreenState
       'Welcome, ${matchResult.userName}! (${(matchResult.confidence * 100).toStringAsFixed(1)}% match)',
     );
 
-    // Stop processing
-    _processingTimer?.cancel();
+    // Stop image stream
+    _stopImageStream();
 
     // Haptic feedback
     HapticFeedback.selectionClick();
@@ -394,14 +423,97 @@ class _FaceRecognitionScannerScreenState
     }
   }
 
+  /// Load face enrollments into cache for faster matching
+  Future<void> _loadEnrollmentsCache() async {
+    try {
+      final enrolledSnapshot = await FirebaseFirestore.instance
+          .collection('FaceEnrollments')
+          .where('eventId', isEqualTo: widget.eventModel.id)
+          .get();
+
+      _cachedEnrollments = {};
+      for (final doc in enrolledSnapshot.docs) {
+        final data = doc.data();
+        final userId = data['userId'] as String;
+        final features = List<double>.from(data['faceFeatures']);
+        _cachedEnrollments![userId] = features;
+      }
+
+      Logger.debug('Cached ${_cachedEnrollments!.length} face enrollments');
+    } catch (e) {
+      Logger.error('Failed to load enrollments cache: $e');
+      _cachedEnrollments = {};
+    }
+  }
+
+  /// Match face using cached enrollments (no Firebase query)
+  Future<FaceMatchResult?> _matchFaceWithCache(Face detectedFace) async {
+    if (_cachedEnrollments == null || _cachedEnrollments!.isEmpty) {
+      return FaceMatchResult(
+        matched: false,
+        confidence: 0.0,
+        reason: 'No enrolled faces for this event',
+      );
+    }
+
+    if (!_faceService.isFaceSuitable(detectedFace)) {
+      return FaceMatchResult(
+        matched: false,
+        confidence: 0.0,
+        reason: 'Face not suitable for recognition',
+      );
+    }
+
+    // Extract features from detected face
+    final detectedFeatures = _faceService.extractFaceFeatures(detectedFace);
+
+    // Find best match from cache
+    FaceMatchResult? bestMatch;
+    double highestSimilarity = 0.0;
+    const matchingThreshold = 0.7;
+
+    for (final entry in _cachedEnrollments!.entries) {
+      final similarity = _faceService.calculateSimilarity(
+        detectedFeatures,
+        entry.value,
+      );
+
+      if (similarity > highestSimilarity && similarity >= matchingThreshold) {
+        highestSimilarity = similarity;
+
+        // Get user name from Firestore (only once when matched)
+        final userDoc = await FirebaseFirestore.instance
+            .collection('FaceEnrollments')
+            .doc('${widget.eventModel.id}-${entry.key}')
+            .get();
+
+        final userName = userDoc.data()?['userName'] as String?;
+
+        bestMatch = FaceMatchResult(
+          matched: true,
+          userId: entry.key,
+          userName: userName ?? 'Unknown User',
+          confidence: similarity,
+          reason: 'Face matched successfully',
+        );
+      }
+    }
+
+    return bestMatch ??
+        FaceMatchResult(
+          matched: false,
+          confidence: highestSimilarity,
+          reason: 'No matching face found',
+        );
+  }
+
   @override
   void dispose() {
-    _processingTimer?.cancel();
+    _stopImageStream();
     _messageTimer?.cancel();
     _scanAnimationController.dispose();
     _pulseAnimationController.dispose();
     _cameraController?.dispose();
-    _faceService.dispose();
     super.dispose();
   }
 

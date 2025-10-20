@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,13 +16,22 @@ import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart'
 
 class EnhancedFeedTab extends StatefulWidget {
   final String organizationId;
-  const EnhancedFeedTab({super.key, required this.organizationId});
+  final Function(bool)? onScrollChange; // Callback for scroll state changes
+  const EnhancedFeedTab({
+    super.key,
+    required this.organizationId,
+    this.onScrollChange,
+  });
 
   @override
   State<EnhancedFeedTab> createState() => _EnhancedFeedTabState();
 }
 
 class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
+  late ScrollController _scrollController;
+  bool _isScrollingDown = false;
+  static const double _appBarHeight = 56.0;
+  Timer? _scrollDebouncer;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final User? _currentUser = FirebaseAuth.instance.currentUser;
   String _selectedFilter = 'All';
@@ -144,6 +154,60 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
       });
     } catch (e) {
       debugPrint('Error toggling like: $e');
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+
+    // Only add scroll listener if callback is provided
+    if (widget.onScrollChange != null) {
+      _scrollController.addListener(_onScroll);
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _scrollDebouncer?.cancel();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    // Safety check
+    if (!_scrollController.hasClients || !mounted) return;
+
+    // Cancel any existing debouncer
+    _scrollDebouncer?.cancel();
+
+    // Debounce scroll events to reduce main thread work
+    _scrollDebouncer = Timer(const Duration(milliseconds: 50), () {
+      if (!mounted) return;
+
+      _checkScrollDirection();
+    });
+  }
+
+  void _checkScrollDirection() {
+    if (!_scrollController.hasClients || !mounted) return;
+
+    final currentOffset = _scrollController.offset;
+    final shouldBeScrollingDown = currentOffset > _appBarHeight;
+
+    // Only notify parent if scroll state actually changed
+    if (shouldBeScrollingDown != _isScrollingDown) {
+      _isScrollingDown = shouldBeScrollingDown;
+
+      // Use a microtask to avoid blocking the main thread
+      if (mounted) {
+        scheduleMicrotask(() {
+          if (mounted) {
+            widget.onScrollChange?.call(_isScrollingDown);
+          }
+        });
+      }
     }
   }
 
@@ -512,6 +576,7 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                         }
 
                         return CustomScrollView(
+                          controller: _scrollController,
                           slivers: [
                             SliverToBoxAdapter(
                               child: Container(

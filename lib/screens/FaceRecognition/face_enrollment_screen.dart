@@ -25,9 +25,11 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     with TickerProviderStateMixin {
   // Camera and face detection
   CameraController? _cameraController;
+  CameraDescription? _camera;
   List<CameraDescription>? _cameras;
   bool _isCameraInitialized = false;
   bool _isProcessing = false;
+  bool _isStreamActive = false;
 
   // Services
   final FaceRecognitionService _faceService = FaceRecognitionService();
@@ -45,12 +47,12 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
   late Animation<double> _progressAnimation;
   late Animation<double> _stepAnimation;
 
-  // Timers
-  Timer? _captureTimer;
+  // Timers and throttling
   Timer? _stepTimer;
+  DateTime? _lastCaptureTime;
 
   // Constants
-  static const Duration _captureInterval = Duration(milliseconds: 800);
+  static const Duration _captureInterval = Duration(milliseconds: 1200); // Reduced frequency
 
   @override
   void initState() {
@@ -107,9 +109,10 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
         orElse: () => _cameras!.first,
       );
 
+      _camera = frontCamera;
       _cameraController = CameraController(
         frontCamera,
-        ResolutionPreset.high, // Higher resolution for better enrollment
+        ResolutionPreset.medium, // Balance between quality and performance
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.nv21,
       );
@@ -121,8 +124,8 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
           _isCameraInitialized = true;
         });
 
-        // Start enrollment process
-        _startEnrollmentProcess();
+        // Start enrollment process with image streaming
+        _startImageStream();
       }
     } catch (e) {
       Logger.error('Camera initialization failed: $e');
@@ -130,26 +133,50 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     }
   }
 
-  void _startEnrollmentProcess() {
-    _updateStatusMessage('Look straight at the camera');
-    _captureTimer = Timer.periodic(_captureInterval, (timer) {
-      if (!_isProcessing && mounted && _currentStep < _requiredSteps) {
-        _captureStep();
-      }
-    });
-  }
-
-  Future<void> _captureStep() async {
-    if (_isProcessing || _cameraController == null || _isEnrollmentComplete) {
+  void _startImageStream() {
+    if (_cameraController == null || !_cameraController!.value.isInitialized || _isStreamActive) {
       return;
     }
 
+    _isStreamActive = true;
+    _updateStatusMessage('Look straight at the camera');
+    _cameraController!.startImageStream(_processCameraImage);
+  }
+
+  void _stopImageStream() {
+    if (_isStreamActive && _cameraController != null) {
+      try {
+        _cameraController!.stopImageStream();
+        _isStreamActive = false;
+      } catch (e) {
+        Logger.error('Error stopping image stream: $e');
+      }
+    }
+  }
+
+  Future<void> _processCameraImage(CameraImage cameraImage) async {
+    // Throttle processing
+    if (_isProcessing || _camera == null || _isEnrollmentComplete || _currentStep >= _requiredSteps) {
+      return;
+    }
+
+    final now = DateTime.now();
+    if (_lastCaptureTime != null &&
+        now.difference(_lastCaptureTime!) < _captureInterval) {
+      return; // Skip this frame
+    }
+
     _isProcessing = true;
+    _lastCaptureTime = now;
 
     try {
-      // Capture image
-      final image = await _cameraController!.takePicture();
-      final inputImage = InputImage.fromFilePath(image.path);
+      // Convert camera image to ML Kit input image
+      final inputImage = _faceService.convertCameraImage(cameraImage, _camera!);
+      
+      if (inputImage == null) {
+        _isProcessing = false;
+        return;
+      }
 
       // Detect faces
       final faces = await _faceService.detectFaces(inputImage);
@@ -199,6 +226,8 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
           'Great! ${_requiredSteps - _currentStep} more captures needed.',
         );
       } else {
+        // Complete enrollment after collecting all steps
+        _stopImageStream();
         await _completeEnrollment();
       }
     } catch (e) {
@@ -226,7 +255,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
   }
 
   Future<void> _completeEnrollment() async {
-    _captureTimer?.cancel();
+    _stopImageStream();
     _isEnrollmentComplete = true;
 
     _updateStatusMessage('Processing enrollment...');
@@ -292,12 +321,11 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
 
   @override
   void dispose() {
-    _captureTimer?.cancel();
+    _stopImageStream();
     _stepTimer?.cancel();
     _progressAnimationController.dispose();
     _stepAnimationController.dispose();
     _cameraController?.dispose();
-    _faceService.dispose();
     super.dispose();
   }
 

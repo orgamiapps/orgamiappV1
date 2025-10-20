@@ -28,11 +28,18 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
   bool _hasRequestedJoin = false;
   bool _checkingMembership = true;
   String _memberRole = '';
+  // Reference to the FAB widget key for direct animation control
+  final GlobalKey<_AdminFabState> _fabKey = GlobalKey<_AdminFabState>();
 
   @override
   void initState() {
     super.initState();
     _checkMembershipStatus();
+  }
+
+  void _handleScrollChange(bool isScrollingDown) {
+    // Directly call FAB animation without triggering parent rebuild
+    _fabKey.currentState?.updateScrollState(isScrollingDown);
   }
 
   Future<void> _checkMembershipStatus() async {
@@ -484,13 +491,17 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
               ],
               body: TabBarView(
                 children: [
-                  EnhancedFeedTab(organizationId: widget.organizationId),
+                  EnhancedFeedTab(
+                    organizationId: widget.organizationId,
+                    onScrollChange: _handleScrollChange,
+                  ),
                   _MembersTab(organizationId: widget.organizationId),
                   _AboutTab(organizationId: widget.organizationId),
                 ],
               ),
             ),
             floatingActionButton: _AdminFab(
+              key: _fabKey,
               organizationId: widget.organizationId,
             ),
           );
@@ -1648,7 +1659,7 @@ class _MembersTabState extends State<_MembersTab> {
             subtitle: 'Invite people to grow your community.',
           );
         }
-        
+
         // Sort members: owner/admin first, then by joinedAt (most recent first)
         final sortedDocs = List.from(docs);
         sortedDocs.sort((a, b) {
@@ -1656,22 +1667,24 @@ class _MembersTabState extends State<_MembersTab> {
           final bData = b.data() as Map<String, dynamic>;
           final aRole = (aData['role'] ?? 'Member').toString().toLowerCase();
           final bRole = (bData['role'] ?? 'Member').toString().toLowerCase();
-          
+
           // Owner comes first
           if (aRole == 'owner' && bRole != 'owner') return -1;
           if (bRole == 'owner' && aRole != 'owner') return 1;
-          
+
           // Admin comes second
-          if (aRole == 'admin' && bRole != 'admin' && bRole != 'owner') return -1;
-          if (bRole == 'admin' && aRole != 'admin' && aRole != 'owner') return 1;
-          
+          if (aRole == 'admin' && bRole != 'admin' && bRole != 'owner')
+            return -1;
+          if (bRole == 'admin' && aRole != 'admin' && aRole != 'owner')
+            return 1;
+
           // Sort by joinedAt (most recent first)
           final aJoined = aData['joinedAt'] as Timestamp?;
           final bJoined = bData['joinedAt'] as Timestamp?;
           if (aJoined == null || bJoined == null) return 0;
           return bJoined.compareTo(aJoined);
         });
-        
+
         return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: sortedDocs.length,
@@ -2064,7 +2077,8 @@ class _AboutTab extends StatelessWidget {
                       final adminData =
                           adminSnapshot.data!.data() as Map<String, dynamic>;
                       final adminName = adminData['name'] ?? 'Unknown';
-                      final adminProfileUrl = adminData['profileImageUrl'] ?? 
+                      final adminProfileUrl =
+                          adminData['profileImageUrl'] ??
                           adminData['profilePictureUrl'];
 
                       return _buildAdminCard(
@@ -2564,21 +2578,60 @@ class _ExpandableTextState extends State<_ExpandableText> {
 
 class _AdminFab extends StatefulWidget {
   final String organizationId;
-  const _AdminFab({required this.organizationId});
+  const _AdminFab({super.key, required this.organizationId});
 
   @override
   State<_AdminFab> createState() => _AdminFabState();
 }
 
-class _AdminFabState extends State<_AdminFab> {
+class _AdminFabState extends State<_AdminFab> with TickerProviderStateMixin {
   bool _isAdmin = false;
   bool _isMember = false;
   bool _isLoading = true;
+  bool _isScrollingDown = false; // Track internal scroll state
+  
+  // Animation controllers
+  late AnimationController _fabOpacityController;
+  late Animation<double> _fabOpacityAnimation;
 
   @override
   void initState() {
     super.initState();
     _checkMembershipStatus();
+
+    // Initialize FAB opacity animation
+    _fabOpacityController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+      value: 1.0,
+    );
+    _fabOpacityAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _fabOpacityController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _fabOpacityController.dispose();
+    super.dispose();
+  }
+
+  // Method to update scroll state and trigger animation directly
+  void updateScrollState(bool isScrollingDown) {
+    if (_isScrollingDown != isScrollingDown && mounted) {
+      _isScrollingDown = isScrollingDown;
+      
+      try {
+        if (_isScrollingDown) {
+          _fabOpacityController.reverse(); // Fade out
+        } else {
+          _fabOpacityController.forward(); // Fade in
+        }
+      } catch (e) {
+        // Silently handle any animation controller errors
+        debugPrint('FAB animation error: $e');
+      }
+    }
   }
 
   Future<void> _checkMembershipStatus() async {
@@ -2805,11 +2858,19 @@ class _AdminFabState extends State<_AdminFab> {
       return const SizedBox.shrink();
     }
 
-    return FloatingActionButton.extended(
-      onPressed: () => _showCreateOptions(context),
-      backgroundColor: const Color(0xFF667EEA),
-      icon: Icon(_isAdmin ? Icons.admin_panel_settings : Icons.add),
-      label: Text(_isAdmin ? 'Manage Group' : 'Create Post'),
+    return AnimatedBuilder(
+      animation: _fabOpacityAnimation,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _fabOpacityAnimation.value,
+          child: FloatingActionButton.extended(
+            onPressed: () => _showCreateOptions(context),
+            backgroundColor: const Color(0xFF667EEA),
+            icon: Icon(_isAdmin ? Icons.admin_panel_settings : Icons.add),
+            label: Text(_isAdmin ? 'Manage Group' : 'Create Post'),
+          ),
+        );
+      },
     );
   }
 }

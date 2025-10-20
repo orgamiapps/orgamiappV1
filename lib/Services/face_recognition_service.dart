@@ -24,23 +24,32 @@ class FaceRecognitionService {
   static const double _matchingThreshold = 0.7;
   static const int _requiredFacesForEnrollment = 3;
 
+  // Performance mode - can be toggled for real-time vs accuracy
+  bool _useFastMode = true;
+
   /// Initialize the face detection service
-  Future<void> initialize() async {
+  Future<void> initialize({bool useFastMode = true}) async {
     if (_isInitialized) return;
 
     try {
+      _useFastMode = useFastMode;
+
       final options = FaceDetectorOptions(
-        enableContours: true,
+        enableContours: false, // Disable for better performance
         enableLandmarks: true,
         enableClassification: true,
         enableTracking: true,
         minFaceSize: _minFaceSize,
-        performanceMode: FaceDetectorMode.accurate,
+        performanceMode: _useFastMode
+            ? FaceDetectorMode.fast
+            : FaceDetectorMode.accurate,
       );
 
       _faceDetector = FaceDetector(options: options);
       _isInitialized = true;
-      Logger.debug('FaceRecognitionService initialized successfully');
+      Logger.debug(
+        'FaceRecognitionService initialized (${_useFastMode ? "fast" : "accurate"} mode)',
+      );
     } catch (e) {
       Logger.error('Failed to initialize FaceRecognitionService: $e');
       rethrow;
@@ -53,7 +62,9 @@ class FaceRecognitionService {
 
     try {
       final faces = await _faceDetector.processImage(inputImage);
-      Logger.debug('Detected ${faces.length} faces');
+      if (faces.isNotEmpty) {
+        Logger.debug('Detected ${faces.length} face(s)');
+      }
       return faces;
     } catch (e) {
       Logger.error('Face detection failed: $e');
@@ -322,21 +333,23 @@ class FaceRecognitionService {
         );
       }
 
-      if (rotation == null) return null;
+      if (rotation == null) {
+        Logger.warning('Could not determine image rotation');
+        return null;
+      }
 
       // Get image format
       final format = InputImageFormatValue.fromRawValue(cameraImage.format.raw);
-      if (format == null) return null;
-
-      // Create plane data
-      final allBytes = <Uint8List>[];
-      for (final plane in cameraImage.planes) {
-        allBytes.add(plane.bytes);
+      if (format == null) {
+        Logger.warning('Unsupported image format: ${cameraImage.format.raw}');
+        return null;
       }
-      final imageBytes = Uint8List.fromList(allBytes.expand((x) => x).toList());
+
+      // For NV21/YUV420, use the first plane (Y plane) for better performance
+      final plane = cameraImage.planes.first;
 
       return InputImage.fromBytes(
-        bytes: imageBytes,
+        bytes: plane.bytes,
         metadata: InputImageMetadata(
           size: Size(
             cameraImage.width.toDouble(),
@@ -344,7 +357,7 @@ class FaceRecognitionService {
           ),
           rotation: rotation,
           format: format,
-          bytesPerRow: cameraImage.planes[0].bytesPerRow,
+          bytesPerRow: plane.bytesPerRow,
         ),
       );
     } catch (e) {
