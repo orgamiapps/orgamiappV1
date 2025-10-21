@@ -5,6 +5,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'package:attendus/screens/Events/add_questions_prompt_screen.dart';
 import 'package:attendus/Utils/router.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
 
 class ChoseLocationInMapScreen extends StatefulWidget {
   final DateTime? selectedDateTime;
@@ -295,72 +296,14 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
       height: _screenHeight,
       child: Column(
         children: [
-          _headerView(),
+          AppAppBarView.modernHeader(
+            context: context,
+            title: 'Select Event Location',
+            subtitle:
+                'Tap on the map to select a location and adjust the radius',
+          ),
           Expanded(child: _mapView()),
           if (selectedLocation != null) _bottomPanel(),
-        ],
-      ),
-    );
-  }
-
-  Widget _headerView() {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-      child: Column(
-        children: [
-          // Back button and title
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    Icons.arrow_back_ios_new,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              const Expanded(
-                child: Text(
-                  'Select Location and Radius',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Subtitle
-          const Text(
-            'Tap on the map to select a location and adjust the radius',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontFamily: 'Roboto',
-              height: 1.4,
-            ),
-            textAlign: TextAlign.center,
-          ),
         ],
       ),
     );

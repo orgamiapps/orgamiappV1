@@ -14,6 +14,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
 
 class TicketManagementScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -426,55 +427,55 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFAFBFC),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF667EEA),
-        elevation: 0,
-        title: const Text(
-          'Ticket Management',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'Roboto',
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-          onPressed: () {
-            Navigator.pop(context);
-            // Call the callback to show Event Management popup again
-            if (widget.onBackPressed != null) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                widget.onBackPressed!();
-              });
-            }
-          },
+      body: SafeArea(
+        child: Column(
+          children: [
+            AppAppBarView.modernHeader(
+              context: context,
+              title: 'Ticket Management',
+              subtitle: 'Manage tickets and settings for your event',
+              trailing: widget.onBackPressed != null
+                  ? IconButton(
+                      icon: const Icon(Icons.settings),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          widget.onBackPressed!();
+                        });
+                      },
+                    )
+                  : null,
+            ),
+            Expanded(
+              child: isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : RefreshIndicator(
+                      onRefresh: _loadEventTickets,
+                      color: const Color(0xFF667EEA),
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildEventInfo(),
+                            const SizedBox(height: 24),
+                            _buildTicketSettings(),
+                            const SizedBox(height: 24),
+                            _buildTicketStats(),
+                            if (ticketPrice != null && ticketPrice! > 0) ...[
+                              const SizedBox(height: 24),
+                              _buildRevenueButton(),
+                            ],
+                            const SizedBox(height: 24),
+                            _buildTicketList(),
+                          ],
+                        ),
+                      ),
+                    ),
+            ),
+          ],
         ),
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadEventTickets,
-              color: const Color(0xFF667EEA),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildEventInfo(),
-                    const SizedBox(height: 24),
-                    _buildTicketSettings(),
-                    const SizedBox(height: 24),
-                    _buildTicketStats(),
-                    if (ticketPrice != null && ticketPrice! > 0) ...[
-                      const SizedBox(height: 24),
-                      _buildRevenueButton(),
-                    ],
-                    const SizedBox(height: 24),
-                    _buildTicketList(),
-                  ],
-                ),
-              ),
-            ),
       floatingActionButton: eventTickets.isNotEmpty
           ? FloatingActionButton.extended(
               onPressed: () async {

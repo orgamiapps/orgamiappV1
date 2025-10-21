@@ -11,6 +11,7 @@ import 'package:attendus/models/badge_model.dart';
 import 'package:attendus/Permissions/permissions_helper.dart';
 import 'package:attendus/Services/nfc_badge_service.dart';
 import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
 
 class TicketScannerScreen extends StatefulWidget {
   final String eventId;
@@ -641,34 +642,32 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFFAFBFC),
       resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF667EEA),
-        elevation: 0,
-        title: const Text(
-          'Ticket Scanner',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'Roboto',
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        child: Column(
           children: [
-            _buildEventInfo(),
-            const SizedBox(height: 24),
-            _buildScannerSection(),
-            const SizedBox(height: 24),
-            if (scannedTicket != null) _buildTicketInfo(),
-            // Add extra space equal to keyboard inset to avoid overflow
-            SizedBox(height: MediaQuery.of(context).viewInsets.bottom + 12),
+            AppAppBarView.modernHeader(
+              context: context,
+              title: 'Ticket Scanner',
+              subtitle: 'Scan and validate event tickets',
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(20),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                children: [
+                  _buildEventInfo(),
+                  const SizedBox(height: 24),
+                  _buildScannerSection(),
+                  const SizedBox(height: 24),
+                  if (scannedTicket != null) _buildTicketInfo(),
+                  // Add extra space equal to keyboard inset to avoid overflow
+                  SizedBox(
+                    height: MediaQuery.of(context).viewInsets.bottom + 12,
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

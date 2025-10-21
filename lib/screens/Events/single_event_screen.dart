@@ -1637,11 +1637,23 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                               icon: Icons.star,
                               title: eventModel.isFeatured
                                   ? 'Featured Event'
+                                  : eventModel.selectedDateTime.isBefore(
+                                      DateTime.now(),
+                                    )
+                                  ? 'Event Has Passed'
                                   : 'Feature This Event',
                               subtitle: eventModel.isFeatured
                                   ? 'Your event is currently featured'
+                                  : eventModel.selectedDateTime.isBefore(
+                                      DateTime.now(),
+                                    )
+                                  ? 'Events can only be featured before their date'
                                   : 'Make your event stand out',
-                              onTap: eventModel.isFeatured
+                              onTap:
+                                  (eventModel.isFeatured ||
+                                      eventModel.selectedDateTime.isBefore(
+                                        DateTime.now(),
+                                      ))
                                   ? null
                                   : () {
                                       Navigator.pop(context);

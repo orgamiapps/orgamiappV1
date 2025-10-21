@@ -4,6 +4,7 @@ import 'package:attendus/models/event_model.dart';
 import 'package:attendus/models/event_feedback_model.dart';
 import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/logger.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
 
 class EventFeedbackManagementScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -468,48 +469,43 @@ class _EventFeedbackManagementScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Event Feedback',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-            ),
-          ),
-        ),
-        iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadFeedbackData,
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadFeedbackData,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    _buildHeader(),
-                    const SizedBox(height: 20),
-                    _buildAnalyticsCard(),
-                    const SizedBox(height: 20),
-                    _buildRatingDistribution(),
-                    const SizedBox(height: 20),
-                    _buildFeedbackList(),
-                    const SizedBox(height: 20),
-                  ],
-                ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            AppAppBarView.modernHeader(
+              context: context,
+              title: 'Event Feedback',
+              subtitle: 'Manage feedback and reviews for your event',
+              trailing: IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: _loadFeedbackData,
               ),
             ),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : RefreshIndicator(
+                      onRefresh: _loadFeedbackData,
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          children: [
+                            _buildHeader(),
+                            const SizedBox(height: 20),
+                            _buildAnalyticsCard(),
+                            const SizedBox(height: 20),
+                            _buildRatingDistribution(),
+                            const SizedBox(height: 20),
+                            _buildFeedbackList(),
+                            const SizedBox(height: 20),
+                          ],
+                        ),
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
