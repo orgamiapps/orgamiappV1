@@ -37,7 +37,16 @@ class _EditEventScreenState extends State<EditEventScreen>
   final _btnCtlr = RoundedLoadingButtonController();
 
   bool privateEvent = false;
-  final List<String> _allCategories = ['Educational', 'Professional', 'Other'];
+  final List<String> _allCategories = [
+    'Social & Networking',
+    'Entertainment', 
+    'Sports & Fitness',
+    'Education & Learning',
+    'Arts & Culture',
+    'Food & Dining',
+    'Technology',
+    'Community & Charity',
+  ];
   List<String> _selectedCategories = [];
 
   final TextEditingController groupNameEdtController = TextEditingController();
@@ -858,8 +867,8 @@ class _EditEventScreenState extends State<EditEventScreen>
           ),
           const SizedBox(height: 16),
           Wrap(
-            spacing: 12,
-            runSpacing: 12,
+            spacing: 8, // Reduced spacing to fit more categories
+            runSpacing: 10,
             children: _allCategories.map((category) {
               final isSelected = _selectedCategories.contains(category);
               return GestureDetector(
@@ -874,7 +883,7 @@ class _EditEventScreenState extends State<EditEventScreen>
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
+                    horizontal: 12, // Slightly reduced horizontal padding
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
@@ -893,10 +902,12 @@ class _EditEventScreenState extends State<EditEventScreen>
                       color: isSelected
                           ? Colors.white
                           : const Color(0xFF667EEA),
-                      fontSize: 14,
+                      fontSize: 13, // Slightly smaller font for longer category names
                       fontWeight: FontWeight.w600,
                       fontFamily: 'Roboto',
                     ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ),
               );

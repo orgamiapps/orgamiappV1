@@ -135,7 +135,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
 
       // Add timeout to prevent hanging
       final snap = await query.get().timeout(
-        const Duration(seconds: 5),
+        const Duration(seconds: 10),
         onTimeout: () {
           debugPrint('Firestore query timeout');
           throw TimeoutException('Query timeout');

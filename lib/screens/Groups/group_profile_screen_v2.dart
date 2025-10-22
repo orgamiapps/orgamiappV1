@@ -2165,11 +2165,15 @@ class _AboutTab extends StatelessWidget {
           children: [
             Icon(icon, size: 20, color: const Color(0xFF667EEA)),
             const SizedBox(width: 8),
-            Text(
-              title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: theme.textTheme.titleMedium?.color,
+            Expanded(
+              child: Text(
+                title,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: theme.textTheme.titleMedium?.color,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],

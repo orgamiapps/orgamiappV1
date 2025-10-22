@@ -103,9 +103,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // Categories including Featured for HomeScreen
   final List<String> _allCategories = [
     'Featured',
-    'Educational',
-    'Professional',
-    'Other',
+    'Social & Networking',
+    'Entertainment', 
+    'Sports & Fitness',
+    'Education & Learning',
+    'Arts & Culture',
+    'Food & Dining',
+    'Technology',
+    'Community & Charity',
   ];
 
   LatLng? currentLocation;
@@ -3019,12 +3024,22 @@ class _FilterSortModalState extends State<_FilterSortModal> {
     switch (category) {
       case 'Featured':
         return Icons.star;
-      case 'Educational':
+      case 'Social & Networking':
+        return Icons.people;
+      case 'Entertainment':
+        return Icons.celebration;
+      case 'Sports & Fitness':
+        return Icons.fitness_center;
+      case 'Education & Learning':
         return Icons.school;
-      case 'Professional':
-        return Icons.work;
-      case 'Other':
-        return Icons.more_horiz;
+      case 'Arts & Culture':
+        return Icons.palette;
+      case 'Food & Dining':
+        return Icons.restaurant;
+      case 'Technology':
+        return Icons.computer;
+      case 'Community & Charity':
+        return Icons.volunteer_activism;
       default:
         return Icons.category;
     }

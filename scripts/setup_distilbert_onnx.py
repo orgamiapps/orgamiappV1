@@ -89,8 +89,9 @@ def create_intent_classifier():
     
     # Categories for event classification
     categories = [
-        "book_club", "music", "sports", "tech", "food", "art", 
-        "workshop", "networking", "party", "conference", "other"
+        "Social & Networking", "Entertainment", "Sports & Fitness",
+        "Education & Learning", "Arts & Culture", "Food & Dining", 
+        "Technology", "Community & Charity"
     ]
     
     # Location intents

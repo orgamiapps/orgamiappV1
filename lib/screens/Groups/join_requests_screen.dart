@@ -472,10 +472,14 @@ class _JoinRequestsScreenState extends State<JoinRequestsScreen> {
                                                       ),
                                                     ),
                                                   if (time.isNotEmpty)
-                                                    Text(
-                                                      time,
-                                                      style: const TextStyle(
-                                                        color: Colors.grey,
+                                                    Flexible(
+                                                      child: Text(
+                                                        time,
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                        style: const TextStyle(
+                                                          color: Colors.grey,
+                                                        ),
                                                       ),
                                                     ),
                                                 ],

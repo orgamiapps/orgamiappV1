@@ -66,7 +66,16 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   // Filter/Sort state
   SortOption currentSortOption = SortOption.none;
   List<String> selectedCategories = [];
-  final List<String> _allCategories = ['Educational', 'Professional', 'Other'];
+  final List<String> _allCategories = [
+    'Social & Networking',
+    'Entertainment', 
+    'Sports & Fitness',
+    'Education & Learning',
+    'Arts & Culture',
+    'Food & Dining',
+    'Technology',
+    'Community & Charity',
+  ];
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -180,13 +189,10 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         'CustomerController User Email: ${CustomerController.logeInCustomer!.email}',
       );
 
-      // Load events for ALL tabs initially to ensure data is available
-      debugPrint('🔄 Loading events for all tabs...');
-      await Future.wait([
-        _fetchMoreEvents(1), // Created
-        _fetchMoreEvents(2), // Attended
-        _fetchMoreEvents(3), // Saved
-      ]);
+      // Load only current tab initially to prevent Firebase overload
+      // Other tabs will load on-demand when user switches to them
+      debugPrint('🔄 Loading events for current tab ($selectedTab)...');
+      await _fetchMoreEvents(selectedTab);
 
       // Non-blocking background fetches
       _loadUserBadge();
@@ -270,38 +276,33 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           newEvents = [];
       }
 
-      debugPrint("📊 Received ${newEvents.length} events for tab $tabIndex");
-      for (int i = 0; i < newEvents.take(3).length; i++) {
-        debugPrint(
-          "📝 Event $i: ${newEvents[i].title} (ID: ${newEvents[i].id})",
-        );
+      // Only log if significant number of events or if there's an issue
+      if (newEvents.length > 10 || newEvents.isEmpty) {
+        debugPrint("📊 Received ${newEvents.length} events for tab $tabIndex");
       }
 
       if (mounted) {
         setState(() {
           if (tabIndex == 1) {
             createdEvents.addAll(newEvents);
-            debugPrint(
-              "✅ Added to createdEvents. Total: ${createdEvents.length}",
-            );
-          }
-          if (tabIndex == 2) {
+          } else if (tabIndex == 2) {
             attendedEvents.addAll(newEvents);
-            debugPrint(
-              "✅ Added to attendedEvents. Total: ${attendedEvents.length}",
-            );
-          }
-          if (tabIndex == 3) {
+          } else if (tabIndex == 3) {
             savedEvents.addAll(newEvents);
-            debugPrint("✅ Added to savedEvents. Total: ${savedEvents.length}");
+          }
+          
+          // Only log totals if significant or if there are issues
+          if (newEvents.length > 5) {
+            final totalCount = tabIndex == 1 ? createdEvents.length : 
+                              tabIndex == 2 ? attendedEvents.length : 
+                              savedEvents.length;
+            debugPrint("✅ Tab $tabIndex: Added ${newEvents.length} events (Total: $totalCount)");
           }
           // For created events, we get all on first fetch. For others, check if we need more.
           _hasMore[tabIndex] = (tabIndex != 1) && (newEvents.length >= 50);
           _isFetchingMore[tabIndex] = false;
 
-          debugPrint(
-            "📈 Tab $tabIndex final state: _hasMore[${tabIndex}] = ${_hasMore[tabIndex]}",
-          );
+          // Reduced state logging
         });
       }
     } catch (e) {
@@ -321,7 +322,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     try {
       final user = await FirebaseFirestoreHelper()
           .getSingleCustomer(customerId: CustomerController.logeInCustomer!.uid)
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 5));
       if (user != null && mounted) {
         setState(() {
           CustomerController.logeInCustomer = user;
@@ -339,14 +340,20 @@ class _MyProfileScreenState extends State<MyProfileScreen>
 
     setState(() {
       selectedTab = newIndex;
-      // If the list for the new tab is empty and there's more to load, fetch it.
-      final events = newIndex == 1
-          ? createdEvents
-          : (newIndex == 2 ? attendedEvents : savedEvents);
-      if (events.isEmpty && (_hasMore[newIndex] ?? true)) {
-        _fetchMoreEvents(newIndex);
-      }
     });
+    
+    // Load tab data on-demand to prevent Firebase overload
+    final events = newIndex == 1
+        ? createdEvents
+        : (newIndex == 2 ? attendedEvents : savedEvents);
+    if (events.isEmpty && (_hasMore[newIndex] ?? true)) {
+      // Add small delay to prevent rapid Firebase calls during tab switching
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted && selectedTab == newIndex) {
+          _fetchMoreEvents(newIndex);
+        }
+      });
+    }
   }
 
   Future<void> _runComprehensiveDiagnostics() async {
@@ -449,13 +456,11 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   Widget build(BuildContext context) {
     final user = CustomerController.logeInCustomer;
 
-    // Log build state for debugging
-    debugPrint('🏗️ MY_PROFILE_SCREEN build() called');
-    debugPrint('🏗️ isLoading: $isLoading');
-    debugPrint('🏗️ createdEvents: ${createdEvents.length}');
-    debugPrint('🏗️ attendedEvents: ${attendedEvents.length}');
-    debugPrint('🏗️ savedEvents: ${savedEvents.length}');
-    debugPrint('🏗️ user: ${user?.email ?? "null"}');
+    // Reduced build logging to prevent main thread blocking
+    // Only log during initial load or significant state changes
+    if (isLoading && createdEvents.isEmpty && attendedEvents.isEmpty && savedEvents.isEmpty) {
+      debugPrint('🏗️ MY_PROFILE_SCREEN: Initial loading state');
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAFBFC),
@@ -1417,14 +1422,8 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         ? FontAwesomeIcons.calendarCheck
         : FontAwesomeIcons.bookmark;
 
-    // Debug logging for troubleshooting
-    debugPrint('🔍 _buildTabContent called');
-    debugPrint('🔍 selectedTab: $selectedTab (1=Created, 2=Attended, 3=Saved)');
-    debugPrint('🔍 Raw events count: ${events.length}');
-    debugPrint('🔍 createdEvents.length: ${createdEvents.length}');
-    debugPrint('🔍 attendedEvents.length: ${attendedEvents.length}');
-    debugPrint('🔍 savedEvents.length: ${savedEvents.length}');
-    debugPrint('🔍 selectedCategories: $selectedCategories');
+    // Reduced debug logging to prevent main thread blocking
+    // Only log when there are actual issues or state changes
 
     // Apply category filtering
     List<EventModel> filteredEvents = List<EventModel>.from(events);
@@ -1436,12 +1435,14 @@ class _MyProfileScreenState extends State<MyProfileScreen>
             ),
           )
           .toList();
-      debugPrint('🔍 After category filter: ${filteredEvents.length} events');
+      // Category filter applied - only log if significant change
+      if (events.length - filteredEvents.length > 5) {
+        debugPrint('🔍 Category filter reduced events: ${events.length} → ${filteredEvents.length}');
+      }
     }
 
     // Apply sorting
     final sortedEvents = _sortEvents(filteredEvents);
-    debugPrint('🔍 After sorting: ${sortedEvents.length} events');
 
     return Container(
       margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),

@@ -9,6 +9,7 @@ import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Services/firebase_initializer.dart';
 import 'package:attendus/firebase/firebase_google_auth_helper.dart';
+import 'package:attendus/Utils/firebase_retry_helper.dart';
 
 /// Authentication service that handles persistent login functionality
 /// using Firebase Auth and secure storage for enhanced security
@@ -109,7 +110,7 @@ class AuthService extends ChangeNotifier {
 
       // Attempt to restore session with timeout to prevent hanging
       await _restoreUserSession().timeout(
-        const Duration(seconds: 1),
+        const Duration(seconds: 5),
         onTimeout: () {
           Logger.warning('Session restoration timed out');
           return false;
@@ -229,16 +230,21 @@ class AuthService extends ChangeNotifier {
         }
       }
 
-      // Load user data from Firestore with shorter timeout for better UX
-      final userData = await FirebaseFirestoreHelper()
-          .getSingleCustomer(customerId: user.uid)
-          .timeout(
-            const Duration(seconds: 2),
-            onTimeout: () {
-              Logger.warning('Firestore user data fetch timed out');
-              return null;
-            },
-          );
+      // Load user data from Firestore with retry logic for better UX
+      CustomerModel? userData;
+      try {
+        userData = await FirebaseRetryHelper.executeWithRetry<CustomerModel?>(
+          () =>
+              FirebaseFirestoreHelper().getSingleCustomer(customerId: user.uid),
+          timeout: const Duration(seconds: 8),
+          operationName: 'User data fetch',
+        );
+      } catch (e) {
+        Logger.warning(
+          '⚠️ WARNING: Could not load user data from Firestore, using minimal profile',
+        );
+        userData = null;
+      }
 
       if (userData != null) {
         CustomerController.logeInCustomer = userData;
@@ -247,9 +253,6 @@ class AuthService extends ChangeNotifier {
         return true;
       } else {
         // Fallback: set minimal customer model so app can proceed offline
-        Logger.warning(
-          'Could not load user data from Firestore, using minimal profile',
-        );
         final minimalCustomer = CustomerModel(
           uid: user.uid,
           name: user.displayName ?? '',

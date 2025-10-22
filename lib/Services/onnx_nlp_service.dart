@@ -479,8 +479,9 @@ class OnnxNlpService {
   Map<String, dynamic> _getDefaultMetadata() {
     return {
       'categories': [
-        'book_club', 'music', 'sports', 'tech', 'food', 'art',
-        'workshop', 'networking', 'party', 'conference', 'other'
+        'Social & Networking', 'Entertainment', 'Sports & Fitness',
+        'Education & Learning', 'Arts & Culture', 'Food & Dining', 
+        'Technology', 'Community & Charity'
       ],
       'max_sequence_length': 128,
     };

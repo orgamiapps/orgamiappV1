@@ -12,18 +12,16 @@ class OnDeviceNLPService {
   
   // Vocabulary removed as it's not used in rule-based parsing
 
-  /// Category mappings for classification
+  /// Category mappings for classification - aligned with app categories
   static const Map<String, List<String>> _categoryMappings = {
-    'book_club': ['book', 'club', 'reading', 'literature'],
-    'music': ['music', 'concert', 'band', 'singer', 'song'],
-    'sports': ['sports', 'fitness', 'gym', 'exercise', 'running'],
-    'tech': ['tech', 'technology', 'programming', 'coding', 'developer'],
-    'networking': ['networking', 'business', 'professional', 'career'],
-    'family': ['family', 'kids', 'children', 'parent'],
-    'art': ['art', 'painting', 'drawing', 'creative', 'artist'],
-    'food': ['food', 'cooking', 'restaurant', 'dining', 'culinary'],
-    'gaming': ['gaming', 'game', 'esports', 'video'],
-    'education': ['education', 'learning', 'workshop', 'training', 'course'],
+    'Social & Networking': ['networking', 'business', 'professional', 'career', 'meetup', 'social', 'connect', 'network', 'professional development', 'colleagues'],
+    'Entertainment': ['music', 'concert', 'band', 'singer', 'song', 'gaming', 'game', 'esports', 'video', 'show', 'performance', 'entertainment', 'fun', 'party', 'festival', 'comedy', 'theater'],
+    'Sports & Fitness': ['sports', 'fitness', 'gym', 'exercise', 'running', 'workout', 'athletic', 'training', 'health', 'wellness', 'yoga', 'dance', 'outdoor', 'recreation'],
+    'Education & Learning': ['education', 'learning', 'workshop', 'training', 'course', 'seminar', 'conference', 'lecture', 'book', 'club', 'reading', 'literature', 'study', 'academic', 'skill'],
+    'Arts & Culture': ['art', 'painting', 'drawing', 'creative', 'artist', 'culture', 'museum', 'gallery', 'exhibition', 'crafts', 'design', 'photography', 'sculpture', 'cultural'],
+    'Food & Dining': ['food', 'cooking', 'restaurant', 'dining', 'culinary', 'chef', 'recipe', 'tasting', 'wine', 'drink', 'meal', 'cuisine', 'foodie', 'kitchen'],
+    'Technology': ['tech', 'technology', 'programming', 'coding', 'developer', 'software', 'hardware', 'digital', 'innovation', 'startup', 'ai', 'data', 'computer', 'mobile'],
+    'Community & Charity': ['community', 'charity', 'volunteer', 'nonprofit', 'service', 'family', 'kids', 'children', 'parent', 'local', 'neighborhood', 'civic', 'fundraising', 'support', 'help'],
   };
 
   /// Initialize the NLP service

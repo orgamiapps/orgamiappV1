@@ -15,6 +15,7 @@ import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:attendus/screens/Home/calendar_screen.dart';
+import 'package:attendus/Utils/firebase_retry_helper.dart';
 
 class HomeHubScreen extends StatefulWidget {
   const HomeHubScreen({super.key});
@@ -138,15 +139,10 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
       }
 
       Logger.debug('🏠 HomeHubScreen: Executing Firestore query...');
-      final snap = await query.get().timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          Logger.warning('⚠️ Organizations discovery timed out');
-          throw TimeoutException(
-            'Organizations query timed out',
-            const Duration(seconds: 10),
-          );
-        },
+      final snap = await FirebaseRetryHelper.executeQueryWithRetry(
+        query,
+        timeout: const Duration(seconds: 10),
+        operationName: 'Organizations discovery',
       );
 
       Logger.debug(
@@ -164,10 +160,14 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
         Logger.debug('🏠 HomeHubScreen: State updated with discovered orgs');
       }
     } catch (e) {
-      Logger.error('Error discovering organizations', e);
+      Logger.error('❌ ERROR: Error discovering organizations');
+      Logger.error('Error details: $e');
       if (mounted) {
         setState(() => _discoverOrgs = []);
       }
+      // Show user-friendly error message
+      final errorMessage = FirebaseRetryHelper.getUserFriendlyErrorMessage(e);
+      Logger.info('User-friendly error: $errorMessage');
     } finally {
       if (mounted) {
         setState(() => _searching = false);
@@ -234,8 +234,8 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
             );
           },
           child: Icon(
-            Icons.add, 
-            color: Theme.of(context).colorScheme.onPrimary, 
+            Icons.add,
+            color: Theme.of(context).colorScheme.onPrimary,
             size: 28,
           ),
         ),

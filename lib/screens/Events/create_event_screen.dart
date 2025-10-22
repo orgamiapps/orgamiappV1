@@ -64,7 +64,16 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
   bool privateEvent =
       false; // Public by default (no group), private when group is selected
-  final List<String> _allCategories = ['Educational', 'Professional', 'Other'];
+  final List<String> _allCategories = [
+    'Social & Networking',
+    'Entertainment', 
+    'Sports & Fitness',
+    'Education & Learning',
+    'Arts & Culture',
+    'Food & Dining',
+    'Technology',
+    'Community & Charity',
+  ];
   final List<String> _selectedCategories = [];
 
   final TextEditingController groupNameEdtController = TextEditingController();
@@ -1025,8 +1034,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           ),
           const SizedBox(height: 16),
           Wrap(
-            spacing: 12,
-            runSpacing: 12,
+            spacing: 8, // Reduced spacing to fit more categories
+            runSpacing: 10,
             children: _allCategories.map((category) {
               final isSelected = _selectedCategories.contains(category);
               return _buildCategoryChip(category, isSelected);
@@ -1044,9 +1053,11 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         style: TextStyle(
           color: isSelected ? Colors.white : const Color(0xFF1A1A1A),
           fontWeight: FontWeight.w500,
-          fontSize: 14,
+          fontSize: 13, // Slightly smaller font for longer category names
           fontFamily: 'Roboto',
         ),
+        overflow: TextOverflow.ellipsis,
+        maxLines: 1,
       ),
       selected: isSelected,
       onSelected: (selected) {
@@ -1066,8 +1077,9 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             : Colors.grey.withValues(alpha: 0.3),
         width: 1,
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // Slightly reduced horizontal padding
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, // Reduces extra space
     );
   }
 

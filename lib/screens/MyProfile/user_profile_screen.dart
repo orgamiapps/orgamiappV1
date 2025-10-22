@@ -236,9 +236,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('🏗️ Building UserProfileScreen - isLoading: $_isLoading');
-    debugPrint('🏗️ _createdEvents.length: ${_createdEvents.length}');
-    debugPrint('🏗️ _attendedEvents.length: ${_attendedEvents.length}');
+    // Reduced build logging to prevent main thread blocking
+    if (_isLoading && _createdEvents.isEmpty) {
+      debugPrint('🏗️ UserProfileScreen: Loading profile for ${widget.user.email}');
+    }
 
     if (_isLoading) {
       return PopScope(
