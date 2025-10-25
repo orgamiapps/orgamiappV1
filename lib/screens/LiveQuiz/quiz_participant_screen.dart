@@ -46,6 +46,9 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
   DateTime? _questionStartTime;
   int _pointsEarned = 0;
   String? _explanation;
+  String? _errorMessage;
+  bool _hasError = false;
+  bool _isConnected = true; // Connection status indicator
 
   // Animation Controllers
   late AnimationController _fadeController;
@@ -132,29 +135,57 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
 
   Future<void> _joinQuiz() async {
     try {
+      // Add timeout to joining process
       final participantId = await _liveQuizService.joinQuiz(
         quizId: widget.quizId,
         displayName: widget.displayName,
         isAnonymous: widget.isAnonymous,
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Connection timeout. Please check your internet and try again.');
+        },
       );
 
       if (participantId != null) {
+        if (!mounted) return;
         setState(() {
           _participantId = participantId;
           _isJoining = false;
+          _hasError = false;
         });
 
-        // Get initial participant data
-        final participant = await _liveQuizService.getParticipant(
-          participantId,
-        );
-        setState(() => _participant = participant);
+        // Get initial participant data asynchronously
+        _loadParticipantDataAsync(participantId);
       } else {
-        _showError('Failed to join quiz');
+        _handleJoinError('Failed to join quiz. Please try again.');
       }
     } catch (e) {
-      _showError('Error joining quiz: $e');
+      Logger.error('Error joining quiz: $e');
+      _handleJoinError('Error joining quiz: ${e.toString()}');
     }
+  }
+
+  Future<void> _loadParticipantDataAsync(String participantId) async {
+    try {
+      final participant = await _liveQuizService.getParticipant(participantId);
+      if (mounted) {
+        setState(() => _participant = participant);
+      }
+    } catch (e) {
+      Logger.error('Error loading participant data: $e');
+      // Non-critical error, don't block the quiz
+    }
+  }
+
+  void _handleJoinError(String message) {
+    if (!mounted) return;
+    setState(() {
+      _hasError = true;
+      _errorMessage = message;
+      _isJoining = false;
+    });
+    _showError(message);
   }
 
   void _setupQuizStream() {
@@ -162,31 +193,54 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
         .getQuizStream(widget.quizId)
         .listen(
           (quiz) {
+            // Update connection status
+            if (mounted && !_isConnected) {
+              setState(() => _isConnected = true);
+            }
+            
             final previousQuestion = _currentQuestion;
+            final previousQuestionIndex = _quiz?.currentQuestionIndex;
             setState(() => _quiz = quiz);
 
             if (quiz.isLive && quiz.hasCurrentQuestion) {
-              _loadCurrentQuestion(quiz.currentQuestionIndex!);
-
-              // Reset answer state for new questions
-              if (previousQuestion?.id != _currentQuestion?.id) {
+              // Only reload question if it changed
+              if (previousQuestionIndex != quiz.currentQuestionIndex) {
+                _loadCurrentQuestion(quiz.currentQuestionIndex!);
+                // Reset answer state for new questions
                 _resetAnswerState();
               }
 
               _startCountdown();
+            } else if (quiz.isEnded) {
+              // Quiz ended - show final results
+              _countdownTimer?.cancel();
             }
           },
           onError: (error) {
-            _showError('Quiz connection error: $error');
+            Logger.error('Quiz stream error: $error');
+            if (mounted) {
+              setState(() => _isConnected = false);
+            }
+            _showError('Connection issue. Reconnecting...');
+            // Try to reconnect after a delay
+            Future.delayed(const Duration(seconds: 3), () {
+              if (mounted) {
+                _setupQuizStream();
+              }
+            });
           },
         );
   }
 
   Future<void> _loadCurrentQuestion(int questionIndex) async {
     try {
-      final questions = await _liveQuizService.getQuestions(widget.quizId);
-      if (questionIndex < questions.length) {
-        final question = questions[questionIndex];
+      // Optimized: Only load the current question, not all questions
+      final question = await _liveQuizService.getCurrentQuestion(widget.quizId).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => null,
+      );
+      
+      if (question != null && mounted) {
         setState(() => _currentQuestion = question);
 
         // Check if participant has already answered this question
@@ -195,11 +249,19 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
             _participantId!,
             question.id,
           );
-          setState(() => _hasAnswered = hasAnswered);
+          if (mounted) {
+            setState(() => _hasAnswered = hasAnswered);
+          }
         }
       }
     } catch (e) {
-      _showError('Error loading question: $e');
+      Logger.error('Error loading question: $e');
+      _showError('Error loading question. Retrying...');
+      // Retry once after a short delay
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) {
+        _loadCurrentQuestion(questionIndex);
+      }
     }
   }
 
@@ -378,27 +440,140 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
   }
 
   Widget _buildJoiningScreen() {
-    return const Center(
+    if (_hasError) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(40),
+                ),
+                child: const Icon(
+                  Icons.error_outline,
+                  color: Colors.red,
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Connection Error',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A1A1A),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _errorMessage ?? 'Unable to join the quiz',
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _hasError = false;
+                    _isJoining = true;
+                    _errorMessage = null;
+                  });
+                  _joinQuiz();
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF667EEA),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 16,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Go Back'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 80,
+                height: 80,
+                child: CircularProgressIndicator(
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    Color(0xFF667EEA),
+                  ),
+                  strokeWidth: 3,
+                ),
+              ),
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: const Icon(
+                  Icons.quiz,
+                  color: Color(0xFF667EEA),
+                  size: 30,
+                ),
+              ),
+            ],
           ),
-          SizedBox(height: 24),
-          Text(
-            'Joining Quiz...',
+          const SizedBox(height: 32),
+          const Text(
+            'Joining Live Quiz...',
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
               color: Color(0xFF1A1A1A),
             ),
           ),
-          SizedBox(height: 8),
-          Text(
-            'Please wait while we connect you to the live quiz',
-            style: TextStyle(fontSize: 14, color: Colors.grey),
-            textAlign: TextAlign.center,
+          const SizedBox(height: 12),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 48),
+            child: Text(
+              'Connecting you to the live quiz.\nThis should only take a moment.',
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.grey,
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 32),
+          const SizedBox(
+            width: 200,
+            child: LinearProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
+              backgroundColor: Color(0xFFE5E7EB),
+            ),
           ),
         ],
       ),
@@ -446,13 +621,53 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
                         fontFamily: 'Roboto',
                       ),
                     ),
-                    Text(
-                      _participant?.displayName ?? 'Participant',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.8),
-                        fontSize: 14,
-                        fontFamily: 'Roboto',
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          _participant?.displayName ?? 'Participant',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.8),
+                            fontSize: 14,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Connection status indicator
+                        AnimatedBuilder(
+                          animation: _pulseController,
+                          builder: (context, child) {
+                            return Transform.scale(
+                              scale: _isConnected ? _pulseAnimation.value : 1.0,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: _isConnected 
+                                      ? const Color(0xFF10B981) 
+                                      : Colors.orange,
+                                  shape: BoxShape.circle,
+                                  boxShadow: _isConnected ? [
+                                    BoxShadow(
+                                      color: const Color(0xFF10B981).withValues(alpha: 0.5),
+                                      spreadRadius: 2,
+                                      blurRadius: 4,
+                                    ),
+                                  ] : [],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _isConnected ? 'Live' : 'Reconnecting',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -636,41 +851,89 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
 
   Widget _buildWaitingScreen(String title, String subtitle) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: const Color(0xFF667EEA).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(40),
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedBuilder(
+              animation: _pulseAnimation,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _pulseAnimation.value,
+                  child: Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          const Color(0xFF667EEA).withValues(alpha: 0.2),
+                          const Color(0xFF764BA2).withValues(alpha: 0.1),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(50),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF667EEA).withValues(alpha: 0.2),
+                          spreadRadius: 2,
+                          blurRadius: 20,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.hourglass_empty,
+                      color: Color(0xFF667EEA),
+                      size: 50,
+                    ),
+                  ),
+                );
+              },
             ),
-            child: const Icon(
-              Icons.hourglass_empty,
-              color: Color(0xFF667EEA),
-              size: 40,
+            const SizedBox(height: 32),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A1A1A),
+              ),
+              textAlign: TextAlign.center,
             ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1A1A1A),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 17,
+                  color: Colors.grey.withValues(alpha: 0.8),
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.withValues(alpha: 0.7),
+            const SizedBox(height: 40),
+            SizedBox(
+              width: 200,
+              child: LinearProgressIndicator(
+                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
+                backgroundColor: const Color(0xFFE5E7EB),
+              ),
             ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+            const SizedBox(height: 16),
+            Text(
+              'Stay connected...',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.withValues(alpha: 0.6),
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

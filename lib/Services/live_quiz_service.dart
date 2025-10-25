@@ -419,7 +419,7 @@ class LiveQuizService extends ChangeNotifier {
   // PARTICIPANT MANAGEMENT
   // ============================================================================
 
-  /// Join a quiz as a participant
+  /// Join a quiz as a participant - OPTIMIZED
   Future<String?> joinQuiz({
     required String quizId,
     String? displayName,
@@ -427,6 +427,16 @@ class LiveQuizService extends ChangeNotifier {
   }) async {
     try {
       final user = _auth.currentUser;
+      
+      // Verify quiz exists and is accepting participants before creating participant
+      final quiz = await getQuiz(quizId);
+      if (quiz == null) {
+        throw Exception('Quiz not found');
+      }
+      
+      if (quiz.participantCount >= quiz.maxParticipants) {
+        throw Exception('Quiz is full');
+      }
       
       // Create participant
       final participantRef = _firestore.collection(QuizParticipantModel.firebaseKey).doc();
@@ -446,10 +456,21 @@ class LiveQuizService extends ChangeNotifier {
       }
       
       final participantWithId = participant.copyWith(id: participantRef.id);
-      await participantRef.set(participantWithId.toJson());
+      
+      // Use batch for atomic operations
+      final batch = _firestore.batch();
+      batch.set(participantRef, participantWithId.toJson());
       
       // Update participant count
-      await _incrementParticipantCount(quizId);
+      final quizRef = _firestore.collection(LiveQuizModel.firebaseKey).doc(quizId);
+      batch.update(quizRef, {
+        'participantCount': FieldValue.increment(1),
+      });
+      
+      await batch.commit().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => throw Exception('Join operation timeout'),
+      );
       
       Logger.info('Participant joined quiz: $quizId');
       return participantRef.id;
@@ -688,10 +709,17 @@ class LiveQuizService extends ChangeNotifier {
   // DATA QUERIES
   // ============================================================================
 
-  /// Get a single quiz
+  /// Get a single quiz - OPTIMIZED with caching
   Future<LiveQuizModel?> getQuiz(String quizId) async {
     try {
-      final doc = await _firestore.collection(LiveQuizModel.firebaseKey).doc(quizId).get();
+      final doc = await _firestore
+          .collection(LiveQuizModel.firebaseKey)
+          .doc(quizId)
+          .get(const GetOptions(source: Source.serverAndCache)) // Use cache when available
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () => throw Exception('Quiz load timeout'),
+          );
       return doc.exists ? LiveQuizModel.fromFirestore(doc) : null;
     } catch (e) {
       Logger.error('Failed to get quiz: $e');
@@ -733,18 +761,23 @@ class LiveQuizService extends ChangeNotifier {
     }
   }
 
-  /// Get current question for a quiz
+  /// Get current question for a quiz - OPTIMIZED
   Future<QuizQuestionModel?> getCurrentQuestion(String quizId) async {
     try {
       final quiz = await getQuiz(quizId);
       if (quiz == null || !quiz.hasCurrentQuestion) return null;
       
+      // Direct query for current question only - much faster than loading all questions
       final snapshot = await _firestore
           .collection(QuizQuestionModel.firebaseKey)
           .where('quizId', isEqualTo: quizId)
           .where('orderIndex', isEqualTo: quiz.currentQuestionIndex)
           .limit(1)
-          .get();
+          .get(const GetOptions(source: Source.server)) // Force server fetch for real-time data
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () => throw Exception('Question load timeout'),
+          );
       
       return snapshot.docs.isNotEmpty 
           ? QuizQuestionModel.fromFirestore(snapshot.docs.first)

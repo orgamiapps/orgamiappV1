@@ -138,7 +138,24 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen>
       backgroundColor: const Color(0xFFFAFBFC),
       body: SafeArea(
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Loading quiz builder...',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ),
+              )
             : FadeTransition(
                 opacity: _fadeAnimation,
                 child: SlideTransition(
