@@ -136,6 +136,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   // Attendees dropdown state
   bool _isAttendeesExpanded = false;
 
+  // Live Quiz dropdown state
+  bool _isLiveQuizExpanded = false;
+
   // Address lookup state (kept for background resolution if needed)
   String? _resolvedAddress;
   String? _creatorName;
@@ -6064,7 +6067,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -6074,7 +6077,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             const Color(0xFF764BA2).withValues(alpha: 0.08),
           ],
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: const Color(0xFF667EEA).withValues(alpha: 0.3),
           width: 2,
@@ -6083,268 +6086,306 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
           BoxShadow(
             color: const Color(0xFF667EEA).withValues(alpha: 0.15),
             spreadRadius: 0,
-            blurRadius: 24,
-            offset: const Offset(0, 8),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF667EEA).withValues(alpha: 0.4),
-                      spreadRadius: 0,
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
+          // Header Row - Always Visible
+          GestureDetector(
+            onTap: () =>
+                setState(() => _isLiveQuizExpanded = !_isLiveQuizExpanded),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
                     ),
-                  ],
-                ),
-                child: const Icon(Icons.quiz, color: Colors.white, size: 24),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Live Quiz Experience',
-                      style: TextStyle(
-                        color: Color(0xFF1A1A1A),
-                        fontWeight: FontWeight.w700,
-                        fontSize: 20,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _liveQuiz!.title,
-                      style: const TextStyle(
-                        color: Color(0xFF667EEA),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: statusColor,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: statusColor.withValues(alpha: 0.3),
-                      spreadRadius: 0,
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_liveQuiz!.status == QuizStatus.live) ...[
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    Text(
-                      statusText,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Text(
-            statusDescription,
-            style: TextStyle(
-              color: Colors.grey.withValues(alpha: 0.8),
-              fontSize: 16,
-              fontFamily: 'Roboto',
-              height: 1.5,
-            ),
-          ),
-          if (_liveQuiz!.description?.isNotEmpty == true) ...[
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.2),
-                ),
-              ),
-              child: Text(
-                _liveQuiz!.description!,
-                style: TextStyle(
-                  color: Colors.grey.withValues(alpha: 0.9),
-                  fontSize: 15,
-                  fontFamily: 'Roboto',
-                  height: 1.4,
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: _buildQuizInfoChip(
-                  Icons.timer,
-                  '${_liveQuiz!.timePerQuestion}s per question',
-                  const Color(0xFF667EEA),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildQuizInfoChip(
-                  Icons.people,
-                  '${_liveQuiz!.participantCount} participants',
-                  const Color(0xFF10B981),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildQuizInfoChip(
-                  Icons.quiz,
-                  '${_liveQuiz!.totalQuestions} questions',
-                  Colors.orange,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Container(
-            width: double.infinity,
-            height: 56,
-            decoration: BoxDecoration(
-              gradient: canJoin
-                  ? (_liveQuiz!.status == QuizStatus.live
-                        ? const LinearGradient(
-                            colors: [Color(0xFF10B981), Color(0xFF059669)],
-                          )
-                        : const LinearGradient(
-                            colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-                          ))
-                  : LinearGradient(
-                      colors: [
-                        Colors.grey.withValues(alpha: 0.4),
-                        Colors.grey.withValues(alpha: 0.4),
-                      ],
-                    ),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: canJoin
-                  ? [
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: [
                       BoxShadow(
-                        color:
-                            (_liveQuiz!.status == QuizStatus.live
-                                    ? const Color(0xFF10B981)
-                                    : const Color(0xFF667EEA))
-                                .withValues(alpha: 0.4),
+                        color: const Color(0xFF667EEA).withValues(alpha: 0.3),
                         spreadRadius: 0,
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
                       ),
-                    ]
-                  : [],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: canJoin ? _navigateToQuizParticipant : null,
-                child: Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    ],
+                  ),
+                  child: const Icon(Icons.quiz, color: Colors.white, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(buttonIcon, color: Colors.white, size: 24),
-                      const SizedBox(width: 12),
-                      Text(
-                        buttonText,
-                        style: const TextStyle(
-                          color: Colors.white,
+                      const Text(
+                        'Live Quiz',
+                        style: TextStyle(
+                          color: Color(0xFF1A1A1A),
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
                           fontFamily: 'Roboto',
-                          letterSpacing: 0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _liveQuiz!.title,
+                        style: TextStyle(
+                          color: Colors.grey.withValues(alpha: 0.8),
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                          fontFamily: 'Roboto',
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: statusColor.withValues(alpha: 0.3),
+                        spreadRadius: 0,
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_liveQuiz!.status == QuizStatus.live) ...[
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      Text(
+                        statusText,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.3,
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
+                const SizedBox(width: 8),
+                AnimatedRotation(
+                  turns: _isLiveQuizExpanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 300),
+                  child: Icon(
+                    Icons.keyboard_arrow_down,
+                    color: const Color(0xFF667EEA),
+                    size: 28,
+                  ),
+                ),
+              ],
             ),
           ),
-          if (_liveQuiz!.status == QuizStatus.live) ...[
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.3),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF10B981),
-                      shape: BoxShape.circle,
-                    ),
+
+          // Expandable Content
+          AnimatedCrossFade(
+            firstChild: const SizedBox(),
+            secondChild: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 16),
+                Text(
+                  statusDescription,
+                  style: TextStyle(
+                    color: Colors.grey.withValues(alpha: 0.8),
+                    fontSize: 15,
+                    fontFamily: 'Roboto',
+                    height: 1.4,
                   ),
-                  const SizedBox(width: 8),
-                  const Expanded(
+                ),
+                if (_liveQuiz!.description?.isNotEmpty == true) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFF667EEA).withValues(alpha: 0.2),
+                      ),
+                    ),
                     child: Text(
-                      'Quiz is live and accepting participants right now!',
+                      _liveQuiz!.description!,
                       style: TextStyle(
-                        color: Color(0xFF10B981),
+                        color: Colors.grey.withValues(alpha: 0.9),
                         fontSize: 14,
-                        fontWeight: FontWeight.w600,
                         fontFamily: 'Roboto',
+                        height: 1.4,
                       ),
                     ),
                   ),
                 ],
-              ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildQuizInfoChip(
+                        Icons.timer,
+                        '${_liveQuiz!.timePerQuestion}s',
+                        const Color(0xFF667EEA),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _buildQuizInfoChip(
+                        Icons.people,
+                        '${_liveQuiz!.participantCount}',
+                        const Color(0xFF10B981),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _buildQuizInfoChip(
+                        Icons.quiz,
+                        '${_liveQuiz!.totalQuestions}',
+                        Colors.orange,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  width: double.infinity,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: canJoin
+                        ? (_liveQuiz!.status == QuizStatus.live
+                              ? const LinearGradient(
+                                  colors: [
+                                    Color(0xFF10B981),
+                                    Color(0xFF059669),
+                                  ],
+                                )
+                              : const LinearGradient(
+                                  colors: [
+                                    Color(0xFF667EEA),
+                                    Color(0xFF764BA2),
+                                  ],
+                                ))
+                        : LinearGradient(
+                            colors: [
+                              Colors.grey.withValues(alpha: 0.4),
+                              Colors.grey.withValues(alpha: 0.4),
+                            ],
+                          ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: canJoin
+                        ? [
+                            BoxShadow(
+                              color:
+                                  (_liveQuiz!.status == QuizStatus.live
+                                          ? const Color(0xFF10B981)
+                                          : const Color(0xFF667EEA))
+                                      .withValues(alpha: 0.4),
+                              spreadRadius: 0,
+                              blurRadius: 16,
+                              offset: const Offset(0, 6),
+                            ),
+                          ]
+                        : [],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: canJoin ? _navigateToQuizParticipant : null,
+                      child: Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(buttonIcon, color: Colors.white, size: 22),
+                            const SizedBox(width: 10),
+                            Text(
+                              buttonText,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                fontFamily: 'Roboto',
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (_liveQuiz!.status == QuizStatus.live) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF10B981),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Join now to compete!',
+                            style: TextStyle(
+                              color: Color(0xFF10B981),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ],
+            crossFadeState: _isLiveQuizExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 300),
+          ),
         ],
       ),
     );
@@ -6352,24 +6393,27 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
 
   Widget _buildQuizInfoChip(IconData icon, String text, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(height: 4),
+          Icon(icon, size: 20, color: color),
+          const SizedBox(height: 6),
           Text(
             text,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               color: color,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.bold,
             ),
             textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

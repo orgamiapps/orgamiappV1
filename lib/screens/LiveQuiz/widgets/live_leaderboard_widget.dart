@@ -632,3 +632,404 @@ class CompactLeaderboardWidget extends StatelessWidget {
     }
   }
 }
+
+// Final Leaderboard Widget - Shows ALL participants for completed quiz
+class FinalLeaderboardWidget extends StatelessWidget {
+  final String quizId;
+  final String? currentParticipantId;
+
+  const FinalLeaderboardWidget({
+    super.key,
+    required this.quizId,
+    this.currentParticipantId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<QuizParticipantModel>>(
+      stream: LiveQuizService().getParticipantsStream(quizId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    color: Colors.red.withValues(alpha: 0.6),
+                    size: 48,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Unable to load leaderboard',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.red,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    snapshot.error.toString(),
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.people_outline, color: Colors.grey, size: 64),
+                  SizedBox(height: 16),
+                  Text(
+                    'No participants',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'No one participated in this quiz',
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final participants = snapshot.data!;
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(20),
+          itemCount: participants.length,
+          itemBuilder: (context, index) {
+            final participant = participants[index];
+            final rank = participant.currentRank ?? (index + 1);
+            final isCurrentUser = participant.id == currentParticipantId;
+
+            return _buildFinalLeaderboardItem(
+              participant,
+              rank,
+              isCurrentUser,
+              index,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildFinalLeaderboardItem(
+    QuizParticipantModel participant,
+    int rank,
+    bool isCurrentUser,
+    int index,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: isCurrentUser
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFF667EEA).withValues(alpha: 0.15),
+                    const Color(0xFF764BA2).withValues(alpha: 0.1),
+                  ],
+                )
+              : null,
+          color: isCurrentUser ? null : _getRankBackgroundColor(rank),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isCurrentUser
+                ? const Color(0xFF667EEA)
+                : _getRankBorderColor(rank),
+            width: isCurrentUser ? 2 : (rank <= 3 ? 2 : 1),
+          ),
+          boxShadow: (rank <= 3 || isCurrentUser)
+              ? [
+                  BoxShadow(
+                    color: isCurrentUser
+                        ? const Color(0xFF667EEA).withValues(alpha: 0.2)
+                        : _getRankBorderColor(rank).withValues(alpha: 0.2),
+                    spreadRadius: 0,
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [],
+        ),
+        child: Row(
+          children: [
+            // Rank Badge with Medal Icons
+            _buildRankBadge(rank),
+            const SizedBox(width: 16),
+
+            // Avatar
+            _buildAvatar(participant, rank),
+            const SizedBox(width: 12),
+
+            // Participant Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          participant.displayName,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: rank <= 3
+                                ? Colors.white
+                                : const Color(0xFF1A1A1A),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (isCurrentUser)
+                        Container(
+                          margin: const EdgeInsets.only(left: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF667EEA),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'YOU',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.check_circle,
+                        size: 12,
+                        color: rank <= 3
+                            ? Colors.white.withValues(alpha: 0.8)
+                            : const Color(0xFF10B981),
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          '${participant.correctAnswers}/${participant.questionsAnswered}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: rank <= 3
+                                ? Colors.white.withValues(alpha: 0.9)
+                                : Colors.grey.withValues(alpha: 0.8),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.analytics,
+                        size: 12,
+                        color: rank <= 3
+                            ? Colors.white.withValues(alpha: 0.8)
+                            : const Color(0xFF667EEA),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        participant.accuracyDisplay,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: rank <= 3
+                              ? Colors.white.withValues(alpha: 0.9)
+                              : Colors.grey.withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // Score Display
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '${participant.currentScore}',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: rank <= 3 ? Colors.white : const Color(0xFF667EEA),
+                  ),
+                ),
+                Text(
+                  'points',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: rank <= 3
+                        ? Colors.white.withValues(alpha: 0.8)
+                        : Colors.grey.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRankBadge(int rank) {
+    final isTopThree = rank <= 3;
+
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: isTopThree
+            ? Colors.white.withValues(alpha: 0.2)
+            : const Color(0xFF667EEA).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isTopThree
+              ? Colors.white.withValues(alpha: 0.5)
+              : const Color(0xFF667EEA).withValues(alpha: 0.3),
+          width: 2,
+        ),
+      ),
+      child: Center(
+        child: isTopThree
+            ? _getRankMedalIcon(rank)
+            : Text(
+                '$rank',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF667EEA),
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _getRankMedalIcon(int rank) {
+    IconData icon;
+    switch (rank) {
+      case 1:
+        icon = Icons.emoji_events; // Trophy
+        break;
+      case 2:
+        icon = Icons.military_tech; // Medal
+        break;
+      case 3:
+        icon = Icons.workspace_premium; // Star medal
+        break;
+      default:
+        icon = Icons.emoji_events;
+    }
+
+    return Icon(icon, color: Colors.white, size: 24);
+  }
+
+  Widget _buildAvatar(QuizParticipantModel participant, int rank) {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        gradient: rank <= 3
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withValues(alpha: 0.3),
+                  Colors.white.withValues(alpha: 0.1),
+                ],
+              )
+            : null,
+        color: rank > 3 ? const Color(0xFF667EEA).withValues(alpha: 0.1) : null,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: rank <= 3
+              ? Colors.white.withValues(alpha: 0.5)
+              : const Color(0xFF667EEA).withValues(alpha: 0.3),
+          width: 2,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          participant.displayName.isNotEmpty
+              ? participant.displayName[0].toUpperCase()
+              : '?',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: rank <= 3 ? Colors.white : const Color(0xFF667EEA),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _getRankBackgroundColor(int rank) {
+    switch (rank) {
+      case 1:
+        return const Color(0xFFFFD700); // Gold
+      case 2:
+        return const Color(0xFFC0C0C0); // Silver
+      case 3:
+        return const Color(0xFFCD7F32); // Bronze
+      default:
+        return Colors.white;
+    }
+  }
+
+  Color _getRankBorderColor(int rank) {
+    switch (rank) {
+      case 1:
+        return const Color(0xFFFFD700);
+      case 2:
+        return const Color(0xFFC0C0C0);
+      case 3:
+        return const Color(0xFFCD7F32);
+      default:
+        return Colors.grey.withValues(alpha: 0.2);
+    }
+  }
+}
