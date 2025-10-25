@@ -29,6 +29,8 @@ class _QuizHostScreenState extends State<QuizHostScreen>
   // UI State
   bool _isLoading = true;
   int _selectedTabIndex = 0;
+  String? _errorMessage;
+  bool _hasError = false;
 
   // Animation Controllers
   late AnimationController _fadeController;
@@ -103,9 +105,19 @@ class _QuizHostScreenState extends State<QuizHostScreen>
 
   Future<void> _loadQuizData() async {
     try {
-      final quiz = await _liveQuizService.getQuiz(widget.quizId);
-      final questions = await _liveQuizService.getQuestions(widget.quizId);
-      final stats = await _liveQuizService.getQuizStats(widget.quizId);
+      // Add timeout to prevent infinite loading
+      final results = await Future.wait([
+        _liveQuizService.getQuiz(widget.quizId),
+        _liveQuizService.getQuestions(widget.quizId),
+        _liveQuizService.getQuizStats(widget.quizId),
+      ]).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => throw Exception('Loading timeout. Please check your connection.'),
+      );
+
+      final quiz = results[0] as LiveQuizModel?;
+      final questions = results[1] as List<QuizQuestionModel>;
+      final stats = results[2] as Map<String, dynamic>;
 
       if (mounted) {
         setState(() {
@@ -113,6 +125,7 @@ class _QuizHostScreenState extends State<QuizHostScreen>
           _questions = questions;
           _quizStats = stats;
           _isLoading = false;
+          _hasError = false;
         });
 
         // Load current question if quiz is active
@@ -126,8 +139,15 @@ class _QuizHostScreenState extends State<QuizHostScreen>
         }
       }
     } catch (e) {
-      _showError('Failed to load quiz data: $e');
-      setState(() => _isLoading = false);
+      Logger.error('Failed to load quiz data: $e');
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+        _showError('Failed to load quiz: ${e.toString()}');
+      }
     }
   }
 
@@ -300,20 +320,111 @@ class _QuizHostScreenState extends State<QuizHostScreen>
       backgroundColor: const Color(0xFFFAFBFC),
       body: SafeArea(
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: Column(
-                    children: [
-                      _buildHeader(),
-                      _buildControlPanel(),
-                      Expanded(child: _buildTabView()),
-                    ],
+            ? const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Loading quiz...',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : _hasError
+                ? _buildErrorState()
+                : FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: SlideTransition(
+                      position: _slideAnimation,
+                      child: Column(
+                        children: [
+                          _buildHeader(),
+                          _buildControlPanel(),
+                          Expanded(child: _buildTabView()),
+                        ],
+                      ),
+                    ),
                   ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(40),
+              ),
+              child: const Icon(
+                Icons.error_outline,
+                color: Colors.red,
+                size: 40,
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Failed to Load Quiz',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A1A1A),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _errorMessage ?? 'An unexpected error occurred',
+              style: const TextStyle(
+                fontSize: 16,
+                color: Colors.grey,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _hasError = false;
+                  _isLoading = true;
+                });
+                _loadQuizData();
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF667EEA),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 16,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Go Back'),
+            ),
+          ],
+        ),
       ),
     );
   }
