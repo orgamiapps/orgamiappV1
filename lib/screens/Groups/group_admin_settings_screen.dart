@@ -161,194 +161,297 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
               subtitle: 'Manage group settings and content',
             ),
             Expanded(
-              child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Group Information Section
-          _buildSectionCard('Group Information', Icons.info_outline, [
-            _buildSettingTile(
-              'Edit Group Details',
-              'Change name, description, category, images',
-              Icons.edit,
-              () => _editGroupDetails(),
-            ),
-            _buildSettingTile(
-              'Location Settings',
-              'Update group location',
-              Icons.location_on,
-              () => _editLocation(),
-            ),
-          ]),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Quick Actions Grid (Most Used)
+                    _buildSectionHeader(
+                      title: 'Quick Actions',
+                      icon: Icons.flash_on,
+                      color: const Color(0xFF667EEA),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildCompactActionsGrid([
+                      _CompactAction(
+                        icon: Icons.edit,
+                        title: 'Edit Group',
+                        subtitle: 'Details & Info',
+                        color: const Color(0xFF667EEA),
+                        onTap: () => _editGroupDetails(),
+                      ),
+                      _CompactAction(
+                        icon: Icons.people,
+                        title: 'Members',
+                        subtitle: 'Manage Access',
+                        color: const Color(0xFF10B981),
+                        onTap: () => _manageMembers(),
+                      ),
+                      _CompactAction(
+                        icon: Icons.feed,
+                        title: 'Feed Posts',
+                        subtitle: 'Moderate Content',
+                        color: const Color(0xFFEC4899),
+                        onTap: () => _manageFeedPosts(),
+                      ),
+                      _CompactAction(
+                        icon: Icons.person_add_alt_1,
+                        title: 'Join Requests',
+                        subtitle: 'Review Pending',
+                        color: const Color(0xFFFF9800),
+                        onTap: () => _manageJoinRequests(),
+                      ),
+                    ]),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Content & Events Management
+                    _buildSectionHeader(
+                      title: 'Content & Events',
+                      icon: Icons.campaign,
+                      color: const Color(0xFF8B5CF6),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildCompactActionsGrid([
+                      _CompactAction(
+                        icon: Icons.event,
+                        title: 'Event Settings',
+                        subtitle: 'Default Visibility',
+                        color: const Color(0xFF3B82F6),
+                        onTap: () => _editEventSettings(),
+                      ),
+                      _CompactAction(
+                        icon: Icons.event_note,
+                        title: 'Pending Events',
+                        subtitle: 'Approve Events',
+                        color: const Color(0xFF06B6D4),
+                        onTap: () => _managePendingEvents(),
+                      ),
+                      _CompactAction(
+                        icon: Icons.location_on,
+                        title: 'Location',
+                        subtitle: 'Update Place',
+                        color: const Color(0xFFEF4444),
+                        onTap: () => _editLocation(),
+                      ),
+                    ]),
 
-          const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
-          // Content Management Section
-          _buildSectionCard('Content Management', Icons.manage_accounts, [
-            _buildSettingTile(
-              'Manage Feed Posts',
-              'Delete or moderate announcements and polls',
-              Icons.feed,
-              () => _manageFeedPosts(),
+                    // Analytics & Insights
+                    _buildSectionHeader(
+                      title: 'Insights & Growth',
+                      icon: Icons.trending_up,
+                      color: const Color(0xFF10B981),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildCompactActionsGrid([
+                      _CompactAction(
+                        icon: Icons.analytics,
+                        title: 'Analytics',
+                        subtitle: 'View Insights',
+                        color: const Color(0xFF059669),
+                        onTap: () => _viewStatistics(),
+                      ),
+                    ]),
+
+                    const SizedBox(height: 24),
+
+                    // Danger Zone
+                    _buildSectionHeader(
+                      title: 'Danger Zone',
+                      icon: Icons.warning,
+                      color: const Color(0xFFEF4444),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildDangerZoneCompact(),
+
+                    const SizedBox(height: 32), // Extra space at bottom
+                  ],
+                ),
+              ),
             ),
-            _buildSettingTile(
-              'Event Settings',
-              'Manage default event visibility',
-              Icons.event,
-              () => _editEventSettings(),
-            ),
-            _buildSettingTile(
-              'Pending Events',
-              'Review and approve member events',
-              Icons.event_note,
-              () => _managePendingEvents(),
-            ),
-          ]),
+          ],
+        ),
+      ),
+    );
+  }
 
-          const SizedBox(height: 16),
+  Widget _buildSectionHeader({
+    required String title,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: color, size: 16),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          title,
+          style: const TextStyle(
+            color: Color(0xFF1A1A1A),
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            fontFamily: 'Roboto',
+            letterSpacing: -0.2,
+          ),
+        ),
+      ],
+    );
+  }
 
-          // Member Management Section
-          _buildSectionCard('Member Management', Icons.people, [
-            _buildSettingTile(
-              'Manage Members',
-              'Promote admins, remove members',
-              Icons.person_add,
-              () => _manageMembers(),
-            ),
-            _buildSettingTile(
-              'Join Requests',
-              'Review pending membership requests',
-              Icons.person_add_alt_1,
-              () => _manageJoinRequests(),
-            ),
-          ]),
+  Widget _buildCompactActionsGrid(List<_CompactAction> actions) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 1.15,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      ),
+      itemCount: actions.length,
+      itemBuilder: (context, index) {
+        final action = actions[index];
+        return _buildCompactActionCard(action);
+      },
+    );
+  }
 
-          const SizedBox(height: 16),
-
-          // Advanced Settings Section
-          _buildSectionCard('Advanced', Icons.settings, [
-            _buildSettingTile(
-              'Group Analytics',
-              'View detailed analytics',
-              Icons.analytics,
-              () => _viewStatistics(),
-            ),
-          ]),
-
-          const SizedBox(height: 32),
-
-          // Danger Zone
-          _buildDangerZone(),
+  Widget _buildCompactActionCard(_CompactAction action) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: action.isDisabled ?? false 
+              ? const Color(0xFFE5E7EB) 
+              : action.color.withValues(alpha: 0.15),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            spreadRadius: 0,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
-              ),
-            ),
-          ],
-        ),
       ),
-    );
-  }
-
-  Widget _buildSectionCard(String title, IconData icon, List<Widget> children) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: action.isDisabled ?? false ? null : action.onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, color: const Color(0xFF667EEA)),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                // Icon with background
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: action.isDisabled ?? false
+                        ? const Color(0xFFF3F4F6)
+                        : action.color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Icon(
+                        action.icon,
+                        color: action.isDisabled ?? false
+                            ? const Color(0xFF9CA3AF)
+                            : action.color,
+                        size: 24,
+                      ),
+                      // Premium badge overlay (if needed)
+                      if (action.isPremium ?? false)
+                        Positioned(
+                          top: 2,
+                          right: 2,
+                          child: Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFD700),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.white, width: 1),
+                            ),
+                            child: const Icon(
+                              Icons.star,
+                              color: Colors.white,
+                              size: 10,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ...children,
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSettingTile(
-    String title,
-    String subtitle,
-    IconData icon,
-    VoidCallback onTap,
-  ) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: CircleAvatar(
-        backgroundColor: const Color(0xFF667EEA).withValues(alpha: 0.1),
-        child: Icon(icon, color: const Color(0xFF667EEA), size: 20),
-      ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-      subtitle: Text(subtitle, style: TextStyle(color: Colors.grey[600])),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: onTap,
-    );
-  }
-
-  Widget _buildDangerZone() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: Colors.red.shade50,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.warning, color: Colors.red.shade600),
-                const SizedBox(width: 8),
+                const SizedBox(height: 12),
+                // Title
                 Text(
-                  'Danger Zone',
+                  action.title,
                   style: TextStyle(
-                    fontSize: 18,
+                    color: action.isDisabled ?? false
+                        ? const Color(0xFF9CA3AF)
+                        : const Color(0xFF1A1A1A),
                     fontWeight: FontWeight.w600,
-                    color: Colors.red.shade700,
+                    fontSize: 16,
+                    fontFamily: 'Roboto',
+                    letterSpacing: -0.1,
                   ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                // Subtitle
+                Text(
+                  action.subtitle,
+                  style: TextStyle(
+                    color: action.isDisabled ?? false
+                        ? const Color(0xFFD1D5DB)
+                        : const Color(0xFF6B7280),
+                    fontSize: 12,
+                    fontFamily: 'Roboto',
+                    letterSpacing: 0.1,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(
-                backgroundColor: Colors.red.shade100,
-                child: Icon(
-                  Icons.delete_forever,
-                  color: Colors.red.shade600,
-                  size: 20,
-                ),
-              ),
-              title: Text(
-                'Delete Group',
-                style: TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: Colors.red.shade700,
-                ),
-              ),
-              subtitle: Text(
-                'Permanently delete this group and all its data',
-                style: TextStyle(color: Colors.red.shade600),
-              ),
-              trailing: Icon(Icons.chevron_right, color: Colors.red.shade600),
-              onTap: () => _showDeleteGroupDialog(),
-            ),
-          ],
+          ),
         ),
       ),
     );
+  }
+
+  Widget _buildDangerZoneCompact() {
+    return _buildCompactActionsGrid([
+      _CompactAction(
+        icon: Icons.delete_forever,
+        title: 'Delete Group',
+        subtitle: 'Permanent Removal',
+        color: const Color(0xFFDC2626),
+        onTap: () => _showDeleteGroupDialog(),
+      ),
+    ]);
   }
 
   void _editGroupDetails() {
@@ -482,14 +585,23 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
   }
 }
 
-// Import the actual implementation
-// The EditGroupDetailsScreen is implemented in edit_group_details_screen.dart
+/// Compact action class for the grid-based group admin interface
+class _CompactAction {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback? onTap;
+  final bool? isPremium;
+  final bool? isDisabled;
 
-// Removed placeholder ManageFeedPostsScreen in favor of the full
-// implementation in manage_feed_posts_screen.dart
-
-// Removed placeholder ManageMembersScreen. The real implementation is
-// in manage_members_screen.dart (imported above).
-
-// Removed placeholder ManageJoinRequestsScreen. The real implementation is
-// in join_requests_screen.dart (imported above).
+  const _CompactAction({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    this.onTap,
+    this.isPremium = false,
+    this.isDisabled = false,
+  });
+}

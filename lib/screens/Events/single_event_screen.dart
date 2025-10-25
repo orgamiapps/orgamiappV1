@@ -83,7 +83,6 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   // Live Quiz related state
   LiveQuizModel? _liveQuiz;
   final _liveQuizService = LiveQuizService();
-  bool _isLoadingQuiz = false;
   late final double _screenWidth = MediaQuery.of(context).size.width;
   late final double _screenHeight = MediaQuery.of(context).size.height;
   bool? signedIn;
@@ -1578,21 +1577,15 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       return;
     }
 
-    setState(() => _isLoadingQuiz = true);
-
     try {
       final quiz = await _liveQuizService.getQuiz(eventModel.liveQuizId!);
       if (mounted) {
         setState(() {
           _liveQuiz = quiz;
-          _isLoadingQuiz = false;
         });
       }
     } catch (e) {
       Logger.error('Error loading live quiz: $e');
-      if (mounted) {
-        setState(() => _isLoadingQuiz = false);
-      }
     }
   }
 
@@ -1602,16 +1595,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       await _loadLiveQuiz().timeout(
         const Duration(seconds: 8),
         onTimeout: () {
-          if (mounted) {
-            setState(() => _isLoadingQuiz = false);
-          }
           Logger.warning('Live quiz loading timed out');
         },
       );
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingQuiz = false);
-      }
       Logger.error('Error in async live quiz loading: $e');
     }
   }
@@ -1854,312 +1841,349 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
-                // Management options - moved to top
+                const SizedBox(height: 20),
+                // Management options - Compact Grid Layout
                 Expanded(
                   child: SingleChildScrollView(
                     controller: scrollController,
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Feature Event Section
-                        _buildManagementSection(
-                          icon: Icons.star,
-                          title: 'Event Promotion',
-                          color: const Color(0xFFFF9800),
-                          children: [
-                            _buildManagementOption(
-                              icon: Icons.star,
-                              title: eventModel.isFeatured
-                                  ? 'Featured Event'
-                                  : eventModel.selectedDateTime.isBefore(
-                                      DateTime.now(),
-                                    )
-                                  ? 'Event Has Passed'
-                                  : 'Feature This Event',
-                              subtitle: eventModel.isFeatured
-                                  ? 'Your event is currently featured'
-                                  : eventModel.selectedDateTime.isBefore(
-                                      DateTime.now(),
-                                    )
-                                  ? 'Events can only be featured before their date'
-                                  : 'Make your event stand out',
-                              onTap:
-                                  (eventModel.isFeatured ||
-                                      eventModel.selectedDateTime.isBefore(
-                                        DateTime.now(),
-                                      ))
-                                  ? null
-                                  : () {
-                                      Navigator.pop(context);
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              FeatureEventScreen(
-                                                eventModel: eventModel,
-                                              ),
-                                        ),
-                                      );
-                                    },
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        // Ticket Management Section
-                        _buildManagementSection(
-                          icon: Icons.confirmation_number,
-                          title: 'Ticket Management',
+                        // Quick Actions Grid (Most Used)
+                        _buildSectionHeader(
+                          title: 'Quick Actions',
+                          icon: Icons.flash_on,
                           color: const Color(0xFF667EEA),
-                          children: [
-                            _buildManagementOption(
-                              icon: Icons.confirmation_number,
-                              title: 'Manage Tickets',
-                              subtitle:
-                                  'Configure ticket settings and availability',
-                              onTap: () {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        TicketManagementScreen(
-                                          eventModel: eventModel,
-                                        ),
-                                  ),
-                                ).then((_) => _showEventManagementModal());
-                              },
-                            ),
-                            _buildManagementOption(
-                              icon: Icons.qr_code_scanner,
-                              title: 'Ticket Scanner',
-                              subtitle: 'Scan and validate tickets',
-                              onTap: () {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => TicketScannerScreen(
-                                      eventId: eventModel.id,
-                                      eventTitle: eventModel.title,
-                                    ),
-                                  ),
-                                ).then((_) => _showEventManagementModal());
-                              },
-                            ),
-                          ],
                         ),
-                        const SizedBox(height: 24),
-                        // Attendance Management Section
-                        _buildManagementSection(
-                          icon: Icons.people,
-                          title: 'Attendance Management',
-                          color: const Color(0xFFEC4899),
-                          children: [
-                            _buildManagementOption(
-                              icon: Icons.people,
-                              title: 'Attendance Sheet',
-                              subtitle: 'View and manage attendance records',
-                              onTap: () {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => AttendanceSheetScreen(
-                                      eventModel: eventModel,
-                                    ),
+                        const SizedBox(height: 12),
+                        _buildCompactActionsGrid([
+                          _CompactAction(
+                            icon: Icons.confirmation_number,
+                            title: 'Tickets',
+                            subtitle: 'Manage',
+                            color: const Color(0xFF667EEA),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => TicketManagementScreen(
+                                    eventModel: eventModel,
                                   ),
-                                ).then((_) => _showEventManagementModal());
-                              },
-                            ),
-                            _buildManagementOption(
-                              icon: Icons.qr_code,
-                              title: 'Share Sign-In QR',
-                              subtitle:
-                                  'Share a QR code that links to this event\'s attendance',
-                              onTap: () {
-                                Navigator.pop(context);
-                                showDialog(
-                                  context: context,
-                                  barrierDismissible: true,
+                                ),
+                              ).then((_) => _showEventManagementModal());
+                            },
+                          ),
+                          _CompactAction(
+                            icon: Icons.qr_code_scanner,
+                            title: 'Scanner',
+                            subtitle: 'Scan Tickets',
+                            color: const Color(0xFF10B981),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => TicketScannerScreen(
+                                    eventId: eventModel.id,
+                                    eventTitle: eventModel.title,
+                                  ),
+                                ),
+                              ).then((_) => _showEventManagementModal());
+                            },
+                          ),
+                          _CompactAction(
+                            icon: Icons.people,
+                            title: 'Attendance',
+                            subtitle: 'View Records',
+                            color: const Color(0xFFEC4899),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => AttendanceSheetScreen(
+                                    eventModel: eventModel,
+                                  ),
+                                ),
+                              ).then((_) => _showEventManagementModal());
+                            },
+                          ),
+                          _CompactAction(
+                            icon: Icons.qr_code,
+                            title: 'Sign-In QR',
+                            subtitle: 'Share Code',
+                            color: const Color(0xFFFF9800),
+                            onTap: () {
+                              Navigator.pop(context);
+                              showDialog(
+                                context: context,
+                                barrierDismissible: true,
+                                builder: (context) =>
+                                    ShareQRDialog(singleEvent: eventModel),
+                              ).then((_) => _showEventManagementModal());
+                            },
+                          ),
+                        ]),
+
+                        const SizedBox(height: 24),
+
+                        // Communication & Engagement
+                        _buildSectionHeader(
+                          title: 'Communication',
+                          icon: Icons.campaign,
+                          color: const Color(0xFF8B5CF6),
+                        ),
+                        const SizedBox(height: 12),
+                        _buildCompactActionsGrid([
+                          _CompactAction(
+                            icon: Icons.notifications,
+                            title: 'Notify',
+                            subtitle: 'Send Updates',
+                            color: const Color(0xFFEF4444),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
                                   builder: (context) =>
-                                      ShareQRDialog(singleEvent: eventModel),
-                                ).then((_) => _showEventManagementModal());
-                              },
+                                      const AttendeeNotificationScreen(),
+                                ),
+                              ).then((_) => _showEventManagementModal());
+                            },
+                          ),
+                          _CompactAction(
+                            icon: Icons.feedback,
+                            title: 'Feedback',
+                            subtitle: 'Manage Reviews',
+                            color: const Color(0xFF06B6D4),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      EventFeedbackManagementScreen(
+                                        eventModel: eventModel,
+                                      ),
+                                ),
+                              ).then((_) => _showEventManagementModal());
+                            },
+                          ),
+                          if (!eventModel.hasLiveQuiz)
+                            _CompactAction(
+                              icon: Icons.quiz,
+                              title: 'Live Quiz',
+                              subtitle: 'Create Quiz',
+                              color: const Color(0xFF7C3AED),
+                              onTap: _navigateToQuizBuilder,
+                            )
+                          else
+                            _CompactAction(
+                              icon: _liveQuiz?.isDraft == true
+                                  ? Icons.edit
+                                  : Icons.quiz,
+                              title: 'Live Quiz',
+                              subtitle: _liveQuiz?.isDraft == true
+                                  ? 'Edit Quiz'
+                                  : 'Manage',
+                              color: const Color(0xFF7C3AED),
+                              onTap: _liveQuiz?.isDraft == true
+                                  ? _navigateToQuizBuilder
+                                  : _navigateToQuizHost,
                             ),
-                            _buildManagementOption(
-                              icon: Icons.notifications,
-                              title: 'Send Notifications',
-                              subtitle: 'Notify attendees about updates',
-                              onTap: () {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const AttendeeNotificationScreen(),
-                                  ),
-                                ).then((_) => _showEventManagementModal());
-                              },
-                            ),
-                          ],
-                        ),
+                          _CompactAction(
+                            icon: Icons.map,
+                            title: 'Location',
+                            subtitle: 'Edit Place',
+                            color: const Color(0xFF3B82F6),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      ChoseLocationInMapScreen(
+                                        selectedDateTime:
+                                            eventModel.selectedDateTime,
+                                        eventDurationHours:
+                                            eventModel.eventDuration,
+                                      ),
+                                ),
+                              ).then((_) => _showEventManagementModal());
+                            },
+                          ),
+                        ]),
+
                         const SizedBox(height: 24),
-                        // Analytics Section (Premium only)
+
+                        // Analytics & Promotion
                         Consumer<SubscriptionService>(
                           builder: (context, subscriptionService, child) {
                             final canAccessAnalytics = subscriptionService
                                 .canAccessAnalytics();
 
-                            return _buildManagementSection(
-                              icon: Icons.analytics,
-                              title: 'Analytics & Insights',
-                              color: const Color(0xFF667EEA),
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildManagementOption(
-                                  icon: Icons.analytics,
-                                  title: canAccessAnalytics
-                                      ? 'Event Analytics'
-                                      : 'Event Analytics (Premium)',
-                                  subtitle: canAccessAnalytics
-                                      ? 'View detailed event performance'
-                                      : 'Upgrade to Premium to unlock analytics',
-                                  onTap: () {
-                                    Navigator.pop(context);
-                                    if (!canAccessAnalytics) {
-                                      UpgradePromptDialog.showAnalyticsUpgrade(
-                                        context,
-                                      );
-                                      return;
-                                    }
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            EventAnalyticsScreen(
-                                              eventId: eventModel.id,
-                                            ),
-                                      ),
-                                    ).then((_) => _showEventManagementModal());
-                                  },
+                                _buildSectionHeader(
+                                  title: 'Insights & Growth',
+                                  icon: Icons.trending_up,
+                                  color: const Color(0xFF10B981),
                                 ),
+                                const SizedBox(height: 12),
+                                _buildCompactActionsGrid([
+                                  _CompactAction(
+                                    icon: Icons.analytics,
+                                    title: 'Analytics',
+                                    subtitle: canAccessAnalytics
+                                        ? 'View Insights'
+                                        : 'Premium',
+                                    color: const Color(0xFF059669),
+                                    isPremium: !canAccessAnalytics,
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      if (!canAccessAnalytics) {
+                                        UpgradePromptDialog.showAnalyticsUpgrade(
+                                          context,
+                                        );
+                                        return;
+                                      }
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              EventAnalyticsScreen(
+                                                eventId: eventModel.id,
+                                              ),
+                                        ),
+                                      ).then(
+                                        (_) => _showEventManagementModal(),
+                                      );
+                                    },
+                                  ),
+                                  _CompactAction(
+                                    icon: eventModel.isFeatured
+                                        ? Icons.star
+                                        : Icons.star_border,
+                                    title: 'Feature',
+                                    subtitle: eventModel.isFeatured
+                                        ? 'Featured'
+                                        : eventModel.selectedDateTime.isBefore(
+                                            DateTime.now(),
+                                          )
+                                        ? 'Past Event'
+                                        : 'Promote',
+                                    color: const Color(0xFFFF9800),
+                                    isDisabled:
+                                        eventModel.isFeatured ||
+                                        eventModel.selectedDateTime.isBefore(
+                                          DateTime.now(),
+                                        ),
+                                    onTap:
+                                        (eventModel.isFeatured ||
+                                            eventModel.selectedDateTime
+                                                .isBefore(DateTime.now()))
+                                        ? null
+                                        : () {
+                                            Navigator.pop(context);
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    FeatureEventScreen(
+                                                      eventModel: eventModel,
+                                                    ),
+                                              ),
+                                            );
+                                          },
+                                  ),
+                                  if (_liveQuiz != null &&
+                                      (_liveQuiz!.isLive || _liveQuiz!.isEnded))
+                                    _CompactAction(
+                                      icon: Icons.emoji_events,
+                                      title: 'Quiz Results',
+                                      subtitle: 'View Analytics',
+                                      color: const Color(0xFF7C3AED),
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                QuizHostScreen(
+                                                  quizId: _liveQuiz!.id,
+                                                ),
+                                          ),
+                                        ).then((_) => _loadLiveQuiz());
+                                      },
+                                    ),
+                                ]),
                               ],
                             );
                           },
                         ),
-                        const SizedBox(height: 24),
-                        _buildManagementSection(
-                          icon: Icons.feedback,
-                          title: 'Engagement',
-                          color: const Color(0xFF667EEA),
-                          children: [
-                            _buildManagementOption(
-                              icon: Icons.feedback,
-                              title: 'Feedback Management',
-                              subtitle: 'Manage event feedback and reviews',
+
+                        // Private Event Management (if applicable)
+                        if (eventModel.private) ...[
+                          const SizedBox(height: 24),
+                          _buildSectionHeader(
+                            title: 'Private Access',
+                            icon: Icons.lock,
+                            color: const Color(0xFFEF4444),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildCompactActionsGrid([
+                            _CompactAction(
+                              icon: Icons.person_add,
+                              title: 'Invites',
+                              subtitle: 'Manage Access',
+                              color: const Color(0xFFDC2626),
                               onTap: () {
                                 Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        EventFeedbackManagementScreen(
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  builder: (_) => DraggableScrollableSheet(
+                                    initialChildSize: 0.85,
+                                    minChildSize: 0.5,
+                                    maxChildSize: 0.95,
+                                    expand: false,
+                                    builder: (_, index) =>
+                                        AccessListManagementWidget(
                                           eventModel: eventModel,
                                         ),
                                   ),
                                 ).then((_) => _showEventManagementModal());
                               },
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        // Live Quiz Section
-                        _buildLiveQuizManagementSection(),
-                        const SizedBox(height: 24),
-                        // Location Management Section
-                        _buildManagementSection(
-                          icon: Icons.location_on,
-                          title: 'Location Management',
-                          color: const Color(0xFF3B82F6),
-                          children: [
-                            _buildManagementOption(
-                              icon: Icons.map,
-                              title: 'Edit Event Location',
-                              subtitle:
-                                  'Update the event\'s location or geofence',
+                            _CompactAction(
+                              icon: Icons.person_search,
+                              title: 'Requests',
+                              subtitle: 'Review Access',
+                              color: const Color(0xFFEAB308),
                               onTap: () {
                                 Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        ChoseLocationInMapScreen(
-                                          selectedDateTime:
-                                              eventModel.selectedDateTime,
-                                          eventDurationHours:
-                                              eventModel.eventDuration,
-                                        ),
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  builder: (_) => DraggableScrollableSheet(
+                                    initialChildSize: 0.85,
+                                    minChildSize: 0.5,
+                                    maxChildSize: 0.95,
+                                    expand: false,
+                                    builder: (_, index) => _AccessRequestsList(
+                                      eventId: eventModel.id,
+                                    ),
                                   ),
                                 ).then((_) => _showEventManagementModal());
                               },
                             ),
-                          ],
-                        ),
+                          ]),
+                        ],
 
-                        const SizedBox(height: 24),
-                        if (eventModel.private)
-                          _buildManagementSection(
-                            icon: Icons.lock,
-                            title: 'Private Access',
-                            color: const Color(0xFF8B5CF6),
-                            children: [
-                              _buildManagementOption(
-                                icon: Icons.person_add,
-                                title: 'Invite & Access List',
-                                subtitle: 'Add or remove people who can view',
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  showModalBottomSheet(
-                                    context: context,
-                                    isScrollControlled: true,
-                                    builder: (_) => DraggableScrollableSheet(
-                                      initialChildSize: 0.85,
-                                      minChildSize: 0.5,
-                                      maxChildSize: 0.95,
-                                      expand: false,
-                                      builder: (_, index) =>
-                                          AccessListManagementWidget(
-                                            eventModel: eventModel,
-                                          ),
-                                    ),
-                                  ).then((_) => _showEventManagementModal());
-                                },
-                              ),
-                              _buildManagementOption(
-                                icon: Icons.person_search,
-                                title: 'Review Access Requests',
-                                subtitle: 'Approve or decline pending requests',
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  showModalBottomSheet(
-                                    context: context,
-                                    isScrollControlled: true,
-                                    builder: (_) => DraggableScrollableSheet(
-                                      initialChildSize: 0.85,
-                                      minChildSize: 0.5,
-                                      maxChildSize: 0.95,
-                                      expand: false,
-                                      builder: (_, index) =>
-                                          _AccessRequestsList(
-                                            eventId: eventModel.id,
-                                          ),
-                                    ),
-                                  ).then((_) => _showEventManagementModal());
-                                },
-                              ),
-                            ],
-                          ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 32), // Extra space at bottom
                       ],
                     ),
                   ),
@@ -2172,60 +2196,70 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     );
   }
 
-  Widget _buildManagementSection({
-    required IconData icon,
+  Widget _buildSectionHeader({
     required String title,
+    required IconData icon,
     required Color color,
-    required List<Widget> children,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       children: [
-        Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: color.withAlpha((0.1 * 255).round()),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: color, size: 18),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Color(0xFF1A1A1A),
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-                fontFamily: 'Roboto',
-              ),
-            ),
-          ],
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: color, size: 16),
         ),
-        const SizedBox(height: 12),
-        ...children,
+        const SizedBox(width: 12),
+        Text(
+          title,
+          style: const TextStyle(
+            color: Color(0xFF1A1A1A),
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            fontFamily: 'Roboto',
+            letterSpacing: -0.2,
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildManagementOption({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback? onTap,
-    Widget? trailing,
-  }) {
+  Widget _buildCompactActionsGrid(List<_CompactAction> actions) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 1.15,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      ),
+      itemCount: actions.length,
+      itemBuilder: (context, index) {
+        final action = actions[index];
+        return _buildCompactActionCard(action);
+      },
+    );
+  }
+
+  Widget _buildCompactActionCard(_CompactAction action) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: action.isDisabled ?? false
+              ? const Color(0xFFE5E7EB)
+              : action.color.withValues(alpha: 0.15),
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha((0.05 * 255).round()),
+            color: Colors.black.withValues(alpha: 0.04),
             spreadRadius: 0,
             blurRadius: 8,
             offset: const Offset(0, 2),
@@ -2235,51 +2269,88 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          onTap: action.isDisabled ?? false ? null : action.onTap,
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Row(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // Icon with background
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(8),
+                    color: action.isDisabled ?? false
+                        ? const Color(0xFFF3F4F6)
+                        : action.color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(icon, color: const Color(0xFF6B7280), size: 20),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Stack(
+                    alignment: Alignment.center,
                     children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: Color(0xFF1A1A1A),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                          fontFamily: 'Roboto',
-                        ),
+                      Icon(
+                        action.icon,
+                        color: action.isDisabled ?? false
+                            ? const Color(0xFF9CA3AF)
+                            : action.color,
+                        size: 24,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(
-                          color: Color(0xFF6B7280),
-                          fontSize: 14,
-                          fontFamily: 'Roboto',
+                      // Premium badge overlay
+                      if (action.isPremium ?? false)
+                        Positioned(
+                          top: 2,
+                          right: 2,
+                          child: Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFD700),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.white, width: 1),
+                            ),
+                            child: const Icon(
+                              Icons.star,
+                              color: Colors.white,
+                              size: 10,
+                            ),
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  color: const Color(0xFF6B7280),
-                  size: 16,
+                const SizedBox(height: 12),
+                // Title
+                Text(
+                  action.title,
+                  style: TextStyle(
+                    color: action.isDisabled ?? false
+                        ? const Color(0xFF9CA3AF)
+                        : const Color(0xFF1A1A1A),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    fontFamily: 'Roboto',
+                    letterSpacing: -0.1,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                // Subtitle
+                Text(
+                  action.subtitle,
+                  style: TextStyle(
+                    color: action.isDisabled ?? false
+                        ? const Color(0xFFD1D5DB)
+                        : const Color(0xFF6B7280),
+                    fontSize: 12,
+                    fontFamily: 'Roboto',
+                    letterSpacing: 0.1,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -2580,7 +2651,7 @@ Join us at: $eventUrl
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: methodInfo['color'].withOpacity(0.1),
+              color: methodInfo['color'].withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: methodInfo['color'], width: 1),
             ),
@@ -2750,7 +2821,7 @@ Join us at: $eventUrl
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
+                color: Colors.blue.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -5942,132 +6013,6 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     );
   }
 
-  Widget _buildLiveQuizManagementSection() {
-    return _buildManagementSection(
-      icon: Icons.quiz,
-      title: 'Live Quiz',
-      color: const Color(0xFF667EEA),
-      children: [
-        if (!eventModel.hasLiveQuiz) ...[
-          _buildManagementOption(
-            icon: Icons.add_circle,
-            title: 'Create Live Quiz',
-            subtitle: 'Add an interactive quiz experience to your event',
-            onTap: _navigateToQuizBuilder,
-          ),
-        ] else ...[
-          _buildManagementOption(
-            icon: _liveQuiz?.isDraft == true ? Icons.edit : Icons.quiz,
-            title: _liveQuiz?.isDraft == true
-                ? 'Edit Live Quiz'
-                : 'Manage Live Quiz',
-            subtitle: _getLiveQuizSubtitle(),
-            onTap: _liveQuiz?.isDraft == true
-                ? _navigateToQuizBuilder
-                : _navigateToQuizHost,
-            trailing: _buildQuizStatusIndicator(),
-          ),
-          if (_liveQuiz?.isDraft == false)
-            _buildManagementOption(
-              icon: Icons.edit,
-              title: 'Edit Questions',
-              subtitle: 'Modify quiz questions and settings',
-              onTap: _navigateToQuizBuilder,
-            ),
-          if (_liveQuiz != null && (_liveQuiz!.isLive || _liveQuiz!.isEnded))
-            _buildManagementOption(
-              icon: Icons.analytics,
-              title: 'Quiz Analytics',
-              subtitle: 'View detailed quiz performance and results',
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => QuizHostScreen(quizId: _liveQuiz!.id),
-                  ),
-                ).then((_) => _loadLiveQuiz());
-              },
-            ),
-        ],
-      ],
-    );
-  }
-
-  String _getLiveQuizSubtitle() {
-    if (_liveQuiz == null) return 'Create an interactive quiz experience';
-
-    switch (_liveQuiz!.status) {
-      case QuizStatus.draft:
-        return 'Quiz created • Ready to start during event';
-      case QuizStatus.live:
-        return 'Quiz is LIVE • ${_liveQuiz!.participantCount} participants';
-      case QuizStatus.paused:
-        return 'Quiz paused • ${_liveQuiz!.participantCount} participants waiting';
-      case QuizStatus.ended:
-        return 'Quiz completed • View results and analytics';
-    }
-  }
-
-  Widget? _buildQuizStatusIndicator() {
-    if (_liveQuiz == null) return null;
-
-    Color indicatorColor;
-    String statusText;
-
-    switch (_liveQuiz!.status) {
-      case QuizStatus.draft:
-        indicatorColor = Colors.orange;
-        statusText = 'DRAFT';
-        break;
-      case QuizStatus.live:
-        indicatorColor = const Color(0xFF10B981);
-        statusText = 'LIVE';
-        break;
-      case QuizStatus.paused:
-        indicatorColor = Colors.amber;
-        statusText = 'PAUSED';
-        break;
-      case QuizStatus.ended:
-        indicatorColor = Colors.grey;
-        statusText = 'ENDED';
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: indicatorColor,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (_liveQuiz!.status == QuizStatus.live) ...[
-            Container(
-              width: 6,
-              height: 6,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 4),
-          ],
-          Text(
-            statusText,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildLiveQuizCard() {
     if (_liveQuiz == null) return const SizedBox();
 
@@ -6430,6 +6375,27 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       ),
     );
   }
+}
+
+/// Compact action class for the grid-based event management interface
+class _CompactAction {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback? onTap;
+  final bool? isPremium;
+  final bool? isDisabled;
+
+  const _CompactAction({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    this.onTap,
+    this.isPremium = false,
+    this.isDisabled = false,
+  });
 }
 
 /// Enhanced custom painter for drawing more realistic continent shapes on the globe
