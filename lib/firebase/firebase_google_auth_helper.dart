@@ -5,7 +5,6 @@ import 'package:attendus/Utils/logger.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:attendus/Utils/app_constants.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-// Using FirebaseAuth provider flow for Google on mobile to avoid analyzer issues
 // import 'package:flutter_facebook_auth/flutter_facebook_auth.dart'; // Temporarily disabled
 // import 'package:twitter_login/twitter_login.dart'; // Disabled due to namespace issues
 
@@ -25,42 +24,69 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
         googleProvider.addScope(
           'profile',
         ); // Add profile scope for better user info
+        
+        // Add custom parameter to force account selection on web
+        googleProvider.setCustomParameters({
+          'prompt': 'select_account', // Forces account picker
+        });
+        
         final UserCredential userCredential = await _auth
             .signInWithPopup(googleProvider)
             .timeout(const Duration(seconds: 30));
         user = userCredential.user;
       } else {
-        // Mobile/desktop: use Firebase Auth's native provider sign-in with robust cancellation handling
+        // Mobile/desktop: use Firebase Auth's native provider sign-in
         try {
+          Logger.info('🔵 Starting Google sign-in flow...');
+          
           final GoogleAuthProvider googleProvider = GoogleAuthProvider();
           googleProvider.addScope('email');
           googleProvider.addScope('profile');
+          
+          // Add custom parameter to force account selection
+          // This is the key - it forces the account picker without signing out
+          googleProvider.setCustomParameters({
+            'prompt': 'select_account', // Forces account picker every time
+          });
 
+          Logger.info('🔵 Calling signInWithProvider with account picker...');
+          
           final UserCredential userCredential = await _auth
               .signInWithProvider(googleProvider)
-              .timeout(const Duration(seconds: 20));
+              .timeout(const Duration(seconds: 60));
           user = userCredential.user;
+          
+          Logger.info('🔵 signInWithProvider completed');
+          Logger.info('🔵 User: ${user?.email}');
         } on TimeoutException catch (e) {
-          Logger.error('Google sign-in timed out: $e');
+          Logger.error('❌ Google sign-in timed out: $e');
           return null;
         } on FirebaseAuthException catch (e) {
+          Logger.error('❌ FirebaseAuthException during Google sign-in');
+          Logger.error('   Code: ${e.code}');
+          Logger.error('   Message: ${e.message}');
+          Logger.error('   Plugin: ${e.plugin}');
+          Logger.error('   Stack trace: ${e.stackTrace}');
+          
           // Heuristics for cancellation/back from provider UI on mobile
           final String code = e.code.toLowerCase();
           final String message = e.message?.toLowerCase() ?? '';
           if (code.contains('canceled') ||
               code.contains('cancelled') ||
               code.contains('aborted') ||
+              code == 'web-context-canceled' ||
               message.contains('canceled') ||
               message.contains('cancelled') ||
               message.contains('aborted')) {
-            Logger.info('Google sign-in cancelled by user: $e');
+            Logger.info('ℹ️ Google sign-in cancelled by user');
             lastGoogleCancelled = true;
             return null;
           }
-          Logger.error('Google sign-in FirebaseAuthException: $e', e);
           return null;
         } catch (e) {
-          Logger.error('Google sign-in error (mobile provider flow): $e', e);
+          Logger.error('❌ Unexpected error during Google sign-in: $e');
+          Logger.error('   Error type: ${e.runtimeType}');
+          Logger.error('   Error string: ${e.toString()}');
           return null;
         }
       }

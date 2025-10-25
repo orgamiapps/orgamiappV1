@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/Services/auth_service.dart';
-import 'package:attendus/Services/firebase_initializer.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/models/customer_model.dart';
 
@@ -112,19 +111,12 @@ class _SplashScreenState extends State<SplashScreen>
         if (mounted) _loadingAnimationController.repeat();
       });
 
-      // Ensure Firebase is ready before auth logic to avoid races
-      // Firebase should already be initialized in main.dart, so this is mainly a safety check
+      // Firebase is already initialized in main.dart
+      // Start auth check immediately without redundant initialization
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted || _hasNavigated) return;
-        final initFuture = FirebaseInitializer.initializeOnce()
-            .timeout(const Duration(seconds: 3))
-            .catchError((_) {});
-        // Don't block on init; start auth check with slight delay
-        Future.delayed(const Duration(milliseconds: 150), () async {
-          if (!mounted || _hasNavigated) return;
-          await _getUser();
-        });
-        await initFuture;
+        // Start auth check immediately
+        await _getUser();
       });
     } catch (e) {
       debugPrint('❌ Error in loading sequence: $e');
@@ -145,24 +137,8 @@ class _SplashScreenState extends State<SplashScreen>
     try {
       debugPrint('🔄 Checking Firebase Auth state directly...');
 
-      // Ensure Firebase is initialized before accessing FirebaseAuth
-      // Firebase should already be initialized in main.dart, so this is mainly a safety check
-      try {
-        await FirebaseInitializer.initializeOnce().timeout(
-          const Duration(seconds: 2),
-          onTimeout: () {
-            debugPrint(
-              '⚠️ Firebase init timeout in Splash; continuing (likely already initialized)',
-            );
-            throw TimeoutException('firebase-init-timeout');
-          },
-        );
-      } catch (e) {
-        // Non-fatal: proceed to check currentUser which may still be present
-        debugPrint('ℹ️ Splash: proceeding without confirmed Firebase init: $e');
-      }
-
-      // Direct Firebase Auth check first - this is immediately available after force-close
+      // Firebase is already initialized in main.dart - skip redundant check
+      // Direct Firebase Auth check - this is immediately available
       final firebaseUser = FirebaseAuth.instance.currentUser;
       if (firebaseUser != null) {
         debugPrint('🔍 Firebase user found directly: ${firebaseUser.uid}');
@@ -179,8 +155,8 @@ class _SplashScreenState extends State<SplashScreen>
           _loadingText = "Welcome back!";
         });
 
-        // Brief pause to show welcome message
-        await Future.delayed(const Duration(milliseconds: 300));
+        // Very brief pause to show welcome message
+        await Future.delayed(const Duration(milliseconds: 100));
 
         if (!mounted || _hasNavigated) return;
         _navigateToHome();
@@ -201,9 +177,9 @@ class _SplashScreenState extends State<SplashScreen>
 
       debugPrint('🔄 No direct Firebase user, initializing AuthService...');
 
-      // Initialize AuthService with reduced timeout to prevent hanging
+      // Initialize AuthService with shorter timeout for faster startup
       await AuthService().initialize().timeout(
-        const Duration(seconds: 2),
+        const Duration(milliseconds: 800),
         onTimeout: () {
           debugPrint('⚠️ AuthService initialization timed out');
           // Continue without auth service if it times out
@@ -225,8 +201,8 @@ class _SplashScreenState extends State<SplashScreen>
 
         debugPrint('✅ User session restored successfully');
 
-        // Brief pause to show welcome message
-        await Future.delayed(const Duration(milliseconds: 300));
+        // Very brief pause to show welcome message
+        await Future.delayed(const Duration(milliseconds: 100));
 
         if (!mounted || _hasNavigated) return;
         _navigateToHome();
@@ -253,7 +229,7 @@ class _SplashScreenState extends State<SplashScreen>
           _loadingText = "Welcome to Attendus";
         });
 
-        await Future.delayed(const Duration(milliseconds: 500));
+        await Future.delayed(const Duration(milliseconds: 100));
         if (!mounted || _hasNavigated) return;
         _navigateToSecondSplash();
       }

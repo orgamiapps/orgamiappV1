@@ -289,7 +289,7 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
             'Priority support 24/7',
           ];
 
-    final ctaText = isBasic ? 'Choose Basic' : 'Choose Premium';
+    final ctaText = isBasic ? 'Choose\nBasic' : 'Choose Premium';
     final cardColor = Colors.white;
     final textColor = Colors.grey.shade800;
     final priceColor = Theme.of(context).colorScheme.primary;
@@ -345,6 +345,9 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
                       ? Theme.of(context).colorScheme.primary
                       : Colors.grey.shade900,
                 ),
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 16),
               Row(

@@ -44,6 +44,11 @@ import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Services/ticket_payment_service.dart';
 import 'package:attendus/Services/face_recognition_service.dart';
+import 'package:attendus/Services/live_quiz_service.dart';
+import 'package:attendus/screens/LiveQuiz/quiz_builder_screen.dart';
+import 'package:attendus/screens/LiveQuiz/quiz_host_screen.dart';
+import 'package:attendus/screens/LiveQuiz/quiz_participant_screen.dart';
+import 'package:attendus/models/live_quiz_model.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
@@ -73,6 +78,12 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   late EventModel eventModel;
   StreamSubscription<DocumentSnapshot>? _eventSubscription;
+  Timer? _streamDebounceTimer;
+
+  // Live Quiz related state
+  LiveQuizModel? _liveQuiz;
+  final _liveQuizService = LiveQuizService();
+  bool _isLoadingQuiz = false;
   late final double _screenWidth = MediaQuery.of(context).size.width;
   late final double _screenHeight = MediaQuery.of(context).size.height;
   bool? signedIn;
@@ -200,6 +211,30 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     setState(() {
       isLoadingSummary = false;
     });
+  }
+
+  /// Async wrapper for loadEventSummary with timeout and error handling
+  Future<void> _loadEventSummaryAsync() async {
+    try {
+      await loadEventSummary().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          if (mounted) {
+            setState(() {
+              isLoadingSummary = false;
+            });
+          }
+          Logger.warning('Event summary loading timed out');
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoadingSummary = false;
+        });
+      }
+      Logger.error('Error in async event summary loading: $e');
+    }
   }
 
   Future<void> _checkRsvpStatus() async {
@@ -1261,64 +1296,28 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     // Initialize event model
     eventModel = widget.eventModel;
 
-    // Set up the event stream listener
-    _eventSubscription = FirebaseFirestore.instance
-        .collection(EventModel.firebaseKey)
-        .doc(widget.eventModel.id)
-        .snapshots()
-        .listen((snapshot) {
-          if (snapshot.exists) {
-            if (mounted) {
-              final newEventModel = EventModel.fromJson(snapshot.data()!);
-              final coordinatesChanged =
-                  newEventModel.latitude != eventModel.latitude ||
-                  newEventModel.longitude != eventModel.longitude;
+    // Initialize animation controllers first for immediate UI response
+    _initAnimationControllers();
 
-              // Check if ticket settings have changed
-              final ticketSettingsChanged =
-                  newEventModel.ticketsEnabled != eventModel.ticketsEnabled ||
-                  newEventModel.ticketPrice != eventModel.ticketPrice ||
-                  newEventModel.maxTickets != eventModel.maxTickets;
-
-              setState(() {
-                eventModel = newEventModel;
-                // Reset address lookup if coordinates changed
-                if (coordinatesChanged) {
-                  _resolvedAddress = null;
-                }
-              });
-
-              // Refresh address lookup if coordinates changed
-              if (coordinatesChanged) {
-                _getAddressFromCoordinates();
-              }
-
-              // Re-check user ticket status if ticket settings changed
-              if (ticketSettingsChanged) {
-                Logger.info(
-                  'Ticket settings changed - refreshing ticket status',
-                );
-                // If tickets are now disabled, clear the ticket status
-                if (!newEventModel.ticketsEnabled) {
-                  setState(() {
-                    _hasTicket = false;
-                  });
-                } else {
-                  // Re-check if user has a ticket for this event
-                  checkUserTicket(updateUI: true);
-                }
-
-                // Refresh the attendance and ticket counts
-                loadEventSummary();
-              }
-            }
-          }
-        });
+    // Start animations immediately
+    _fadeController.forward();
+    _slideController.forward();
+    _pulseController.forward();
+    _glowController.forward();
 
     // Add lifecycle observer
     WidgetsBinding.instance.addObserver(this);
 
-    // Initialize animation controllers
+    // Set up the event stream listener with debouncing to prevent excessive updates
+    _setupEventStreamListener();
+
+    // Load data progressively to prevent UI blocking
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadDataProgressively();
+    });
+  }
+
+  void _initAnimationControllers() {
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -1352,30 +1351,127 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     _glowAnimation = Tween<double>(begin: 1.0, end: 1.5).animate(
       CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
     );
+  }
 
-    _fadeController.forward();
-    _slideController.forward();
-    _pulseController.forward();
-    _glowController.forward();
+  void _setupEventStreamListener() {
+    _eventSubscription = FirebaseFirestore.instance
+        .collection(EventModel.firebaseKey)
+        .doc(widget.eventModel.id)
+        .snapshots()
+        .listen((snapshot) {
+          if (!snapshot.exists || !mounted) return;
 
-    getAttendance();
-    getPreRegisterCount();
-    loadEventSummary();
-    _loadCreatorName();
-    _checkRsvpStatus();
+          // Debounce rapid stream updates to prevent UI blocking
+          _streamDebounceTimer?.cancel();
+          _streamDebounceTimer = Timer(const Duration(milliseconds: 300), () {
+            if (!mounted) return;
+            _processEventUpdate(snapshot);
+          });
+        });
+  }
 
-    // Check if event is favorited
-    _checkFavoriteStatus();
+  void _processEventUpdate(DocumentSnapshot snapshot) {
+    final newEventModel = EventModel.fromJson(snapshot.data()!);
+    final coordinatesChanged =
+        newEventModel.latitude != eventModel.latitude ||
+        newEventModel.longitude != eventModel.longitude;
 
-    // Check user ticket status after a short delay to ensure proper initialization
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) {
-        checkUserTicket(updateUI: true);
+    // Check if ticket settings have changed
+    final ticketSettingsChanged =
+        newEventModel.ticketsEnabled != eventModel.ticketsEnabled ||
+        newEventModel.ticketPrice != eventModel.ticketPrice ||
+        newEventModel.maxTickets != eventModel.maxTickets;
+
+    setState(() {
+      eventModel = newEventModel;
+      // Reset address lookup if coordinates changed
+      if (coordinatesChanged) {
+        _resolvedAddress = null;
+      }
+
+      // Reload Live Quiz if event quiz settings changed
+      if (eventModel.hasLiveQuiz) {
+        _loadLiveQuizAsync();
+      } else {
+        _liveQuiz = null;
       }
     });
 
-    // Get address from coordinates if available
-    _getAddressFromCoordinates();
+    // Handle changes asynchronously to avoid blocking UI
+    if (coordinatesChanged) {
+      _getAddressFromCoordinatesAsync();
+    }
+
+    if (ticketSettingsChanged) {
+      _handleTicketSettingsChangeAsync(newEventModel);
+    }
+  }
+
+  /// Progressive data loading to prevent UI blocking
+  Future<void> _loadDataProgressively() async {
+    try {
+      // Phase 1: Load critical user-facing data first
+      await _loadCriticalData();
+
+      // Phase 2: Load secondary data with small delays to prevent blocking
+      await _loadSecondaryData();
+
+      // Phase 3: Load non-critical background data
+      await _loadBackgroundData();
+    } catch (e) {
+      Logger.error('Error in progressive data loading: $e');
+    }
+  }
+
+  /// Phase 1: Load critical data needed for immediate user interaction
+  Future<void> _loadCriticalData() async {
+    if (!mounted) return;
+
+    // Load attendance status first (needed for sign-in functionality)
+    await getAttendance();
+
+    // Small delay to prevent blocking
+    await Future.delayed(const Duration(milliseconds: 50));
+
+    if (!mounted) return;
+
+    // Load RSVP status (important for user interaction)
+    await _checkRsvpStatus();
+  }
+
+  /// Phase 2: Load secondary data that affects UI but isn't critical
+  Future<void> _loadSecondaryData() async {
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (!mounted) return;
+
+    // Load these in parallel but separate from critical data
+    await Future.wait([_checkFavoriteStatus(), _loadCreatorNameAsync()]);
+
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (!mounted) return;
+
+    // Load ticket status
+    checkUserTicket(updateUI: true);
+  }
+
+  /// Phase 3: Load background data that's nice to have but not immediately needed
+  Future<void> _loadBackgroundData() async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    if (!mounted) return;
+
+    // Load summary data (counts) - this is heavy but not immediately critical
+    await _loadEventSummaryAsync();
+
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (!mounted) return;
+
+    // Load quiz data if needed
+    if (eventModel.hasLiveQuiz) {
+      await _loadLiveQuizAsync();
+    }
+
+    // Load address in background (lowest priority)
+    _getAddressFromCoordinatesAsync();
   }
 
   Future<void> _loadCreatorName() async {
@@ -1392,6 +1488,20 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       }
     } catch (e) {
       Logger.error('Error loading creator name: $e');
+    }
+  }
+
+  /// Async wrapper for _loadCreatorName with timeout
+  Future<void> _loadCreatorNameAsync() async {
+    try {
+      await _loadCreatorName().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          Logger.warning('Creator name loading timed out');
+        },
+      );
+    } catch (e) {
+      Logger.error('Error in async creator name loading: $e');
     }
   }
 
@@ -1462,8 +1572,133 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     }
   }
 
+  Future<void> _loadLiveQuiz() async {
+    if (!eventModel.hasLiveQuiz || eventModel.liveQuizId == null) {
+      setState(() => _liveQuiz = null);
+      return;
+    }
+
+    setState(() => _isLoadingQuiz = true);
+
+    try {
+      final quiz = await _liveQuizService.getQuiz(eventModel.liveQuizId!);
+      if (mounted) {
+        setState(() {
+          _liveQuiz = quiz;
+          _isLoadingQuiz = false;
+        });
+      }
+    } catch (e) {
+      Logger.error('Error loading live quiz: $e');
+      if (mounted) {
+        setState(() => _isLoadingQuiz = false);
+      }
+    }
+  }
+
+  /// Async wrapper for _loadLiveQuiz with timeout
+  Future<void> _loadLiveQuizAsync() async {
+    try {
+      await _loadLiveQuiz().timeout(
+        const Duration(seconds: 8),
+        onTimeout: () {
+          if (mounted) {
+            setState(() => _isLoadingQuiz = false);
+          }
+          Logger.warning('Live quiz loading timed out');
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingQuiz = false);
+      }
+      Logger.error('Error in async live quiz loading: $e');
+    }
+  }
+
+  /// Handle ticket settings changes asynchronously
+  Future<void> _handleTicketSettingsChangeAsync(
+    EventModel newEventModel,
+  ) async {
+    try {
+      Logger.info('Ticket settings changed - refreshing ticket status');
+
+      // If tickets are now disabled, clear the ticket status
+      if (!newEventModel.ticketsEnabled) {
+        if (mounted) {
+          setState(() {
+            _hasTicket = false;
+          });
+        }
+      } else {
+        // Re-check if user has a ticket for this event
+        await checkUserTicket(updateUI: true);
+      }
+
+      // Refresh the attendance and ticket counts in background
+      _loadEventSummaryAsync();
+    } catch (e) {
+      Logger.error('Error handling ticket settings change: $e');
+    }
+  }
+
+  void _navigateToQuizBuilder() {
+    Navigator.pop(context); // Close modal first
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => QuizBuilderScreen(
+          eventId: eventModel.id,
+          existingQuizId: eventModel.liveQuizId,
+        ),
+      ),
+    ).then((_) {
+      // Reload quiz after returning from builder
+      _loadLiveQuiz();
+    });
+  }
+
+  void _navigateToQuizHost() {
+    if (_liveQuiz == null) {
+      ShowToast().showNormalToast(msg: 'Quiz not available');
+      return;
+    }
+
+    Navigator.pop(context); // Close modal first
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => QuizHostScreen(quizId: _liveQuiz!.id),
+      ),
+    ).then((_) {
+      // Reload quiz after returning from host
+      _loadLiveQuiz();
+    });
+  }
+
+  void _navigateToQuizParticipant() {
+    if (_liveQuiz == null) {
+      ShowToast().showNormalToast(msg: 'Quiz not available');
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => QuizParticipantScreen(
+          quizId: _liveQuiz!.id,
+          isAnonymous: CustomerController.logeInCustomer == null,
+          displayName: CustomerController.logeInCustomer?.name,
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
+    // Cancel debounce timer
+    _streamDebounceTimer?.cancel();
+
     // Remove lifecycle observer
     WidgetsBinding.instance.removeObserver(this);
 
@@ -1838,6 +2073,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                           ],
                         ),
                         const SizedBox(height: 24),
+                        // Live Quiz Section
+                        _buildLiveQuizManagementSection(),
+                        const SizedBox(height: 24),
                         // Location Management Section
                         _buildManagementSection(
                           icon: Icons.location_on,
@@ -1977,6 +2215,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     required String title,
     required String subtitle,
     required VoidCallback? onTap,
+    Widget? trailing,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -2893,6 +3132,20 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     }
   }
 
+  /// Async wrapper for address resolution with timeout
+  Future<void> _getAddressFromCoordinatesAsync() async {
+    try {
+      await _getAddressFromCoordinates().timeout(
+        const Duration(seconds: 8),
+        onTimeout: () {
+          Logger.warning('Address resolution timed out');
+        },
+      );
+    } catch (e) {
+      Logger.error('Error in async address resolution: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppScaffoldWrapper(
@@ -3237,6 +3490,12 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             // Event Image
             _buildEventImage(),
             const SizedBox(height: 24),
+
+            // Live Quiz Card (prominently displayed under event image)
+            if (eventModel.hasLiveQuiz && _liveQuiz != null)
+              _buildLiveQuizCard(),
+            if (eventModel.hasLiveQuiz && _liveQuiz != null)
+              const SizedBox(height: 24),
 
             // RSVP Button
             _buildRsvpButton(),
@@ -5660,6 +5919,495 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                 const SnackBar(content: Text('Access request sent')),
               );
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLiveQuizManagementSection() {
+    return _buildManagementSection(
+      icon: Icons.quiz,
+      title: 'Live Quiz',
+      color: const Color(0xFF667EEA),
+      children: [
+        if (!eventModel.hasLiveQuiz) ...[
+          _buildManagementOption(
+            icon: Icons.add_circle,
+            title: 'Create Live Quiz',
+            subtitle: 'Add an interactive quiz experience to your event',
+            onTap: _navigateToQuizBuilder,
+          ),
+        ] else ...[
+          _buildManagementOption(
+            icon: _liveQuiz?.isDraft == true ? Icons.edit : Icons.quiz,
+            title: _liveQuiz?.isDraft == true
+                ? 'Edit Live Quiz'
+                : 'Manage Live Quiz',
+            subtitle: _getLiveQuizSubtitle(),
+            onTap: _liveQuiz?.isDraft == true
+                ? _navigateToQuizBuilder
+                : _navigateToQuizHost,
+            trailing: _buildQuizStatusIndicator(),
+          ),
+          if (_liveQuiz?.isDraft == false)
+            _buildManagementOption(
+              icon: Icons.edit,
+              title: 'Edit Questions',
+              subtitle: 'Modify quiz questions and settings',
+              onTap: _navigateToQuizBuilder,
+            ),
+          if (_liveQuiz != null && (_liveQuiz!.isLive || _liveQuiz!.isEnded))
+            _buildManagementOption(
+              icon: Icons.analytics,
+              title: 'Quiz Analytics',
+              subtitle: 'View detailed quiz performance and results',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => QuizHostScreen(quizId: _liveQuiz!.id),
+                  ),
+                ).then((_) => _loadLiveQuiz());
+              },
+            ),
+        ],
+      ],
+    );
+  }
+
+  String _getLiveQuizSubtitle() {
+    if (_liveQuiz == null) return 'Create an interactive quiz experience';
+
+    switch (_liveQuiz!.status) {
+      case QuizStatus.draft:
+        return 'Quiz created • Ready to start during event';
+      case QuizStatus.live:
+        return 'Quiz is LIVE • ${_liveQuiz!.participantCount} participants';
+      case QuizStatus.paused:
+        return 'Quiz paused • ${_liveQuiz!.participantCount} participants waiting';
+      case QuizStatus.ended:
+        return 'Quiz completed • View results and analytics';
+    }
+  }
+
+  Widget? _buildQuizStatusIndicator() {
+    if (_liveQuiz == null) return null;
+
+    Color indicatorColor;
+    String statusText;
+
+    switch (_liveQuiz!.status) {
+      case QuizStatus.draft:
+        indicatorColor = Colors.orange;
+        statusText = 'DRAFT';
+        break;
+      case QuizStatus.live:
+        indicatorColor = const Color(0xFF10B981);
+        statusText = 'LIVE';
+        break;
+      case QuizStatus.paused:
+        indicatorColor = Colors.amber;
+        statusText = 'PAUSED';
+        break;
+      case QuizStatus.ended:
+        indicatorColor = Colors.grey;
+        statusText = 'ENDED';
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: indicatorColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_liveQuiz!.status == QuizStatus.live) ...[
+            Container(
+              width: 6,
+              height: 6,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            statusText,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLiveQuizCard() {
+    if (_liveQuiz == null) return const SizedBox();
+
+    Color statusColor;
+    String statusText;
+    String statusDescription;
+    String buttonText;
+    IconData buttonIcon;
+    bool canJoin;
+
+    switch (_liveQuiz!.status) {
+      case QuizStatus.live:
+        statusColor = const Color(0xFF10B981);
+        statusText = '🔴 LIVE NOW';
+        statusDescription =
+            'Interactive quiz is currently active! Join the competition.';
+        buttonText = 'Join Live Quiz';
+        buttonIcon = Icons.live_tv;
+        canJoin = true;
+        break;
+      case QuizStatus.draft:
+        statusColor = Colors.orange;
+        statusText = '⏳ COMING SOON';
+        statusDescription =
+            'An interactive quiz will be available during this event.';
+        buttonText = 'Quiz Starting Soon';
+        buttonIcon = Icons.quiz;
+        canJoin = false;
+        break;
+      case QuizStatus.ended:
+        statusColor = Colors.grey;
+        statusText = '✅ COMPLETED';
+        statusDescription =
+            'The interactive quiz has ended. Thanks to everyone who participated!';
+        buttonText = 'View Results';
+        buttonIcon = Icons.emoji_events;
+        canJoin = true; // Can view final results
+        break;
+      case QuizStatus.paused:
+        statusColor = Colors.amber;
+        statusText = '⏸️ PAUSED';
+        statusDescription =
+            'Quiz temporarily paused by the host. Please wait...';
+        buttonText = 'Quiz Paused';
+        buttonIcon = Icons.pause_circle;
+        canJoin = false;
+        break;
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF667EEA).withValues(alpha: 0.15),
+            const Color(0xFF764BA2).withValues(alpha: 0.08),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF667EEA).withValues(alpha: 0.15),
+            spreadRadius: 0,
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF667EEA).withValues(alpha: 0.4),
+                      spreadRadius: 0,
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.quiz, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Live Quiz Experience',
+                      style: TextStyle(
+                        color: Color(0xFF1A1A1A),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 20,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _liveQuiz!.title,
+                      style: const TextStyle(
+                        color: Color(0xFF667EEA),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: statusColor,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: statusColor.withValues(alpha: 0.3),
+                      spreadRadius: 0,
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_liveQuiz!.status == QuizStatus.live) ...[
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Text(
+                      statusText,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Text(
+            statusDescription,
+            style: TextStyle(
+              color: Colors.grey.withValues(alpha: 0.8),
+              fontSize: 16,
+              fontFamily: 'Roboto',
+              height: 1.5,
+            ),
+          ),
+          if (_liveQuiz!.description?.isNotEmpty == true) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: const Color(0xFF667EEA).withValues(alpha: 0.2),
+                ),
+              ),
+              child: Text(
+                _liveQuiz!.description!,
+                style: TextStyle(
+                  color: Colors.grey.withValues(alpha: 0.9),
+                  fontSize: 15,
+                  fontFamily: 'Roboto',
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: _buildQuizInfoChip(
+                  Icons.timer,
+                  '${_liveQuiz!.timePerQuestion}s per question',
+                  const Color(0xFF667EEA),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildQuizInfoChip(
+                  Icons.people,
+                  '${_liveQuiz!.participantCount} participants',
+                  const Color(0xFF10B981),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildQuizInfoChip(
+                  Icons.quiz,
+                  '${_liveQuiz!.totalQuestions} questions',
+                  Colors.orange,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Container(
+            width: double.infinity,
+            height: 56,
+            decoration: BoxDecoration(
+              gradient: canJoin
+                  ? (_liveQuiz!.status == QuizStatus.live
+                        ? const LinearGradient(
+                            colors: [Color(0xFF10B981), Color(0xFF059669)],
+                          )
+                        : const LinearGradient(
+                            colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                          ))
+                  : LinearGradient(
+                      colors: [
+                        Colors.grey.withValues(alpha: 0.4),
+                        Colors.grey.withValues(alpha: 0.4),
+                      ],
+                    ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: canJoin
+                  ? [
+                      BoxShadow(
+                        color:
+                            (_liveQuiz!.status == QuizStatus.live
+                                    ? const Color(0xFF10B981)
+                                    : const Color(0xFF667EEA))
+                                .withValues(alpha: 0.4),
+                        spreadRadius: 0,
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ]
+                  : [],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: canJoin ? _navigateToQuizParticipant : null,
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(buttonIcon, color: Colors.white, size: 24),
+                      const SizedBox(width: 12),
+                      Text(
+                        buttonText,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          fontFamily: 'Roboto',
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (_liveQuiz!.status == QuizStatus.live) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF10B981),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Quiz is live and accepting participants right now!',
+                      style: TextStyle(
+                        color: Color(0xFF10B981),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuizInfoChip(IconData icon, String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(height: 4),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),

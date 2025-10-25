@@ -33,6 +33,10 @@ class EventModel {
   List<String> signInMethods; // ['qr_code', 'manual_code', 'geofence']
   String? manualCode; // Custom manual code for the event
 
+  // Live Quiz configuration
+  bool hasLiveQuiz; // Whether this event has a live quiz
+  String? liveQuizId; // ID of the associated live quiz
+
   LatLng getLatLngOfEvent() {
     return LatLng(latitude, longitude);
   }
@@ -72,6 +76,8 @@ class EventModel {
       'manual_code',
     ], // Default methods
     this.manualCode,
+    this.hasLiveQuiz = false,
+    this.liveQuizId,
   });
 
   factory EventModel.fromJson(dynamic parsedJson) {
@@ -129,6 +135,8 @@ class EventModel {
           ? List<String>.from(data['signInMethods'])
           : ['facial_recognition', 'qr_code', 'manual_code'],
       manualCode: data['manualCode'],
+      hasLiveQuiz: data['hasLiveQuiz'] ?? false,
+      liveQuizId: data['liveQuizId'],
     );
   }
 
@@ -223,6 +231,8 @@ class EventModel {
     data['accessList'] = accessList;
     data['signInMethods'] = signInMethods;
     if (manualCode != null) data['manualCode'] = manualCode;
+    data['hasLiveQuiz'] = hasLiveQuiz;
+    if (liveQuizId != null) data['liveQuizId'] = liveQuizId;
     return data;
   }
 }

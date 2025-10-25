@@ -25,17 +25,19 @@ class _SocialLoginViewState extends State<SocialLoginView> {
             setState(() {
               _googleBtnLoading = true;
             });
-            final navigator = Navigator.of(context);
-            final profileData = await FirebaseGoogleAuthHelper()
-                .loginWithGoogle();
+            final helper = FirebaseGoogleAuthHelper();
+            final profileData = await helper.loginWithGoogle();
             if (profileData != null) {
               try {
                 await AuthService().handleSocialLoginSuccessWithProfileData(
                   profileData,
                 );
                 if (!mounted) return;
+                // Ensure in-memory session model is ready before navigating
                 await AuthService().ensureInMemoryUserModel();
-                RouterClass().homeScreenRoute(context: navigator.context);
+                await Future.delayed(const Duration(milliseconds: 120));
+                if (!mounted) return;
+                RouterClass().homeScreenRoute(context: context);
               } catch (e) {
                 ShowToast().showNormalToast(
                   msg: 'Error setting up profile: ${e.toString()}',
@@ -46,14 +48,17 @@ class _SocialLoginViewState extends State<SocialLoginView> {
                 ShowToast().showNormalToast(msg: 'Google sign-in failed');
               }
             }
+          }
+        } catch (e) {
+          ShowToast().showNormalToast(
+            msg: 'Google sign-in error: ${e.toString()}',
+          );
+        } finally {
+          if (mounted) {
             setState(() {
               _googleBtnLoading = false;
             });
           }
-        } catch (e) {
-          setState(() {
-            _googleBtnLoading = false;
-          });
         }
       },
       child: AnimatedContainer(

@@ -7,7 +7,6 @@ import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/Services/auth_service.dart';
 import 'package:attendus/Utils/logger.dart';
-import 'package:attendus/Services/firebase_initializer.dart';
 import 'package:attendus/Services/subscription_service.dart';
 import 'package:provider/provider.dart';
 
@@ -39,24 +38,9 @@ class _AuthGateState extends State<AuthGate> {
     try {
       Logger.debug('🔄 AuthGate: Checking Firebase Auth state...');
 
-      // Ensure Firebase is initialized first (centralized + idempotent)
-      // Firebase should already be initialized in main.dart, so this is a safety check
-      try {
-        await FirebaseInitializer.initializeOnce().timeout(
-          const Duration(seconds: 2),
-          onTimeout: () {
-            Logger.debug(
-              '⏰ AuthGate: Firebase init timeout, assuming already initialized',
-            );
-          },
-        );
-        Logger.debug('✅ AuthGate: Firebase initialized');
-      } catch (e) {
-        Logger.debug(
-          'ℹ️ AuthGate: Firebase init failed or timed out, continuing: $e',
-        );
-      }
-
+      // Firebase should already be initialized in main.dart
+      // Skip redundant initialization to speed up startup
+      
       // First, check if Firebase Auth is immediately available
       final firebaseUser = FirebaseAuth.instance.currentUser;
       Logger.debug(
@@ -71,37 +55,41 @@ class _AuthGateState extends State<AuthGate> {
         return;
       }
 
-      // If no immediate user, wait for Firebase Auth to initialize and check again
-      Logger.debug(
-        '🔄 AuthGate: No immediate user, waiting for Firebase Auth initialization...',
-      );
+      // If no immediate user, we need to wait briefly for auth state
+      // But immediately show not logged in if still no user after short wait
+      Logger.debug('🔄 AuthGate: No immediate user, checking auth state...');
 
-      // Listen for the first auth state change (this delivers persisted user on cold start)
+      bool authChecked = false;
+
+      // Listen for the first auth state change
       _authStateSubscription = FirebaseAuth.instance.authStateChanges().listen((
         User? user,
       ) {
+        if (!mounted || authChecked) return;
+        authChecked = true;
+        
         Logger.debug('🔍 AuthGate: Auth state changed: ${user?.uid ?? 'null'}');
 
-        if (mounted) {
-          if (user != null) {
-            Logger.debug(
-              '✅ AuthGate: Firebase user found via state change: ${user.uid}',
-            );
-            _setUserAndNavigate(user);
-          } else {
-            Logger.debug('❌ AuthGate: No user found via state change');
-            setState(() {
-              _isLoggedIn = false;
-              _isChecking = false;
-            });
-          }
+        if (user != null) {
+          Logger.debug(
+            '✅ AuthGate: Firebase user found via state change: ${user.uid}',
+          );
+          _setUserAndNavigate(user);
+        } else {
+          Logger.debug('❌ AuthGate: No user found via state change');
+          setState(() {
+            _isLoggedIn = false;
+            _isChecking = false;
+          });
         }
+        
+        _authStateSubscription?.cancel();
       });
 
-      // Timeout after 2 seconds to prevent hanging (reduced from 3s)
-      Timer(const Duration(seconds: 2), () {
-        if (mounted && _isChecking) {
-          Logger.warning('⏰ AuthGate: Timeout waiting for Firebase Auth state');
+      // Much shorter timeout - if no user after 500ms, show login screen
+      Timer(const Duration(milliseconds: 500), () {
+        if (mounted && _isChecking && !authChecked) {
+          Logger.debug('⏰ AuthGate: Quick timeout - showing login screen');
           _authStateSubscription?.cancel();
           setState(() {
             _isLoggedIn = false;

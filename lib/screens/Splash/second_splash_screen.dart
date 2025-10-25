@@ -158,8 +158,21 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
       final profileData = await helper.loginWithGoogle();
 
       if (profileData != null) {
-        await _handleSuccessfulLoginWithProfileData(profileData);
-        await AuthService().ensureInMemoryUserModel();
+        try {
+          await AuthService().handleSocialLoginSuccessWithProfileData(
+            profileData,
+          );
+          if (!mounted) return;
+          // Ensure in-memory session model is ready before navigating
+          await AuthService().ensureInMemoryUserModel();
+          await Future.delayed(const Duration(milliseconds: 120));
+          if (!mounted) return;
+          RouterClass().homeScreenRoute(context: context);
+        } catch (e) {
+          ShowToast().showNormalToast(
+            msg: 'Error loading user data: ${e.toString()}',
+          );
+        }
       } else {
         if (!FirebaseGoogleAuthHelper.lastGoogleCancelled) {
           ShowToast().showNormalToast(msg: 'Google sign-in failed');
@@ -193,8 +206,21 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
       final profileData = await helper.loginWithApple();
 
       if (profileData != null) {
-        await _handleSuccessfulLoginWithProfileData(profileData);
-        await AuthService().ensureInMemoryUserModel();
+        try {
+          await AuthService().handleSocialLoginSuccessWithProfileData(
+            profileData,
+          );
+          if (!mounted) return;
+          // Ensure in-memory session model is ready before navigating
+          await AuthService().ensureInMemoryUserModel();
+          await Future.delayed(const Duration(milliseconds: 120));
+          if (!mounted) return;
+          RouterClass().homeScreenRoute(context: context);
+        } catch (e) {
+          ShowToast().showNormalToast(
+            msg: 'Error loading user data: ${e.toString()}',
+          );
+        }
       } else {
         if (!FirebaseGoogleAuthHelper.lastAppleCancelled) {
           ShowToast().showNormalToast(
@@ -219,19 +245,7 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
     }
   }
 
-  Future<void> _handleSuccessfulLoginWithProfileData(
-    Map<String, dynamic> profileData,
-  ) async {
-    try {
-      await AuthService().handleSocialLoginSuccessWithProfileData(profileData);
-      if (!mounted) return;
-      RouterClass().homeScreenRoute(context: context);
-    } catch (e) {
-      ShowToast().showNormalToast(
-        msg: 'Error loading user data: ${e.toString()}',
-      );
-    }
-  }
+  // Removed - no longer needed as sign-in methods now handle everything directly
 
   @override
   Widget build(BuildContext context) {
