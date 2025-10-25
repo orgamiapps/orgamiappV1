@@ -66,7 +66,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       false; // Public by default (no group), private when group is selected
   final List<String> _allCategories = [
     'Social & Networking',
-    'Entertainment', 
+    'Entertainment',
     'Sports & Fitness',
     'Education & Learning',
     'Arts & Culture',
@@ -79,6 +79,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   final TextEditingController groupNameEdtController = TextEditingController();
   final TextEditingController titleEdtController = TextEditingController();
   final TextEditingController locationEdtController = TextEditingController();
+  final TextEditingController locationNameEdtController =
+      TextEditingController();
   final TextEditingController thumbnailUrlCtlr = TextEditingController();
   final TextEditingController descriptionEdtController =
       TextEditingController();
@@ -115,18 +117,27 @@ class _CreateEventScreenState extends State<CreateEventScreen>
     _startTime!.minute,
   );
 
-  DateTime get _endDateTime => DateTime(
-    _selectedDate!.year,
-    _selectedDate!.month,
-    _selectedDate!.day,
-    _endTime!.hour,
-    _endTime!.minute,
-  );
+  DateTime get _endDateTime {
+    // Base end datetime on the selected date and end time
+    DateTime baseEnd = DateTime(
+      _selectedDate!.year,
+      _selectedDate!.month,
+      _selectedDate!.day,
+      _endTime!.hour,
+      _endTime!.minute,
+    );
+    // If end is not after start on the same day, roll to the next day
+    final DateTime start = _startDateTime;
+    if (!baseEnd.isAfter(start)) {
+      baseEnd = baseEnd.add(const Duration(days: 1));
+    }
+    return baseEnd;
+  }
 
   int get _durationHours {
-    final int startMinutes = (_startTime!.hour * 60) + _startTime!.minute;
-    final int endMinutes = (_endTime!.hour * 60) + _endTime!.minute;
-    int hours = ((endMinutes - startMinutes) / 60).ceil();
+    // Compute duration using resolved DateTimes to handle cross-midnight
+    final Duration diff = _endDateTime.difference(_startDateTime);
+    int hours = diff.inMinutes <= 0 ? 1 : (diff.inMinutes / 60).ceil();
     if (hours < 1) hours = 1;
     return hours;
   }
@@ -254,17 +265,41 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
   void _handleSubmit() async {
     if (_formKey.currentState!.validate()) {
-      if (_selectedLocationInternal == null ||
-          (_selectedLocationInternal!.latitude == 0 &&
-              _selectedLocationInternal!.longitude == 0)) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please pick the event location'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
+      final bool hasLocation =
+          _selectedLocationInternal != null &&
+          !(_selectedLocationInternal!.latitude == 0 &&
+              _selectedLocationInternal!.longitude == 0);
+      final bool hasLocationName = locationNameEdtController.text
+          .trim()
+          .isNotEmpty;
+      // If geofence sign-in is selected, require a map location
+      if (_selectedSignInMethods.contains('geofence')) {
+        if (!hasLocation) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Please pick the event location to enable geofence sign-in',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+      } else {
+        // Otherwise require either a location name or a selected map location
+        if (!hasLocation && !hasLocationName) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Please enter a location name or select a location',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
       }
       if (!_hasDateTime) {
         if (!mounted) return;
@@ -386,21 +421,38 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           }
         }
 
+        final bool hasLocation =
+            _selectedLocationInternal != null &&
+            !(_selectedLocationInternal!.latitude == 0 &&
+                _selectedLocationInternal!.longitude == 0);
+
+        // Ensure 'location' has a meaningful value: prefer resolved address,
+        // otherwise fall back to manual location name (if provided)
+        final String computedLocation =
+            locationEdtController.text.trim().isNotEmpty
+            ? locationEdtController.text.trim()
+            : (locationNameEdtController.text.trim().isNotEmpty
+                  ? locationNameEdtController.text.trim()
+                  : '');
+
         EventModel newEvent = EventModel(
           id: docId,
           groupName: groupNameEdtController.text,
           title: titleEdtController.text,
           description: descriptionEdtController.text,
-          location: locationEdtController.text,
+          location: computedLocation,
+          locationName: locationNameEdtController.text.isNotEmpty
+              ? locationNameEdtController.text
+              : null,
           customerUid: FirebaseAuth.instance.currentUser!.uid,
           imageUrl: thumbnailUrlCtlr.text,
           selectedDateTime: _startDateTime,
           eventGenerateTime: DateTime.now(),
           status: eventStatus,
-          getLocation: true,
+          getLocation: hasLocation,
           radius: widget.radios,
-          longitude: _selectedLocationInternal!.longitude,
-          latitude: _selectedLocationInternal!.latitude,
+          longitude: hasLocation ? _selectedLocationInternal!.longitude : 0.0,
+          latitude: hasLocation ? _selectedLocationInternal!.latitude : 0.0,
           private: privateEvent,
           categories: _selectedCategories,
           eventDuration: _durationHours,
@@ -552,7 +604,13 @@ class _CreateEventScreenState extends State<CreateEventScreen>
     // Initialize location from incoming value and resolve address
     _selectedLocationInternal = widget.selectedLocation;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _reverseGeocodeSelectedLocation();
+      final bool hasInitialLocation =
+          _selectedLocationInternal != null &&
+          !(_selectedLocationInternal!.latitude == 0 &&
+              _selectedLocationInternal!.longitude == 0);
+      if (hasInitialLocation) {
+        _reverseGeocodeSelectedLocation();
+      }
     });
   }
 
@@ -767,12 +825,6 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         if (picked != null) {
           setState(() {
             _startTime = picked;
-            // reset end time if invalid
-            if (_endTime != null) {
-              final start = (_startTime!.hour * 60) + _startTime!.minute;
-              final end = (_endTime!.hour * 60) + _endTime!.minute;
-              if (end <= start) _endTime = null;
-            }
           });
         }
       },
@@ -803,19 +855,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         );
         if (!mounted) return;
         if (picked != null) {
-          if (_startTime == null) {
-            setState(() => _endTime = picked);
-          } else {
-            final start = (_startTime!.hour * 60) + _startTime!.minute;
-            final end = (picked.hour * 60) + picked.minute;
-            if (end > start) {
-              setState(() => _endTime = picked);
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('End time must be after start')),
-              );
-            }
-          }
+          setState(() => _endTime = picked);
         }
       },
     );
@@ -1077,9 +1117,13 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             : Colors.grey.withValues(alpha: 0.3),
         width: 1,
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // Slightly reduced horizontal padding
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 8,
+      ), // Slightly reduced horizontal padding
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, // Reduces extra space
+      materialTapTargetSize:
+          MaterialTapTargetSize.shrinkWrap, // Reduces extra space
     );
   }
 
@@ -1256,6 +1300,16 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           // Image Field
           _buildImageField(),
           const SizedBox(height: 16),
+          // Location Name (optional)
+          _buildTextField(
+            controller: locationNameEdtController,
+            label: 'Location Name (Optional)',
+            hint: 'e.g., Madison Square Garden',
+            icon: Icons.place_outlined,
+            enableCapitalization: true,
+            validator: (_) => null,
+          ),
+          const SizedBox(height: 16),
           // Location Picker
           _buildLocationSelector(),
           const SizedBox(height: 16),
@@ -1292,7 +1346,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Location',
+            'Location (Optional)',
             style: TextStyle(
               color: Color(0xFF1A1A1A),
               fontWeight: FontWeight.w600,
@@ -1375,7 +1429,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
               OutlinedButton.icon(
                 onPressed: _pickLocation,
                 icon: const Icon(Icons.map_outlined),
-                label: Text(hasLocation ? 'Change' : 'Pick'),
+                label: Text(hasLocation ? 'Change' : 'Select'),
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0xFF667EEA)),
                   foregroundColor: const Color(0xFF667EEA),

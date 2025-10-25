@@ -4234,13 +4234,30 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
   }
 
   Widget _buildLocationText() {
-    // Always show the creator-entered location text for clarity
+    // Show optional locationName above the address/location if provided
+    final String? locationName = eventModel.locationName;
     final String displayText = eventModel.location;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildPrivateAccessNotice(),
+        if (locationName != null && locationName.isNotEmpty) ...[
+          Text(
+            locationName,
+            style: TextStyle(
+              color: _darkText,
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
+              fontFamily: 'Roboto',
+              letterSpacing: -0.2,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+          ),
+          const SizedBox(height: 2),
+        ],
         Text(
           displayText,
           style: TextStyle(

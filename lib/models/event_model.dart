@@ -5,6 +5,7 @@ class EventModel {
   static String firebaseKey = 'Events';
 
   String id, groupName, title, description, location, customerUid, imageUrl;
+  String? locationName; // Optional display name for the venue/location
 
   DateTime selectedDateTime, eventGenerateTime;
 
@@ -57,6 +58,7 @@ class EventModel {
     required this.radius,
     required this.latitude,
     required this.longitude,
+    this.locationName,
     this.categories = const [],
     this.isFeatured = false,
     this.featureEndDate,
@@ -91,6 +93,7 @@ class EventModel {
       title: data['title'],
       description: data['description'],
       location: data['location'],
+      locationName: data['locationName'],
       imageUrl: data['imageUrl'],
       customerUid: data['customerUid'],
       status: data['status'],
@@ -205,6 +208,7 @@ class EventModel {
     data['title'] = title;
     data['description'] = description;
     data['location'] = location;
+    if (locationName != null) data['locationName'] = locationName;
     data['imageUrl'] = imageUrl;
     data['customerUid'] = customerUid;
     data['status'] = status;
