@@ -201,9 +201,9 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
           return _buildErrorView(snapshot.error.toString());
         }
 
-        // No data yet - show empty state
+        // FALLBACK: If no data exists in user_analytics, calculate on-the-fly
         if (!snapshot.hasData || !snapshot.data!.exists) {
-          return _buildEmptyState();
+          return _buildFallbackAnalytics(currentUser.uid);
         }
 
         // Parse analytics data from Firestore
@@ -216,6 +216,156 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
         return _buildDashboard(analyticsData, isFromCache: false);
       },
     );
+  }
+
+  // Fallback: Calculate analytics on-the-fly when Cloud Functions haven't been deployed
+  Widget _buildFallbackAnalytics(String userId) {
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: _calculateAnalyticsOnTheFly(userId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingSkeleton();
+        }
+
+        if (snapshot.hasError) {
+          debugPrint('Error calculating fallback analytics: ${snapshot.error}');
+          return _buildErrorView(snapshot.error.toString());
+        }
+
+        final analyticsData = snapshot.data;
+        
+        // If no data at all, show empty state
+        if (analyticsData == null || analyticsData['totalEvents'] == 0) {
+          return _buildEmptyState();
+        }
+
+        // Show calculated analytics
+        return _buildDashboard(analyticsData, isFromCache: false);
+      },
+    );
+  }
+
+  // Calculate analytics on the fly by querying all user events
+  Future<Map<String, dynamic>?> _calculateAnalyticsOnTheFly(String userId) async {
+    try {
+      debugPrint('Calculating analytics on-the-fly for user: $userId');
+
+      // Get all events created by this user
+      final eventsQuery = await FirebaseFirestore.instance
+          .collection('Events')
+          .where('customerUid', isEqualTo: userId)
+          .get();
+
+      if (eventsQuery.docs.isEmpty) {
+        debugPrint('No events found for user');
+        return {'totalEvents': 0};
+      }
+
+      final events = eventsQuery.docs.map((doc) {
+        return EventModel.fromJson(doc);
+      }).toList();
+
+      // Get event analytics for all events in parallel
+      final eventAnalyticsPromises = events.map((event) {
+        return FirebaseFirestore.instance
+            .collection('event_analytics')
+            .doc(event.id)
+            .get();
+      }).toList();
+
+      final eventAnalyticsDocs = await Future.wait(eventAnalyticsPromises);
+
+      // Calculate aggregated metrics
+      int totalAttendees = 0;
+      Map<String, dynamic>? topPerformingEvent;
+      int maxAttendees = 0;
+      Map<String, int> eventCategories = {};
+      Map<String, int> monthlyTrends = {};
+      Map<String, dynamic> eventAnalytics = {};
+      Set<String> allAttendees = {};
+      Set<String> repeatAttendees = {};
+
+      for (int i = 0; i < events.length; i++) {
+        final event = events[i];
+        final analyticsDoc = eventAnalyticsDocs[i];
+        
+        int eventAttendees = 0;
+        if (analyticsDoc.exists) {
+          final analyticsData = analyticsDoc.data() as Map<String, dynamic>;
+          eventAttendees = (analyticsData['totalAttendees'] ?? 0) as int;
+          
+          // Track unique and repeat attendees
+          final attendeesList = analyticsData['attendees'] as List<dynamic>? ?? [];
+          for (var attendeeId in attendeesList) {
+            if (allAttendees.contains(attendeeId.toString())) {
+              repeatAttendees.add(attendeeId.toString());
+            } else {
+              allAttendees.add(attendeeId.toString());
+            }
+          }
+        }
+
+        totalAttendees += eventAttendees;
+
+        // Track top performing event
+        if (eventAttendees > maxAttendees) {
+          maxAttendees = eventAttendees;
+          topPerformingEvent = {
+            'id': event.id,
+            'title': event.title,
+            'attendees': eventAttendees,
+            'date': event.selectedDateTime,
+          };
+        }
+
+        // Track event categories
+        final category = event.category ?? 'Uncategorized';
+        eventCategories[category] = (eventCategories[category] ?? 0) + 1;
+
+        // Track monthly trends
+        final monthKey = '${event.selectedDateTime.year}-${event.selectedDateTime.month.toString().padLeft(2, '0')}';
+        monthlyTrends[monthKey] = (monthlyTrends[monthKey] ?? 0) + eventAttendees;
+
+        // Store per-event analytics
+        eventAnalytics[event.id] = {
+          'attendees': eventAttendees,
+          'repeatAttendees': 0, // Would need more complex calculation
+        };
+      }
+
+      // Calculate retention rate
+      final retentionRate = allAttendees.isEmpty 
+          ? 0.0 
+          : (repeatAttendees.length / allAttendees.length * 100);
+
+      // Calculate average attendance
+      final averageAttendance = events.isEmpty 
+          ? 0.0 
+          : totalAttendees / events.length;
+
+      final analyticsData = {
+        'totalEvents': events.length,
+        'totalAttendees': totalAttendees,
+        'averageAttendance': averageAttendance,
+        'retentionRate': retentionRate,
+        'topPerformingEvent': topPerformingEvent,
+        'eventCategories': eventCategories,
+        'monthlyTrends': monthlyTrends,
+        'eventAnalytics': eventAnalytics,
+        'lastUpdated': DateTime.now(),
+        '_calculatedOnTheFly': true, // Flag to indicate this was calculated client-side
+      };
+
+      debugPrint('Calculated analytics: $analyticsData');
+
+      // Cache the calculated analytics
+      _cacheAnalytics(analyticsData);
+
+      return analyticsData;
+    } catch (e) {
+      debugPrint('Error calculating analytics on-the-fly: $e');
+      return null;
+    }
   }
 
   Widget _buildLoadingSkeleton() {
