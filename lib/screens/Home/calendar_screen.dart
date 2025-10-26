@@ -819,10 +819,10 @@ class _CalendarScreenState extends State<CalendarScreen>
                   SliverToBoxAdapter(
                     child: Container(
                       height: 24 * 80.0, // Total height for 24 hours
-                      margin: const EdgeInsets.only(
+                      margin: EdgeInsets.only(
                         left: 16,
                         right: 16,
-                        bottom: 80,
+                        bottom: MediaQuery.of(context).padding.bottom + 80,
                       ),
                       child: Stack(
                         children: [

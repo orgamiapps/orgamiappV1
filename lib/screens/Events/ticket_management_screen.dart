@@ -1809,7 +1809,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                       Positioned(
                         left: 20,
                         right: 20,
-                        bottom: 16,
+                        bottom: MediaQuery.of(context).padding.bottom + 16,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [

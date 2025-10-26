@@ -641,7 +641,8 @@ class _GlobalEventsMapScreenState extends State<GlobalEventsMapScreen> {
             mapType: _currentMapType,
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
-            zoomControlsEnabled: true,
+            zoomControlsEnabled:
+                false, // Disabled to avoid overlap with Samsung nav bar
             zoomGesturesEnabled: true,
             scrollGesturesEnabled: true,
             rotateGesturesEnabled: true,
@@ -810,7 +811,7 @@ class _GlobalEventsMapScreenState extends State<GlobalEventsMapScreen> {
           // Map controls (right side)
           Positioned(
             right: 16,
-            bottom: MediaQuery.of(context).padding.bottom + 80,
+            bottom: MediaQuery.of(context).padding.bottom + 120,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [

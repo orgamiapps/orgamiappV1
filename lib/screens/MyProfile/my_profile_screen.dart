@@ -2065,7 +2065,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                   Positioned(
                     left: 24,
                     right: 24,
-                    bottom: 32,
+                    bottom: MediaQuery.of(context).padding.bottom + 32,
                     child: ElevatedButton(
                       onPressed: () => _saveToWallet(context),
                       style: ElevatedButton.styleFrom(

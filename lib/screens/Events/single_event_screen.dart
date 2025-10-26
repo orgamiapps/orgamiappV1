@@ -3304,7 +3304,9 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       animation: _pulseAnimation,
       builder: (context, child) {
         return Container(
-          margin: const EdgeInsets.only(bottom: 24),
+          margin: EdgeInsets.only(
+            bottom: MediaQuery.of(context).padding.bottom + 24,
+          ),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,

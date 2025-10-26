@@ -1765,7 +1765,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             _bodyView(),
             // Continue Button (Fixed at bottom)
             Positioned(
-              bottom: 0,
+              bottom: MediaQuery.of(context).padding.bottom,
               left: 0,
               right: 0,
               child: Container(
