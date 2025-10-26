@@ -294,7 +294,7 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
             _bodyView(),
             // Continue Button (Fixed at bottom)
             Positioned(
-              bottom: 0,
+              bottom: MediaQuery.of(context).padding.bottom,
               left: 0,
               right: 0,
               child: Container(
