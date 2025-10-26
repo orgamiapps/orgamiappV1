@@ -16,6 +16,7 @@ import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart'
 import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:attendus/screens/Home/calendar_screen.dart';
 import 'package:attendus/Utils/firebase_retry_helper.dart';
+import 'package:attendus/screens/Events/global_events_map_screen.dart';
 
 class HomeHubScreen extends StatefulWidget {
   const HomeHubScreen({super.key});
@@ -246,7 +247,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   Widget _buildSimpleHeader() {
     return Container(
       color: Theme.of(context).cardColor,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Row(
         children: [
           Image.asset(Images.inAppLogo, width: 36, height: 36),
@@ -281,7 +282,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
                   },
                   blendMode: BlendMode.srcIn,
                   child: Text(
-                    'Amazing Events',
+                    'Events',
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurface,
                       fontWeight: FontWeight.w800,
@@ -295,12 +296,23 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
             ),
           ),
           _roundIconButton(
+            icon: Icons.public,
+            onTap: () {
+              RouterClass.nextScreenNormal(
+                context,
+                const GlobalEventsMapScreen(),
+              );
+            },
+            isMapButton: true,
+          ),
+          const SizedBox(width: 6),
+          _roundIconButton(
             icon: Icons.event,
             onTap: () {
               RouterClass.nextScreenNormal(context, const CalendarScreen());
             },
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           _roundIconButton(
             icon: Icons.qr_code_scanner,
             onTap: () {
@@ -310,7 +322,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
               );
             },
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           _roundIconButton(
             icon: Icons.search,
             onTap: () {
@@ -325,10 +337,44 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   Widget _roundIconButton({
     required IconData icon,
     required VoidCallback onTap,
+    bool isMapButton = false,
   }) {
+    // Special styling for Map button with gradient and modern look
+    if (isMapButton) {
+      return Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+          ),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+              spreadRadius: 0,
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: onTap,
+            child: Icon(Icons.public, color: Colors.white, size: 19),
+          ),
+        ),
+      );
+    }
+
+    // Default styling for other buttons
     return Container(
-      width: 40,
-      height: 40,
+      width: 38,
+      height: 38,
       decoration: BoxDecoration(
         color: const Color(0xFFF1F5F9),
         borderRadius: BorderRadius.circular(12),
@@ -338,7 +384,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
-          child: Icon(icon, color: const Color(0xFF1E293B), size: 20),
+          child: Icon(icon, color: const Color(0xFF1E293B), size: 19),
         ),
       ),
     );
