@@ -10,6 +10,7 @@ import 'package:attendus/Services/live_quiz_service.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/screens/LiveQuiz/widgets/live_leaderboard_widget.dart';
+import 'package:attendus/screens/LiveQuiz/widgets/quiz_waiting_lobby.dart';
 
 class QuizParticipantScreen extends StatefulWidget {
   final String quizId;
@@ -961,6 +962,16 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
   }
 
   Widget _buildWaitingScreen(String title, String subtitle) {
+    // Special handling for draft status - show waiting lobby
+    if (_quiz?.isDraft == true) {
+      return QuizWaitingLobby(
+        quizId: widget.quizId,
+        currentParticipantId: _participantId,
+        quizTitle: _quiz?.title ?? 'Live Quiz',
+      );
+    }
+    
+    // For other waiting states (like paused), show simple waiting screen
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32.0),

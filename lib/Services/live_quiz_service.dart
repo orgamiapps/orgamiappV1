@@ -404,6 +404,88 @@ class LiveQuizService extends ChangeNotifier {
     }
   }
 
+  /// Restart the quiz - allows host to run the quiz again with fresh state
+  /// Options: keepParticipants (keep current participants) or fresh start
+  Future<bool> restartQuiz(String quizId, {bool keepParticipants = false}) async {
+    try {
+      final quiz = await getQuiz(quizId);
+      if (quiz == null) {
+        Logger.error('Cannot restart quiz: quiz not found');
+        return false;
+      }
+
+      // Cancel any running timers
+      _questionTimers[quizId]?.cancel();
+      _questionTimers.remove(quizId);
+
+      final batch = _firestore.batch();
+
+      // Reset quiz state to draft
+      final quizRef = _firestore.collection(LiveQuizModel.firebaseKey).doc(quizId);
+      batch.update(quizRef, {
+        'status': QuizStatus.draft.name,
+        'startedAt': null,
+        'endedAt': null,
+        'currentQuestionIndex': null,
+        'currentQuestionStartedAt': null,
+        'participantCount': keepParticipants ? quiz.participantCount : 0,
+      });
+
+      if (!keepParticipants) {
+        // Archive old participants by marking them as inactive
+        final participantsSnapshot = await _firestore
+            .collection(QuizParticipantModel.firebaseKey)
+            .where('quizId', isEqualTo: quizId)
+            .get();
+
+        for (final doc in participantsSnapshot.docs) {
+          batch.update(doc.reference, {
+            'isActive': false,
+            'archivedAt': Timestamp.fromDate(DateTime.now()),
+          });
+        }
+      } else {
+        // Reset participant stats but keep them in the lobby
+        final participantsSnapshot = await _firestore
+            .collection(QuizParticipantModel.firebaseKey)
+            .where('quizId', isEqualTo: quizId)
+            .where('isActive', isEqualTo: true)
+            .get();
+
+        for (final doc in participantsSnapshot.docs) {
+          batch.update(doc.reference, {
+            'currentScore': 0,
+            'questionsAnswered': 0,
+            'correctAnswers': 0,
+            'currentRank': null,
+            'bestRank': null,
+          });
+        }
+      }
+
+      // Archive old responses (don't delete, for historical data)
+      final responsesSnapshot = await _firestore
+          .collection(QuizResponseModel.firebaseKey)
+          .where('quizId', isEqualTo: quizId)
+          .get();
+
+      for (final doc in responsesSnapshot.docs) {
+        batch.update(doc.reference, {
+          'archived': true,
+          'archivedAt': Timestamp.fromDate(DateTime.now()),
+        });
+      }
+
+      await batch.commit();
+
+      Logger.info('Quiz restarted: $quizId - Ready for new session');
+      return true;
+    } catch (e) {
+      Logger.error('Failed to restart quiz: $e');
+      return false;
+    }
+  }
+
   void _startQuestionTimer(String quizId, int timeLimit) {
     // Cancel existing timer
     _questionTimers[quizId]?.cancel();
