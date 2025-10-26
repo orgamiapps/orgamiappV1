@@ -368,7 +368,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
 
           // Instructions card
           Positioned(
-            bottom: 100,
+            bottom: MediaQuery.of(context).padding.bottom + 100,
             left: 20,
             right: 20,
             child: _buildInstructionsCard(),

@@ -457,7 +457,7 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
             ),
             // Helper hint
             Positioned(
-              bottom: 12,
+              bottom: MediaQuery.of(context).padding.bottom + 12,
               left: 12,
               right: 12,
               child: Container(

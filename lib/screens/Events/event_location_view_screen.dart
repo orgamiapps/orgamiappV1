@@ -353,7 +353,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
         ),
         // Map controls
         Positioned(
-          bottom: 20,
+          bottom: MediaQuery.of(context).padding.bottom + 20,
           left: 20,
           right: 20,
           child: Container(

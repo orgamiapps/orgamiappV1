@@ -555,7 +555,7 @@ class _FaceRecognitionScannerScreenState
 
           // Instructions
           Positioned(
-            bottom: 100,
+            bottom: MediaQuery.of(context).padding.bottom + 100,
             left: 20,
             right: 20,
             child: _buildInstructionsCard(),
