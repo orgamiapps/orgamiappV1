@@ -7,6 +7,7 @@ import 'package:attendus/Services/live_quiz_service.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/screens/LiveQuiz/widgets/live_leaderboard_widget.dart';
+import 'package:attendus/screens/LiveQuiz/widgets/quiz_waiting_lobby.dart';
 
 class QuizHostScreen extends StatefulWidget {
   final String quizId;
@@ -918,7 +919,8 @@ class _QuizHostScreenState extends State<QuizHostScreen>
   Widget _buildTabView() {
     return Column(
       children: [
-        _buildTabSelector(),
+        // Only show tab selector if quiz is not in draft
+        if (_quiz?.isDraft != true) _buildTabSelector(),
         Expanded(child: _buildTabContent()),
       ],
     );
@@ -979,6 +981,17 @@ class _QuizHostScreenState extends State<QuizHostScreen>
   }
 
   Widget _buildTabContent() {
+    // Show waiting lobby for draft quizzes
+    if (_quiz?.isDraft == true) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 24),
+        child: QuizWaitingLobby(
+          quizId: widget.quizId,
+          quizTitle: _quiz?.title ?? 'Live Quiz',
+        ),
+      );
+    }
+    
     return Padding(
       padding: const EdgeInsets.all(24),
       child: AnimatedSwitcher(
