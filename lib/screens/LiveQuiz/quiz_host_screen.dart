@@ -7,6 +7,7 @@ import 'package:attendus/Services/live_quiz_service.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/screens/LiveQuiz/widgets/live_leaderboard_widget.dart';
+import 'package:attendus/screens/LiveQuiz/widgets/quiz_waiting_lobby.dart';
 
 class QuizHostScreen extends StatefulWidget {
   final String quizId;
@@ -308,6 +309,176 @@ class _QuizHostScreenState extends State<QuizHostScreen>
           ),
         ) ??
         false;
+  }
+
+  Future<void> _restartQuiz() async {
+    final option = await _showRestartQuizDialog();
+    if (option == null) return; // User cancelled
+
+    HapticFeedback.mediumImpact();
+    
+    // Show loading indicator
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Restarting quiz...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final success = await _liveQuizService.restartQuiz(
+      widget.quizId,
+      keepParticipants: option == 'keep',
+    );
+
+    if (!mounted) return;
+    Navigator.pop(context); // Close loading dialog
+
+    if (success) {
+      _showSuccess(
+        option == 'keep'
+            ? 'Quiz restarted! Participants remain in the lobby.'
+            : 'Quiz restarted! Ready for new participants.',
+      );
+    } else {
+      _showError('Failed to restart quiz');
+    }
+  }
+
+  Future<String?> _showRestartQuizDialog() async {
+    return await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.refresh, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Restart Quiz',
+                style: TextStyle(fontSize: 20),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'How would you like to restart this quiz?',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 20),
+            _buildRestartOption(
+              context,
+              'Fresh Start',
+              'Remove all participants and responses.\nStart completely fresh.',
+              Icons.auto_awesome,
+              Colors.blue,
+              'fresh',
+            ),
+            const SizedBox(height: 12),
+            _buildRestartOption(
+              context,
+              'Keep Participants',
+              'Keep current participants in lobby.\nReset their scores and responses.',
+              Icons.people,
+              const Color(0xFF10B981),
+              'keep',
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRestartOption(
+    BuildContext context,
+    String title,
+    String description,
+    IconData icon,
+    Color color,
+    String value,
+  ) {
+    return InkWell(
+      onTap: () => Navigator.pop(context, value),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+          borderRadius: BorderRadius.circular(12),
+          color: color.withValues(alpha: 0.05),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.withValues(alpha: 0.8),
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios, color: color, size: 16),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showError(String message) {
@@ -824,23 +995,11 @@ class _QuizHostScreenState extends State<QuizHostScreen>
           ),
         ] else if (_quiz!.isEnded) ...[
           Expanded(
-            child: Container(
-              height: 48,
-              decoration: BoxDecoration(
-                color: Colors.grey.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
-              ),
-              child: const Center(
-                child: Text(
-                  'Quiz Completed',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
+            child: _buildActionButton(
+              'Restart Quiz',
+              Icons.refresh,
+              const Color(0xFF667EEA),
+              _restartQuiz,
             ),
           ),
         ],
@@ -918,7 +1077,8 @@ class _QuizHostScreenState extends State<QuizHostScreen>
   Widget _buildTabView() {
     return Column(
       children: [
-        _buildTabSelector(),
+        // Only show tab selector if quiz is not in draft
+        if (_quiz?.isDraft != true) _buildTabSelector(),
         Expanded(child: _buildTabContent()),
       ],
     );
@@ -979,6 +1139,17 @@ class _QuizHostScreenState extends State<QuizHostScreen>
   }
 
   Widget _buildTabContent() {
+    // Show waiting lobby for draft quizzes
+    if (_quiz?.isDraft == true) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 24),
+        child: QuizWaitingLobby(
+          quizId: widget.quizId,
+          quizTitle: _quiz?.title ?? 'Live Quiz',
+        ),
+      );
+    }
+    
     return Padding(
       padding: const EdgeInsets.all(24),
       child: AnimatedSwitcher(

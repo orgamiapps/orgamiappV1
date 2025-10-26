@@ -21,7 +21,8 @@ class GroupProfileScreenV2 extends StatefulWidget {
   State<GroupProfileScreenV2> createState() => _GroupProfileScreenV2State();
 }
 
-class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
+class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
+    with SingleTickerProviderStateMixin {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final OrganizationHelper _helper = OrganizationHelper();
   bool _isMember = false;
@@ -30,11 +31,19 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
   String _memberRole = '';
   // Reference to the FAB widget key for direct animation control
   final GlobalKey<_AdminFabState> _fabKey = GlobalKey<_AdminFabState>();
+  TabController? _tabController;
 
   @override
   void initState() {
     super.initState();
     _checkMembershipStatus();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController?.dispose();
+    super.dispose();
   }
 
   void _handleScrollChange(bool isScrollingDown) {
@@ -205,308 +214,303 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2> {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 3,
-      child: StreamBuilder<DocumentSnapshot>(
-        stream: _db
-            .collection('Organizations')
-            .doc(widget.organizationId)
-            .snapshots(),
-        builder: (context, snapshot) {
-          final data = snapshot.data?.data() as Map<String, dynamic>?;
-          final name = (data?['name'] ?? '').toString();
-          final category = (data?['category'] ?? 'Group').toString();
-          final bannerUrl = data?['bannerUrl']?.toString();
-          final logoUrl = data?['logoUrl']?.toString();
+    return StreamBuilder<DocumentSnapshot>(
+      stream: _db
+          .collection('Organizations')
+          .doc(widget.organizationId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data() as Map<String, dynamic>?;
+        final name = (data?['name'] ?? '').toString();
+        final category = (data?['category'] ?? 'Group').toString();
+        final bannerUrl = data?['bannerUrl']?.toString();
+        final logoUrl = data?['logoUrl']?.toString();
 
-          return Scaffold(
-            body: NestedScrollView(
-              headerSliverBuilder: (context, innerBoxIsScrolled) => [
-                SliverAppBar(
-                  pinned: true,
-                  floating: false,
-                  expandedHeight:
-                      260, // Compact height while keeping header content visible
-                  collapsedHeight:
-                      kToolbarHeight + 48, // Account for tab bar height
-                  elevation: 0,
-                  surfaceTintColor: Colors.transparent,
-                  backgroundColor: const Color(0xFF667EEA),
-                  leading: IconButton(
+        return Scaffold(
+          body: NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) => [
+              SliverAppBar(
+                pinned: false,
+                floating: true,
+                snap: true,
+                expandedHeight: 260,
+                elevation: 0,
+                surfaceTintColor: Colors.transparent,
+                backgroundColor: const Color(0xFF667EEA),
+                leading: IconButton(
+                  icon: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white,
+                  ),
+                  onPressed: () => Navigator.of(context).maybePop(),
+                ),
+                actions: [
+                  IconButton(
                     icon: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
+                      Icons.ios_share_rounded,
                       color: Colors.white,
                     ),
-                    onPressed: () => Navigator.of(context).maybePop(),
+                    onPressed: _share,
                   ),
-                  actions: [
-                    IconButton(
-                      icon: const Icon(
-                        Icons.ios_share_rounded,
-                        color: Colors.white,
-                      ),
-                      onPressed: _share,
-                    ),
-                  ],
-                  flexibleSpace: FlexibleSpaceBar(
-                    collapseMode: CollapseMode.pin,
-                    background: Stack(
-                      children: [
-                        // Default banner or custom banner
-                        Container(
-                          decoration: BoxDecoration(
-                            image: bannerUrl != null
-                                ? DecorationImage(
-                                    image: NetworkImage(bannerUrl),
-                                    fit: BoxFit.cover,
-                                    colorFilter: ColorFilter.mode(
-                                      Colors.black.withValues(alpha: 0.3),
-                                      BlendMode.darken,
-                                    ),
-                                  )
-                                : null,
-                          ),
-                          child: bannerUrl == null
-                              ? _buildDefaultBanner(context)
+                ],
+                flexibleSpace: FlexibleSpaceBar(
+                  collapseMode: CollapseMode.pin,
+                  background: Stack(
+                    children: [
+                      // Default banner or custom banner
+                      Container(
+                        decoration: BoxDecoration(
+                          image: bannerUrl != null
+                              ? DecorationImage(
+                                  image: NetworkImage(bannerUrl),
+                                  fit: BoxFit.cover,
+                                  colorFilter: ColorFilter.mode(
+                                    Colors.black.withValues(alpha: 0.3),
+                                    BlendMode.darken,
+                                  ),
+                                )
                               : null,
                         ),
-                        // Gradient overlay for better text visibility
-                        Positioned(
-                          bottom: 48, // Start from tab bar height
-                          left: 0,
-                          right: 0,
-                          height:
-                              140, // Compact gradient coverage while maintaining readability
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.black.withValues(alpha: 0.2),
-                                  Colors.black.withValues(alpha: 0.4),
-                                ],
-                                stops: const [0.0, 0.6, 1.0],
-                              ),
+                        child: bannerUrl == null
+                            ? _buildDefaultBanner(context)
+                            : null,
+                      ),
+                      // Gradient overlay for better text visibility
+                      Positioned(
+                        bottom: 48, // Start from tab bar height
+                        left: 0,
+                        right: 0,
+                        height:
+                            140, // Compact gradient coverage while maintaining readability
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.2),
+                                Colors.black.withValues(alpha: 0.4),
+                              ],
+                              stops: const [0.0, 0.6, 1.0],
                             ),
                           ),
                         ),
-                        // Group info overlay
-                        Positioned(
-                          bottom: 96, // Added cushion below group profile info
-                          left: 0,
-                          right: 0,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                CircleAvatar(
-                                  radius:
-                                      22, // Slightly reduced to avoid clipping
-                                  backgroundColor: Colors.white,
-                                  backgroundImage: logoUrl != null
-                                      ? NetworkImage(logoUrl)
-                                      : null,
-                                  child: logoUrl == null
-                                      ? const Icon(
-                                          Icons.apartment,
-                                          size: 20, // Proportionally reduced
-                                          color: Color(0xFF667EEA),
-                                        )
-                                      : null,
+                      ),
+                      // Group info overlay
+                      Positioned(
+                        bottom: 96, // Added cushion below group profile info
+                        left: 0,
+                        right: 0,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              CircleAvatar(
+                                radius:
+                                    22, // Slightly reduced to avoid clipping
+                                backgroundColor: Colors.white,
+                                backgroundImage: logoUrl != null
+                                    ? NetworkImage(logoUrl)
+                                    : null,
+                                child: logoUrl == null
+                                    ? const Icon(
+                                        Icons.apartment,
+                                        size: 20, // Proportionally reduced
+                                        color: Color(0xFF667EEA),
+                                      )
+                                    : null,
+                              ),
+                              const SizedBox(width: 12), // Reduced from 16
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      name.isEmpty ? 'Group' : name,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18, // Further reduced
+                                        fontWeight: FontWeight.w700,
+                                        shadows: [
+                                          Shadow(
+                                            offset: Offset(0, 1),
+                                            blurRadius: 3,
+                                            color: Colors.black26,
+                                          ),
+                                        ],
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(
+                                      height: 1,
+                                    ), // Minimal spacing
+                                    Text(
+                                      category,
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 12, // Further reduced
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 12), // Reduced from 16
-                                Expanded(
-                                  child: Column(
+                              ),
+                              if (!_isMember && !_checkingMembership) ...[
+                                const SizedBox(width: 8),
+                                FilledButton(
+                                  onPressed: _hasRequestedJoin
+                                      ? null
+                                      : _requestToJoin,
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 6,
+                                    ),
+                                    backgroundColor: _hasRequestedJoin
+                                        ? Colors.grey.shade400
+                                        : Colors.white,
+                                    foregroundColor: _hasRequestedJoin
+                                        ? Colors.white
+                                        : const Color(0xFF667EEA),
+                                    disabledBackgroundColor:
+                                        Colors.grey.shade400,
+                                    disabledForegroundColor: Colors.white,
+                                  ),
+                                  child: Text(
+                                    _hasRequestedJoin ? 'Requested' : 'Join',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ] else if (_isMember && !_checkingMembership) ...[
+                                const SizedBox(width: 8), // Reduced from 12
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, // Further reduced
+                                    vertical: 3, // Further reduced
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient:
+                                        _memberRole == 'Owner' ||
+                                            _memberRole == 'Admin'
+                                        ? LinearGradient(
+                                            colors: [
+                                              Colors.amber.shade400,
+                                              Colors.orange.shade400,
+                                            ],
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                          )
+                                        : null,
+                                    color:
+                                        _memberRole == 'Owner' ||
+                                            _memberRole == 'Admin'
+                                        ? null
+                                        : Colors.white.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.3,
+                                      ),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
                                     mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        name.isEmpty ? 'Group' : name,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 18, // Further reduced
-                                          fontWeight: FontWeight.w700,
-                                          shadows: [
-                                            Shadow(
-                                              offset: Offset(0, 1),
-                                              blurRadius: 3,
-                                              color: Colors.black26,
-                                            ),
-                                          ],
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+                                      Icon(
+                                        _memberRole == 'Owner'
+                                            ? Icons.star
+                                            : _memberRole == 'Admin'
+                                            ? Icons.shield
+                                            : Icons.check_circle,
+                                        size: 12, // Further reduced
+                                        color: Colors.white,
                                       ),
                                       const SizedBox(
-                                        height: 1,
-                                      ), // Minimal spacing
+                                        width: 3,
+                                      ), // Reduced spacing
                                       Text(
-                                        category,
+                                        _memberRole.isEmpty
+                                            ? 'Member'
+                                            : _memberRole,
                                         style: const TextStyle(
-                                          color: Colors.white70,
-                                          fontSize: 12, // Further reduced
-                                          fontWeight: FontWeight.w500,
+                                          color: Colors.white,
+                                          fontSize: 11, // Further reduced
+                                          fontWeight: FontWeight.w600,
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                if (!_isMember && !_checkingMembership) ...[
-                                  const SizedBox(width: 8),
-                                  FilledButton(
-                                    onPressed: _hasRequestedJoin
-                                        ? null
-                                        : _requestToJoin,
-                                    style: FilledButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 6,
-                                      ),
-                                      backgroundColor: _hasRequestedJoin
-                                          ? Colors.grey.shade400
-                                          : Colors.white,
-                                      foregroundColor: _hasRequestedJoin
-                                          ? Colors.white
-                                          : const Color(0xFF667EEA),
-                                      disabledBackgroundColor:
-                                          Colors.grey.shade400,
-                                      disabledForegroundColor: Colors.white,
-                                    ),
-                                    child: Text(
-                                      _hasRequestedJoin ? 'Requested' : 'Join',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ] else if (_isMember &&
-                                    !_checkingMembership) ...[
-                                  const SizedBox(width: 8), // Reduced from 12
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, // Further reduced
-                                      vertical: 3, // Further reduced
-                                    ),
-                                    decoration: BoxDecoration(
-                                      gradient:
-                                          _memberRole == 'Owner' ||
-                                              _memberRole == 'Admin'
-                                          ? LinearGradient(
-                                              colors: [
-                                                Colors.amber.shade400,
-                                                Colors.orange.shade400,
-                                              ],
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                            )
-                                          : null,
-                                      color:
-                                          _memberRole == 'Owner' ||
-                                              _memberRole == 'Admin'
-                                          ? null
-                                          : Colors.white.withValues(alpha: 0.2),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(
-                                        color: Colors.white.withValues(
-                                          alpha: 0.3,
-                                        ),
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          _memberRole == 'Owner'
-                                              ? Icons.star
-                                              : _memberRole == 'Admin'
-                                              ? Icons.shield
-                                              : Icons.check_circle,
-                                          size: 12, // Further reduced
-                                          color: Colors.white,
-                                        ),
-                                        const SizedBox(
-                                          width: 3,
-                                        ), // Reduced spacing
-                                        Text(
-                                          _memberRole.isEmpty
-                                              ? 'Member'
-                                              : _memberRole,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 11, // Further reduced
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
                               ],
-                            ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  bottom: PreferredSize(
-                    preferredSize: const Size.fromHeight(60),
-                    child: Container(
-                      color: Colors.white,
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child: TabBar(
-                          isScrollable: false,
-                          tabAlignment: TabAlignment.fill,
-                          labelColor: const Color(0xFF667EEA),
-                          unselectedLabelColor: Colors.black54,
-                          indicatorColor: const Color(0xFF667EEA),
-                          indicatorWeight: 3,
-                          labelStyle: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                          ),
-                          unselectedLabelStyle: const TextStyle(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 15,
-                          ),
-                          labelPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          tabs: const [
-                            Tab(text: 'Feed'),
-                            Tab(text: 'Members'),
-                            Tab(text: 'About'),
-                          ],
+                ),
+                bottom: PreferredSize(
+                  preferredSize: const Size.fromHeight(60),
+                  child: Container(
+                    color: Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: TabBar(
+                        controller: _tabController,
+                        isScrollable: false,
+                        tabAlignment: TabAlignment.fill,
+                        labelColor: const Color(0xFF667EEA),
+                        unselectedLabelColor: Colors.black54,
+                        indicatorColor: const Color(0xFF667EEA),
+                        indicatorWeight: 3,
+                        labelStyle: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
                         ),
+                        unselectedLabelStyle: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 15,
+                        ),
+                        labelPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        tabs: const [
+                          Tab(text: 'Feed'),
+                          Tab(text: 'Members'),
+                          Tab(text: 'About'),
+                        ],
                       ),
                     ),
                   ),
                 ),
-              ],
-              body: TabBarView(
-                children: [
-                  EnhancedFeedTab(
-                    organizationId: widget.organizationId,
-                    onScrollChange: _handleScrollChange,
-                  ),
-                  _MembersTab(organizationId: widget.organizationId),
-                  _AboutTab(organizationId: widget.organizationId),
-                ],
               ),
+            ],
+            body: TabBarView(
+              controller: _tabController,
+              children: [
+                EnhancedFeedTab(
+                  organizationId: widget.organizationId,
+                  onScrollChange: _handleScrollChange,
+                ),
+                _MembersTab(organizationId: widget.organizationId),
+                _AboutTab(organizationId: widget.organizationId),
+              ],
             ),
-            floatingActionButton: _AdminFab(
-              key: _fabKey,
-              organizationId: widget.organizationId,
-            ),
-          );
-        },
-      ),
+          ),
+          floatingActionButton: _AdminFab(
+            key: _fabKey,
+            organizationId: widget.organizationId,
+          ),
+        );
+      },
     );
   }
 }
@@ -1673,10 +1677,12 @@ class _MembersTabState extends State<_MembersTab> {
           if (bRole == 'owner' && aRole != 'owner') return 1;
 
           // Admin comes second
-          if (aRole == 'admin' && bRole != 'admin' && bRole != 'owner')
+          if (aRole == 'admin' && bRole != 'admin' && bRole != 'owner') {
             return -1;
-          if (bRole == 'admin' && aRole != 'admin' && aRole != 'owner')
+          }
+          if (bRole == 'admin' && aRole != 'admin' && aRole != 'owner') {
             return 1;
+          }
 
           // Sort by joinedAt (most recent first)
           final aJoined = aData['joinedAt'] as Timestamp?;
@@ -2593,7 +2599,7 @@ class _AdminFabState extends State<_AdminFab> with TickerProviderStateMixin {
   bool _isMember = false;
   bool _isLoading = true;
   bool _isScrollingDown = false; // Track internal scroll state
-  
+
   // Animation controllers
   late AnimationController _fabOpacityController;
   late Animation<double> _fabOpacityAnimation;
@@ -2624,7 +2630,7 @@ class _AdminFabState extends State<_AdminFab> with TickerProviderStateMixin {
   void updateScrollState(bool isScrollingDown) {
     if (_isScrollingDown != isScrollingDown && mounted) {
       _isScrollingDown = isScrollingDown;
-      
+
       try {
         if (_isScrollingDown) {
           _fabOpacityController.reverse(); // Fade out

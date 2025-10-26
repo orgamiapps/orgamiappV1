@@ -1863,6 +1863,19 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                         const SizedBox(height: 12),
                         _buildCompactActionsGrid([
                           _CompactAction(
+                            icon: Icons.edit_note,
+                            title: 'Edit Profile',
+                            subtitle: 'Event Details',
+                            color: const Color(0xFF667EEA),
+                            onTap: () {
+                              Navigator.pop(context);
+                              RouterClass.nextScreenNormal(
+                                context,
+                                EditEventScreen(eventModel: eventModel),
+                              );
+                            },
+                          ),
+                          _CompactAction(
                             icon: Icons.confirmation_number,
                             title: 'Tickets',
                             subtitle: 'Manage',
@@ -3303,62 +3316,63 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     return AnimatedBuilder(
       animation: _pulseAnimation,
       builder: (context, child) {
-        return Container(
-          margin: EdgeInsets.only(
-            bottom: MediaQuery.of(context).padding.bottom + 24,
-          ),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [_primaryBlue, _primaryPurple],
+        return GestureDetector(
+          onTap: () => _showEventManagementModal(),
+          child: Container(
+            margin: EdgeInsets.only(
+              bottom: MediaQuery.of(context).padding.bottom + 24,
             ),
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: _primaryBlue.withValues(alpha: 0.4),
-                spreadRadius: 0,
-                blurRadius: 15,
-                offset: const Offset(0, 6),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [_primaryBlue, _primaryPurple],
               ),
-              BoxShadow(
-                color: _primaryPurple.withValues(alpha: 0.3),
-                spreadRadius: 0,
-                blurRadius: 25,
-                offset: const Offset(0, 12),
-              ),
-            ],
-          ),
-          child: FloatingActionButton.extended(
-            onPressed: () => _showEventManagementModal(),
-            backgroundColor: Colors.transparent,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            extendedPadding: const EdgeInsets.symmetric(horizontal: 24),
-            icon: Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Icon(
-                Icons.dashboard_outlined,
-                size: 18,
-                color: Colors.white,
-              ),
-            ),
-            label: const Text(
-              'Manage Event',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontFamily: 'Roboto',
-                fontSize: 16,
-                letterSpacing: 0.2,
-              ),
-            ),
-            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: _primaryBlue.withValues(alpha: 0.4),
+                  spreadRadius: 0,
+                  blurRadius: 15,
+                  offset: const Offset(0, 6),
+                ),
+                BoxShadow(
+                  color: _primaryPurple.withValues(alpha: 0.3),
+                  spreadRadius: 0,
+                  blurRadius: 25,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(
+                    Icons.dashboard_outlined,
+                    size: 18,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Manage Event',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Roboto',
+                    fontSize: 16,
+                    letterSpacing: 0.2,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -4072,49 +4086,6 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                       ),
                     ),
                   const Spacer(),
-                  if (eventModel.hasManagementPermissions(
-                    FirebaseAuth.instance.currentUser!.uid,
-                  ))
-                    GestureDetector(
-                      onTap: () => RouterClass.nextScreenNormal(
-                        context,
-                        EditEventScreen(eventModel: eventModel),
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF667EEA).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: const Color(0xFF667EEA),
-                            width: 1,
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.edit,
-                              color: Color(0xFF667EEA),
-                              size: 16,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              'Edit',
-                              style: TextStyle(
-                                color: Color(0xFF667EEA),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                fontFamily: 'Roboto',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                 ],
               ),
               const SizedBox(height: 12),

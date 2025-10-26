@@ -74,6 +74,9 @@ class _EditEventScreenState extends State<EditEventScreen>
   late AnimationController _slideController;
   late Animation<Offset> _slideAnimation;
 
+  // Change detection
+  bool _hasChanges = false;
+
   @override
   void initState() {
     super.initState();
@@ -102,6 +105,24 @@ class _EditEventScreenState extends State<EditEventScreen>
 
     _fadeController.forward();
     _slideController.forward();
+
+    // Add listeners to detect changes
+    _addChangeListeners();
+  }
+
+  void _addChangeListeners() {
+    titleEdtController.addListener(_onFieldChanged);
+    descriptionEdtController.addListener(_onFieldChanged);
+    groupNameEdtController.addListener(_onFieldChanged);
+    locationEdtController.addListener(_onFieldChanged);
+  }
+
+  void _onFieldChanged() {
+    if (!_hasChanges) {
+      setState(() {
+        _hasChanges = true;
+      });
+    }
   }
 
   void _initializeEventData() {
@@ -144,6 +165,7 @@ class _EditEventScreenState extends State<EditEventScreen>
         setState(() {
           _selectedImagePath = image.path;
           thumbnailUrlCtlr.text = image.path;
+          _hasChanges = true;
         });
       }
     } catch (e) {
@@ -165,7 +187,10 @@ class _EditEventScreenState extends State<EditEventScreen>
       ),
     );
     if (picked != null) {
-      setState(() => _selectedLocationInternal = picked);
+      setState(() {
+        _selectedLocationInternal = picked;
+        _hasChanges = true;
+      });
       await _reverseGeocodeSelectedLocation();
     }
   }
@@ -208,11 +233,20 @@ class _EditEventScreenState extends State<EditEventScreen>
   }
 
   Future<String?> _uploadToFirebaseHosting() async {
-    if (_selectedImagePath == null) return _currentImageUrl;
+    debugPrint('🔍 DEBUG: _uploadToFirebaseHosting called');
+    debugPrint('🔍 DEBUG: _selectedImagePath: $_selectedImagePath');
+    debugPrint('🔍 DEBUG: _currentImageUrl: $_currentImageUrl');
+    
+    if (_selectedImagePath == null) {
+      debugPrint('🔍 DEBUG: No new image selected, returning current URL: $_currentImageUrl');
+      return _currentImageUrl;
+    }
 
     try {
+      debugPrint('🔍 DEBUG: Starting image upload...');
       String? imageUrl;
       Uint8List imageData = await XFile(_selectedImagePath!).readAsBytes();
+      debugPrint('🔍 DEBUG: Image data loaded, size: ${imageData.length} bytes');
 
       // Generate unique filename with timestamp
       final String fileName =
@@ -220,6 +254,7 @@ class _EditEventScreenState extends State<EditEventScreen>
       final Reference storageReference = FirebaseStorage.instance.ref().child(
         'events_images/$fileName',
       );
+      debugPrint('🔍 DEBUG: Uploading to: events_images/$fileName');
 
       final SettableMetadata metadata = SettableMetadata(
         contentType: 'image/jpeg',
@@ -239,21 +274,28 @@ class _EditEventScreenState extends State<EditEventScreen>
 
       await uploadTask.whenComplete(() async {
         imageUrl = await storageReference.getDownloadURL();
+        debugPrint('🔍 DEBUG: Upload complete, URL: $imageUrl');
       });
 
       return imageUrl;
     } catch (e) {
-      debugPrint('Error uploading image: $e');
-      return null;
+      debugPrint('❌ ERROR: Error uploading image: $e');
+      debugPrint('❌ ERROR: Stack trace: ${StackTrace.current}');
+      // Return current image URL as fallback instead of null
+      debugPrint('🔍 DEBUG: Falling back to current image URL: $_currentImageUrl');
+      return _currentImageUrl;
     }
   }
 
   void _handleSubmit() async {
+    debugPrint('🔍 DEBUG: _handleSubmit called');
     if (_formKey.currentState!.validate()) {
+      debugPrint('🔍 DEBUG: Form validation passed');
       _btnCtlr.start();
 
       try {
         if (_selectedLocationInternal == null) {
+          debugPrint('❌ ERROR: Location not selected');
           _btnCtlr.reset();
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -264,9 +306,15 @@ class _EditEventScreenState extends State<EditEventScreen>
           );
           return;
         }
+        debugPrint('🔍 DEBUG: Location validated: ${_selectedLocationInternal!.latitude}, ${_selectedLocationInternal!.longitude}');
+        
+        debugPrint('🔍 DEBUG: Starting image upload...');
         String? imageUrl = await _uploadToFirebaseHosting();
+        debugPrint('🔍 DEBUG: Image upload result: $imageUrl');
 
+        // Proceed with save if we have an image URL (either new or existing)
         if (imageUrl != null) {
+          debugPrint('🔍 DEBUG: Creating updated event model...');
           // Create updated event model
           EventModel updatedEvent = EventModel(
             id: widget.eventModel.id,
@@ -295,19 +343,25 @@ class _EditEventScreenState extends State<EditEventScreen>
             manualCode: _manualCode,
           );
 
+          debugPrint('🔍 DEBUG: Updating Firestore document: ${widget.eventModel.id}');
           // Update in Firestore
           await FirebaseFirestore.instance
               .collection(EventModel.firebaseKey)
               .doc(widget.eventModel.id)
               .update(updatedEvent.toJson());
 
+          debugPrint('✅ SUCCESS: Event updated in Firestore');
           _btnCtlr.success();
           if (!mounted) return;
+          setState(() {
+            _hasChanges = false;
+          });
           ShowToast().showNormalToast(msg: 'Event updated successfully!');
 
           // Navigate back to the updated event
           Future.delayed(const Duration(seconds: 1), () {
             if (!mounted) return;
+            debugPrint('🔍 DEBUG: Navigating back to event screen');
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
@@ -317,19 +371,29 @@ class _EditEventScreenState extends State<EditEventScreen>
             );
           });
         } else {
+          debugPrint('❌ ERROR: Image URL is null - cannot save event without image');
           _btnCtlr.error();
           if (!mounted) return;
           ShowToast().showNormalToast(
-            msg: 'Failed to upload image. Please try again.',
+            msg: 'Event image is required. Please select an image.',
           );
-          Future.delayed(const Duration(seconds: 2), () => _btnCtlr.reset());
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) _btnCtlr.reset();
+          });
         }
-      } catch (e) {
+      } catch (e, stackTrace) {
+        debugPrint('❌ ERROR: Failed to update event: $e');
+        debugPrint('❌ ERROR: Stack trace: $stackTrace');
         _btnCtlr.error();
         if (!mounted) return;
         ShowToast().showNormalToast(msg: 'Failed to update event: $e');
-        Future.delayed(const Duration(seconds: 2), () => _btnCtlr.reset());
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) _btnCtlr.reset();
+        });
       }
+    } else {
+      debugPrint('❌ ERROR: Form validation failed');
+      _btnCtlr.reset();
     }
   }
 
@@ -347,6 +411,82 @@ class _EditEventScreenState extends State<EditEventScreen>
                 key: _formKey,
                 child: Column(children: [_buildHeader(), _buildFormContent()]),
               ),
+            ),
+          ),
+        ),
+      ),
+      floatingActionButton: _hasChanges ? _buildFloatingUpdateButton() : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+    );
+  }
+
+  Widget _buildFloatingUpdateButton() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      width: double.infinity,
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+        ),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF667EEA).withValues(alpha: 0.35),
+            spreadRadius: 0,
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: const Color(0xFF764BA2).withValues(alpha: 0.2),
+            spreadRadius: 0,
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(28),
+          onTap: () {
+            debugPrint('🔍 DEBUG: Floating button tapped');
+            _handleSubmit();
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_btnCtlr.currentState == ButtonState.loading)
+                  const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                else
+                  const Icon(
+                    Icons.check_circle_outline,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                const SizedBox(width: 10),
+                const Text(
+                  'Update Event',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    fontFamily: 'Roboto',
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -879,6 +1019,7 @@ class _EditEventScreenState extends State<EditEventScreen>
                     } else {
                       _selectedCategories.add(category);
                     }
+                    _hasChanges = true;
                   });
                 },
                 child: Container(
@@ -924,12 +1065,14 @@ class _EditEventScreenState extends State<EditEventScreen>
       onMethodsChanged: (methods) {
         setState(() {
           _selectedSignInMethods = methods;
+          _hasChanges = true;
         });
       },
       manualCode: _manualCode,
       onManualCodeChanged: (code) {
         setState(() {
           _manualCode = code;
+          _hasChanges = true;
         });
       },
       isEditing: true,
@@ -990,6 +1133,7 @@ class _EditEventScreenState extends State<EditEventScreen>
                 onChanged: (value) {
                   setState(() {
                     privateEvent = value ?? false;
+                    _hasChanges = true;
                   });
                 },
                 activeColor: const Color(0xFF667EEA),
@@ -1023,7 +1167,7 @@ class _EditEventScreenState extends State<EditEventScreen>
           end: Alignment.bottomRight,
           colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF667EEA).withValues(alpha: 0.3),
@@ -1031,26 +1175,54 @@ class _EditEventScreenState extends State<EditEventScreen>
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
+          BoxShadow(
+            color: const Color(0xFF764BA2).withValues(alpha: 0.15),
+            spreadRadius: 0,
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: _handleSubmit,
-          child: Center(
-            child: RoundedLoadingButton(
-              controller: _btnCtlr,
-              onPressed: () {},
-              child: const Text(
-                'Update Event',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  fontFamily: 'Roboto',
+          borderRadius: BorderRadius.circular(28),
+          onTap: () {
+            debugPrint('🔍 DEBUG: Bottom button tapped');
+            _handleSubmit();
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_btnCtlr.currentState == ButtonState.loading)
+                  const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                else
+                  const Icon(
+                    Icons.check_circle_outline,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                const SizedBox(width: 10),
+                const Text(
+                  'Update Event',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    fontFamily: 'Roboto',
+                    letterSpacing: 0.5,
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ),

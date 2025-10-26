@@ -234,7 +234,12 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
             if (feedSnapshot.connectionState == ConnectionState.waiting ||
                 eventsSnapshot.connectionState == ConnectionState.waiting) {
               return ListView.builder(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 16,
+                  bottom: MediaQuery.of(context).padding.bottom + 80,
+                ),
                 itemCount: 3,
                 itemBuilder: (context, index) => _buildShimmerCard(),
               );
@@ -285,7 +290,12 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                   await Future.delayed(const Duration(seconds: 1));
                 },
                 child: ListView(
-                  padding: const EdgeInsets.all(24),
+                  padding: EdgeInsets.only(
+                    left: 24,
+                    right: 24,
+                    top: 24,
+                    bottom: MediaQuery.of(context).padding.bottom + 80,
+                  ),
                   children: [
                     const SizedBox(height: 80),
                     Icon(
@@ -662,6 +672,13 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                                 (context, index) =>
                                     buildItem(regularItems[index]),
                                 childCount: regularItems.length,
+                              ),
+                            ),
+                            // Add extra bottom padding for better UX, especially on Android/Samsung devices
+                            SliverPadding(
+                              padding: EdgeInsets.only(
+                                bottom:
+                                    MediaQuery.of(context).padding.bottom + 80,
                               ),
                             ),
                           ],
