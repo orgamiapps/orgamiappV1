@@ -25,6 +25,7 @@ import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/screens/QRScanner/qr_scanner_flow_screen.dart';
+import 'package:attendus/screens/Events/global_events_map_screen.dart';
 
 import 'package:attendus/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
@@ -715,7 +716,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
               Row(
                 children: [
-                  // QR Code Icon (now to the left of search)
+                  // QR Code Icon
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
                     width: _isSearchExpanded ? 0 : 40,
@@ -740,6 +741,39 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 },
                                 child: const Icon(
                                   Icons.qr_code_scanner,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Map Icon
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    width: _isSearchExpanded ? 0 : 40,
+                    child: _isSearchExpanded
+                        ? const SizedBox.shrink()
+                        : Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(20),
+                                onTap: () {
+                                  RouterClass.nextScreenNormal(
+                                    context,
+                                    const GlobalEventsMapScreen(),
+                                  );
+                                },
+                                child: const Icon(
+                                  Icons.map,
                                   color: Colors.white,
                                   size: 20,
                                 ),
