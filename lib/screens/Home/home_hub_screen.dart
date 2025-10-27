@@ -38,14 +38,9 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   void initState() {
     super.initState();
     Logger.debug('🏠 HomeHubScreen: initState started');
-    // Defer heavy operations to prevent blocking UI during navigation
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Logger.debug('🏠 HomeHubScreen: Post-frame callback triggered');
-      if (mounted) {
-        Logger.debug('🏠 HomeHubScreen: Starting _loadOrgs...');
-        _loadOrgs();
-      }
-    });
+    // OPTIMIZATION: Start loading immediately instead of waiting for post-frame callback
+    // This gives us a head start on data fetching
+    _loadOrgs();
     Logger.debug('🏠 HomeHubScreen: initState finished');
   }
 
@@ -86,7 +81,8 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
 
   /// Load user organizations in background after initial UI render
   void _loadUserOrgsInBackground() {
-    Future.delayed(const Duration(seconds: 2), () async {
+    // OPTIMIZATION: Reduced delay from 2s to 1s for faster user org loading
+    Future.delayed(const Duration(seconds: 1), () async {
       if (!mounted) return;
 
       try {
@@ -120,7 +116,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
       Logger.debug('🏠 HomeHubScreen: Creating Firestore query...');
       Query query = FirebaseFirestore.instance
           .collection('Organizations')
-          .limit(10); // Further reduced limit for fastest initial load
+          .limit(20); // OPTIMIZATION: Increased from 10 to 20 for better initial content
 
       final q = _searchCtlr.text.trim().toLowerCase();
       if (_selectedCategoryLower != null &&
