@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -95,7 +96,9 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
 
   Future<void> _initializeServices() async {
     try {
+      Logger.info('Initializing face recognition service...');
       await _faceService.initialize();
+      Logger.info('Face recognition service initialized successfully');
     } catch (e) {
       Logger.error('Failed to initialize face recognition service: $e');
       _showErrorAndExit('Failed to initialize face recognition');
@@ -104,11 +107,15 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
 
   Future<void> _initializeCamera() async {
     try {
+      Logger.info('Initializing camera for face enrollment...');
       _cameras = await availableCameras();
       if (_cameras == null || _cameras!.isEmpty) {
+        Logger.error('No cameras available on this device');
         _showErrorAndExit('No cameras available on this device');
         return;
       }
+
+      Logger.info('Found ${_cameras!.length} camera(s)');
 
       // Prefer front camera for face enrollment
       final frontCamera = _cameras!.firstWhere(
@@ -116,15 +123,21 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
         orElse: () => _cameras!.first,
       );
 
+      Logger.info('Using camera: ${frontCamera.name} (${frontCamera.lensDirection})');
+
       _camera = frontCamera;
+      final imageFormat = Platform.isIOS ? ImageFormatGroup.bgra8888 : ImageFormatGroup.nv21;
+      Logger.info('Using image format: $imageFormat for platform: ${Platform.operatingSystem}');
+      
       _cameraController = CameraController(
         frontCamera,
         ResolutionPreset.medium, // Balance between quality and performance
         enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.nv21,
+        imageFormatGroup: imageFormat,
       );
 
       await _cameraController!.initialize();
+      Logger.info('Camera initialized successfully');
 
       if (mounted) {
         setState(() {
@@ -142,9 +155,11 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
 
   void _startImageStream() {
     if (_cameraController == null || !_cameraController!.value.isInitialized || _isStreamActive) {
+      Logger.warning('Cannot start image stream: camera=${_cameraController != null}, initialized=${_cameraController?.value.isInitialized}, streamActive=$_isStreamActive');
       return;
     }
 
+    Logger.info('Starting image stream for face enrollment');
     _isStreamActive = true;
     _updateStatusMessage('Look straight at the camera');
     _cameraController!.startImageStream(_processCameraImage);
@@ -181,7 +196,9 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
       final inputImage = _faceService.convertCameraImage(cameraImage, _camera!);
       
       if (inputImage == null) {
-        _isProcessing = false;
+        if (mounted) {
+          _updateStatusMessage('Processing image...');
+        }
         return;
       }
 
@@ -189,9 +206,11 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
       final faces = await _faceService.detectFaces(inputImage);
 
       if (faces.isEmpty) {
-        _updateStatusMessage(
-          'No face detected. Please position yourself in the frame.',
-        );
+        if (mounted) {
+          _updateStatusMessage(
+            'No face detected. Please position yourself in the frame.',
+          );
+        }
         return;
       }
 
@@ -199,9 +218,11 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
 
       // Check if face is suitable for enrollment
       if (!_faceService.isFaceSuitable(face)) {
-        _updateStatusMessage(
-          'Please look straight at the camera and keep still.',
-        );
+        if (mounted) {
+          _updateStatusMessage(
+            'Please look straight at the camera and keep still.',
+          );
+        }
         return;
       }
 
@@ -210,13 +231,17 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
 
       // Check if this sample is significantly different from previous ones
       if (_isFeaturesSimilarToExisting(features)) {
-        _updateStatusMessage('Please change your pose slightly.');
+        if (mounted) {
+          _updateStatusMessage('Please change your pose slightly.');
+        }
         return;
       }
 
       // Add to collected features
       _collectedFeatures.add(features);
       _currentStep++;
+
+      Logger.info('Face sample $_currentStep/$_requiredSteps captured successfully');
 
       // Update progress
       _progressAnimationController.animateTo(_currentStep / _requiredSteps);
@@ -229,17 +254,22 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
 
       // Update status message
       if (_currentStep < _requiredSteps) {
-        _updateStatusMessage(
-          'Great! ${_requiredSteps - _currentStep} more captures needed.',
-        );
+        if (mounted) {
+          _updateStatusMessage(
+            'Great! ${_requiredSteps - _currentStep} more captures needed.',
+          );
+        }
       } else {
         // Complete enrollment after collecting all steps
+        Logger.info('All $_requiredSteps face samples collected, completing enrollment');
         _stopImageStream();
         await _completeEnrollment();
       }
     } catch (e) {
       Logger.error('Step capture failed: $e');
-      _updateStatusMessage('Capture failed. Please try again.');
+      if (mounted) {
+        _updateStatusMessage('Capture failed. Please try again.');
+      }
     } finally {
       _isProcessing = false;
     }
@@ -278,16 +308,22 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
         // Use guest parameters
         userId = widget.guestUserId!;
         userName = widget.guestUserName ?? 'Guest';
+        Logger.info('Enrolling guest: $userName (ID: $userId)');
       } else {
         // Use logged-in user
         final currentUser = CustomerController.logeInCustomer;
         if (currentUser == null) {
+          Logger.error('No logged-in user found for enrollment');
           _showErrorAndExit('Please log in to enroll your face.');
           return;
         }
         userId = currentUser.uid;
         userName = currentUser.name;
+        Logger.info('Enrolling logged-in user: $userName (ID: $userId)');
       }
+
+      Logger.info('Enrolling face for event: ${widget.eventModel.id} (${widget.eventModel.title})');
+      Logger.info('Collected ${_collectedFeatures.length} face feature samples');
 
       // Enroll face with collected features
       final success = await _faceService.enrollUserFace(
@@ -298,6 +334,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
       );
 
       if (success) {
+        Logger.info('Face enrollment completed successfully!');
         _updateStatusMessage(
           'Enrollment successful! You can now use face recognition.',
         );
@@ -306,6 +343,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
         // Navigate to scanner or back
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
+            Logger.info('Navigating to face recognition scanner');
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
@@ -319,6 +357,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
           }
         });
       } else {
+        Logger.error('Face enrollment failed - service returned false');
         _showErrorAndExit('Failed to enroll face. Please try again.');
       }
     } catch (e) {

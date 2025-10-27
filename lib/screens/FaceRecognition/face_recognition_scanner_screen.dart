@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'package:camera/camera.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -132,7 +133,9 @@ class _FaceRecognitionScannerScreenState
         frontCamera,
         ResolutionPreset.low, // Lower resolution for faster processing
         enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.nv21, // Better for ML processing
+        imageFormatGroup: Platform.isIOS
+            ? ImageFormatGroup.bgra8888
+            : ImageFormatGroup.nv21,
       );
 
       await _cameraController!.initialize();
