@@ -2513,7 +2513,7 @@ Join us at: $eventUrl
   }
 
   void _showSignInMethodSelector() {
-    final availableMethods = eventModel.signInMethods;
+    final availableMethods = eventModel.getAvailableSignInMethods();
 
     if (availableMethods.length == 1) {
       // Only one method available, use it directly
@@ -2644,6 +2644,13 @@ Join us at: $eventUrl
 
   Map<String, dynamic> _getMethodInfo(String method) {
     switch (method) {
+      case 'most_secure':
+        return {
+          'title': 'Most Secure',
+          'description': 'Verify with geofence + facial recognition',
+          'icon': Icons.verified_user,
+          'color': const Color(0xFFFF6B6B),
+        };
       case 'facial_recognition':
         return {
           'title': 'Facial Recognition',
@@ -2684,6 +2691,10 @@ Join us at: $eventUrl
 
   void _handleSignInMethod(String method) {
     switch (method) {
+      case 'most_secure':
+        // Most Secure: requires geofence validation THEN facial recognition
+        _handleMostSecureSignIn();
+        break;
       case 'facial_recognition':
         _handleFacialRecognitionSignIn();
         break;
@@ -2701,6 +2712,67 @@ Join us at: $eventUrl
               'Geofence sign-in is automatic when you\'re near the event location.',
         );
         break;
+    }
+  }
+  
+  /// Handles the Most Secure sign-in method (geofence + facial recognition)
+  void _handleMostSecureSignIn() async {
+    // Check if user is logged in
+    if (user == null) {
+      ShowToast().showNormalToast(
+        msg: 'Please log in to sign in to this event.',
+      );
+      return;
+    }
+
+    // Step 1: Check geofence - user must be within the event location
+    try {
+      // Get current location
+      Position? currentPosition = await LocationHelper.getCurrentLocation(
+        context,
+        showDialogs: true,
+      );
+
+      if (currentPosition == null) {
+        ShowToast().showNormalToast(
+          msg: 'Unable to get your location. Please enable location services.',
+        );
+        return;
+      }
+
+      // Check if user is within geofence
+      final eventLocation = LatLng(eventModel.latitude, eventModel.longitude);
+      final distance = LocationHelper.calculateDistance(
+        eventLocation,
+        LatLng(currentPosition.latitude, currentPosition.longitude),
+      );
+
+      final isWithinGeofence = distance <= eventModel.radius;
+
+      if (!isWithinGeofence) {
+        // Show error with distance information
+        final distanceKm = (distance / 1000).toStringAsFixed(2);
+        ShowToast().showNormalToast(
+          msg:
+              'You must be at the event location to sign in. You are $distanceKm km away.',
+        );
+        return;
+      }
+
+      // Step 2: User is within geofence, now prompt for facial recognition
+      ShowToast().showNormalToast(
+        msg: 'Location verified! Please complete facial recognition.',
+      );
+
+      // Wait a moment for the toast to show
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      // Launch facial recognition
+      _handleFacialRecognitionSignIn();
+    } catch (e) {
+      ShowToast().showNormalToast(
+        msg: 'Error verifying location: ${e.toString()}',
+      );
     }
   }
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:attendus/screens/Events/add_questions_prompt_screen.dart';
-import 'package:attendus/screens/Events/Widget/sign_in_methods_selector.dart';
+import 'package:attendus/screens/Events/Widget/sign_in_security_tier_selector.dart';
 import 'package:attendus/Utils/router.dart';
 
 class ChoseSignInMethodsScreen extends StatefulWidget {
@@ -25,13 +25,11 @@ class ChoseSignInMethodsScreen extends StatefulWidget {
 
 class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
     with TickerProviderStateMixin {
-  // Default to all four methods selected
-  List<String> _selectedSignInMethods = [
-    'facial_recognition',
-    'geofence',
-    'qr_code',
-    'manual_code',
-  ];
+  // New security tier system
+  String _selectedSignInTier = 'regular'; // 'most_secure', 'regular', or 'all'
+  
+  // Legacy method list for backward compatibility
+  List<String> _selectedSignInMethods = ['qr_code', 'manual_code'];
   String? _manualCode;
 
   // Animation controllers
@@ -154,18 +152,30 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Sign-In Methods Selector
-            SignInMethodsSelector(
-              selectedMethods: _selectedSignInMethods,
-              onMethodsChanged: (methods) {
+            // New Sign-In Security Tier Selector
+            SignInSecurityTierSelector(
+              selectedTier: _selectedSignInTier,
+              onTierChanged: (tier) {
                 setState(() {
-                  _selectedSignInMethods = methods;
-                });
-              },
-              manualCode: _manualCode,
-              onManualCodeChanged: (code) {
-                setState(() {
-                  _manualCode = code;
+                  _selectedSignInTier = tier;
+                  
+                  // Update legacy methods list based on tier
+                  switch (tier) {
+                    case 'most_secure':
+                      _selectedSignInMethods = ['geofence', 'facial_recognition'];
+                      break;
+                    case 'regular':
+                      _selectedSignInMethods = ['qr_code', 'manual_code'];
+                      break;
+                    case 'all':
+                      _selectedSignInMethods = [
+                        'geofence',
+                        'facial_recognition',
+                        'qr_code',
+                        'manual_code',
+                      ];
+                      break;
+                  }
                 });
               },
             ),
@@ -254,6 +264,7 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
           borderRadius: BorderRadius.circular(16),
           onTap: () {
             // Proceed directly to questions prompt. Location will be picked on Event Details.
+            // Pass the security tier info to the next screen
             RouterClass.nextScreenNormal(
               context,
               AddQuestionsPromptScreen(
@@ -262,6 +273,7 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
                 selectedLocation: const LatLng(0, 0), // Placeholder
                 radios: 10.0, // Default radius
                 selectedSignInMethods: _selectedSignInMethods,
+                selectedSignInTier: _selectedSignInTier, // Pass the tier
                 manualCode: _manualCode,
                 preselectedOrganizationId: widget.preselectedOrganizationId,
                 forceOrganizationEvent: widget.forceOrganizationEvent,

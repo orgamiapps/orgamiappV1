@@ -26,6 +26,7 @@ import 'package:attendus/screens/Events/location_picker_screen.dart';
 import 'package:attendus/Services/creation_limit_service.dart';
 import 'package:attendus/widgets/limit_reached_dialog.dart';
 import 'package:attendus/Utils/app_app_bar_view.dart';
+import 'package:attendus/screens/Events/Widget/sign_in_security_tier_selector.dart';
 
 class CreateEventScreen extends StatefulWidget {
   final DateTime? selectedDateTime;
@@ -33,6 +34,7 @@ class CreateEventScreen extends StatefulWidget {
   final LatLng selectedLocation;
   final double radios;
   final List<String>? selectedSignInMethods;
+  final String? selectedSignInTier; // New: security tier
   final String? manualCode;
   final List<EventQuestionModel>? questions;
   final String? preselectedOrganizationId;
@@ -45,6 +47,7 @@ class CreateEventScreen extends StatefulWidget {
     required this.selectedLocation,
     required this.radios,
     this.selectedSignInMethods,
+    this.selectedSignInTier = 'regular',
     this.manualCode,
     this.questions,
     this.preselectedOrganizationId,
@@ -91,8 +94,9 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   String? _selectedOrganizationId;
   List<Map<String, String>> _userOrganizations = const [];
 
-  // Sign-in methods
-  late List<String> _selectedSignInMethods;
+  // Sign-in security tier
+  String _selectedSignInTier = 'regular'; // 'most_secure', 'regular', or 'all'
+  late List<String> _selectedSignInMethods; // Legacy support
   String? _manualCode;
 
   // Animation controllers
@@ -273,7 +277,9 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           .trim()
           .isNotEmpty;
       // If geofence sign-in is selected, require a map location
-      if (_selectedSignInMethods.contains('geofence')) {
+      if (_selectedSignInMethods.contains('geofence') || 
+          _selectedSignInTier == 'most_secure' || 
+          _selectedSignInTier == 'all') {
         if (!hasLocation) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -461,6 +467,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
               ? [FirebaseAuth.instance.currentUser!.uid]
               : const [],
           signInMethods: _selectedSignInMethods,
+          signInSecurityTier: _selectedSignInTier, // Add security tier
           manualCode: _manualCode,
         );
 
@@ -551,7 +558,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   void initState() {
     super.initState();
 
-    // Initialize sign-in methods
+    // Initialize sign-in tier and methods
+    _selectedSignInTier = widget.selectedSignInTier ?? 'regular';
     _selectedSignInMethods =
         widget.selectedSignInMethods ?? ['qr_code', 'manual_code'];
     _manualCode = widget.manualCode;

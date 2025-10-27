@@ -16,7 +16,7 @@ import 'package:attendus/Utils/text_fields.dart';
 import 'package:attendus/Utils/toast.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
-import 'package:attendus/screens/Events/Widget/sign_in_methods_selector.dart';
+import 'package:attendus/screens/Events/Widget/sign_in_security_tier_selector.dart';
 import 'package:attendus/screens/Events/location_picker_screen.dart';
 import 'dart:io';
 
@@ -59,7 +59,8 @@ class _EditEventScreenState extends State<EditEventScreen>
   String? _selectedImagePath;
   String? _currentImageUrl;
 
-  // Sign-in methods
+  // Sign-in security tier
+  String _selectedSignInTier = 'regular'; // 'most_secure', 'regular', or 'all'
   List<String> _selectedSignInMethods = ['qr_code', 'manual_code'];
   String? _manualCode;
 
@@ -135,6 +136,7 @@ class _EditEventScreenState extends State<EditEventScreen>
     _currentImageUrl = event.imageUrl;
     _selectedCategories = List.from(event.categories);
     privateEvent = event.private;
+    _selectedSignInTier = event.signInSecurityTier ?? 'regular';
     _selectedSignInMethods = List.from(event.signInMethods);
     _manualCode = event.manualCode;
 
@@ -339,6 +341,7 @@ class _EditEventScreenState extends State<EditEventScreen>
           organizationId: widget.eventModel.organizationId,
           accessList: widget.eventModel.accessList,
           signInMethods: _selectedSignInMethods,
+          signInSecurityTier: _selectedSignInTier, // Add security tier
           manualCode: _manualCode,
         );
 
@@ -1048,19 +1051,30 @@ class _EditEventScreenState extends State<EditEventScreen>
   }
 
   Widget _buildSignInMethodsSection() {
-    return SignInMethodsSelector(
-      selectedMethods: _selectedSignInMethods,
-      onMethodsChanged: (methods) {
+    return SignInSecurityTierSelector(
+      selectedTier: _selectedSignInTier,
+      onTierChanged: (tier) {
         setState(() {
-          _selectedSignInMethods = methods;
+          _selectedSignInTier = tier;
           _hasChanges = true;
-        });
-      },
-      manualCode: _manualCode,
-      onManualCodeChanged: (code) {
-        setState(() {
-          _manualCode = code;
-          _hasChanges = true;
+          
+          // Update legacy methods list based on tier
+          switch (tier) {
+            case 'most_secure':
+              _selectedSignInMethods = ['geofence', 'facial_recognition'];
+              break;
+            case 'regular':
+              _selectedSignInMethods = ['qr_code', 'manual_code'];
+              break;
+            case 'all':
+              _selectedSignInMethods = [
+                'geofence',
+                'facial_recognition',
+                'qr_code',
+                'manual_code',
+              ];
+              break;
+          }
         });
       },
       isEditing: true,

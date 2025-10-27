@@ -31,7 +31,13 @@ class EventModel {
   accessList; // For private events outside org or additional invitees
 
   // Sign-in methods configuration
-  List<String> signInMethods; // ['qr_code', 'manual_code', 'geofence']
+  // Legacy support: ['qr_code', 'manual_code', 'geofence', 'facial_recognition']
+  List<String> signInMethods; 
+  
+  // New security tier system
+  // Options: 'most_secure', 'regular', 'all'
+  String? signInSecurityTier;
+  
   String? manualCode; // Custom manual code for the event
 
   // Live Quiz configuration
@@ -73,10 +79,10 @@ class EventModel {
     this.organizationId,
     this.accessList = const [],
     this.signInMethods = const [
-      'facial_recognition',
       'qr_code',
       'manual_code',
-    ], // Default methods
+    ], // Default methods (legacy support)
+    this.signInSecurityTier = 'regular', // Default to regular tier
     this.manualCode,
     this.hasLiveQuiz = false,
     this.liveQuizId,
@@ -136,7 +142,8 @@ class EventModel {
       signInMethods:
           (data.containsKey('signInMethods') && data['signInMethods'] != null)
           ? List<String>.from(data['signInMethods'])
-          : ['facial_recognition', 'qr_code', 'manual_code'],
+          : ['qr_code', 'manual_code'], // Default to regular methods
+      signInSecurityTier: data['signInSecurityTier'] ?? 'regular',
       manualCode: data['manualCode'],
       hasLiveQuiz: data['hasLiveQuiz'] ?? false,
       liveQuizId: data['liveQuizId'],
@@ -188,7 +195,51 @@ class EventModel {
 
   /// Check if a specific sign-in method is enabled
   bool isSignInMethodEnabled(String method) {
+    // For new security tier system
+    if (signInSecurityTier != null) {
+      switch (signInSecurityTier) {
+        case 'most_secure':
+          // Most Secure: requires geofence AND facial recognition combo
+          return method == 'geofence' || method == 'facial_recognition';
+        case 'regular':
+          // Regular: QR code or manual code
+          return method == 'qr_code' || method == 'manual_code';
+        case 'all':
+          // All methods available
+          return true;
+        default:
+          break;
+      }
+    }
+    
+    // Legacy support: check individual methods
     return signInMethods.contains(method);
+  }
+  
+  /// Get available sign-in methods based on security tier
+  List<String> getAvailableSignInMethods() {
+    if (signInSecurityTier != null) {
+      switch (signInSecurityTier) {
+        case 'most_secure':
+          return ['most_secure']; // Special indicator for geofence + facial combo
+        case 'regular':
+          return ['qr_code', 'manual_code'];
+        case 'all':
+          return ['most_secure', 'qr_code', 'manual_code'];
+        default:
+          break;
+      }
+    }
+    
+    // Legacy support
+    return signInMethods;
+  }
+  
+  /// Check if the event requires geofence-based sign-in
+  bool get requiresGeofence {
+    return signInSecurityTier == 'most_secure' || 
+           signInSecurityTier == 'all' ||
+           signInMethods.contains('geofence');
   }
 
   /// Get the manual code for the event (generates one if not set)
@@ -234,6 +285,7 @@ class EventModel {
     if (organizationId != null) data['organizationId'] = organizationId;
     data['accessList'] = accessList;
     data['signInMethods'] = signInMethods;
+    if (signInSecurityTier != null) data['signInSecurityTier'] = signInSecurityTier;
     if (manualCode != null) data['manualCode'] = manualCode;
     data['hasLiveQuiz'] = hasLiveQuiz;
     if (liveQuizId != null) data['liveQuizId'] = liveQuizId;
