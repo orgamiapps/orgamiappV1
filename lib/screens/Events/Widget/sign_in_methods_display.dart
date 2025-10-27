@@ -16,7 +16,9 @@ class SignInMethodsDisplay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (eventModel.signInMethods.isEmpty) {
+    final availableMethods = eventModel.getAvailableSignInMethods();
+    
+    if (availableMethods.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -48,14 +50,14 @@ class SignInMethodsDisplay extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
-                  Icons.login,
+                  Icons.security,
                   color: Color(0xFF667EEA),
                   size: 18,
                 ),
               ),
               const SizedBox(width: 12),
               const Text(
-                'Sign-In Methods',
+                'Sign-In Security',
                 style: TextStyle(
                   color: Color(0xFF1A1A1A),
                   fontWeight: FontWeight.w600,
@@ -87,15 +89,80 @@ class SignInMethodsDisplay extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
+          // Show security tier badge if using new system
+          if (eventModel.signInSecurityTier != null)
+            _buildSecurityTierBadge(),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: eventModel.signInMethods.map((method) {
+            children: availableMethods.map((method) {
               return _buildMethodChip(method);
             }).toList(),
           ),
           if (eventModel.isSignInMethodEnabled('manual_code'))
             _buildManualCodeSection(),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildSecurityTierBadge() {
+    String tierText;
+    Color tierColor;
+    IconData tierIcon;
+    
+    switch (eventModel.signInSecurityTier) {
+      case 'most_secure':
+        tierText = 'Most Secure';
+        tierColor = const Color(0xFFFF6B6B);
+        tierIcon = Icons.verified_user;
+        break;
+      case 'regular':
+        tierText = 'Regular Security';
+        tierColor = const Color(0xFF667EEA);
+        tierIcon = Icons.shield;
+        break;
+      case 'all':
+        tierText = 'All Methods Available';
+        tierColor = const Color(0xFF11998E);
+        tierIcon = Icons.all_inclusive;
+        break;
+      default:
+        return const SizedBox.shrink();
+    }
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            tierColor.withValues(alpha: 0.15),
+            tierColor.withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: tierColor.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(tierIcon, color: tierColor, size: 16),
+          const SizedBox(width: 8),
+          Text(
+            tierText,
+            style: TextStyle(
+              color: tierColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Roboto',
+            ),
+          ),
         ],
       ),
     );
@@ -201,6 +268,18 @@ class SignInMethodsDisplay extends StatelessWidget {
 
   Map<String, dynamic> _getMethodInfo(String method) {
     switch (method) {
+      case 'most_secure':
+        return {
+          'title': 'Most Secure',
+          'icon': Icons.verified_user,
+          'color': const Color(0xFFFF6B6B),
+        };
+      case 'facial_recognition':
+        return {
+          'title': 'Facial Recognition',
+          'icon': Icons.face,
+          'color': const Color(0xFFFF6B6B),
+        };
       case 'qr_code':
         return {
           'title': 'QR Code',
