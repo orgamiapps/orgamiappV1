@@ -14,8 +14,15 @@ import 'face_recognition_scanner_screen.dart';
 /// Professional face enrollment screen for event attendance
 class FaceEnrollmentScreen extends StatefulWidget {
   final EventModel eventModel;
+  final String? guestUserId;
+  final String? guestUserName;
 
-  const FaceEnrollmentScreen({super.key, required this.eventModel});
+  const FaceEnrollmentScreen({
+    super.key,
+    required this.eventModel,
+    this.guestUserId,
+    this.guestUserName,
+  });
 
   @override
   State<FaceEnrollmentScreen> createState() => _FaceEnrollmentScreenState();
@@ -261,16 +268,31 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     _updateStatusMessage('Processing enrollment...');
 
     try {
-      final currentUser = CustomerController.logeInCustomer;
-      if (currentUser == null) {
-        _showErrorAndExit('Please log in to enroll your face.');
-        return;
+      // Determine if this is a guest enrollment
+      final isGuest = widget.guestUserId != null;
+      
+      String userId;
+      String userName;
+      
+      if (isGuest) {
+        // Use guest parameters
+        userId = widget.guestUserId!;
+        userName = widget.guestUserName ?? 'Guest';
+      } else {
+        // Use logged-in user
+        final currentUser = CustomerController.logeInCustomer;
+        if (currentUser == null) {
+          _showErrorAndExit('Please log in to enroll your face.');
+          return;
+        }
+        userId = currentUser.uid;
+        userName = currentUser.name;
       }
 
       // Enroll face with collected features
       final success = await _faceService.enrollUserFace(
-        userId: currentUser.uid,
-        userName: currentUser.name,
+        userId: userId,
+        userName: userName,
         eventId: widget.eventModel.id,
         faceFeatures: _collectedFeatures,
       );
@@ -287,8 +309,11 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) =>
-                    FaceRecognitionScannerScreen(eventModel: widget.eventModel),
+                builder: (context) => FaceRecognitionScannerScreen(
+                  eventModel: widget.eventModel,
+                  guestUserId: isGuest ? userId : null,
+                  guestUserName: isGuest ? userName : null,
+                ),
               ),
             );
           }

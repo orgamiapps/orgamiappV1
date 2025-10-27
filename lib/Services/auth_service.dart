@@ -10,6 +10,7 @@ import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Services/firebase_initializer.dart';
 import 'package:attendus/firebase/firebase_google_auth_helper.dart';
 import 'package:attendus/Utils/firebase_retry_helper.dart';
+import 'package:attendus/Services/guest_mode_service.dart';
 
 /// Authentication service that handles persistent login functionality
 /// using Firebase Auth and secure storage for enhanced security
@@ -278,6 +279,10 @@ class AuthService extends ChangeNotifier {
         key: _keyLastLoginTime,
         value: DateTime.now().toIso8601String(),
       );
+      
+      // Disable guest mode when user logs in
+      await GuestModeService().disableGuestMode();
+      
       Logger.info('User session saved');
     } catch (e) {
       Logger.error('Error saving user session', e);
