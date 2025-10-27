@@ -1250,18 +1250,6 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       _buildActionButton(
-                        icon: Icons.refresh,
-                        label: 'Refresh',
-                        onTap: () async {
-                          setState(() {
-                            isLoading = true;
-                          });
-                          await _loadProfileData();
-                        },
-                        isActive: false,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildActionButton(
                         icon: Icons.tune,
                         label: 'Filter/Sort',
                         onTap: _showFilterSortModal,

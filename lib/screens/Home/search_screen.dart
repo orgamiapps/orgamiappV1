@@ -862,7 +862,7 @@ class _EventsListState extends State<EventsList>
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                _usingAi ? Icons.psychology_rounded : Icons.search_off_rounded,
+                _usingAi ? Icons.search_off_rounded : Icons.search_off_rounded,
                 size: 60,
                 color: _usingAi
                     ? const Color(0xFF6366F1)
@@ -873,9 +873,7 @@ class _EventsListState extends State<EventsList>
             Text(
               widget.searchQuery.isEmpty
                   ? 'No Events Available'
-                  : (_usingAi
-                        ? '🤖 Smart Search: No Matching Events'
-                        : 'No Events Found'),
+                  : (_usingAi ? 'No Matching Events' : 'No Events Found'),
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
@@ -898,32 +896,48 @@ class _EventsListState extends State<EventsList>
               textAlign: TextAlign.center,
             ),
             if (_usingAi && widget.searchQuery.isNotEmpty) ...[
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.lightbulb_outline,
+                          size: 18,
+                          color: Color(0xFF6366F1),
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Search Suggestions',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1E293B),
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 12),
                     Text(
-                      '💡 Smart Search Examples:',
+                      '• "find a book club near me"\n• "concert this weekend"\n• "tech workshop tomorrow"',
                       style: TextStyle(
                         fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF6366F1),
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      '"find a book club near me"\n"concert this weekend"\n"tech workshop tomorrow"',
-                      style: TextStyle(
-                        fontSize: 12,
                         color: Color(0xFF64748B),
-                        height: 1.5,
+                        height: 1.6,
+                        fontFamily: 'Roboto',
                       ),
-                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),

@@ -183,12 +183,20 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
         'updatedBy': user.uid,
       };
 
-      // Add image URLs if they exist
+      // Always include image URLs (even if null) to ensure removals are saved
+      // When null, use FieldValue.delete() to remove the field from Firestore
       if (logoUrl != null) {
         updateData['logoUrl'] = logoUrl;
+      } else if (_currentLogoUrl == null && _logoFile == null) {
+        // Logo was explicitly removed
+        updateData['logoUrl'] = FieldValue.delete();
       }
+
       if (bannerUrl != null) {
         updateData['bannerUrl'] = bannerUrl;
+      } else if (_currentBannerUrl == null && _bannerFile == null) {
+        // Banner was explicitly removed
+        updateData['bannerUrl'] = FieldValue.delete();
       }
 
       final ok = await _orgHelper.updateOrganizationDetailsUnique(

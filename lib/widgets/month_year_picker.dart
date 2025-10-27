@@ -264,7 +264,9 @@ class _MonthYearPickerSheetState extends State<MonthYearPickerSheet>
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -352,29 +354,37 @@ class _MonthYearPickerSheetState extends State<MonthYearPickerSheet>
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            Theme.of(context).colorScheme.primary, 
-                            Theme.of(context).colorScheme.secondary
+                            Theme.of(context).colorScheme.primary,
+                            Theme.of(context).colorScheme.secondary,
                           ],
                         )
                       : null,
                   color: !isSelected
                       ? isCurrentMonth
-                            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
-                            : Theme.of(context).colorScheme.surfaceContainerHighest
+                            ? Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.1)
+                            : Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHighest
                       : null,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: isSelected
                         ? Colors.transparent
                         : isCurrentMonth
-                        ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)
+                        ? Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0.3)
                         : Theme.of(context).dividerColor,
                     width: isSelected ? 0 : 1.5,
                   ),
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.primary.withValues(alpha: 0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 4),
                           ),
@@ -422,8 +432,15 @@ class _MonthYearPickerSheetState extends State<MonthYearPickerSheet>
   }
 
   Widget _buildBottomButtons() {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: 20 + bottomPadding,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Colors.grey.shade200, width: 1)),

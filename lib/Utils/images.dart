@@ -1,5 +1,6 @@
 class Images {
-  static const String inAppLogo = 'attendus_logo.png';
+  static const String inAppLogo = 'attendus_logo_withText.png';
+  static const String inAppLogoOnly = 'attendus_logo_only.png';
   static const String qrCode = 'images/qrCode.png';
 
   static const String worstNonActive = 'images/worstNonActive.png';

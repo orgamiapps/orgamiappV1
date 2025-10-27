@@ -230,9 +230,9 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
           body: NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) => [
               SliverAppBar(
-                pinned: false,
+                pinned: true,
                 floating: true,
-                snap: true,
+                snap: false,
                 expandedHeight: 260,
                 elevation: 0,
                 surfaceTintColor: Colors.transparent,
@@ -1920,25 +1920,34 @@ class _AboutTab extends StatelessWidget {
             .where('organizationId', isEqualTo: organizationId)
             .get(),
         _getAttendanceDataForOrganization(organizationId),
+        _getUpcomingEvents(organizationId),
       ]),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
             child: Padding(
               padding: EdgeInsets.all(32),
-              child: CircularProgressIndicator(),
+              child: CircularProgressIndicator(
+                color: Color(0xFF667EEA),
+              ),
             ),
           );
         }
 
         if (!snapshot.hasData) {
-          return const Center(child: Text('Unable to load group information'));
+          return const Center(
+            child: Text(
+              'Unable to load group information',
+              style: TextStyle(fontSize: 16),
+            ),
+          );
         }
 
         final orgSnapshot = snapshot.data![0] as DocumentSnapshot;
         final membersSnapshot = snapshot.data![1] as QuerySnapshot;
         final eventsSnapshot = snapshot.data![2] as QuerySnapshot;
         final totalAttendees = snapshot.data![3] as int;
+        final upcomingEvents = snapshot.data![4] as List<Map<String, dynamic>>;
 
         final data = orgSnapshot.data() as Map<String, dynamic>?;
         final description = (data?['description'] ?? '').toString();
@@ -1960,144 +1969,54 @@ class _AboutTab extends StatelessWidget {
         }).length;
 
         return ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           children: [
-            // Group Overview Section
-            _buildSection(context, 'Group Overview', Icons.info_outline, [
-              if (description.isNotEmpty) ...[
-                _buildInfoRow(
-                  context,
-                  'Description',
-                  description,
-                  isExpandable: description.length > 100,
-                ),
-                const SizedBox(height: 16),
-              ],
-              _buildInfoRow(context, 'Category', category),
-              const SizedBox(height: 12),
-              _buildInfoRow(
-                context,
-                'Event Privacy',
-                defaultEventVisibility == 'public'
-                    ? 'Public Events'
-                    : 'Private Events',
-                subtitle: defaultEventVisibility == 'public'
-                    ? 'Events are visible to everyone'
-                    : 'Events are only visible to members',
-              ),
-              if (createdAt != null) ...[
-                const SizedBox(height: 12),
-                _buildInfoRow(
-                  context,
-                  'Created',
-                  _formatDate(createdAt),
-                  subtitle: _getTimeAgo(createdAt),
-                ),
-              ],
-            ]),
+            // Hero Stats Card - Eye-catching overview
+            _buildHeroStatsCard(
+              context,
+              memberCount,
+              eventCount,
+              activeEvents,
+              totalAttendees,
+            ),
 
             const SizedBox(height: 24),
 
-            // Statistics Section
-            _buildSection(context, 'Statistics', Icons.analytics_outlined, [
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
-                      context,
-                      'Members',
-                      memberCount.toString(),
-                      Icons.people_outline,
-                      const Color(0xFF667EEA),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(
-                      context,
-                      'Total Events',
-                      eventCount.toString(),
-                      Icons.event_outlined,
-                      const Color(0xFF764BA2),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
-                      context,
-                      'Active Events',
-                      activeEvents.toString(),
-                      Icons.event_available_outlined,
-                      const Color(0xFF4CAF50),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCardWithDynamicText(
-                      context,
-                      'Total Attendees',
-                      totalAttendees.toString(),
-                      Icons.people_alt_outlined,
-                      const Color(0xFFFF6B6B),
-                      totalAttendees,
-                    ),
-                  ),
-                ],
-              ),
-            ]),
-
-            // Location Section (if available)
-            if (locationAddress.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              _buildSection(context, 'Location', Icons.location_on_outlined, [
-                _buildLocationCard(context, locationAddress),
-              ]),
+            // Description Section
+            if (description.isNotEmpty) ...[
+              _buildDescriptionCard(context, description, category),
+              const SizedBox(height: 20),
             ],
 
-            // Contact & Links Section
-            if (website.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              _buildSection(context, 'Contact & Links', Icons.link_outlined, [
-                _buildLinkCard(context, 'Website', website, Icons.language),
-              ]),
+            // Key Information Grid
+            _buildKeyInfoGrid(
+              context,
+              category,
+              defaultEventVisibility,
+              createdAt,
+              locationAddress,
+            ),
+
+            const SizedBox(height: 20),
+
+            // Upcoming Events Section
+            if (upcomingEvents.isNotEmpty) ...[
+              _buildUpcomingEventsSection(context, upcomingEvents),
+              const SizedBox(height: 20),
             ],
+
+            // Quick Actions Section
+            _buildQuickActionsSection(
+              context,
+              website,
+              locationAddress,
+              organizationId,
+            ),
+
+            const SizedBox(height: 20),
 
             // Admin Information Section
-            const SizedBox(height: 24),
-            _buildSection(
-              context,
-              'Administration',
-              Icons.admin_panel_settings_outlined,
-              [
-                FutureBuilder<DocumentSnapshot>(
-                  future: FirebaseFirestore.instance
-                      .collection('Customers')
-                      .doc(createdBy)
-                      .get(),
-                  builder: (context, adminSnapshot) {
-                    if (adminSnapshot.hasData && adminSnapshot.data!.exists) {
-                      final adminData =
-                          adminSnapshot.data!.data() as Map<String, dynamic>;
-                      final adminName = adminData['name'] ?? 'Unknown';
-                      final adminProfileUrl =
-                          adminData['profileImageUrl'] ??
-                          adminData['profilePictureUrl'];
-
-                      return _buildAdminCard(
-                        context,
-                        adminName,
-                        adminProfileUrl,
-                      );
-                    }
-                    return _buildAdminCard(context, 'Group Admin', null);
-                  },
-                ),
-              ],
-            ),
+            _buildAdminSection(context, createdBy),
 
             const SizedBox(height: 32),
           ],
@@ -2156,274 +2075,667 @@ class _AboutTab extends StatelessWidget {
     }
   }
 
-  Widget _buildSection(
+  Future<List<Map<String, dynamic>>> _getUpcomingEvents(
+    String organizationId,
+  ) async {
+    try {
+      final now = DateTime.now();
+      final eventsSnapshot = await FirebaseFirestore.instance
+          .collection('Events')
+          .where('organizationId', isEqualTo: organizationId)
+          .where('startDateTime', isGreaterThan: Timestamp.fromDate(now))
+          .orderBy('startDateTime')
+          .limit(3)
+          .get();
+
+      return eventsSnapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          'name': data['name'] ?? '',
+          'startDateTime': data['startDateTime'] as Timestamp?,
+          'imageUrl': data['imageUrl'] ?? data['eventImageUrl'],
+        };
+      }).toList();
+    } catch (e) {
+      debugPrint('Error getting upcoming events: $e');
+      return [];
+    }
+  }
+
+  // New refined UI components
+
+  Widget _buildHeroStatsCard(
     BuildContext context,
-    String title,
-    IconData icon,
-    List<Widget> children,
+    int memberCount,
+    int eventCount,
+    int activeEvents,
+    int totalAttendees,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.insights,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Group Insights',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildHeroStatItem(
+                    'Members',
+                    memberCount.toString(),
+                    Icons.people,
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 50,
+                  color: Colors.white.withValues(alpha: 0.3),
+                ),
+                Expanded(
+                  child: _buildHeroStatItem(
+                    'Events',
+                    eventCount.toString(),
+                    Icons.event,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              height: 1,
+              color: Colors.white.withValues(alpha: 0.3),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildHeroStatItem(
+                    'Active',
+                    activeEvents.toString(),
+                    Icons.event_available,
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 50,
+                  color: Colors.white.withValues(alpha: 0.3),
+                ),
+                Expanded(
+                  child: _buildHeroStatItem(
+                    'Attendees',
+                    totalAttendees.toString(),
+                    Icons.people_alt,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeroStatItem(String label, String value, IconData icon) {
+    return Column(
+      children: [
+        Icon(icon, color: Colors.white.withValues(alpha: 0.9), size: 28),
+        const SizedBox(height: 8),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.9),
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDescriptionCard(
+    BuildContext context,
+    String description,
+    String category,
   ) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey[850] : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 20, color: const Color(0xFF667EEA)),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: theme.textTheme.titleMedium?.color,
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _getCategoryIcon(category),
+                        size: 16,
+                        color: const Color(0xFF667EEA),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        category,
+                        style: TextStyle(
+                          color: const Color(0xFF667EEA),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'About this group',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _ExpandableText(
+              text: description,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                height: 1.6,
+                color: theme.textTheme.bodyMedium?.color?.withValues(
+                  alpha: 0.8,
+                ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        ...children,
-      ],
+      ),
     );
   }
 
-  Widget _buildInfoRow(
+  Widget _buildKeyInfoGrid(
     BuildContext context,
-    String label,
-    String value, {
-    String? subtitle,
-    bool isExpandable = false,
-  }) {
+    String category,
+    String visibility,
+    DateTime? createdAt,
+    String locationAddress,
+  ) {
     final theme = Theme.of(context);
+
+    final items = <Widget>[
+      _buildInfoGridItem(
+        context,
+        'Event Privacy',
+        visibility == 'public' ? 'Public Events' : 'Private Events',
+        visibility == 'public'
+            ? Icons.public
+            : Icons.lock_outline,
+        const Color(0xFF667EEA),
+        subtitle: visibility == 'public'
+            ? 'Open to everyone'
+            : 'Members only',
+      ),
+      if (createdAt != null)
+        _buildInfoGridItem(
+          context,
+          'Established',
+          _formatDate(createdAt),
+          Icons.calendar_today_outlined,
+          const Color(0xFF764BA2),
+          subtitle: _getTimeAgo(createdAt).replaceFirst('Created ', ''),
+        ),
+      if (locationAddress.isNotEmpty)
+        _buildInfoGridItem(
+          context,
+          'Location',
+          _getShortLocation(locationAddress),
+          Icons.location_on_outlined,
+          const Color(0xFF4CAF50),
+          subtitle: 'Tap to view on map',
+          onTap: () async {
+            final encodedAddress = Uri.encodeComponent(locationAddress);
+            final uri = Uri.parse(
+              'https://maps.google.com/?q=$encodedAddress',
+            );
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            }
+          },
+        ),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 4),
-        if (isExpandable)
-          _ExpandableText(text: value, style: theme.textTheme.bodyMedium)
-        else
-          Text(value, style: theme.textTheme.bodyMedium),
-        if (subtitle != null) ...[
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            'Key Information',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
             ),
           ),
-        ],
+        ),
+        ...items.map((item) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: item,
+        )),
       ],
     );
   }
 
-  Widget _buildStatCard(
+  Widget _buildInfoGridItem(
     BuildContext context,
     String label,
     String value,
     IconData icon,
-    Color color,
-  ) {
+    Color color, {
+    String? subtitle,
+    VoidCallback? onTap,
+  }) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey[850] : Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
-          width: 1,
-        ),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: theme.textTheme.headlineSmall?.color,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatCardWithDynamicText(
-    BuildContext context,
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-    int numericValue,
-  ) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    // Dynamic font size based on number of digits
-    double getFontSize() {
-      if (numericValue < 10) return 28.0; // Single digit: largest
-      if (numericValue < 100) return 26.0; // Two digits: large
-      if (numericValue < 1000) return 24.0; // Three digits: medium
-      if (numericValue < 10000) return 22.0; // Four digits: smaller
-      return 20.0; // Five+ digits: smallest
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey[850] : Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
-          width: 1,
-        ),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              value,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.textTheme.headlineSmall?.color,
-                fontSize: getFontSize(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLocationCard(BuildContext context, String address) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey[850] : Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.place_outlined, color: const Color(0xFF667EEA), size: 20),
-          const SizedBox(width: 12),
-          Expanded(child: Text(address, style: theme.textTheme.bodyMedium)),
-          IconButton(
-            onPressed: () async {
-              final encodedAddress = Uri.encodeComponent(address);
-              final uri = Uri.parse(
-                'https://maps.google.com/?q=$encodedAddress',
-              );
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              }
-            },
-            icon: const Icon(Icons.open_in_new, size: 18),
-            style: IconButton.styleFrom(
-              foregroundColor: const Color(0xFF667EEA),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLinkCard(
-    BuildContext context,
-    String label,
-    String url,
-    IconData icon,
-  ) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey[850] : Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
-          width: 1,
-        ),
-      ),
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
-        onTap: () async {
-          final uri = Uri.tryParse(url);
-          if (uri != null && await canLaunchUrl(uri)) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          }
-        },
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark ? Colors.grey[850] : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: color, size: 24),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.textTheme.bodySmall?.color?.withValues(
+                            alpha: 0.6,
+                          ),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        value,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.textTheme.bodySmall?.color?.withValues(
+                              alpha: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (onTap != null)
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 16,
+                    color: theme.textTheme.bodySmall?.color?.withValues(
+                      alpha: 0.4,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUpcomingEventsSection(
+    BuildContext context,
+    List<Map<String, dynamic>> events,
+  ) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
           child: Row(
             children: [
-              Icon(icon, color: const Color(0xFF667EEA), size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      url,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: const Color(0xFF667EEA),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+              Icon(
+                Icons.event_available,
+                size: 20,
+                color: const Color(0xFF667EEA),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Upcoming Events',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              const Icon(Icons.open_in_new, size: 16, color: Color(0xFF667EEA)),
+            ],
+          ),
+        ),
+        ...events.take(3).map((event) {
+          final startDateTime = event['startDateTime'] as Timestamp?;
+          final date = startDateTime?.toDate();
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.grey[850] : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: date != null
+                      ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              date.day.toString(),
+                              style: const TextStyle(
+                                color: Color(0xFF667EEA),
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              _getMonthAbbr(date.month),
+                              style: TextStyle(
+                                color: const Color(0xFF667EEA).withValues(
+                                  alpha: 0.7,
+                                ),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        )
+                      : const Icon(
+                          Icons.event,
+                          color: Color(0xFF667EEA),
+                          size: 28,
+                        ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          event['name'] ?? 'Unnamed Event',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (date != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            _formatEventDateTime(date),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.textTheme.bodySmall?.color
+                                  ?.withValues(alpha: 0.6),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 14,
+                    color: theme.textTheme.bodySmall?.color?.withValues(
+                      alpha: 0.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildQuickActionsSection(
+    BuildContext context,
+    String website,
+    String locationAddress,
+    String organizationId,
+  ) {
+    final theme = Theme.of(context);
+
+    final actions = <Widget>[];
+
+    if (website.isNotEmpty) {
+      actions.add(
+        _buildQuickActionButton(
+          context,
+          'Visit Website',
+          Icons.language,
+          const Color(0xFF667EEA),
+          () async {
+            final uri = Uri.tryParse(website);
+            if (uri != null && await canLaunchUrl(uri)) {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            }
+          },
+        ),
+      );
+    }
+
+    if (locationAddress.isNotEmpty) {
+      actions.add(
+        _buildQuickActionButton(
+          context,
+          'View on Map',
+          Icons.map_outlined,
+          const Color(0xFF4CAF50),
+          () async {
+            final encodedAddress = Uri.encodeComponent(locationAddress);
+            final uri = Uri.parse(
+              'https://maps.google.com/?q=$encodedAddress',
+            );
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            }
+          },
+        ),
+      );
+    }
+
+    if (actions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            'Quick Actions',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: actions,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActionButton(
+    BuildContext context,
+    String label,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: color.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
             ],
           ),
         ),
@@ -2431,76 +2743,221 @@ class _AboutTab extends StatelessWidget {
     );
   }
 
-  Widget _buildAdminCard(
-    BuildContext context,
-    String adminName,
-    String? profileUrl,
-  ) {
+  Widget _buildAdminSection(BuildContext context, String createdBy) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey[850] : Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: const Color(0xFF667EEA),
-            backgroundImage: profileUrl != null
-                ? NetworkImage(profileUrl)
-                : null,
-            child: profileUrl == null
-                ? const Icon(Icons.person, color: Colors.white, size: 20)
-                : null,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Group Admin',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.textTheme.bodySmall?.color?.withValues(
-                      alpha: 0.7,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  adminName,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFF667EEA).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              'Owner',
-              style: theme.textTheme.bodySmall?.copyWith(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Row(
+            children: [
+              Icon(
+                Icons.admin_panel_settings_outlined,
+                size: 20,
                 color: const Color(0xFF667EEA),
-                fontWeight: FontWeight.w500,
               ),
-            ),
+              const SizedBox(width: 8),
+              Text(
+                'Group Admin',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+        FutureBuilder<DocumentSnapshot>(
+          future: FirebaseFirestore.instance
+              .collection('Customers')
+              .doc(createdBy)
+              .get(),
+          builder: (context, snapshot) {
+            final adminData = snapshot.hasData && snapshot.data!.exists
+                ? snapshot.data!.data() as Map<String, dynamic>
+                : null;
+
+            final adminName = adminData?['name'] ?? 'Group Admin';
+            final adminProfileUrl = adminData?['profileImageUrl'] ??
+                adminData?['profilePictureUrl'];
+
+            return Container(
+              decoration: BoxDecoration(
+                color: isDark ? Colors.grey[850] : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                        ),
+                        border: Border.all(
+                          color: Colors.white,
+                          width: 2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF667EEA).withValues(
+                              alpha: 0.3,
+                            ),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: adminProfileUrl != null
+                          ? ClipOval(
+                              child: Image.network(
+                                adminProfileUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Icon(
+                                    Icons.person,
+                                    color: Colors.white,
+                                    size: 28,
+                                  );
+                                },
+                              ),
+                            )
+                          : const Icon(
+                              Icons.person,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            adminName,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF667EEA).withValues(
+                                alpha: 0.1,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.workspace_premium,
+                                  size: 14,
+                                  color: const Color(0xFF667EEA),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Owner',
+                                  style: TextStyle(
+                                    color: const Color(0xFF667EEA),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ],
     );
+  }
+
+  // Helper methods
+
+  IconData _getCategoryIcon(String category) {
+    final categoryLower = category.toLowerCase();
+    if (categoryLower.contains('sport')) return Icons.sports_soccer;
+    if (categoryLower.contains('music')) return Icons.music_note;
+    if (categoryLower.contains('art')) return Icons.palette;
+    if (categoryLower.contains('tech')) return Icons.computer;
+    if (categoryLower.contains('food')) return Icons.restaurant;
+    if (categoryLower.contains('education')) return Icons.school;
+    if (categoryLower.contains('business')) return Icons.business_center;
+    if (categoryLower.contains('social')) return Icons.people;
+    return Icons.category;
+  }
+
+  String _getShortLocation(String address) {
+    final parts = address.split(',');
+    if (parts.length > 2) {
+      return '${parts[0].trim()}, ${parts[1].trim()}';
+    }
+    return parts.isNotEmpty ? parts[0].trim() : address;
+  }
+
+  String _getMonthAbbr(int month) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return months[month - 1];
+  }
+
+  String _formatEventDateTime(DateTime date) {
+    final now = DateTime.now();
+    final difference = date.difference(now);
+
+    if (difference.inDays == 0) {
+      return 'Today at ${_formatTime(date)}';
+    } else if (difference.inDays == 1) {
+      return 'Tomorrow at ${_formatTime(date)}';
+    } else if (difference.inDays < 7) {
+      return '${_getDayName(date.weekday)} at ${_formatTime(date)}';
+    } else {
+      return '${_getMonthAbbr(date.month)} ${date.day} at ${_formatTime(date)}';
+    }
+  }
+
+  String _formatTime(DateTime date) {
+    final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
+    final minute = date.minute.toString().padLeft(2, '0');
+    final period = date.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:$minute $period';
+  }
+
+  String _getDayName(int weekday) {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return days[weekday - 1];
   }
 
   String _formatDate(DateTime date) {

@@ -11,6 +11,7 @@ class AddQuestionsPromptScreen extends StatefulWidget {
   final LatLng selectedLocation;
   final double radios;
   final List<String> selectedSignInMethods;
+  final String? selectedSignInTier; // New: security tier ('most_secure', 'regular', 'all')
   final String? manualCode;
   final String? preselectedOrganizationId;
   final bool forceOrganizationEvent;
@@ -22,6 +23,7 @@ class AddQuestionsPromptScreen extends StatefulWidget {
     required this.selectedLocation,
     required this.radios,
     required this.selectedSignInMethods,
+    this.selectedSignInTier = 'regular', // Default to regular
     this.manualCode,
     this.preselectedOrganizationId,
     this.forceOrganizationEvent = false,
@@ -244,9 +246,9 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
                     selectedDateTime: widget.selectedDateTime ?? DateTime.now(),
                     eventGenerateTime: DateTime.now(),
                     status: '',
-                    getLocation: widget.selectedSignInMethods.contains(
-                      'geofence',
-                    ),
+                    getLocation: widget.selectedSignInMethods.contains('geofence') ||
+                        widget.selectedSignInTier == 'most_secure' ||
+                        widget.selectedSignInTier == 'all',
                     radius: widget.radios,
                     longitude: widget.selectedLocation.longitude,
                     latitude: widget.selectedLocation.latitude,
@@ -254,6 +256,7 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
                     categories: [],
                     eventDuration: widget.eventDurationHours ?? 1,
                     signInMethods: widget.selectedSignInMethods,
+                    signInSecurityTier: widget.selectedSignInTier,
                     manualCode: widget.manualCode,
                   ),
                   onBackPressed: () {
@@ -265,6 +268,7 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
                     'selectedLocation': widget.selectedLocation,
                     'radios': widget.radios,
                     'selectedSignInMethods': widget.selectedSignInMethods,
+                    'selectedSignInTier': widget.selectedSignInTier,
                     'manualCode': widget.manualCode,
                     'preselectedOrganizationId':
                         widget.preselectedOrganizationId,
@@ -291,6 +295,7 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
                   selectedLocation: widget.selectedLocation,
                   radios: widget.radios,
                   selectedSignInMethods: widget.selectedSignInMethods,
+                  selectedSignInTier: widget.selectedSignInTier,
                   manualCode: widget.manualCode,
                   preselectedOrganizationId: widget.preselectedOrganizationId,
                   forceOrganizationEvent: widget.forceOrganizationEvent,

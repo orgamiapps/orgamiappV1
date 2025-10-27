@@ -8,6 +8,8 @@ import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Groups/create_announcement_screen.dart';
 import 'package:attendus/screens/Groups/create_poll_screen.dart';
 import 'package:attendus/screens/Groups/create_photo_post_screen.dart';
+import 'package:attendus/screens/Groups/photo_comments_modal.dart';
+import 'package:attendus/screens/Groups/photo_viewer_screen.dart';
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 import 'package:attendus/Utils/cached_image.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
@@ -1047,13 +1049,16 @@ class _PhotoPostCard extends StatelessWidget {
                                 children: [
                                   Row(
                                     children: [
-                                      Text(
-                                        displayName.isNotEmpty
-                                            ? displayName
-                                            : 'Unknown',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 14,
+                                      Flexible(
+                                        child: Text(
+                                          displayName.isNotEmpty
+                                              ? displayName
+                                              : 'Unknown',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                       if (authorRole == 'admin' ||
@@ -1084,12 +1089,23 @@ class _PhotoPostCard extends StatelessWidget {
                                       ],
                                     ],
                                   ),
+                                  const SizedBox(height: 2),
                                   if (createdAt != null)
                                     Text(
                                       _getTimeAgo(createdAt.toDate()),
                                       style: TextStyle(
                                         color: Colors.grey.shade600,
                                         fontSize: 12,
+                                        fontWeight: FontWeight.w400,
+                                      ),
+                                    )
+                                  else
+                                    Text(
+                                      'Just now',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade600,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w400,
                                       ),
                                     ),
                                 ],
@@ -1195,28 +1211,64 @@ class _PhotoPostCard extends StatelessWidget {
             // Images
             if (imageUrls.isNotEmpty) ...[
               if (imageUrls.length == 1)
-                AspectRatio(
-                  aspectRatio: 1,
-                  child: SafeNetworkImage(
-                    imageUrl: imageUrls[0],
-                    fit: BoxFit.cover,
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PhotoViewerScreen(
+                          imageUrls: imageUrls,
+                          initialIndex: 0,
+                          organizationId: organizationId,
+                          postId: docId,
+                          authorName: authorName,
+                          caption: caption,
+                          commentCount: data['commentCount'] ?? 0,
+                        ),
+                      ),
+                    );
+                  },
+                  child: AspectRatio(
+                    aspectRatio: 1,
+                    child: SafeNetworkImage(
+                      imageUrl: imageUrls[0],
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 )
               else if (imageUrls.length == 2)
                 Row(
-                  children: imageUrls
-                      .map(
-                        (url) => Expanded(
-                          child: AspectRatio(
-                            aspectRatio: 1,
-                            child: SafeNetworkImage(
-                              imageUrl: url,
-                              fit: BoxFit.cover,
+                  children: imageUrls.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final url = entry.value;
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PhotoViewerScreen(
+                                imageUrls: imageUrls,
+                                initialIndex: index,
+                                organizationId: organizationId,
+                                postId: docId,
+                                authorName: authorName,
+                                caption: caption,
+                                commentCount: data['commentCount'] ?? 0,
+                              ),
                             ),
+                          );
+                        },
+                        child: AspectRatio(
+                          aspectRatio: 1,
+                          child: SafeNetworkImage(
+                            imageUrl: url,
+                            fit: BoxFit.cover,
                           ),
                         ),
-                      )
-                      .toList(),
+                      ),
+                    );
+                  }).toList(),
                 )
               else
                 GridView.builder(
@@ -1229,33 +1281,50 @@ class _PhotoPostCard extends StatelessWidget {
                   ),
                   itemCount: imageUrls.length > 9 ? 9 : imageUrls.length,
                   itemBuilder: (context, index) {
-                    if (index == 8 && imageUrls.length > 9) {
-                      return Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          SafeNetworkImage(
-                            imageUrl: imageUrls[index],
-                            fit: BoxFit.cover,
-                          ),
-                          Container(
-                            color: Colors.black54,
-                            child: Center(
-                              child: Text(
-                                '+${imageUrls.length - 9}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => PhotoViewerScreen(
+                              imageUrls: imageUrls,
+                              initialIndex: index,
+                              organizationId: organizationId,
+                              postId: docId,
+                              authorName: authorName,
+                              caption: caption,
+                              commentCount: data['commentCount'] ?? 0,
                             ),
                           ),
-                        ],
-                      );
-                    }
-                    return SafeNetworkImage(
-                      imageUrl: imageUrls[index],
-                      fit: BoxFit.cover,
+                        );
+                      },
+                      child: index == 8 && imageUrls.length > 9
+                          ? Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                SafeNetworkImage(
+                                  imageUrl: imageUrls[index],
+                                  fit: BoxFit.cover,
+                                ),
+                                Container(
+                                  color: Colors.black54,
+                                  child: Center(
+                                    child: Text(
+                                      '+${imageUrls.length - 9}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : SafeNetworkImage(
+                              imageUrl: imageUrls[index],
+                              fit: BoxFit.cover,
+                            ),
                     );
                   },
                 ),
@@ -1304,7 +1373,16 @@ class _PhotoPostCard extends StatelessWidget {
                       const SizedBox(width: 16),
                       InkWell(
                         onTap: () {
-                          // TODO: Implement comments
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (context) => PhotoCommentsModal(
+                              organizationId: organizationId,
+                              postId: docId,
+                              initialCommentCount: data['commentCount'] ?? 0,
+                            ),
+                          );
                         },
                         borderRadius: BorderRadius.circular(20),
                         child: Padding(
@@ -1317,12 +1395,31 @@ class _PhotoPostCard extends StatelessWidget {
                                 size: 20,
                               ),
                               const SizedBox(width: 4),
-                              Text(
-                                '0',
-                                style: TextStyle(
-                                  color: Colors.grey.shade600,
-                                  fontSize: 14,
-                                ),
+                              StreamBuilder<DocumentSnapshot>(
+                                stream: FirebaseFirestore.instance
+                                    .collection('Organizations')
+                                    .doc(organizationId)
+                                    .collection('Feed')
+                                    .doc(docId)
+                                    .snapshots(),
+                                builder: (context, snapshot) {
+                                  final commentCount =
+                                      snapshot.data?.data() != null
+                                      ? ((snapshot.data!.data()
+                                                as Map<
+                                                  String,
+                                                  dynamic
+                                                >)['commentCount'] ??
+                                            0)
+                                      : 0;
+                                  return Text(
+                                    commentCount.toString(),
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 14,
+                                    ),
+                                  );
+                                },
                               ),
                             ],
                           ),

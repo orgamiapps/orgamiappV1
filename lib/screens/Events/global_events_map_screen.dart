@@ -619,6 +619,205 @@ class _GlobalEventsMapScreenState extends State<GlobalEventsMapScreen> {
     }
   }
 
+  // Calculate distance from user location to event
+  double _calculateDistance(EventModel event) {
+    if (_userLocation == null) {
+      return double.infinity;
+    }
+    return Geolocator.distanceBetween(
+      _userLocation!.latitude,
+      _userLocation!.longitude,
+      event.latitude,
+      event.longitude,
+    );
+  }
+
+  // Format distance for display (US units: feet/miles)
+  String _formatDistance(double distanceInMeters) {
+    if (distanceInMeters == double.infinity) {
+      return 'Unknown';
+    }
+    
+    // Convert meters to feet
+    final distanceInFeet = distanceInMeters * 3.28084;
+    
+    // If less than 1 mile (5280 feet), show in feet
+    if (distanceInFeet < 5280) {
+      return '${distanceInFeet.round()} ft';
+    }
+    
+    // Otherwise show in miles
+    final distanceInMiles = distanceInFeet / 5280;
+    return '${distanceInMiles.toStringAsFixed(1)} mi';
+  }
+
+  // Show events list modal sorted by distance
+  void _showEventsListModal() {
+    if (_allEvents.isEmpty) {
+      return;
+    }
+
+    // Sort events by distance from user location
+    final sortedEvents = List<EventModel>.from(_allEvents);
+    sortedEvents.sort((a, b) {
+      final distanceA = _calculateDistance(a);
+      final distanceB = _calculateDistance(b);
+      return distanceA.compareTo(distanceB);
+    });
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.4,
+        minChildSize: 0.3,
+        maxChildSize: 0.45,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+
+              // Header
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.event, color: Colors.blue, size: 24),
+                    const SizedBox(width: 12),
+                    Text(
+                      '${sortedEvents.length} Events Nearby',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+
+              // Events list
+              Expanded(
+                child: ListView.separated(
+                  controller: scrollController,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: sortedEvents.length,
+                  separatorBuilder: (context, index) =>
+                      const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final event = sortedEvents[index];
+                    final distance = _calculateDistance(event);
+                    final distanceText = _formatDistance(distance);
+
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 8,
+                      ),
+                      leading: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: event.imageUrl.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: event.imageUrl,
+                                width: 60,
+                                height: 60,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => Container(
+                                  width: 60,
+                                  height: 60,
+                                  color: Colors.grey[200],
+                                  child: const Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  width: 60,
+                                  height: 60,
+                                  color: Colors.grey[200],
+                                  child: const Icon(Icons.event, size: 30),
+                                ),
+                              )
+                            : Container(
+                                width: 60,
+                                height: 60,
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.event, size: 30),
+                              ),
+                      ),
+                      title: Text(
+                        event.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on,
+                                size: 14,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                distanceText,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            DateFormat(
+                              'MMM d, y • h:mm a',
+                            ).format(event.selectedDateTime),
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                      onTap: () {
+                        Navigator.pop(context); // Close modal
+                        _zoomToEvent(event);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -855,44 +1054,56 @@ class _GlobalEventsMapScreenState extends State<GlobalEventsMapScreen> {
             ),
           ),
 
-          // Event counter badge (bottom center)
+          // Event counter badge (bottom center) - Tappable
           Positioned(
             bottom: MediaQuery.of(context).padding.bottom + 16,
             left: 0,
             right: 0,
             child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(25),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.event, size: 18, color: Colors.blue),
-                    const SizedBox(width: 8),
-                    Text(
-                      _markers.isEmpty
-                          ? 'No events with locations'
-                          : '${_markers.length} events on map',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+              child: InkWell(
+                onTap: _markers.isNotEmpty ? _showEventsListModal : null,
+                borderRadius: BorderRadius.circular(25),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(25),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.event, size: 18, color: Colors.blue),
+                      const SizedBox(width: 8),
+                      Text(
+                        _markers.isEmpty
+                            ? 'No events with locations'
+                            : '${_markers.length} events on map',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      if (_markers.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.arrow_drop_up,
+                          size: 20,
+                          color: Colors.blue,
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
             ),
