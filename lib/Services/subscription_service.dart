@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/models/subscription_model.dart';
@@ -98,7 +99,10 @@ class SubscriptionService extends ChangeNotifier {
       // Only notify if state actually changes
       if (!_isLoading) {
         _isLoading = true;
-        notifyListeners();
+        // CRITICAL FIX: Defer notifyListeners to prevent setState during build
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          notifyListeners();
+        });
       }
 
       await _loadUserSubscription();
@@ -113,7 +117,10 @@ class SubscriptionService extends ChangeNotifier {
     } finally {
       if (_isLoading) {
         _isLoading = false;
-        notifyListeners();
+        // CRITICAL FIX: Defer notifyListeners to prevent setState during build
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          notifyListeners();
+        });
       }
     }
   }
@@ -123,7 +130,10 @@ class SubscriptionService extends ChangeNotifier {
     final userId = _auth.currentUser?.uid;
     if (userId == null) {
       _currentSubscription = null;
-      notifyListeners();
+      // CRITICAL FIX: Defer notifyListeners to prevent setState during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
       return;
     }
 
@@ -147,12 +157,18 @@ class SubscriptionService extends ChangeNotifier {
       
       // Notify listeners if subscription state changed
       if (oldSubscription?.isActive != _currentSubscription?.isActive) {
-        notifyListeners();
+        // CRITICAL FIX: Defer notifyListeners to prevent setState during build
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          notifyListeners();
+        });
       }
     } catch (e) {
       Logger.error('Error loading user subscription', e);
       _currentSubscription = null;
-      notifyListeners();
+      // CRITICAL FIX: Defer notifyListeners to prevent setState during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
     }
   }
 

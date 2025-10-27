@@ -71,17 +71,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _bodyView() {
-    final size = MediaQuery.of(context).size;
-    
-    // Use IndexedStack for better performance - keeps widget state and avoids rebuilding
-    return SizedBox(
-      height: size.height,
-      width: size.width,
-      child: IndexedStack(
-        index: _selectedIndex,
-        sizing: StackFit.expand,
-        children: _screens,
-      ),
+    // OPTIMIZATION: IndexedStack with StackFit.expand handles sizing automatically
+    // No need for MediaQuery or explicit SizedBox dimensions
+    return IndexedStack(
+      index: _selectedIndex,
+      sizing: StackFit.expand,
+      children: _screens,
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Services/subscription_service.dart';
 import 'package:attendus/models/subscription_model.dart';
@@ -82,14 +83,20 @@ class CreationLimitService extends ChangeNotifier {
 
     try {
       _isLoading = true;
-      notifyListeners();
+      // CRITICAL FIX: Defer notifyListeners to prevent setState during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
 
       await _loadCreationCounts();
     } catch (e) {
       Logger.error('Failed to initialize creation limit service', e);
     } finally {
       _isLoading = false;
-      notifyListeners();
+      // CRITICAL FIX: Defer notifyListeners to prevent setState during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
     }
   }
 

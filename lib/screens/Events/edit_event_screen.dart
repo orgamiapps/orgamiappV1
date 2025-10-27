@@ -312,75 +312,63 @@ class _EditEventScreenState extends State<EditEventScreen>
         String? imageUrl = await _uploadToFirebaseHosting();
         debugPrint('🔍 DEBUG: Image upload result: $imageUrl');
 
-        // Proceed with save if we have an image URL (either new or existing)
-        if (imageUrl != null) {
-          debugPrint('🔍 DEBUG: Creating updated event model...');
-          // Create updated event model
-          EventModel updatedEvent = EventModel(
-            id: widget.eventModel.id,
-            title: titleEdtController.text.trim(),
-            description: descriptionEdtController.text.trim(),
-            location: locationEdtController.text.trim(),
-            groupName: groupNameEdtController.text.trim(),
-            imageUrl: imageUrl,
-            selectedDateTime: widget.eventModel.selectedDateTime,
-            customerUid: widget.eventModel.customerUid,
-            categories: _selectedCategories,
-            private: privateEvent,
-            getLocation: widget.eventModel.getLocation,
-            radius: widget.eventModel.radius,
-            ticketsEnabled: widget.eventModel.ticketsEnabled,
-            maxTickets: widget.eventModel.maxTickets,
-            issuedTickets: widget.eventModel.issuedTickets,
-            isFeatured: widget.eventModel.isFeatured,
-            status: widget.eventModel.status,
-            eventGenerateTime: widget.eventModel.eventGenerateTime,
-            latitude: _selectedLocationInternal!.latitude,
-            longitude: _selectedLocationInternal!.longitude,
-            organizationId: widget.eventModel.organizationId,
-            accessList: widget.eventModel.accessList,
-            signInMethods: _selectedSignInMethods,
-            manualCode: _manualCode,
-          );
+        // Image is now optional - proceed with save even if imageUrl is null/empty
+        debugPrint('🔍 DEBUG: Creating updated event model...');
+        // Create updated event model
+        EventModel updatedEvent = EventModel(
+          id: widget.eventModel.id,
+          title: titleEdtController.text.trim(),
+          description: descriptionEdtController.text.trim(),
+          location: locationEdtController.text.trim(),
+          groupName: groupNameEdtController.text.trim(),
+          imageUrl: imageUrl ?? '', // Use empty string if no image
+          selectedDateTime: widget.eventModel.selectedDateTime,
+          customerUid: widget.eventModel.customerUid,
+          categories: _selectedCategories,
+          private: privateEvent,
+          getLocation: widget.eventModel.getLocation,
+          radius: widget.eventModel.radius,
+          ticketsEnabled: widget.eventModel.ticketsEnabled,
+          maxTickets: widget.eventModel.maxTickets,
+          issuedTickets: widget.eventModel.issuedTickets,
+          isFeatured: widget.eventModel.isFeatured,
+          status: widget.eventModel.status,
+          eventGenerateTime: widget.eventModel.eventGenerateTime,
+          latitude: _selectedLocationInternal!.latitude,
+          longitude: _selectedLocationInternal!.longitude,
+          organizationId: widget.eventModel.organizationId,
+          accessList: widget.eventModel.accessList,
+          signInMethods: _selectedSignInMethods,
+          manualCode: _manualCode,
+        );
 
-          debugPrint('🔍 DEBUG: Updating Firestore document: ${widget.eventModel.id}');
-          // Update in Firestore
-          await FirebaseFirestore.instance
-              .collection(EventModel.firebaseKey)
-              .doc(widget.eventModel.id)
-              .update(updatedEvent.toJson());
+        debugPrint('🔍 DEBUG: Updating Firestore document: ${widget.eventModel.id}');
+        // Update in Firestore
+        await FirebaseFirestore.instance
+            .collection(EventModel.firebaseKey)
+            .doc(widget.eventModel.id)
+            .update(updatedEvent.toJson());
 
-          debugPrint('✅ SUCCESS: Event updated in Firestore');
-          _btnCtlr.success();
+        debugPrint('✅ SUCCESS: Event updated in Firestore');
+        _btnCtlr.success();
+        if (!mounted) return;
+        setState(() {
+          _hasChanges = false;
+        });
+        ShowToast().showNormalToast(msg: 'Event updated successfully!');
+
+        // Navigate back to the updated event
+        Future.delayed(const Duration(seconds: 1), () {
           if (!mounted) return;
-          setState(() {
-            _hasChanges = false;
-          });
-          ShowToast().showNormalToast(msg: 'Event updated successfully!');
-
-          // Navigate back to the updated event
-          Future.delayed(const Duration(seconds: 1), () {
-            if (!mounted) return;
-            debugPrint('🔍 DEBUG: Navigating back to event screen');
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    SingleEventScreen(eventModel: updatedEvent),
-              ),
-            );
-          });
-        } else {
-          debugPrint('❌ ERROR: Image URL is null - cannot save event without image');
-          _btnCtlr.error();
-          if (!mounted) return;
-          ShowToast().showNormalToast(
-            msg: 'Event image is required. Please select an image.',
+          debugPrint('🔍 DEBUG: Navigating back to event screen');
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  SingleEventScreen(eventModel: updatedEvent),
+            ),
           );
-          Future.delayed(const Duration(seconds: 2), () {
-            if (mounted) _btnCtlr.reset();
-          });
-        }
+        });
       } catch (e, stackTrace) {
         debugPrint('❌ ERROR: Failed to update event: $e');
         debugPrint('❌ ERROR: Stack trace: $stackTrace');
@@ -627,7 +615,7 @@ class _EditEventScreenState extends State<EditEventScreen>
               ),
               const SizedBox(width: 12),
               const Text(
-                'Event Image',
+                'Event Image (Optional)',
                 style: TextStyle(
                   color: Color(0xFF1A1A1A),
                   fontWeight: FontWeight.w600,
@@ -1376,7 +1364,7 @@ class _EditEventScreenState extends State<EditEventScreen>
             ),
             const SizedBox(height: 16),
             Text(
-              'Upload Event Image',
+              'Upload Event Image (Optional)',
               style: TextStyle(
                 color: const Color(0xFF1A1A1A),
                 fontWeight: FontWeight.w600,

@@ -1884,7 +1884,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                         _buildCompactActionsGrid([
                           _CompactAction(
                             icon: Icons.edit_note,
-                            title: 'Edit Profile',
+                            title: 'Edit Event',
                             subtitle: 'Event Details',
                             color: const Color(0xFF667EEA),
                             onTap: () {
@@ -3641,9 +3641,10 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
-            // Event Image
+            // Event Image (only shown if image URL exists)
             _buildEventImage(),
-            const SizedBox(height: 24),
+            // Only add spacing if there's an image
+            if (eventModel.imageUrl.isNotEmpty) const SizedBox(height: 24),
 
             // Live Quiz Card (prominently displayed under event image)
             if (eventModel.hasLiveQuiz && _liveQuiz != null)
@@ -3770,6 +3771,11 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
   }
 
   Widget _buildEventImage() {
+    // Don't show image section at all if no image URL is provided
+    if (eventModel.imageUrl.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return AnimatedBuilder(
       animation: _pulseAnimation,
       builder: (context, child) {

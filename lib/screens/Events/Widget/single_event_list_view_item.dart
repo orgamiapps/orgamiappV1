@@ -164,6 +164,8 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
   }
 
   Widget _buildImageSection() {
+    final bool hasImage = widget.eventModel.imageUrl.isNotEmpty;
+
     return ClipRRect(
       borderRadius: const BorderRadius.only(
         topLeft: Radius.circular(20),
@@ -173,22 +175,64 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
         children: [
           AspectRatio(
             aspectRatio: 16 / 9,
-            child: SafeNetworkImage(
-              imageUrl: widget.eventModel.imageUrl,
-              fit: BoxFit.cover,
-              placeholder: Container(color: const Color(0xFFF5F7FA)),
-              errorWidget: Container(
-                color: const Color(0xFFF5F7FA),
-                child: const Center(
-                  child: Icon(Icons.image_not_supported, color: Colors.grey),
-                ),
-              ),
-            ),
+            child: hasImage
+                ? SafeNetworkImage(
+                    imageUrl: widget.eventModel.imageUrl,
+                    fit: BoxFit.cover,
+                    placeholder: Container(color: const Color(0xFFF5F7FA)),
+                    errorWidget: _buildPlaceholderContent(),
+                  )
+                : _buildPlaceholderContent(),
           ),
           Positioned(top: 12, right: 12, child: _buildFavoriteButton()),
           if (widget.eventModel.isFeatured)
             Positioned(top: 12, left: 12, child: _buildFeaturedBadge()),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPlaceholderContent() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF667EEA).withValues(alpha: 0.1),
+            const Color(0xFF764BA2).withValues(alpha: 0.1),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(36),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Image.asset(
+                  'attendus_logo_only.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    // Fallback to icon if logo not found
+                    return const Icon(
+                      Icons.event,
+                      color: Color(0xFF667EEA),
+                      size: 36,
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

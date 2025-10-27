@@ -77,11 +77,13 @@ void main() async {
 
   // Build the app after Firebase is ready
   // Use lazy initialization for providers to improve startup time
+  // OPTIMIZATION: Create ThemeProvider synchronously to avoid async SharedPreferences call on startup
+  final themeProvider = ThemeProvider();
+  
   final Widget appWidget = MultiProvider(
     providers: [
-      ChangeNotifierProvider(
-        create: (context) => ThemeProvider(),
-        lazy: false, // Load immediately as it affects initial render
+      ChangeNotifierProvider.value(
+        value: themeProvider,
       ),
       ChangeNotifierProvider(
         create: (context) => SubscriptionService(),
@@ -98,21 +100,18 @@ void main() async {
 
   // Initialize background services and theme after first frame
   WidgetsBinding.instance.addPostFrameCallback((_) async {
-    // Load theme preference
-    SharedPreferences.getInstance().then((prefs) {
-      final isDarkMode = prefs.getBool('isDarkMode') ?? false;
-      final context = appNavigatorKey.currentContext;
-      if (context != null) {
-        try {
-          final themeProvider = Provider.of<ThemeProvider>(
-            context,
-            listen: false,
-          );
+    // OPTIMIZATION: Load theme preference asynchronously without blocking UI
+    // The ThemeProvider is already initialized, just load the saved preference
+    Future.microtask(() async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final isDarkMode = prefs.getBool('isDarkMode') ?? false;
+        if (isDarkMode != themeProvider.isDarkMode) {
           themeProvider.loadTheme(isDarkMode);
-        } catch (e) {
-          if (kDebugMode) {
-            Logger.warning('Failed to apply saved theme: $e');
-          }
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          Logger.warning('Failed to load saved theme: $e');
         }
       }
     });
@@ -121,8 +120,8 @@ void main() async {
     _initializeBackgroundServices();
 
     // PERFORMANCE: Delay subscription service initialization to reduce startup time
-    // Increased from 1s to 2s to prioritize UI rendering
-    Future.delayed(const Duration(seconds: 2), () {
+    // OPTIMIZATION: Reduced from 2s to 1.5s to improve user experience
+    Future.delayed(const Duration(milliseconds: 1500), () {
       try {
         final context = appNavigatorKey.currentContext;
         if (context != null) {
@@ -135,7 +134,8 @@ void main() async {
           });
 
           // PERFORMANCE: Initialize creation limit service with additional delay
-          Future.delayed(const Duration(milliseconds: 500), () {
+          // OPTIMIZATION: Reduced from 500ms to 300ms
+          Future.delayed(const Duration(milliseconds: 300), () {
             final creationLimitService = Provider.of<CreationLimitService>(
               context,
               listen: false,
@@ -166,12 +166,12 @@ Future<void> _initializeBackgroundServices() async {
     // Reduced cache size for faster startup and less memory pressure
     FirebaseFirestore.instance.settings = Settings(
       persistenceEnabled: true,
-      // PERFORMANCE: Reduced cache size dramatically for faster app startup
+      // OPTIMIZATION: Further reduced cache sizes for even faster app startup
       cacheSizeBytes: kDebugMode
-          ? 20 *
+          ? 10 *
                 1024 *
-                1024 // 20MB in debug mode (reduced from 40MB)
-          : 40 * 1024 * 1024, // 40MB in release (reduced from 80MB)
+                1024 // 10MB in debug mode (reduced from 20MB)
+          : 20 * 1024 * 1024, // 20MB in release (reduced from 40MB)
     );
 
     // Quick connectivity check without blocking
@@ -232,7 +232,8 @@ Future<void> _initializeBackgroundServices() async {
           }
 
           // PERFORMANCE: Initialize notifications in background with minimal delay
-          Future.delayed(const Duration(milliseconds: 500), () {
+          // OPTIMIZATION: Reduced from 500ms to 300ms
+          Future.delayed(const Duration(milliseconds: 300), () {
             NotificationService.initialize().catchError((e) {
               Logger.warning('Notification service initialization failed: $e');
               return;
@@ -240,9 +241,9 @@ Future<void> _initializeBackgroundServices() async {
           });
 
           // PERFORMANCE: Initialize Firebase Messaging in background if online
-          // Delayed further to reduce startup load
+          // OPTIMIZATION: Reduced delay from 3s to 2s
           if (isReachable) {
-            Future.delayed(const Duration(seconds: 3), () {
+            Future.delayed(const Duration(seconds: 2), () {
               FirebaseMessagingHelper().initialize().catchError((e) {
                 Logger.warning('Firebase Messaging initialization failed: $e');
               });

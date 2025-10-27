@@ -2373,6 +2373,75 @@ class _FeaturedEventCardState extends State<_FeaturedEventCard>
     }
   }
 
+  Widget _buildFeaturedPlaceholder() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF667EEA).withValues(alpha: 0.15),
+            const Color(0xFF764BA2).withValues(alpha: 0.15),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(40),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(18.0),
+                child: Image.asset(
+                  'attendus_logo_only.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    // Fallback to icon if logo not found
+                    return const Icon(
+                      Icons.event,
+                      color: Color(0xFF667EEA),
+                      size: 40,
+                    );
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF9800).withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.star, color: Colors.white, size: 16),
+                  SizedBox(width: 6),
+                  Text(
+                    'Featured',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -2402,50 +2471,30 @@ class _FeaturedEventCardState extends State<_FeaturedEventCard>
             borderRadius: BorderRadius.circular(20),
             child: Stack(
               children: [
-                // Background Image
+                // Background Image with elegant placeholder
                 SizedBox(
                   width: double.infinity,
                   height: 240,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
-                    child: CachedNetworkImage(
-                      imageUrl: widget.event.imageUrl,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: 240,
-                      placeholder: (context, url) => Container(
-                        color: const Color(0xFFF5F7FA),
-                        child: const Center(
-                          child: CircularProgressIndicator(
-                            color: Color(0xFF667EEA),
-                          ),
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => Container(
-                        color: const Color(0xFFF5F7FA),
-                        child: const Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.image_not_supported,
-                                color: Color(0xFF667EEA),
-                                size: 48,
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                'Image not available',
-                                style: TextStyle(
+                    child: widget.event.imageUrl.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: widget.event.imageUrl,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: 240,
+                            placeholder: (context, url) => Container(
+                              color: const Color(0xFFF5F7FA),
+                              child: const Center(
+                                child: CircularProgressIndicator(
                                   color: Color(0xFF667EEA),
-                                  fontSize: 14,
-                                  fontFamily: 'Roboto',
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                            ),
+                            errorWidget: (context, url, error) =>
+                                _buildFeaturedPlaceholder(),
+                          )
+                        : _buildFeaturedPlaceholder(),
                   ),
                 ),
                 // Gradient Overlay

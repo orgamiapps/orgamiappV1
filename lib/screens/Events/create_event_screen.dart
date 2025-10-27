@@ -1547,7 +1547,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Event Image',
+          'Event Image (Optional)',
           style: TextStyle(
             color: Color(0xFF1A1A1A),
             fontWeight: FontWeight.w500,
@@ -1731,7 +1731,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             ),
             const SizedBox(height: 16),
             Text(
-              'Upload Event Image',
+              'Upload Event Image (Optional)',
               style: TextStyle(
                 color: const Color(0xFF1A1A1A),
                 fontWeight: FontWeight.w600,

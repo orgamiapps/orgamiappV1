@@ -86,8 +86,9 @@ class _AuthGateState extends State<AuthGate> {
         _authStateSubscription?.cancel();
       });
 
-      // Much shorter timeout - if no user after 500ms, show login screen
-      Timer(const Duration(milliseconds: 500), () {
+      // Much shorter timeout - if no user after 300ms, show login screen
+      // OPTIMIZATION: Reduced from 500ms to 300ms for faster initial screen display
+      Timer(const Duration(milliseconds: 300), () {
         if (mounted && _isChecking && !authChecked) {
           Logger.debug('⏰ AuthGate: Quick timeout - showing login screen');
           _authStateSubscription?.cancel();

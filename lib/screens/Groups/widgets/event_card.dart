@@ -144,20 +144,61 @@ class EventCard extends StatelessWidget {
                   ),
                 ),
 
-              // Event image
-              if (imageUrl.isNotEmpty)
-                ClipRRect(
-                  borderRadius: BorderRadius.vertical(
-                    top: Radius.circular(isPinned ? 0 : 16),
-                  ),
-                  child: AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: SafeNetworkImage(
-                      imageUrl: imageUrl,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
+              // Event image with elegant placeholder
+              ClipRRect(
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(isPinned ? 0 : 16),
                 ),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: imageUrl.isNotEmpty
+                      ? SafeNetworkImage(
+                          imageUrl: imageUrl,
+                          fit: BoxFit.cover,
+                        )
+                      : Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                const Color(0xFF667EEA).withValues(alpha: 0.1),
+                                const Color(0xFF764BA2).withValues(alpha: 0.1),
+                              ],
+                            ),
+                          ),
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 64,
+                                  height: 64,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF667EEA)
+                                        .withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(32),
+                                  ),
+                                  child: Image.asset(
+                                    'attendus_logo_only.png',
+                                    width: 40,
+                                    height: 40,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      // Fallback to icon if logo not found
+                                      return const Icon(
+                                        Icons.event,
+                                        color: Color(0xFF667EEA),
+                                        size: 32,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                ),
+              ),
 
               Padding(
                 padding: const EdgeInsets.all(16),
