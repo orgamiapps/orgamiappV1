@@ -36,7 +36,7 @@ class GeofenceEventDetector {
 
       // Get all active events with geofence enabled
       final now = DateTime.now();
-      final timeBufferDuration = timeBuffer ?? const Duration(hours: 2);
+      final timeBufferDuration = timeBuffer ?? const Duration(hours: 24);
 
       final eventsSnapshot = await FirebaseFirestore.instance
           .collection(EventModel.firebaseKey)
@@ -56,10 +56,19 @@ class GeofenceEventDetector {
 
           // Check if event is happening now or soon
           final eventTime = event.selectedDateTime;
-          final timeDifference = eventTime.difference(now).abs();
-
-          // Event must be within the time window (default 2 hours before/after)
-          if (timeDifference > timeBufferDuration) {
+          final eventEndTime = eventTime.add(const Duration(hours: 12)); // Assume event lasts up to 12 hours
+          
+          // Event must be either:
+          // 1. Starting within the time buffer (24 hours by default)
+          // 2. Currently happening (between start time and end time)
+          final isUpcoming = eventTime.isAfter(now) && 
+              eventTime.difference(now) <= timeBufferDuration;
+          final isHappening = now.isAfter(eventTime) && now.isBefore(eventEndTime);
+          
+          if (!isUpcoming && !isHappening) {
+            Logger.debug(
+              'Event ${event.title} is outside time window (starts: $eventTime, now: $now)',
+            );
             continue;
           }
 
