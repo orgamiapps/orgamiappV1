@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import '../../Controller/customer_controller.dart';
+import '../../Permissions/permissions_helper.dart';
 import '../../Services/face_recognition_service.dart';
 import '../../models/event_model.dart';
 import '../../Utils/logger.dart';
@@ -107,7 +108,19 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
 
   Future<void> _initializeCamera() async {
     try {
-      Logger.info('Initializing camera for face enrollment...');
+      // Request camera permission first
+      Logger.info('Requesting camera permission...');
+      final hasPermission = await PermissionsHelperClass.checkCameraPermission(
+        context: context,
+      );
+      
+      if (!hasPermission) {
+        Logger.error('Camera permission denied');
+        _showErrorAndExit('Camera permission is required for face enrollment');
+        return;
+      }
+      
+      Logger.info('Camera permission granted, initializing camera...');
       _cameras = await availableCameras();
       if (_cameras == null || _cameras!.isEmpty) {
         Logger.error('No cameras available on this device');

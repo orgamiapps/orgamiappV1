@@ -29,9 +29,13 @@ class FaceRecognitionService {
 
   /// Initialize the face detection service
   Future<void> initialize({bool useFastMode = true}) async {
-    if (_isInitialized) return;
+    if (_isInitialized) {
+      Logger.debug('FaceRecognitionService already initialized');
+      return;
+    }
 
     try {
+      Logger.info('Initializing FaceDetector with ML Kit...');
       _useFastMode = useFastMode;
 
       final options = FaceDetectorOptions(
@@ -45,29 +49,47 @@ class FaceRecognitionService {
             : FaceDetectorMode.accurate,
       );
 
+      Logger.debug('Creating FaceDetector with options: '
+        'landmarks=true, classification=true, tracking=true, '
+        'minFaceSize=$_minFaceSize, mode=${_useFastMode ? "fast" : "accurate"}');
+
       _faceDetector = FaceDetector(options: options);
       _isInitialized = true;
-      Logger.debug(
-        'FaceRecognitionService initialized (${_useFastMode ? "fast" : "accurate"} mode)',
+      Logger.info(
+        'FaceRecognitionService initialized successfully (${_useFastMode ? "fast" : "accurate"} mode)',
       );
-    } catch (e) {
+      Logger.info('ML Kit face detection model loaded and ready');
+    } catch (e, stackTrace) {
       Logger.error('Failed to initialize FaceRecognitionService: $e');
+      Logger.error('Stack trace: $stackTrace');
+      Logger.error('This could be due to:');
+      Logger.error('1. ML Kit model not downloaded (requires internet on first use)');
+      Logger.error('2. Insufficient device storage');
+      Logger.error('3. Google Play Services issue (Android)');
+      Logger.error('4. Platform-specific configuration missing');
       rethrow;
     }
   }
 
   /// Detect faces in the provided image
   Future<List<Face>> detectFaces(InputImage inputImage) async {
-    if (!_isInitialized) await initialize();
+    if (!_isInitialized) {
+      Logger.warning('FaceDetector not initialized, initializing now...');
+      await initialize();
+    }
 
     try {
       final faces = await _faceDetector.processImage(inputImage);
       if (faces.isNotEmpty) {
-        Logger.debug('Detected ${faces.length} face(s)');
+        Logger.debug('Detected ${faces.length} face(s) in image');
+      } else {
+        Logger.debug('No faces detected in current frame');
       }
       return faces;
-    } catch (e) {
+    } catch (e, stackTrace) {
       Logger.error('Face detection failed: $e');
+      Logger.error('Stack trace: $stackTrace');
+      Logger.error('Input image metadata: size=${inputImage.metadata?.size}, format=${inputImage.metadata?.format}, rotation=${inputImage.metadata?.rotation}');
       return [];
     }
   }
