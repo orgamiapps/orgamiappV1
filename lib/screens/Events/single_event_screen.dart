@@ -1636,19 +1636,28 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   }
 
   void _navigateToQuizBuilder() {
-    Navigator.pop(context); // Close modal first
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => QuizBuilderScreen(
-          eventId: eventModel.id,
-          existingQuizId: eventModel.liveQuizId,
-        ),
-      ),
-    ).then((_) {
-      // Reload quiz after returning from builder
-      _loadLiveQuiz();
-    });
+    // Get the navigator before popping to avoid context issues
+    final navigator = Navigator.of(context);
+    navigator.pop(); // Close modal first
+
+    // Use mounted check before navigating
+    if (!mounted) return;
+
+    navigator
+        .push(
+          MaterialPageRoute(
+            builder: (context) => QuizBuilderScreen(
+              eventId: eventModel.id,
+              existingQuizId: eventModel.liveQuizId,
+            ),
+          ),
+        )
+        .then((_) {
+          // Reload quiz after returning from builder
+          if (mounted) {
+            _loadLiveQuiz();
+          }
+        });
   }
 
   void _navigateToQuizHost() {
@@ -1657,16 +1666,25 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       return;
     }
 
-    Navigator.pop(context); // Close modal first
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => QuizHostScreen(quizId: _liveQuiz!.id),
-      ),
-    ).then((_) {
-      // Reload quiz after returning from host
-      _loadLiveQuiz();
-    });
+    // Get the navigator before popping to avoid context issues
+    final navigator = Navigator.of(context);
+    navigator.pop(); // Close modal first
+
+    // Use mounted check before navigating
+    if (!mounted) return;
+
+    navigator
+        .push(
+          MaterialPageRoute(
+            builder: (context) => QuizHostScreen(quizId: _liveQuiz!.id),
+          ),
+        )
+        .then((_) {
+          // Reload quiz after returning from host
+          if (mounted) {
+            _loadLiveQuiz();
+          }
+        });
   }
 
   void _navigateToQuizParticipant() {
