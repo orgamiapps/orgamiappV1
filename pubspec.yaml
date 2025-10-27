@@ -134,6 +134,8 @@ flutter:
   assets:
     - images/
     - attendus_logo.png
+    - attendus_logo_only.png
+    - attendus_logo_withText.png
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

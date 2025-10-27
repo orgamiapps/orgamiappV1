@@ -66,6 +66,8 @@ import 'package:attendus/screens/FaceRecognition/face_recognition_scanner_screen
 import 'package:attendus/screens/FaceRecognition/face_enrollment_screen.dart';
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 import 'package:attendus/screens/Events/Widget/delete_event_dialogue.dart';
+import 'package:attendus/services/event_flyer_generator.dart';
+import 'dart:io';
 
 class SingleEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -2438,205 +2440,182 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     );
   }
 
-  void _showQuickShareOptions() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
-        ),
-        child: SafeArea(
-          child: DraggableScrollableSheet(
-            initialChildSize: 0.5,
-            minChildSize: 0.5,
-            maxChildSize: 0.5,
-            builder: (context, scrollController) => Column(
-              children: [
-                // Handle bar
-                Container(
-                  margin: const EdgeInsets.only(top: 12),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppThemeColor.dullBlueColor.withAlpha(
-                      (0.3 * 255).round(),
-                    ),
-                    borderRadius: BorderRadius.circular(2),
+  Future<void> _shareEventDetails() async {
+    final GlobalKey flyerKey = GlobalKey();
+
+    try {
+      // Show flyer preview dialog
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (BuildContext dialogContext) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Flyer preview - uses FittedBox to scale down for preview
+              // The RepaintBoundary captures the widget at its original size
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.contain,
+                  child: RepaintBoundary(
+                    key: flyerKey,
+                    child: EventFlyerWidget(event: eventModel),
                   ),
                 ),
-                const SizedBox(height: 16),
-                // Header
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppThemeColor.darkBlueColor.withAlpha(
-                            (0.1 * 255).round(),
-                          ),
-                          borderRadius: BorderRadius.circular(12),
+              ),
+              const SizedBox(height: 16),
+              // Action buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Close button
+                  Material(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    child: InkWell(
+                      onTap: () => Navigator.of(dialogContext).pop(),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 16,
                         ),
-                        child: Icon(
-                          CupertinoIcons.share,
-                          color: AppThemeColor.darkBlueColor,
-                          size: 24,
+                        child: const Row(
+                          children: [
+                            Icon(Icons.close, size: 20),
+                            SizedBox(width: 8),
+                            Text(
+                              'Close',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Text(
-                          'Share Event',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: AppThemeColor.pureBlackColor,
-                            fontFamily: 'Roboto',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                // Share options
-                Expanded(
-                  child: SingleChildScrollView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      children: [
-                        _buildShareOption(
-                          icon: CupertinoIcons.share,
-                          title: 'Share Event Details',
-                          subtitle: 'Share event information with others',
-                          onTap: () {
-                            Navigator.pop(context);
-                            _shareEventDetails();
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        _buildShareOption(
-                          icon: Icons.calendar_today,
-                          title: 'Add to Calendar',
-                          subtitle: 'Add event to your calendar',
-                          onTap: () {
-                            Navigator.pop(context);
-                            _addToCalendar();
-                          },
-                        ),
-                      ],
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildShareOption({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha((0.05 * 255).round()),
-            spreadRadius: 0,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(icon, color: const Color(0xFF6B7280), size: 20),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: Color(0xFF1A1A1A),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                          fontFamily: 'Roboto',
+                  const SizedBox(width: 16),
+                  // Share button
+                  Material(
+                    color: const Color(0xFF6C63FF),
+                    borderRadius: BorderRadius.circular(16),
+                    child: InkWell(
+                      onTap: () async {
+                        // Generate flyer BEFORE closing dialog to keep widget tree alive
+                        await _generateAndShareFlyer(flyerKey, dialogContext);
+                      },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 16,
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.share, color: Colors.white, size: 20),
+                            SizedBox(width: 8),
+                            Text(
+                              'Share',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(
-                          color: Color(0xFF6B7280),
-                          fontSize: 14,
-                          fontFamily: 'Roboto',
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  color: const Color(0xFF6B7280),
-                  size: 16,
-                ),
-              ],
-            ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
           ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      // Show error message
+      ShowToast().showNormalToast(
+        msg: 'Failed to display event flyer. Please try again.',
+      );
+    }
   }
 
-  void _shareEventDetails() {
-    final eventUrl = 'https://attendus.app/event/${eventModel.id}';
-    final shareText =
-        '''
+  Future<void> _generateAndShareFlyer(
+    GlobalKey flyerKey,
+    BuildContext dialogContext,
+  ) async {
+    File? flyerFile;
+    try {
+      // Generate the flyer image BEFORE closing the preview dialog
+      // This keeps the widget tree alive during capture
+      flyerFile = await EventFlyerGenerator.generateEventFlyer(
+        eventModel,
+        flyerKey,
+      );
+
+      // Close the preview dialog after successful generation
+      if (mounted) {
+        Navigator.of(dialogContext).pop();
+      }
+
+      // Share the flyer image
+      await Share.shareXFiles(
+        [XFile(flyerFile.path)],
+        text:
+            '${eventModel.title}\n\nJoin us at: https://attendus.app/event/${eventModel.id}',
+      );
+
+      // Clean up the temporary file after sharing
+      try {
+        await flyerFile.delete();
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    } catch (e) {
+      print('Error in _generateAndShareFlyer: $e');
+
+      // Close the preview dialog if still open
+      if (mounted && Navigator.of(dialogContext).canPop()) {
+        Navigator.of(dialogContext).pop();
+      }
+
+      // Show error message
+      ShowToast().showNormalToast(
+        msg: 'Failed to generate event flyer. Please try again.',
+      );
+
+      // Clean up file if it was created
+      if (flyerFile != null) {
+        try {
+          await flyerFile.delete();
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
+
+      // Fallback to text sharing
+      final eventUrl = 'https://attendus.app/event/${eventModel.id}';
+      final shareText =
+          '''
 ${eventModel.title}
 
- ${eventModel.description}
+${eventModel.description}
 
-  📅 ${DateFormat('EEEE, MMMM d, y').format(eventModel.selectedDateTime)}
-  ⏰ ${DateFormat('h:mm a').format(eventModel.selectedDateTime)} – ${DateFormat('h:mm a').format(eventModel.eventEndTime)}
+📅 ${DateFormat('EEEE, MMMM d, y').format(eventModel.selectedDateTime)}
+⏰ ${DateFormat('h:mm a').format(eventModel.selectedDateTime)} – ${DateFormat('h:mm a').format(eventModel.eventEndTime)}
 📍 ${eventModel.location}
 
 Join us at: $eventUrl
 ''';
 
-    Share.share(shareText);
+      Share.share(shareText);
+    }
   }
 
   void _handleSignIn() {
@@ -3432,6 +3411,11 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                     ))
                       Row(
                         children: [
+                          _buildCalendarAddButton(
+                            onTap: () => _addToCalendar(),
+                            tooltip: 'Add to Calendar',
+                          ),
+                          const SizedBox(width: 16),
                           _buildModernButton(
                             icon: _isFavorited
                                 ? Icons.bookmark
@@ -3446,7 +3430,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                           const SizedBox(width: 16),
                           _buildModernButton(
                             icon: CupertinoIcons.share,
-                            onTap: () => _showQuickShareOptions(),
+                            onTap: () => _shareEventDetails(),
                             tooltip: 'Share Event',
                           ),
                         ],
