@@ -14,6 +14,7 @@ import 'package:attendus/Utils/location_helper.dart';
 import 'package:attendus/screens/FaceRecognition/face_recognition_scanner_screen.dart';
 import 'package:attendus/Services/face_recognition_service.dart';
 import 'package:attendus/screens/FaceRecognition/face_enrollment_screen.dart';
+import 'package:attendus/Services/guest_mode_service.dart';
 
 /// Modern, streamlined sign-in flow screen
 /// Professional UI/UX following Material Design 3 principles
@@ -165,19 +166,25 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
 
   Widget _buildWelcomeSection() {
     final isLoggedIn = CustomerController.logeInCustomer != null;
+    final isGuestMode = GuestModeService().isGuestMode;
 
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+        gradient: LinearGradient(
+          colors: isGuestMode
+              ? const [Color(0xFF10B981), Color(0xFF059669)]
+              : const [Color(0xFF667EEA), Color(0xFF764BA2)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+            color: (isGuestMode
+                    ? const Color(0xFF10B981)
+                    : const Color(0xFF667EEA))
+                .withValues(alpha: 0.3),
             offset: const Offset(0, 8),
             blurRadius: 24,
           ),
@@ -192,8 +199,8 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
               color: Colors.white.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.qr_code_scanner,
+            child: Icon(
+              isGuestMode ? Icons.explore_outlined : Icons.qr_code_scanner,
               size: 40,
               color: Colors.white,
             ),
@@ -213,7 +220,9 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
           Text(
             isLoggedIn
                 ? 'Welcome back, ${CustomerController.logeInCustomer!.name}!'
-                : 'Choose your sign-in method below',
+                : isGuestMode
+                    ? 'Enter your name for each sign-in'
+                    : 'Choose your sign-in method below',
             style: TextStyle(
               fontSize: 15,
               color: Colors.white.withValues(alpha: 0.9),
@@ -251,12 +260,44 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
               ),
             ),
           ],
+          if (isGuestMode && !isLoggedIn) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.explore_outlined,
+                    size: 16,
+                    color: Colors.white.withValues(alpha: 0.9),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Guest Mode',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Roboto',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildSignInMethods() {
+    final isGuestMode = GuestModeService().isGuestMode;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -280,17 +321,19 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
           ),
         ),
         const SizedBox(height: 20),
-        _buildMethodCard(
-          icon: Icons.location_on,
-          iconColor: const Color(0xFF10B981),
-          title: 'Location & Facial Recognition',
-          subtitle: 'Automatic detection & biometric',
-          badge: 'MOST SECURE',
-          badgeColor: const Color(0xFF10B981),
-          isLoading: _isLocationCheckLoading,
-          onTap: _handleLocationFacialSignIn,
-        ),
-        const SizedBox(height: 16),
+        // Hide location + facial recognition for guest users
+        if (!isGuestMode)
+          _buildMethodCard(
+            icon: Icons.location_on,
+            iconColor: const Color(0xFF10B981),
+            title: 'Location & Facial Recognition',
+            subtitle: 'Automatic detection & biometric',
+            badge: 'MOST SECURE',
+            badgeColor: const Color(0xFF10B981),
+            isLoading: _isLocationCheckLoading,
+            onTap: _handleLocationFacialSignIn,
+          ),
+        if (!isGuestMode) const SizedBox(height: 16),
         _buildMethodCard(
           icon: Icons.qr_code_scanner,
           iconColor: const Color(0xFF667EEA),
