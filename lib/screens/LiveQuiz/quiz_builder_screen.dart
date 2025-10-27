@@ -84,17 +84,17 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen>
 
     try {
       LiveQuizModel? quiz;
-      
+
       // First try to load by existing quiz ID if provided
       if (widget.existingQuizId != null) {
         quiz = await _liveQuizService.getQuiz(widget.existingQuizId!);
       }
-      
+
       // If no quiz found by ID or no ID provided, try to find by event ID
       if (quiz == null) {
         quiz = await _liveQuizService.getQuizByEventId(widget.eventId);
       }
-      
+
       if (quiz != null) {
         _titleController.text = quiz.title;
         _descriptionController.text = quiz.description ?? '';
@@ -143,7 +143,9 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Color(0xFF667EEA),
+                      ),
                     ),
                     const SizedBox(height: 20),
                     Text(
@@ -1318,6 +1320,8 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
     return Scaffold(
       backgroundColor: const Color(0xFFFAFBFC),
       appBar: AppBar(
@@ -1328,23 +1332,31 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
       ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildQuestionTypeSelector(),
-              const SizedBox(height: 24),
-              _buildQuestionInput(),
-              const SizedBox(height: 24),
-              _buildAnswerSection(),
-              const SizedBox(height: 24),
-              _buildQuestionSettings(),
-              const SizedBox(height: 32),
-              _buildSaveButton(),
-            ],
+      body: SafeArea(
+        bottom: true,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            padding: EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 24,
+              bottom: 24 + bottomPadding,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildQuestionTypeSelector(),
+                const SizedBox(height: 24),
+                _buildQuestionInput(),
+                const SizedBox(height: 24),
+                _buildAnswerSection(),
+                const SizedBox(height: 24),
+                _buildQuestionSettings(),
+                const SizedBox(height: 32),
+                _buildSaveButton(),
+              ],
+            ),
           ),
         ),
       ),
@@ -1764,15 +1776,23 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
           ),
           const SizedBox(height: 16),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Time Limit (seconds)'),
+                    const Text(
+                      'Time Limit (seconds)',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<int>(
                       initialValue: _timeLimit,
+                      isDense: true,
                       onChanged: (value) => setState(() => _timeLimit = value!),
                       items: [10, 15, 20, 30, 45, 60, 90, 120].map((time) {
                         return DropdownMenuItem(
@@ -1781,6 +1801,10 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
                         );
                       }).toList(),
                       decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
                         filled: true,
                         fillColor: const Color(0xFFF9FAFB),
                         border: OutlineInputBorder(
@@ -1812,10 +1836,17 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Points'),
+                    const Text(
+                      'Points',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<int>(
                       initialValue: _points,
+                      isDense: true,
                       onChanged: (value) => setState(() => _points = value!),
                       items: [50, 100, 150, 200, 250, 300, 500].map((points) {
                         return DropdownMenuItem(
@@ -1824,6 +1855,10 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
                         );
                       }).toList(),
                       decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
                         filled: true,
                         fillColor: const Color(0xFFF9FAFB),
                         border: OutlineInputBorder(

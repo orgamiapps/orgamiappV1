@@ -105,7 +105,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final List<String> _allCategories = [
     'Featured',
     'Social & Networking',
-    'Entertainment', 
+    'Entertainment',
     'Sports & Fitness',
     'Education & Learning',
     'Arts & Culture',
@@ -582,12 +582,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: Provider.of<ThemeProvider>(context).getGradientColors(context),
+                        colors: Provider.of<ThemeProvider>(
+                          context,
+                        ).getGradientColors(context),
                       ),
                       borderRadius: BorderRadius.circular(28),
                       boxShadow: [
                         BoxShadow(
-                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0.3),
                           spreadRadius: 2,
                           blurRadius: 8,
                           offset: const Offset(0, 4),
@@ -740,7 +744,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   );
                                 },
                                 child: const Icon(
-                                  Icons.qr_code_scanner,
+                                  Icons.fact_check,
                                   color: Colors.white,
                                   size: 20,
                                 ),

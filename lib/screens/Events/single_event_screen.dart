@@ -5311,8 +5311,8 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                               _isRsvpStatusLoading
                                   ? 'Loading...'
                                   : _isRsvped
-                                  ? 'Spot Reserved'
-                                  : 'Reserve Your Spot',
+                                  ? 'RSVP Confirmed'
+                                  : 'RSVP',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w700,
@@ -6083,10 +6083,10 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         statusColor = Colors.orange;
         statusText = '⏳ COMING SOON';
         statusDescription =
-            'An interactive quiz will be available during this event.';
-        buttonText = 'Quiz Starting Soon';
-        buttonIcon = Icons.quiz;
-        canJoin = false;
+            'An interactive quiz will be available during this event. Join the waiting lobby now!';
+        buttonText = 'Join Waiting Lobby';
+        buttonIcon = Icons.people;
+        canJoin = true;
         break;
       case QuizStatus.ended:
         statusColor = Colors.grey;

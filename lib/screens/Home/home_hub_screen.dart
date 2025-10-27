@@ -116,7 +116,9 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
       Logger.debug('🏠 HomeHubScreen: Creating Firestore query...');
       Query query = FirebaseFirestore.instance
           .collection('Organizations')
-          .limit(20); // OPTIMIZATION: Increased from 10 to 20 for better initial content
+          .limit(
+            20,
+          ); // OPTIMIZATION: Increased from 10 to 20 for better initial content
 
       final q = _searchCtlr.text.trim().toLowerCase();
       if (_selectedCategoryLower != null &&
@@ -310,7 +312,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
           ),
           const SizedBox(width: 6),
           _roundIconButton(
-            icon: Icons.qr_code_scanner,
+            icon: Icons.fact_check,
             onTap: () {
               RouterClass.nextScreenNormal(
                 context,
