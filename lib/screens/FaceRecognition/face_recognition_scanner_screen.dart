@@ -17,11 +17,15 @@ import 'face_enrollment_screen.dart';
 class FaceRecognitionScannerScreen extends StatefulWidget {
   final EventModel eventModel;
   final bool isEnrollment;
+  final String? guestUserId;
+  final String? guestUserName;
 
   const FaceRecognitionScannerScreen({
     super.key,
     required this.eventModel,
     this.isEnrollment = false,
+    this.guestUserId,
+    this.guestUserName,
   });
 
   @override

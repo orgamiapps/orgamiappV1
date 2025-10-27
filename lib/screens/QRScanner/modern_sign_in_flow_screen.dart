@@ -321,19 +321,20 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
           ),
         ),
         const SizedBox(height: 20),
-        // Hide location + facial recognition for guest users
-        if (!isGuestMode)
-          _buildMethodCard(
-            icon: Icons.location_on,
-            iconColor: const Color(0xFF10B981),
-            title: 'Location & Facial Recognition',
-            subtitle: 'Automatic detection & biometric',
-            badge: 'MOST SECURE',
-            badgeColor: const Color(0xFF10B981),
-            isLoading: _isLocationCheckLoading,
-            onTap: _handleLocationFacialSignIn,
-          ),
-        if (!isGuestMode) const SizedBox(height: 16),
+        // Location + facial recognition available to all (guests need to input name)
+        _buildMethodCard(
+          icon: Icons.location_on,
+          iconColor: const Color(0xFF10B981),
+          title: 'Location & Facial Recognition',
+          subtitle: isGuestMode
+              ? 'Secure verification (name required)'
+              : 'Automatic detection & biometric',
+          badge: 'MOST SECURE',
+          badgeColor: const Color(0xFF10B981),
+          isLoading: _isLocationCheckLoading,
+          onTap: _handleLocationFacialSignIn,
+        ),
+        const SizedBox(height: 16),
         _buildMethodCard(
           icon: Icons.qr_code_scanner,
           iconColor: const Color(0xFF667EEA),
@@ -1371,7 +1372,24 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
   /// Handle facial recognition for a specific event
   Future<void> _handleFacialRecognitionForEvent(EventModel event) async {
     try {
-      // Check if user is logged in
+      final isGuestMode = GuestModeService().isGuestMode;
+
+      // For guests, show name input dialog before proceeding
+      if (isGuestMode) {
+        final guestName = await _showGuestNameInputDialog();
+        if (guestName == null || guestName.trim().isEmpty) {
+          ShowToast().showNormalToast(
+            msg: 'Name is required for guest sign-in',
+          );
+          return;
+        }
+
+        // Show facial recognition enrollment/scan for guest
+        _showGuestFacialRecognitionDialog(event, guestName);
+        return;
+      }
+
+      // Check if user is logged in (for non-guest users)
       if (CustomerController.logeInCustomer == null) {
         ShowToast().showNormalToast(
           msg: 'Please log in to use facial recognition.',
@@ -1542,6 +1560,317 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
       context,
       MaterialPageRoute(
         builder: (context) => FaceEnrollmentScreen(eventModel: event),
+      ),
+    );
+  }
+
+  /// Show name input dialog for guest users
+  Future<String?> _showGuestNameInputDialog() async {
+    final TextEditingController guestNameController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.person_outline,
+                color: Color(0xFF10B981),
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Enter Your Name',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Please provide your name for event sign-in verification.',
+                style: TextStyle(
+                  fontSize: 15,
+                  height: 1.5,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+              const SizedBox(height: 20),
+              TextFormField(
+                controller: guestNameController,
+                autofocus: true,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF1A1A1A),
+                  fontFamily: 'Roboto',
+                ),
+                decoration: InputDecoration(
+                  hintText: 'e.g., John Smith',
+                  hintStyle: TextStyle(
+                    color: Colors.grey[400],
+                    fontFamily: 'Roboto',
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.person,
+                    color: Color(0xFF10B981),
+                    size: 22,
+                  ),
+                  filled: true,
+                  fillColor: const Color(0xFFF5F5F5),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF10B981),
+                      width: 2,
+                    ),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter your name';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.grey[600],
+            ),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                Navigator.pop(context, guestNameController.text.trim());
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            child: const Text(
+              'Continue',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Show guest facial recognition dialog with enrollment option
+  void _showGuestFacialRecognitionDialog(EventModel event, String guestName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.face_retouching_natural,
+                color: Color(0xFF10B981),
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Facial Recognition',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.face,
+              size: 64,
+              color: Color(0xFF10B981),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Hi $guestName!',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Roboto',
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Complete facial recognition to sign in to ${event.title}.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 15,
+                height: 1.5,
+                fontFamily: 'Roboto',
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF667EEA).withValues(alpha: 0.2),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.security,
+                        color: Color(0xFF667EEA),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Your face data is stored securely and temporarily for this event only.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[700],
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.person_outline,
+                        color: Color(0xFF667EEA),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Signed in as: $guestName',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[700],
+                            fontFamily: 'Roboto',
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.grey[600],
+            ),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _navigateToGuestFaceEnrollment(event, guestName);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            child: const Text(
+              'Start Verification',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Navigate to guest face enrollment screen
+  void _navigateToGuestFaceEnrollment(EventModel event, String guestName) {
+    // For guests, we'll use a special guest ID based on timestamp
+    final guestId = 'guest_${DateTime.now().millisecondsSinceEpoch}';
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FaceEnrollmentScreen(
+          eventModel: event,
+          guestUserId: guestId,
+          guestUserName: guestName,
+        ),
       ),
     );
   }
