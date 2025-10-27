@@ -139,6 +139,25 @@ class EventFlyerWidget extends StatelessWidget {
           colors: [Color(0xFF6C63FF), Color(0xFF5A52D5), Color(0xFF1A1A2E)],
         ),
       ),
+      child: Center(
+        child: Opacity(
+          opacity: 0.15,
+          child: Image.asset(
+            'attendus_logo_only.png',
+            width: 300,
+            height: 300,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              // Fallback to icon pattern if logo not available
+              return const Icon(
+                Icons.event,
+                size: 200,
+                color: Colors.white24,
+              );
+            },
+          ),
+        ),
+      ),
     );
   }
 
