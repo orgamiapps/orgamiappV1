@@ -442,7 +442,7 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
             return Transform.scale(
               scale: value,
               child: Opacity(
-                opacity: value,
+                opacity: value.clamp(0.0, 1.0),
                 child: _buildParticipantChip(participant, isCurrentUser),
               ),
             );

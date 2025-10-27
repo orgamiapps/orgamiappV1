@@ -111,7 +111,6 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   bool _isDwellTrackingActive = false;
   // ignore: unused_field
   String _dwellStatusMessage = '';
-  bool _hasShownPrivacyDialog = false;
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -438,139 +437,6 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     } catch (e) {
       Logger.error('Error checking dwell tracking status: $e');
     }
-  }
-
-  /// Shows privacy opt-in dialog for dwell tracking
-  void _showPrivacyDialog() {
-    if (_hasShownPrivacyDialog) return;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20.0),
-          ),
-          title: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withAlpha((0.1 * 255).round()),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.location_on,
-                  color: Color(0xFF667EEA),
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text(
-                  'Enable Dwell Tracking',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: const Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'This event uses location tracking to measure your time at the venue.',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontFamily: 'Roboto',
-                  height: 1.4,
-                ),
-              ),
-              SizedBox(height: 16),
-              Text(
-                'What we track:',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Roboto',
-                ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                '• Entry and exit times\n'
-                '• Total time spent at the event\n'
-                '• Location within 200 feet of venue\n'
-                '• Auto-stop when event ends',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontFamily: 'Roboto',
-                  height: 1.4,
-                ),
-              ),
-              SizedBox(height: 16),
-              Text(
-                'Privacy:',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Roboto',
-                ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                '• Data is only visible to event organizers\n'
-                '• Tracking stops automatically\n'
-                '• You can manually stop tracking anytime',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontFamily: 'Roboto',
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                setState(() {
-                  _hasShownPrivacyDialog = true;
-                });
-              },
-              child: const Text(
-                'Decline',
-                style: TextStyle(
-                  color: Color(0xFF6B7280),
-                  fontFamily: 'Roboto',
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _startDwellTracking();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF667EEA),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Enable Tracking',
-                style: TextStyle(color: Colors.white, fontFamily: 'Roboto'),
-              ),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   bool isInEventInTime() {
@@ -940,13 +806,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         });
       });
 
-      // Show privacy dialog for dwell tracking if event has location enabled
-      if (eventModel.getLocation && !_hasShownPrivacyDialog) {
-        Future.delayed(const Duration(seconds: 4), () {
-          if (mounted) {
-            _showPrivacyDialog();
-          }
-        });
+      // Automatically start dwell tracking if event has location enabled
+      // Since user has already granted location permission to sign in
+      if (eventModel.getLocation && !_isDwellTrackingActive) {
+        _startDwellTracking();
       }
     } catch (firestoreError) {
       Logger.error('Firestore error during sign-in: $firestoreError');
@@ -3458,7 +3321,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                       Row(
                         children: [
                           _buildModernButton(
-                            icon: Icons.qr_code_scanner,
+                            icon: Icons.fact_check,
                             onTap: () => _handleSignIn(),
                             tooltip: 'Sign In',
                           ),
@@ -3740,7 +3603,6 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       if (mounted) {
         setState(() {
           _isDwellTrackingActive = true;
-          _hasShownPrivacyDialog = true;
         });
       }
 
@@ -6192,50 +6054,53 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                   ),
                 ),
                 const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: statusColor.withValues(alpha: 0.3),
-                        spreadRadius: 0,
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_liveQuiz!.status == QuizStatus.live) ...[
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: const BoxDecoration(
+                // Only show status badge for live, paused, and ended states (not draft)
+                if (_liveQuiz!.status != QuizStatus.draft) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: statusColor.withValues(alpha: 0.3),
+                          spreadRadius: 0,
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_liveQuiz!.status == QuizStatus.live) ...[
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                        ],
+                        Text(
+                          statusText,
+                          style: const TextStyle(
                             color: Colors.white,
-                            shape: BoxShape.circle,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.3,
                           ),
                         ),
-                        const SizedBox(width: 4),
                       ],
-                      Text(
-                        statusText,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
+                  const SizedBox(width: 8),
+                ],
                 AnimatedRotation(
                   turns: _isLiveQuizExpanded ? 0.5 : 0,
                   duration: const Duration(milliseconds: 300),

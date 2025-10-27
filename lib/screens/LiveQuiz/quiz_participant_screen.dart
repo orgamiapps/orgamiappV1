@@ -141,21 +141,30 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
     try {
       final userId = FirebaseAuth.instance.currentUser?.uid;
 
+      Logger.info('Checking for existing participant: userId=$userId, isAnonymous=${widget.isAnonymous}');
+
       // Only search for authenticated users (anonymous users can't be tracked across sessions)
       if (userId != null && !widget.isAnonymous) {
         final participantsSnapshot = await FirebaseFirestore.instance
             .collection(QuizParticipantModel.firebaseKey)
             .where('quizId', isEqualTo: widget.quizId)
             .where('userId', isEqualTo: userId)
+            .where('isActive', isEqualTo: true) // Only find active participants
             .limit(1)
             .get()
             .timeout(const Duration(seconds: 5));
 
         if (participantsSnapshot.docs.isNotEmpty) {
-          return QuizParticipantModel.fromFirestore(
+          final participant = QuizParticipantModel.fromFirestore(
             participantsSnapshot.docs.first,
           );
+          Logger.info('Found existing participant for userId=$userId: ${participant.id}');
+          return participant;
+        } else {
+          Logger.info('No existing participant found for userId=$userId');
         }
+      } else {
+        Logger.info('Skipping existing participant check (userId=$userId, isAnonymous=${widget.isAnonymous})');
       }
 
       return null;
