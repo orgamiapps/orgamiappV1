@@ -13,6 +13,8 @@ import 'package:attendus/Utils/app_constants.dart';
 
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:attendus/Services/auth_service.dart';
+import 'package:attendus/Services/guest_mode_service.dart';
+import 'package:attendus/screens/Home/home_hub_screen.dart';
 
 class SecondSplashScreen extends StatefulWidget {
   const SecondSplashScreen({super.key});
@@ -245,7 +247,27 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
     }
   }
 
-  // Removed - no longer needed as sign-in methods now handle everything directly
+  /// Handle guest mode navigation
+  Future<void> _handleContinueAsGuest() async {
+    try {
+      // Enable guest mode
+      await GuestModeService().enableGuestMode();
+      
+      if (!mounted) return;
+      
+      // Show a brief welcome message
+      ShowToast().showNormalToast(
+        msg: 'Welcome! You\'re browsing as a guest',
+      );
+      
+      // Navigate to home hub screen
+      RouterClass().homeScreenRoute(context: context);
+    } catch (e) {
+      ShowToast().showNormalToast(
+        msg: 'Error entering guest mode: ${e.toString()}',
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -368,7 +390,7 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
                               SizedBox(height: sectionSpacing),
                               _buildWelcomeSection(),
                               SizedBox(height: welcomeSpacing),
-                              _buildQRCodeSection(),
+                              _buildGuestModeSection(),
                               // Flexible spacing that adjusts to available space
                               Flexible(
                                 child: SizedBox(
@@ -502,12 +524,11 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
     );
   }
 
-  Widget _buildQRCodeSection() {
+  Widget _buildGuestModeSection() {
     return SlideTransition(
       position: _slideUpAnimation,
       child: GestureDetector(
-        onTap: () =>
-            RouterClass.nextScreenNormal(context, const QRScannerFlowScreen()),
+        onTap: _handleContinueAsGuest,
         child: Builder(
           builder: (context) {
             final screenHeight = MediaQuery.of(context).size.height;
@@ -539,7 +560,7 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
               ),
               child: Row(
                 children: [
-                  // QR Icon
+                  // Guest Icon
                   Container(
                     width: iconSize,
                     height: iconSize,
@@ -548,18 +569,18 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
                       gradient: const LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [Color(0xFF7B61FF), Color(0xFF00BCD4)],
+                        colors: [Color(0xFF10B981), Color(0xFF059669)],
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF7B61FF).withValues(alpha: 0.3),
+                          color: const Color(0xFF10B981).withValues(alpha: 0.3),
                           blurRadius: 12,
                           offset: const Offset(0, 6),
                         ),
                       ],
                     ),
                     child: Icon(
-                      Icons.qr_code_scanner,
+                      Icons.explore_outlined,
                       color: Colors.white,
                       size: iconInnerSize,
                     ),
@@ -571,7 +592,7 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Quick Sign-In',
+                          'Continue as Guest',
                           style: TextStyle(
                             fontSize: titleSize,
                             fontWeight: FontWeight.bold,
@@ -580,7 +601,7 @@ class _SecondSplashScreenState extends State<SecondSplashScreen>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Scan QR code for instant event access',
+                          'Explore events without creating an account',
                           style: TextStyle(
                             fontSize: subtitleSize,
                             color: Colors.grey[600],

@@ -38,6 +38,7 @@ import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 
 // import 'package:attendus/screens/QRScanner/QrScannerScreenForLogedIn.dart';
 import 'package:attendus/screens/QRScanner/qr_scanner_flow_screen.dart';
+import 'package:attendus/screens/QRScanner/ans_questions_to_sign_in_event_screen.dart';
 import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
@@ -581,12 +582,44 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      "Tap 'Sign In' to confirm your attendance.",
+                      "Complete facial recognition to verify your identity and sign in.",
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 16,
                         color: const Color(0xFF6B7280),
                         fontFamily: 'Roboto',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Security badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.verified_user,
+                            size: 16,
+                            color: Color(0xFF10B981),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Location + Biometric Verification',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: const Color(0xFF10B981),
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -685,16 +718,30 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                               color: Colors.transparent,
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(12),
-                                onTap: makeSignInToEvent,
+                                onTap: () {
+                                  Navigator.of(context).pop(); // Close dialog
+                                  _handleGeofenceFacialRecognitionSignIn();
+                                },
                                 child: const Center(
-                                  child: Text(
-                                    'Sign In',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      fontFamily: 'Roboto',
-                                    ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.face,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Verify Face',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          fontFamily: 'Roboto',
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -2810,6 +2857,294 @@ Join us at: $eventUrl
     } else {
       // Show enrollment dialog
       _showFaceEnrollmentDialog();
+    }
+  }
+
+  /// Handle facial recognition sign-in triggered from geofence popup
+  void _handleGeofenceFacialRecognitionSignIn() async {
+    try {
+      // Check if user is logged in
+      if (CustomerController.logeInCustomer == null) {
+        ShowToast().showNormalToast(
+          msg: 'Please log in to use facial recognition.',
+        );
+        return;
+      }
+
+      // Show loading message
+      ShowToast().showNormalToast(
+        msg: 'Preparing facial recognition...',
+      );
+
+      // Check if user is enrolled for facial recognition for this event
+      final faceService = FaceRecognitionService();
+      final isEnrolled = await faceService.isUserEnrolled(
+        userId: CustomerController.logeInCustomer!.uid,
+        eventId: eventModel.id,
+      );
+
+      if (!mounted) return;
+
+      if (isEnrolled) {
+        // User is enrolled, launch face scanner
+        final result = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FaceRecognitionScannerScreen(
+              eventModel: eventModel,
+            ),
+          ),
+        );
+
+        if (result == true && mounted) {
+          // Successful facial recognition, now complete the sign-in
+          ShowToast().showNormalToast(
+            msg: 'Face verified! Completing sign-in...',
+          );
+
+          // Wait a moment for the toast
+          await Future.delayed(const Duration(milliseconds: 500));
+
+          // Complete the sign-in with facial recognition method
+          await _completeFacialRecognitionSignIn();
+        }
+      } else {
+        // User not enrolled, show enrollment dialog
+        _showGeofenceFaceEnrollmentDialog();
+      }
+    } catch (e) {
+      Logger.error('Error during geofence facial recognition: $e');
+      ShowToast().showNormalToast(
+        msg: 'Error during facial recognition. Please try again.',
+      );
+    }
+  }
+
+  /// Complete the sign-in after successful facial recognition
+  Future<void> _completeFacialRecognitionSignIn() async {
+    try {
+      if (CustomerController.logeInCustomer == null) {
+        ShowToast().showNormalToast(msg: 'Please log in to sign in.');
+        return;
+      }
+
+      // Create attendance record
+      final docId =
+          '${eventModel.id}-${CustomerController.logeInCustomer!.uid}';
+
+      final attendanceModel = AttendanceModel(
+        id: docId,
+        eventId: eventModel.id,
+        userName: _isAnonymousSignIn
+            ? 'Anonymous'
+            : CustomerController.logeInCustomer!.name,
+        customerUid: CustomerController.logeInCustomer!.uid,
+        attendanceDateTime: DateTime.now(),
+        answers: [],
+        isAnonymous: _isAnonymousSignIn,
+        signInMethod: 'location_facial_recognition',
+        realName: _isAnonymousSignIn
+            ? CustomerController.logeInCustomer!.name
+            : null,
+        dwellNotes: 'Geofence + Facial Recognition sign-in',
+        entryTimestamp: eventModel.getLocation ? DateTime.now() : null,
+        dwellStatus: eventModel.getLocation ? 'active' : null,
+      );
+
+      // Check for sign-in questions first
+      final eventQuestions = await FirebaseFirestoreHelper().getEventQuestions(
+        eventId: eventModel.id,
+      );
+
+      if (eventQuestions.isNotEmpty) {
+        // Navigate to questions screen
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AnsQuestionsToSignInEventScreen(
+                eventModel: eventModel,
+                newAttendance: attendanceModel,
+                nextPageRoute: 'event_details',
+              ),
+            ),
+          );
+        }
+      } else {
+        // Direct sign-in without questions
+        await FirebaseFirestore.instance
+            .collection(AttendanceModel.firebaseKey)
+            .doc(docId)
+            .set(attendanceModel.toJson());
+
+        ShowToast().showNormalToast(
+          msg: 'Successfully signed in with location + facial recognition!',
+        );
+
+        // Set flag to prevent showing dialog again immediately
+        setState(() {
+          _justSignedIn = true;
+        });
+
+        // Refresh attendance status
+        await getAttendance();
+
+        // Clear the flag after a delay
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            setState(() {
+              _justSignedIn = false;
+            });
+          }
+        });
+      }
+    } catch (e) {
+      Logger.error('Error completing facial recognition sign-in: $e');
+      ShowToast().showNormalToast(
+        msg: 'Failed to complete sign-in. Please try again.',
+      );
+    }
+  }
+
+  /// Show face enrollment dialog for geofence sign-in
+  void _showGeofenceFaceEnrollmentDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.face,
+                color: Color(0xFF10B981),
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Face Recognition Required',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.face_retouching_natural,
+              size: 64,
+              color: Color(0xFF10B981),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'To sign in to ${eventModel.title}, you need to enroll your face first. This is a one-time setup for enhanced security.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 15,
+                height: 1.5,
+                fontFamily: 'Roboto',
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF667EEA).withValues(alpha: 0.2),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.security,
+                    color: Color(0xFF667EEA),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Your face data is encrypted and stored securely for this event only.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey[700],
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.grey[600],
+            ),
+            child: const Text('Later'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _navigateToGeofenceFaceEnrollment();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 12,
+              ),
+            ),
+            child: const Text(
+              'Enroll Now',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Navigate to face enrollment and return to complete sign-in
+  void _navigateToGeofenceFaceEnrollment() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FaceEnrollmentScreen(eventModel: eventModel),
+      ),
+    );
+
+    // After enrollment, automatically launch face scanner
+    if (result == true && mounted) {
+      ShowToast().showNormalToast(
+        msg: 'Enrollment complete! Now verifying your face...',
+      );
+      await Future.delayed(const Duration(milliseconds: 800));
+      _handleGeofenceFacialRecognitionSignIn();
     }
   }
 

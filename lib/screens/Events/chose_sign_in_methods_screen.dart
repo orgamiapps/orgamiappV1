@@ -3,6 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:attendus/screens/Events/add_questions_prompt_screen.dart';
 import 'package:attendus/screens/Events/Widget/sign_in_security_tier_selector.dart';
 import 'package:attendus/Utils/router.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
 
 class ChoseSignInMethodsScreen extends StatefulWidget {
   final DateTime? selectedDateTime;
@@ -27,7 +28,7 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
     with TickerProviderStateMixin {
   // New security tier system
   String _selectedSignInTier = 'regular'; // 'most_secure', 'regular', or 'all'
-  
+
   // Legacy method list for backward compatibility
   List<String> _selectedSignInMethods = ['qr_code', 'manual_code'];
   String? _manualCode;
@@ -36,6 +37,11 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
   late AnimationController _fadeController;
   late AnimationController _slideController;
   late Animation<Offset> _slideAnimation;
+
+  // Scroll controller for header visibility
+  final ScrollController _scrollController = ScrollController();
+  bool _showHeader = true;
+  double _lastScrollOffset = 0;
 
   @override
   void initState() {
@@ -59,110 +65,79 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
 
     _fadeController.forward();
     _slideController.forward();
+
+    // Listen to scroll events to hide/show header
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
     _fadeController.dispose();
     _slideController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  Widget _bodyView() {
-    return SizedBox(
-      width: MediaQuery.of(context).size.width,
-      height: MediaQuery.of(context).size.height,
-      child: Column(
-        children: [
-          _headerView(),
-          Expanded(child: _contentView()),
-        ],
-      ),
-    );
-  }
+  void _onScroll() {
+    final currentOffset = _scrollController.offset;
+    final delta = currentOffset - _lastScrollOffset;
 
-  Widget _headerView() {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-      child: Column(
-        children: [
-          // Back button and title
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    Icons.arrow_back_ios_new,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              const Expanded(
-                child: Text(
-                  'Create Event',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          // Subtitle
-          const Text(
-            'Choose how attendees can sign in to your event',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontFamily: 'Roboto',
-              height: 1.4,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
+    // Hide header when scrolling down, show when scrolling up
+    if (delta > 5 && _showHeader) {
+      setState(() {
+        _showHeader = false;
+      });
+    } else if (delta < -5 && !_showHeader) {
+      setState(() {
+        _showHeader = true;
+      });
+    }
+
+    // Also show header when at the top
+    if (currentOffset <= 0 && !_showHeader) {
+      setState(() {
+        _showHeader = true;
+      });
+    }
+
+    _lastScrollOffset = currentOffset;
   }
 
   Widget _contentView() {
     return SlideTransition(
       position: _slideAnimation,
       child: SingleChildScrollView(
+        controller: _scrollController,
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const SizedBox(height: 16),
+            // Subtitle
+            Text(
+              'Choose how attendees can sign in to your event',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 16,
+                fontFamily: 'Roboto',
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 24),
             // New Sign-In Security Tier Selector
             SignInSecurityTierSelector(
               selectedTier: _selectedSignInTier,
               onTierChanged: (tier) {
                 setState(() {
                   _selectedSignInTier = tier;
-                  
+
                   // Update legacy methods list based on tier
                   switch (tier) {
                     case 'most_secure':
-                      _selectedSignInMethods = ['geofence', 'facial_recognition'];
+                      _selectedSignInMethods = [
+                        'geofence',
+                        'facial_recognition',
+                      ];
                       break;
                     case 'regular':
                       _selectedSignInMethods = ['qr_code', 'manual_code'];
@@ -301,29 +276,40 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFFAFBFC),
       body: SafeArea(
-        child: Stack(
+        child: Column(
           children: [
-            _bodyView(),
-            // Continue Button (Fixed at bottom)
-            Positioned(
-              bottom: MediaQuery.of(context).padding.bottom,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      spreadRadius: 0,
-                      blurRadius: 20,
-                      offset: const Offset(0, -4),
-                    ),
-                  ],
+            // Modern header with animation for hide/show
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              height: _showHeader ? null : 0,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: _showHeader ? 1.0 : 0.0,
+                child: AppAppBarView.modernHeader(
+                  context: context,
+                  title: 'Create Event',
+                  subtitle: 'Step 1 of 3',
                 ),
-                child: _buildContinueButton(),
               ),
+            ),
+            // Content
+            Expanded(child: _contentView()),
+            // Continue Button (Fixed at bottom)
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    spreadRadius: 0,
+                    blurRadius: 20,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: _buildContinueButton(),
             ),
           ],
         ),

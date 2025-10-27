@@ -26,7 +26,6 @@ import 'package:attendus/screens/Events/location_picker_screen.dart';
 import 'package:attendus/Services/creation_limit_service.dart';
 import 'package:attendus/widgets/limit_reached_dialog.dart';
 import 'package:attendus/Utils/app_app_bar_view.dart';
-import 'package:attendus/screens/Events/Widget/sign_in_security_tier_selector.dart';
 
 class CreateEventScreen extends StatefulWidget {
   final DateTime? selectedDateTime;
@@ -104,6 +103,11 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
   late AnimationController _slideController;
   late Animation<Offset> _slideAnimation;
+
+  // Scroll controller for header visibility
+  final ScrollController _scrollController = ScrollController();
+  bool _showHeader = true;
+  double _lastScrollOffset = 0;
 
   // Inline date/time selection state
   DateTime? _selectedDate;
@@ -277,8 +281,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           .trim()
           .isNotEmpty;
       // If geofence sign-in is selected, require a map location
-      if (_selectedSignInMethods.contains('geofence') || 
-          _selectedSignInTier == 'most_secure' || 
+      if (_selectedSignInMethods.contains('geofence') ||
+          _selectedSignInTier == 'most_secure' ||
           _selectedSignInTier == 'all') {
         if (!hasLocation) {
           if (!mounted) return;
@@ -599,6 +603,9 @@ class _CreateEventScreenState extends State<CreateEventScreen>
     _fadeController.forward();
     _slideController.forward();
 
+    // Listen to scroll events to hide/show header
+    _scrollController.addListener(_onScroll);
+
     // Prefill inline date/time from incoming values when available
     if (widget.selectedDateTime != null) {
       final dt = widget.selectedDateTime!;
@@ -671,26 +678,40 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   void dispose() {
     _fadeController.dispose();
     _slideController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  Widget _bodyView() {
-    return Column(
-      children: [
-        AppAppBarView.modernHeader(
-          context: context,
-          title: 'Create Event',
-          subtitle: 'Schedule a new event for this group',
-        ),
-        Expanded(child: _contentView()),
-      ],
-    );
+  void _onScroll() {
+    final currentOffset = _scrollController.offset;
+    final delta = currentOffset - _lastScrollOffset;
+
+    // Hide header when scrolling down, show when scrolling up
+    if (delta > 5 && _showHeader) {
+      setState(() {
+        _showHeader = false;
+      });
+    } else if (delta < -5 && !_showHeader) {
+      setState(() {
+        _showHeader = true;
+      });
+    }
+
+    // Also show header when at the top
+    if (currentOffset <= 0 && !_showHeader) {
+      setState(() {
+        _showHeader = true;
+      });
+    }
+
+    _lastScrollOffset = currentOffset;
   }
 
   Widget _contentView() {
     return SlideTransition(
       position: _slideAnimation,
       child: SingleChildScrollView(
+        controller: _scrollController,
         padding: const EdgeInsets.all(24),
         child: Form(
           key: _formKey,
@@ -1768,45 +1789,56 @@ class _CreateEventScreenState extends State<CreateEventScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFFAFBFC),
       body: SafeArea(
-        child: Stack(
+        child: Column(
           children: [
-            _bodyView(),
-            // Continue Button (Fixed at bottom)
-            Positioned(
-              bottom: MediaQuery.of(context).padding.bottom,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      spreadRadius: 0,
-                      blurRadius: 20,
-                      offset: const Offset(0, -4),
-                    ),
-                  ],
+            // Modern header with animation for hide/show
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              height: _showHeader ? null : 0,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: _showHeader ? 1.0 : 0.0,
+                child: AppAppBarView.modernHeader(
+                  context: context,
+                  title: 'Create Event',
+                  subtitle: 'Step 3 of 3',
                 ),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: RoundedLoadingButton(
-                    animateOnTap: false,
-                    borderRadius: 16,
-                    controller: _btnCtlr,
-                    onPressed: () => _handleSubmit(),
-                    color: const Color(0xFF667EEA),
-                    elevation: 0,
-                    child: const Text(
-                      'Add New Event',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        fontFamily: 'Roboto',
-                      ),
+              ),
+            ),
+            // Content
+            Expanded(child: _contentView()),
+            // Continue Button (Fixed at bottom)
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    spreadRadius: 0,
+                    blurRadius: 20,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: RoundedLoadingButton(
+                  animateOnTap: false,
+                  borderRadius: 16,
+                  controller: _btnCtlr,
+                  onPressed: () => _handleSubmit(),
+                  color: const Color(0xFF667EEA),
+                  elevation: 0,
+                  child: const Text(
+                    'Add New Event',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      fontFamily: 'Roboto',
                     ),
                   ),
                 ),

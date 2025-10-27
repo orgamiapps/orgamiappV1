@@ -17,6 +17,10 @@ import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:attendus/screens/Home/calendar_screen.dart';
 import 'package:attendus/Utils/firebase_retry_helper.dart';
 import 'package:attendus/screens/Events/global_events_map_screen.dart';
+import 'package:attendus/Services/guest_mode_service.dart';
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/Utils/toast.dart';
+import 'package:attendus/screens/Authentication/create_account/create_account_screen.dart';
 
 class HomeHubScreen extends StatefulWidget {
   const HomeHubScreen({super.key});
@@ -177,6 +181,8 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isGuestMode = GuestModeService().isGuestMode;
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       floatingActionButton: _tabIndex == 1 ? _buildCreateFab() : null,
@@ -184,13 +190,15 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
         child: Column(
           children: [
             _buildSimpleHeader(),
+            if (isGuestMode) _buildGuestBanner(),
             const SizedBox(height: 12),
-            _buildSegmentedTabs(),
-            const SizedBox(height: 12),
+            // Hide Private tab in guest mode
+            if (!isGuestMode) _buildSegmentedTabs(),
+            if (!isGuestMode) const SizedBox(height: 12),
             Expanded(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 250),
-                child: _tabIndex == 0
+                child: (_tabIndex == 0 || isGuestMode)
                     ? const legacy.HomeScreen(showHeader: false)
                     : _buildOrgsTab(),
               ),
@@ -203,6 +211,8 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
 
   Widget _buildCreateFab() {
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final isGuestMode = GuestModeService().isGuestMode;
+
     return Container(
       width: 56,
       height: 56,
@@ -227,10 +237,14 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
         child: InkWell(
           borderRadius: BorderRadius.circular(28),
           onTap: () {
-            RouterClass.nextScreenNormal(
-              context,
-              const PremiumEventCreationWrapper(),
-            );
+            if (isGuestMode) {
+              _showGuestRestrictionDialog(GuestFeature.createEvent);
+            } else {
+              RouterClass.nextScreenNormal(
+                context,
+                const PremiumEventCreationWrapper(),
+              );
+            }
           },
           child: Icon(
             Icons.add,
@@ -663,4 +677,248 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   );
 
   // Removed unused _pill helper
+
+  /// Build guest mode banner with account creation CTA
+  Widget _buildGuestBanner() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+            offset: const Offset(0, 4),
+            blurRadius: 12,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.explore_outlined,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Browsing as Guest',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Create an account for full access',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 13,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                RouterClass.nextScreenNormal(
+                  context,
+                  const CreateAccountScreen(),
+                );
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Sign Up',
+                  style: TextStyle(
+                    color: Color(0xFF667EEA),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Show dialog explaining guest mode restrictions
+  void _showGuestRestrictionDialog(GuestFeature feature) {
+    final message = GuestModeService().getFeatureRestrictionMessage(feature);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.lock_outline,
+                color: Color(0xFF667EEA),
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Account Required',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.person_add_outlined,
+              size: 64,
+              color: Color(0xFF667EEA),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 15,
+                height: 1.5,
+                fontFamily: 'Roboto',
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.check_circle_outline,
+                        color: Color(0xFF10B981),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Free account with instant access',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[700],
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.check_circle_outline,
+                        color: Color(0xFF10B981),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Create events, join groups & more',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[700],
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.grey[600],
+            ),
+            child: const Text('Maybe Later'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              RouterClass.nextScreenNormal(
+                context,
+                const CreateAccountScreen(),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF667EEA),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            child: const Text(
+              'Create Account',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

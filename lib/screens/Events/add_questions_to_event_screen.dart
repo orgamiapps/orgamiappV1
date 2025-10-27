@@ -7,6 +7,7 @@ import 'package:attendus/models/event_question_model.dart';
 import 'package:attendus/screens/Events/Widget/add_question_popup.dart';
 import 'package:attendus/screens/Events/create_event_screen.dart';
 import 'package:attendus/Utils/router.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
 
 class AddQuestionsToEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -27,9 +28,6 @@ class AddQuestionsToEventScreen extends StatefulWidget {
 
 class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
     with TickerProviderStateMixin {
-  late final double _screenWidth = MediaQuery.of(context).size.width;
-  late final double _screenHeight = MediaQuery.of(context).size.height;
-
   List<EventQuestionModel> questionsList = [];
   bool _isLoading = true;
   bool _showTemplates = false;
@@ -43,6 +41,11 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
   late Animation<double> _fadeAnimation;
   late AnimationController _slideController;
   late Animation<Offset> _slideAnimation;
+
+  // Scroll controller for header visibility
+  final ScrollController _scrollController = ScrollController();
+  bool _showHeader = true;
+  double _lastScrollOffset = 0;
 
   // Pre-built question templates - Professional questions that event hosts actually want to ask
   final List<Map<String, dynamic>> _questionTemplates = [
@@ -464,6 +467,9 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
     _fadeController.forward();
     _slideController.forward();
 
+    // Listen to scroll events to hide/show header
+    _scrollController.addListener(_onScroll);
+
     // Start with templates collapsed to reduce initial overwhelm
     // Users can expand when they want to browse all templates.
     _showTemplates = false;
@@ -476,7 +482,33 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
     _fadeController.dispose();
     _slideController.dispose();
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    final currentOffset = _scrollController.offset;
+    final delta = currentOffset - _lastScrollOffset;
+
+    // Hide header when scrolling down, show when scrolling up
+    if (delta > 5 && _showHeader) {
+      setState(() {
+        _showHeader = false;
+      });
+    } else if (delta < -5 && !_showHeader) {
+      setState(() {
+        _showHeader = true;
+      });
+    }
+
+    // Also show header when at the top
+    if (currentOffset <= 0 && !_showHeader) {
+      setState(() {
+        _showHeader = true;
+      });
+    }
+
+    _lastScrollOffset = currentOffset;
   }
 
   @override
@@ -484,7 +516,30 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFFAFBFC),
       body: SafeArea(
-        child: FadeTransition(opacity: _fadeAnimation, child: _bodyView()),
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: Column(
+            children: [
+              // Modern header with animation for hide/show
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                height: _showHeader ? null : 0,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 300),
+                  opacity: _showHeader ? 1.0 : 0.0,
+                  child: AppAppBarView.modernHeader(
+                    context: context,
+                    title: 'Create Event',
+                    subtitle: 'Step 2 of 3 - Add Prompts',
+                  ),
+                ),
+              ),
+              // Content
+              Expanded(child: _contentView()),
+            ],
+          ),
+        ),
       ),
       floatingActionButton: widget.eventModel.id.isEmpty
           ? null // Hide FAB during event creation, use bottom button instead
@@ -522,91 +577,27 @@ class _AddQuestionsToEventScreenState extends State<AddQuestionsToEventScreen>
     );
   }
 
-  Widget _bodyView() {
-    return SizedBox(
-      width: _screenWidth,
-      height: _screenHeight,
-      child: Column(
-        children: [
-          _headerView(),
-          Expanded(child: _contentView()),
-        ],
-      ),
-    );
-  }
-
-  Widget _headerView() {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () {
-                  // Simply pop back to the previous screen (AddQuestionsPromptScreen)
-                  Navigator.pop(context);
-                },
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    Icons.arrow_back_ios_new,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              const Expanded(
-                child: Text(
-                  'Add Sign-In Prompts',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Create questions that attendees will answer when signing in',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontFamily: 'Roboto',
-              height: 1.4,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _contentView() {
     return SlideTransition(
       position: _slideAnimation,
       child: SingleChildScrollView(
+        controller: _scrollController,
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const SizedBox(height: 16),
+            // Subtitle
+            Text(
+              'Create questions that attendees will answer when signing in',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 16,
+                fontFamily: 'Roboto',
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 24),
             // Quick Templates Section
             _buildTemplatesSection(),
             const SizedBox(height: 24),

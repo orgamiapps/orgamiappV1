@@ -4,6 +4,7 @@ import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Events/add_questions_to_event_screen.dart';
 import 'package:attendus/screens/Events/create_event_screen.dart';
 import 'package:attendus/Utils/router.dart';
+import 'package:attendus/Utils/app_app_bar_view.dart';
 
 class AddQuestionsPromptScreen extends StatefulWidget {
   final DateTime? selectedDateTime;
@@ -11,7 +12,8 @@ class AddQuestionsPromptScreen extends StatefulWidget {
   final LatLng selectedLocation;
   final double radios;
   final List<String> selectedSignInMethods;
-  final String? selectedSignInTier; // New: security tier ('most_secure', 'regular', 'all')
+  final String?
+  selectedSignInTier; // New: security tier ('most_secure', 'regular', 'all')
   final String? manualCode;
   final String? preselectedOrganizationId;
   final bool forceOrganizationEvent;
@@ -36,14 +38,16 @@ class AddQuestionsPromptScreen extends StatefulWidget {
 
 class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
     with TickerProviderStateMixin {
-  late final double _screenWidth = MediaQuery.of(context).size.width;
-  late final double _screenHeight = MediaQuery.of(context).size.height;
-
   // Animation controllers
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
   late AnimationController _slideController;
   late Animation<Offset> _slideAnimation;
+
+  // Scroll controller for header visibility
+  final ScrollController _scrollController = ScrollController();
+  bool _showHeader = true;
+  double _lastScrollOffset = 0;
 
   @override
   void initState() {
@@ -70,99 +74,65 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
 
     _fadeController.forward();
     _slideController.forward();
+
+    // Listen to scroll events to hide/show header
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
     _fadeController.dispose();
     _slideController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  Widget _bodyView() {
-    return SizedBox(
-      width: _screenWidth,
-      height: _screenHeight,
-      child: Column(
-        children: [
-          _headerView(),
-          Expanded(child: _contentView()),
-        ],
-      ),
-    );
-  }
+  void _onScroll() {
+    final currentOffset = _scrollController.offset;
+    final delta = currentOffset - _lastScrollOffset;
 
-  Widget _headerView() {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-      child: Column(
-        children: [
-          // Back button and title
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    Icons.arrow_back_ios_new,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              const Expanded(
-                child: Text(
-                  'Sign-In Prompts',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          // Subtitle
-          const Text(
-            'Would you like to collect information from attendees when they sign in?',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontFamily: 'Roboto',
-              height: 1.4,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
+    // Hide header when scrolling down, show when scrolling up
+    if (delta > 5 && _showHeader) {
+      setState(() {
+        _showHeader = false;
+      });
+    } else if (delta < -5 && !_showHeader) {
+      setState(() {
+        _showHeader = true;
+      });
+    }
+
+    // Also show header when at the top
+    if (currentOffset <= 0 && !_showHeader) {
+      setState(() {
+        _showHeader = true;
+      });
+    }
+
+    _lastScrollOffset = currentOffset;
   }
 
   Widget _contentView() {
     return SlideTransition(
       position: _slideAnimation,
       child: SingleChildScrollView(
+        controller: _scrollController,
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const SizedBox(height: 16),
+            // Subtitle
+            Text(
+              'Would you like to collect information from attendees when they sign in?',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 16,
+                fontFamily: 'Roboto',
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 24),
             // Question Options
             _buildQuestionOptions(),
             const SizedBox(height: 24),
@@ -246,7 +216,8 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
                     selectedDateTime: widget.selectedDateTime ?? DateTime.now(),
                     eventGenerateTime: DateTime.now(),
                     status: '',
-                    getLocation: widget.selectedSignInMethods.contains('geofence') ||
+                    getLocation:
+                        widget.selectedSignInMethods.contains('geofence') ||
                         widget.selectedSignInTier == 'most_secure' ||
                         widget.selectedSignInTier == 'all',
                     radius: widget.radios,
@@ -447,7 +418,30 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFFAFBFC),
       body: SafeArea(
-        child: FadeTransition(opacity: _fadeAnimation, child: _bodyView()),
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: Column(
+            children: [
+              // Modern header with animation for hide/show
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                height: _showHeader ? null : 0,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 300),
+                  opacity: _showHeader ? 1.0 : 0.0,
+                  child: AppAppBarView.modernHeader(
+                    context: context,
+                    title: 'Create Event',
+                    subtitle: 'Step 2 of 3',
+                  ),
+                ),
+              ),
+              // Content
+              Expanded(child: _contentView()),
+            ],
+          ),
+        ),
       ),
     );
   }
