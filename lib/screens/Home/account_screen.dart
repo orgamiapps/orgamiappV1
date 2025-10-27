@@ -7,7 +7,6 @@ import 'package:attendus/controller/customer_controller.dart';
 
 import 'package:attendus/screens/Feedback/feedback_screen.dart';
 
-import 'package:attendus/screens/Home/analytics_dashboard_screen.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/theme_provider.dart';
 
@@ -18,7 +17,6 @@ import 'package:attendus/Services/auth_service.dart';
 
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 
-import 'package:attendus/screens/Home/attendee_notification_screen.dart';
 import 'package:attendus/screens/Home/about_us_screen.dart';
 import 'package:attendus/screens/Home/blocked_users_screen.dart';
 import 'package:attendus/screens/Legal/terms_conditions_screen.dart';
@@ -26,6 +24,7 @@ import 'package:attendus/screens/Legal/privacy_policy_screen.dart';
 import 'package:attendus/screens/Home/help_screen.dart';
 import 'package:attendus/screens/Premium/premium_upgrade_screen_v2.dart';
 import 'package:attendus/screens/Premium/subscription_management_screen.dart';
+import 'package:attendus/screens/Premium/premium_features_screen.dart';
 import 'package:attendus/models/subscription_model.dart';
 import 'package:attendus/Services/subscription_service.dart';
 import 'package:attendus/Utils/logger.dart';
@@ -369,6 +368,19 @@ class _AccountScreenState extends State<AccountScreen> {
                 _buildPremiumManageItem(subscriptionService),
                 _buildDivider(),
               ],
+              // Premium Features (only show if user has premium)
+              if (hasPremium) ...[
+                _buildSettingsItem(
+                  icon: Icons.workspace_premium,
+                  title: 'Premium Features',
+                  subtitle: 'Access analytics and advanced tools',
+                  onTap: () => RouterClass.nextScreenNormal(
+                    context,
+                    const PremiumFeaturesScreen(),
+                  ),
+                ),
+                _buildDivider(),
+              ],
               // Feedback
               _buildSettingsItem(
                 icon: Icons.feedback,
@@ -376,27 +388,6 @@ class _AccountScreenState extends State<AccountScreen> {
                 subtitle: 'Share your thoughts with us',
                 onTap: () =>
                     RouterClass.nextScreenNormal(context, FeedbackScreen()),
-              ),
-              _buildDivider(),
-              // Profile moved to bottom app bar
-              _buildSettingsItem(
-                icon: Icons.analytics_rounded,
-                title: 'Analytics Dashboard',
-                subtitle: 'Comprehensive insights across all events',
-                onTap: () => RouterClass.nextScreenNormal(
-                  context,
-                  const AnalyticsDashboardScreen(),
-                ),
-              ),
-              _buildDivider(),
-              _buildSettingsItem(
-                icon: Icons.sms_rounded,
-                title: 'Send Notifications',
-                subtitle: 'Send SMS or in-app notifications',
-                onTap: () => RouterClass.nextScreenNormal(
-                  context,
-                  const AttendeeNotificationScreen(),
-                ),
               ),
               _buildDivider(),
               _buildSettingsItem(

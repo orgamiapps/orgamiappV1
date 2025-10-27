@@ -459,7 +459,7 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
                 bottom: PreferredSize(
                   preferredSize: const Size.fromHeight(60),
                   child: Container(
-                    color: Colors.white,
+                    color: Theme.of(context).scaffoldBackgroundColor,
                     child: Padding(
                       padding: const EdgeInsets.only(top: 12),
                       child: TabBar(
@@ -467,7 +467,9 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
                         isScrollable: false,
                         tabAlignment: TabAlignment.fill,
                         labelColor: const Color(0xFF667EEA),
-                        unselectedLabelColor: Colors.black54,
+                        unselectedLabelColor: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
                         indicatorColor: const Color(0xFF667EEA),
                         indicatorWeight: 3,
                         labelStyle: const TextStyle(
@@ -501,7 +503,10 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
                   onScrollChange: _handleScrollChange,
                 ),
                 _MembersTab(organizationId: widget.organizationId),
-                _AboutTab(organizationId: widget.organizationId),
+                _AboutTab(
+                  organizationId: widget.organizationId,
+                  onScrollChange: _handleScrollChange,
+                ),
               ],
             ),
           ),
@@ -1897,9 +1902,53 @@ class _MembersTabState extends State<_MembersTab> {
   }
 }
 
-class _AboutTab extends StatelessWidget {
+class _AboutTab extends StatefulWidget {
   final String organizationId;
-  const _AboutTab({required this.organizationId});
+  final Function(bool)? onScrollChange;
+
+  const _AboutTab({required this.organizationId, this.onScrollChange});
+
+  @override
+  State<_AboutTab> createState() => _AboutTabState();
+}
+
+class _AboutTabState extends State<_AboutTab> {
+  ScrollController? _scrollController;
+  double _lastScrollPosition = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Scroll controller will be attached in didChangeDependencies
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Use PrimaryScrollController when inside NestedScrollView
+    if (widget.onScrollChange != null && _scrollController == null) {
+      _scrollController = PrimaryScrollController.of(context);
+      _scrollController?.addListener(_onScroll);
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController?.removeListener(_onScroll);
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController == null || !_scrollController!.hasClients) return;
+    
+    final currentScrollPosition = _scrollController!.position.pixels;
+    final isScrollingDown = currentScrollPosition > _lastScrollPosition;
+
+    if ((currentScrollPosition - _lastScrollPosition).abs() > 5) {
+      widget.onScrollChange?.call(isScrollingDown);
+      _lastScrollPosition = currentScrollPosition;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1907,29 +1956,27 @@ class _AboutTab extends StatelessWidget {
       future: Future.wait([
         FirebaseFirestore.instance
             .collection('Organizations')
-            .doc(organizationId)
+            .doc(widget.organizationId)
             .get(),
         FirebaseFirestore.instance
             .collection('Organizations')
-            .doc(organizationId)
+            .doc(widget.organizationId)
             .collection('Members')
             .where('status', isEqualTo: 'approved')
             .get(),
         FirebaseFirestore.instance
             .collection('Events')
-            .where('organizationId', isEqualTo: organizationId)
+            .where('organizationId', isEqualTo: widget.organizationId)
             .get(),
-        _getAttendanceDataForOrganization(organizationId),
-        _getUpcomingEvents(organizationId),
+        _getAttendanceDataForOrganization(widget.organizationId),
+        _getUpcomingEvents(widget.organizationId),
       ]),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
             child: Padding(
               padding: EdgeInsets.all(32),
-              child: CircularProgressIndicator(
-                color: Color(0xFF667EEA),
-              ),
+              child: CircularProgressIndicator(color: Color(0xFF667EEA)),
             ),
           );
         }
@@ -1969,6 +2016,7 @@ class _AboutTab extends StatelessWidget {
         }).length;
 
         return ListView(
+          primary: true,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           children: [
             // Hero Stats Card - Eye-catching overview
@@ -2010,7 +2058,7 @@ class _AboutTab extends StatelessWidget {
               context,
               website,
               locationAddress,
-              organizationId,
+              widget.organizationId,
             ),
 
             const SizedBox(height: 20),
@@ -2018,7 +2066,8 @@ class _AboutTab extends StatelessWidget {
             // Admin Information Section
             _buildAdminSection(context, createdBy),
 
-            const SizedBox(height: 32),
+            // Extra bottom padding to allow scrolling past the FAB
+            const SizedBox(height: 120),
           ],
         );
       },
@@ -2185,10 +2234,7 @@ class _AboutTab extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            Container(
-              height: 1,
-              color: Colors.white.withValues(alpha: 0.3),
-            ),
+            Container(height: 1, color: Colors.white.withValues(alpha: 0.3)),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -2346,13 +2392,9 @@ class _AboutTab extends StatelessWidget {
         context,
         'Event Privacy',
         visibility == 'public' ? 'Public Events' : 'Private Events',
-        visibility == 'public'
-            ? Icons.public
-            : Icons.lock_outline,
+        visibility == 'public' ? Icons.public : Icons.lock_outline,
         const Color(0xFF667EEA),
-        subtitle: visibility == 'public'
-            ? 'Open to everyone'
-            : 'Members only',
+        subtitle: visibility == 'public' ? 'Open to everyone' : 'Members only',
       ),
       if (createdAt != null)
         _buildInfoGridItem(
@@ -2373,9 +2415,7 @@ class _AboutTab extends StatelessWidget {
           subtitle: 'Tap to view on map',
           onTap: () async {
             final encodedAddress = Uri.encodeComponent(locationAddress);
-            final uri = Uri.parse(
-              'https://maps.google.com/?q=$encodedAddress',
-            );
+            final uri = Uri.parse('https://maps.google.com/?q=$encodedAddress');
             if (await canLaunchUrl(uri)) {
               await launchUrl(uri, mode: LaunchMode.externalApplication);
             }
@@ -2395,10 +2435,10 @@ class _AboutTab extends StatelessWidget {
             ),
           ),
         ),
-        ...items.map((item) => Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: item,
-        )),
+        ...items.map(
+          (item) =>
+              Padding(padding: const EdgeInsets.only(bottom: 12), child: item),
+        ),
       ],
     );
   }
@@ -2559,34 +2599,34 @@ class _AboutTab extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: date != null
-                      ? Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              date.day.toString(),
-                              style: const TextStyle(
-                                color: Color(0xFF667EEA),
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              _getMonthAbbr(date.month),
-                              style: TextStyle(
-                                color: const Color(0xFF667EEA).withValues(
-                                  alpha: 0.7,
+                        ? Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                date.day.toString(),
+                                style: const TextStyle(
+                                  color: Color(0xFF667EEA),
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
                               ),
-                            ),
-                          ],
-                        )
-                      : const Icon(
-                          Icons.event,
-                          color: Color(0xFF667EEA),
-                          size: 28,
-                        ),
+                              Text(
+                                _getMonthAbbr(date.month),
+                                style: TextStyle(
+                                  color: const Color(
+                                    0xFF667EEA,
+                                  ).withValues(alpha: 0.7),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          )
+                        : const Icon(
+                            Icons.event,
+                            color: Color(0xFF667EEA),
+                            size: 28,
+                          ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -2666,9 +2706,7 @@ class _AboutTab extends StatelessWidget {
           const Color(0xFF4CAF50),
           () async {
             final encodedAddress = Uri.encodeComponent(locationAddress);
-            final uri = Uri.parse(
-              'https://maps.google.com/?q=$encodedAddress',
-            );
+            final uri = Uri.parse('https://maps.google.com/?q=$encodedAddress');
             if (await canLaunchUrl(uri)) {
               await launchUrl(uri, mode: LaunchMode.externalApplication);
             }
@@ -2693,11 +2731,7 @@ class _AboutTab extends StatelessWidget {
             ),
           ),
         ),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: actions,
-        ),
+        Wrap(spacing: 12, runSpacing: 12, children: actions),
       ],
     );
   }
@@ -2719,9 +2753,7 @@ class _AboutTab extends StatelessWidget {
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: color.withValues(alpha: 0.3),
-            ),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -2780,7 +2812,8 @@ class _AboutTab extends StatelessWidget {
                 : null;
 
             final adminName = adminData?['name'] ?? 'Group Admin';
-            final adminProfileUrl = adminData?['profileImageUrl'] ??
+            final adminProfileUrl =
+                adminData?['profileImageUrl'] ??
                 adminData?['profilePictureUrl'];
 
             return Container(
@@ -2812,15 +2845,12 @@ class _AboutTab extends StatelessWidget {
                           end: Alignment.bottomRight,
                           colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
                         ),
-                        border: Border.all(
-                          color: Colors.white,
-                          width: 2,
-                        ),
+                        border: Border.all(color: Colors.white, width: 2),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF667EEA).withValues(
-                              alpha: 0.3,
-                            ),
+                            color: const Color(
+                              0xFF667EEA,
+                            ).withValues(alpha: 0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -2864,9 +2894,9 @@ class _AboutTab extends StatelessWidget {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF667EEA).withValues(
-                                alpha: 0.1,
-                              ),
+                              color: const Color(
+                                0xFF667EEA,
+                              ).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
@@ -2927,8 +2957,18 @@ class _AboutTab extends StatelessWidget {
 
   String _getMonthAbbr(int month) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return months[month - 1];
   }
@@ -2949,7 +2989,9 @@ class _AboutTab extends StatelessWidget {
   }
 
   String _formatTime(DateTime date) {
-    final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
+    final hour = date.hour > 12
+        ? date.hour - 12
+        : (date.hour == 0 ? 12 : date.hour);
     final minute = date.minute.toString().padLeft(2, '0');
     final period = date.hour >= 12 ? 'PM' : 'AM';
     return '$hour:$minute $period';

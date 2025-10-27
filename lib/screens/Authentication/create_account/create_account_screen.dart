@@ -8,11 +8,6 @@ import 'package:attendus/screens/Authentication/create_account/steps/step_passwo
 import 'package:attendus/screens/Authentication/create_account/steps/step_profile_photo.dart';
 import 'package:attendus/screens/Authentication/create_account/steps/step_professional_info.dart';
 import 'package:attendus/screens/Authentication/create_account/steps/step_contacts.dart';
-import 'package:attendus/Utils/app_constants.dart';
-import 'package:attendus/Utils/toast.dart';
-import 'package:attendus/firebase/firebase_google_auth_helper.dart';
-import 'package:attendus/Services/auth_service.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
@@ -55,23 +50,17 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
               child: Column(
                 children: [
                   _header(context),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-                    child: Column(
-                      children: [
-                        _buildGoogleSignInButton(context),
-                        const SizedBox(height: 12),
-                        if (AppConstants.enableAppleSignIn)
-                          _buildAppleSignInButton(context),
-                      ],
-                    ),
-                  ),
                   Expanded(
                     child: PageView(
                       controller: _pageController,
                       physics: const NeverScrollableScrollPhysics(),
                       children: [
-                        StepBasicInfo(onNext: () => _goTo(1)),
+                        StepBasicInfo(
+                          onNext: () => _goTo(1),
+                          onSocialSignIn: (isSigning) {
+                            setState(() => _socialSigningIn = isSigning);
+                          },
+                        ),
                         StepPassword(onNext: () => _goTo(2)),
                         StepProfilePhoto(
                           onSkip: () =>
@@ -158,116 +147,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           ),
         );
       }),
-    );
-  }
-
-  Widget _buildGoogleSignInButton(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: OutlinedButton.icon(
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(
-            color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        onPressed: () async {
-          if (_socialSigningIn) return;
-          setState(() => _socialSigningIn = true);
-          try {
-            final helper = FirebaseGoogleAuthHelper();
-            final profileData = await helper.loginWithGoogle();
-            if (profileData != null) {
-              try {
-                await AuthService().handleSocialLoginSuccessWithProfileData(
-                  profileData,
-                );
-                if (!mounted) return;
-                await AuthService().ensureInMemoryUserModel();
-                await Future.delayed(const Duration(milliseconds: 120));
-                RouterClass().homeScreenRoute(context: context);
-              } catch (e) {
-                ShowToast().showNormalToast(msg: 'Login error');
-              }
-            } else {
-              if (!FirebaseGoogleAuthHelper.lastGoogleCancelled) {
-                ShowToast().showNormalToast(msg: 'Google sign-in failed');
-              }
-            }
-          } finally {
-            if (mounted) setState(() => _socialSigningIn = false);
-          }
-        },
-        icon: const FaIcon(
-          FontAwesomeIcons.google,
-          size: 18,
-          color: Color(0xFF4285F4),
-        ),
-        label: const Text(
-          'Continue with Google',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAppleSignInButton(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: OutlinedButton.icon(
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(
-            color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        onPressed: () async {
-          if (_socialSigningIn) return;
-          setState(() => _socialSigningIn = true);
-          try {
-            final helper = FirebaseGoogleAuthHelper();
-            final profileData = await helper.loginWithApple();
-            if (profileData != null) {
-              try {
-                await AuthService().handleSocialLoginSuccessWithProfileData(
-                  profileData,
-                );
-                if (!mounted) return;
-                await AuthService().ensureInMemoryUserModel();
-                await Future.delayed(const Duration(milliseconds: 120));
-                RouterClass().homeScreenRoute(context: context);
-              } catch (e) {
-                ShowToast().showNormalToast(msg: 'Login error');
-              }
-            } else {
-              if (!FirebaseGoogleAuthHelper.lastAppleCancelled) {
-                ShowToast().showNormalToast(msg: 'Apple sign-in failed');
-              }
-            }
-          } finally {
-            if (mounted) setState(() => _socialSigningIn = false);
-          }
-        },
-        icon: const Icon(Icons.apple, size: 20, color: Colors.black),
-        label: const Text(
-          'Continue with Apple',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
-        ),
-      ),
     );
   }
 }

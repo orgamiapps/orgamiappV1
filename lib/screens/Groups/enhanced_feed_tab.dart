@@ -30,7 +30,7 @@ class EnhancedFeedTab extends StatefulWidget {
 }
 
 class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
-  late ScrollController _scrollController;
+  ScrollController? _scrollController;
   bool _isScrollingDown = false;
   static const double _appBarHeight = 56.0;
   Timer? _scrollDebouncer;
@@ -162,24 +162,29 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
   @override
   void initState() {
     super.initState();
-    _scrollController = ScrollController();
+    // Scroll controller will be attached in didChangeDependencies
+  }
 
-    // Only add scroll listener if callback is provided
-    if (widget.onScrollChange != null) {
-      _scrollController.addListener(_onScroll);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Use PrimaryScrollController when inside NestedScrollView
+    if (widget.onScrollChange != null && _scrollController == null) {
+      _scrollController = PrimaryScrollController.of(context);
+      _scrollController?.addListener(_onScroll);
     }
   }
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    _scrollController?.removeListener(_onScroll);
     _scrollDebouncer?.cancel();
     super.dispose();
   }
 
   void _onScroll() {
     // Safety check
-    if (!_scrollController.hasClients || !mounted) return;
+    if (_scrollController == null || !_scrollController!.hasClients || !mounted) return;
 
     // Cancel any existing debouncer
     _scrollDebouncer?.cancel();
@@ -193,9 +198,9 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
   }
 
   void _checkScrollDirection() {
-    if (!_scrollController.hasClients || !mounted) return;
+    if (_scrollController == null || !_scrollController!.hasClients || !mounted) return;
 
-    final currentOffset = _scrollController.offset;
+    final currentOffset = _scrollController!.offset;
     final shouldBeScrollingDown = currentOffset > _appBarHeight;
 
     // Only notify parent if scroll state actually changed
@@ -588,7 +593,7 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                         }
 
                         return CustomScrollView(
-                          controller: _scrollController,
+                          primary: true,
                           slivers: [
                             SliverToBoxAdapter(
                               child: Container(

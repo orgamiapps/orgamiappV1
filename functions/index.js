@@ -2053,7 +2053,33 @@ exports.notifyOrgMembershipChanges = onDocumentWritten("Organizations/{orgId}/Me
     const beforeData = event.data.before.exists ? event.data.before.data() : null;
     const afterData = afterExists ? event.data.after.data() : null;
 
-    // If status changed to approved/declined, inform the user
+    // Get organization name for better notification messages
+    let orgName = "the group";
+    try {
+      const orgDoc = await db.collection("Organizations").doc(orgId).get();
+      if (orgDoc.exists) {
+        orgName = orgDoc.data().name || "the group";
+      }
+    } catch (e) {
+      logger.warn("Could not fetch org name:", e);
+    }
+
+    // NEW MEMBER APPROVAL: When a member document is created with approved status
+    // This happens when an admin approves a join request
+    if (afterExists && !beforeData && afterData.status === "approved") {
+      const settingsDoc = await db.collection("users").doc(userId).collection("settings").doc("notifications").get();
+      const settings = settingsDoc.exists ? settingsDoc.data() : {};
+      if (settings.organizationUpdates !== false) {
+        await sendNotificationToUser(userId, {
+          type: "org_update",
+          title: "Join Request Approved! 🎉",
+          body: `Your request to join ${orgName} has been approved`,
+          data: { organizationId: orgId, organizationName: orgName },
+        }, db);
+      }
+    }
+
+    // EXISTING MEMBER STATUS UPDATE: If status changed on an existing member
     if (afterExists && beforeData && beforeData.status !== afterData.status) {
       const settingsDoc = await db.collection("users").doc(userId).collection("settings").doc("notifications").get();
       const settings = settingsDoc.exists ? settingsDoc.data() : {};
@@ -2062,22 +2088,22 @@ exports.notifyOrgMembershipChanges = onDocumentWritten("Organizations/{orgId}/Me
         await sendNotificationToUser(userId, {
           type: "org_update",
           title: approved ? "Join request approved" : "Join request updated",
-          body: approved ? "You have been approved to join the organization" : `Your status is now ${afterData.status}`,
-          data: { organizationId: orgId },
+          body: approved ? `You have been approved to join ${orgName}` : `Your status in ${orgName} is now ${afterData.status}`,
+          data: { organizationId: orgId, organizationName: orgName },
         }, db);
       }
     }
 
-    // If role changes, notify the user
+    // ROLE CHANGE: If role changes, notify the user
     if (afterExists && beforeData && beforeData.role !== afterData.role) {
       const settingsDoc = await db.collection("users").doc(userId).collection("settings").doc("notifications").get();
       const settings = settingsDoc.exists ? settingsDoc.data() : {};
       if (settings.organizationUpdates !== false) {
         await sendNotificationToUser(userId, {
           type: "org_update",
-          title: "Role changed",
-          body: `Your role is now ${afterData.role}`,
-          data: { organizationId: orgId },
+          title: "Role Changed",
+          body: `Your role in ${orgName} is now ${afterData.role}`,
+          data: { organizationId: orgId, organizationName: orgName },
         }, db);
       }
     }

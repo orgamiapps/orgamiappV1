@@ -2,12 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/models/attendance_model.dart';
+import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/QRScanner/ans_questions_to_sign_in_event_screen.dart';
 import 'package:attendus/screens/QRScanner/modern_qr_scanner_screen.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
+import 'package:attendus/Services/geofence_event_detector.dart';
+import 'package:attendus/Utils/location_helper.dart';
+import 'package:attendus/screens/FaceRecognition/face_recognition_scanner_screen.dart';
+import 'package:attendus/Services/face_recognition_service.dart';
+import 'package:attendus/screens/FaceRecognition/face_enrollment_screen.dart';
 
 /// Modern, streamlined sign-in flow screen
 /// Professional UI/UX following Material Design 3 principles
@@ -23,10 +29,11 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
   final TextEditingController _codeController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  
+
   bool _isAnonymousSignIn = false;
   bool _isLoading = false;
-  
+  bool _isLocationCheckLoading = false;
+
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -38,18 +45,16 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
       duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
     );
-    
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
-    );
-    
+
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+        );
+
     _animationController.forward();
   }
 
@@ -160,7 +165,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
 
   Widget _buildWelcomeSection() {
     final isLoggedIn = CustomerController.logeInCustomer != null;
-    
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -195,7 +200,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
           ),
           const SizedBox(height: 20),
           const Text(
-            'Check In to Event',
+            'Sign In to Event',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w700,
@@ -276,6 +281,17 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
         ),
         const SizedBox(height: 20),
         _buildMethodCard(
+          icon: Icons.location_on,
+          iconColor: const Color(0xFF10B981),
+          title: 'Location & Facial Recognition',
+          subtitle: 'Automatic detection & biometric',
+          badge: 'MOST SECURE',
+          badgeColor: const Color(0xFF10B981),
+          isLoading: _isLocationCheckLoading,
+          onTap: _handleLocationFacialSignIn,
+        ),
+        const SizedBox(height: 16),
+        _buildMethodCard(
           icon: Icons.qr_code_scanner,
           iconColor: const Color(0xFF667EEA),
           title: 'Scan QR Code',
@@ -289,7 +305,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
                 builder: (context) => const ModernQRScannerScreen(),
               ),
             );
-            
+
             if (result != null && mounted) {
               _codeController.text = result;
               _handleSignIn();
@@ -317,6 +333,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
     required String subtitle,
     String? badge,
     Color? badgeColor,
+    bool isLoading = false,
     required VoidCallback onTap,
   }) {
     return Material(
@@ -329,10 +346,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: const Color(0xFFE5E7EB),
-              width: 1.5,
-            ),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.04),
@@ -348,10 +362,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
                 height: 56,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [
-                      iconColor,
-                      iconColor.withValues(alpha: 0.7),
-                    ],
+                    colors: [iconColor, iconColor.withValues(alpha: 0.7)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -419,11 +430,22 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
                 ),
               ),
               const SizedBox(width: 12),
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 18,
-                color: Colors.grey[400],
-              ),
+              isLoading
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Colors.grey[400]!,
+                        ),
+                      ),
+                    )
+                  : Icon(
+                      Icons.arrow_forward_ios,
+                      size: 18,
+                      color: Colors.grey[400],
+                    ),
             ],
           ),
         ),
@@ -474,17 +496,20 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
           const SizedBox(height: 16),
           _buildTipItem(
             icon: Icons.qr_code_2,
-            text: 'QR codes are displayed at the event entrance or by the organizer',
+            text:
+                'QR codes are displayed at the event entrance or by the organizer',
           ),
           const SizedBox(height: 12),
           _buildTipItem(
             icon: Icons.vpn_key,
-            text: 'Event codes are shared by organizers via email, text, or announcement',
+            text:
+                'Event codes are shared by organizers via email, text, or announcement',
           ),
           const SizedBox(height: 12),
           _buildTipItem(
             icon: Icons.verified_user,
-            text: 'Some events may require facial recognition or location verification',
+            text:
+                'Some events may require facial recognition or location verification',
           ),
         ],
       ),
@@ -495,11 +520,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          icon,
-          size: 18,
-          color: const Color(0xFF667EEA),
-        ),
+        Icon(icon, size: 18, color: const Color(0xFF667EEA)),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
@@ -518,103 +539,107 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
 
   void _showManualCodeDialog() {
     final isLoggedIn = CustomerController.logeInCustomer != null;
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
+      builder: (context) => Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Handle
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Handle
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 24),
+
+                    // Header
+                    const Text(
+                      'Enter Event Code',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1A1A1A),
+                        fontFamily: 'Roboto',
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Type the code provided by the event organizer',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Event Code Input
+                    _buildModernTextField(
+                      controller: _codeController,
+                      label: 'Event Code',
+                      hint: 'e.g., ABC123 or EVENT-ID',
+                      icon: Icons.qr_code,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter the event code';
+                        }
+                        return null;
+                      },
+                    ),
+
+                    // Name Input (if not logged in)
+                    if (!isLoggedIn) ...[
+                      const SizedBox(height: 16),
+                      _buildModernTextField(
+                        controller: _nameController,
+                        label: 'Your Name',
+                        hint: 'Enter your full name',
+                        icon: Icons.person_outline,
+                        validator: (value) {
+                          if (!_isAnonymousSignIn &&
+                              (value == null || value.trim().isEmpty)) {
+                            return 'Please enter your name';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Anonymous Toggle
+                      _buildAnonymousCheckbox(),
+                    ],
+
+                    const SizedBox(height: 24),
+
+                    // Sign In Button
+                    _buildSignInButton(),
+                  ],
                 ),
-                const SizedBox(height: 24),
-                
-                // Header
-                const Text(
-                  'Enter Event Code',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1A1A1A),
-                    fontFamily: 'Roboto',
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Type the code provided by the event organizer',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-                const SizedBox(height: 24),
-                
-                // Event Code Input
-                _buildModernTextField(
-                  controller: _codeController,
-                  label: 'Event Code',
-                  hint: 'e.g., ABC123 or EVENT-ID',
-                  icon: Icons.qr_code,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Please enter the event code';
-                    }
-                    return null;
-                  },
-                ),
-                
-                // Name Input (if not logged in)
-                if (!isLoggedIn) ...[
-                  const SizedBox(height: 16),
-                  _buildModernTextField(
-                    controller: _nameController,
-                    label: 'Your Name',
-                    hint: 'Enter your full name',
-                    icon: Icons.person_outline,
-                    validator: (value) {
-                      if (!_isAnonymousSignIn &&
-                          (value == null || value.trim().isEmpty)) {
-                        return 'Please enter your name';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Anonymous Toggle
-                  _buildAnonymousCheckbox(),
-                ],
-                
-                const SizedBox(height: 24),
-                
-                // Sign In Button
-                _buildSignInButton(),
-              ],
+              ),
             ),
           ),
         ),
@@ -652,10 +677,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
           ),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(
-              color: Colors.grey[400],
-              fontFamily: 'Roboto',
-            ),
+            hintStyle: TextStyle(color: Colors.grey[400], fontFamily: 'Roboto'),
             prefixIcon: Icon(icon, color: const Color(0xFF667EEA), size: 22),
             filled: true,
             fillColor: const Color(0xFFF5F5F5),
@@ -665,31 +687,19 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: Colors.grey[300]!,
-                width: 1,
-              ),
+              borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Color(0xFF667EEA),
-                width: 2,
-              ),
+              borderSide: const BorderSide(color: Color(0xFF667EEA), width: 2),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Color(0xFFFF6B6B),
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Color(0xFFFF6B6B), width: 1),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Color(0xFFFF6B6B),
-                width: 2,
-              ),
+              borderSide: const BorderSide(color: Color(0xFFFF6B6B), width: 2),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
@@ -743,11 +753,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
                   ),
                 ),
                 child: _isAnonymousSignIn
-                    ? const Icon(
-                        Icons.check,
-                        size: 16,
-                        color: Colors.white,
-                      )
+                    ? const Icon(Icons.check, size: 16, color: Colors.white)
                     : null,
               ),
               const SizedBox(width: 12),
@@ -788,12 +794,14 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
       width: double.infinity,
       height: 56,
       child: ElevatedButton(
-        onPressed: _isLoading ? null : () {
-          if (_formKey.currentState?.validate() ?? false) {
-            Navigator.pop(context); // Close the modal
-            _handleSignIn();
-          }
-        },
+        onPressed: _isLoading
+            ? null
+            : () {
+                if (_formKey.currentState?.validate() ?? false) {
+                  Navigator.pop(context); // Close the modal
+                  _handleSignIn();
+                }
+              },
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF667EEA),
           disabledBackgroundColor: Colors.grey[300],
@@ -914,7 +922,9 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
           );
         }
       } else {
-        ShowToast().showNormalToast(msg: 'Event not found. Please check the code and try again.');
+        ShowToast().showNormalToast(
+          msg: 'Event not found. Please check the code and try again.',
+        );
       }
     } catch (e) {
       debugPrint('Error signing in: $e');
@@ -925,5 +935,571 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
       }
     }
   }
-}
 
+  /// Handle Location and Facial Recognition Sign-In
+  /// This is the most secure method combining geofence and biometric verification
+  Future<void> _handleLocationFacialSignIn() async {
+    // Prevent multiple simultaneous requests
+    if (_isLocationCheckLoading) return;
+
+    setState(() => _isLocationCheckLoading = true);
+
+    try {
+      // Step 1: Get user location
+      ShowToast().showNormalToast(msg: 'Checking your location...');
+
+      final position = await LocationHelper.getCurrentLocation(
+        showErrorDialog: true,
+        context: context,
+      );
+
+      if (position == null) {
+        ShowToast().showNormalToast(
+          msg: 'Unable to get your location. Please enable location services.',
+        );
+        setState(() => _isLocationCheckLoading = false);
+        return;
+      }
+
+      // Step 2: Find events with active geofence that user is within
+      final geofenceDetector = GeofenceEventDetector();
+      final nearbyEvents = await geofenceDetector.findNearbyGeofencedEvents(
+        userPosition: position,
+      );
+
+      if (nearbyEvents.isEmpty) {
+        if (!mounted) return;
+        setState(() => _isLocationCheckLoading = false);
+
+        // Show helpful dialog
+        _showNoEventsFoundDialog();
+        return;
+      }
+
+      // Step 3: If multiple events found, let user choose
+      EventWithDistance selectedEvent;
+      if (nearbyEvents.length > 1) {
+        final selected = await _showEventSelectionDialog(nearbyEvents);
+        if (selected == null) {
+          setState(() => _isLocationCheckLoading = false);
+          return;
+        }
+        selectedEvent = selected;
+      } else {
+        selectedEvent = nearbyEvents.first;
+      }
+
+      // Step 4: Location verified, now proceed to facial recognition
+      if (!mounted) return;
+      setState(() => _isLocationCheckLoading = false);
+
+      ShowToast().showNormalToast(
+        msg:
+            'Location verified at ${selectedEvent.event.title}! Preparing facial recognition...',
+      );
+
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      // Step 5: Launch facial recognition
+      await _handleFacialRecognitionForEvent(selectedEvent.event);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLocationCheckLoading = false);
+        ShowToast().showNormalToast(
+          msg: 'Error during location check: ${e.toString()}',
+        );
+      }
+    }
+  }
+
+  /// Show dialog when no nearby events are found
+  void _showNoEventsFoundDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF6B6B).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.location_off,
+                color: Color(0xFFFF6B6B),
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'No Events Nearby',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'We couldn\'t find any events with active geofence at your current location.',
+              style: TextStyle(fontSize: 15, height: 1.5, fontFamily: 'Roboto'),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF667EEA).withValues(alpha: 0.2),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        color: Color(0xFF667EEA),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Possible reasons:',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[800],
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  _buildInfoItem('You\'re not at an event venue yet'),
+                  _buildInfoItem('The event hasn\'t started'),
+                  _buildInfoItem('Geofence is not enabled for this event'),
+                  _buildInfoItem(
+                    'You\'re outside the event\'s check-in radius',
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(foregroundColor: Colors.grey[600]),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Trigger a retry
+              _handleLocationFacialSignIn();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF667EEA),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            child: const Text(
+              'Try Again',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('•  ', style: TextStyle(color: Colors.grey[700], fontSize: 14)),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: Colors.grey[700],
+                fontSize: 14,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Show event selection dialog when multiple events are found
+  Future<EventWithDistance?> _showEventSelectionDialog(
+    List<EventWithDistance> events,
+  ) async {
+    return showDialog<EventWithDistance>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.event_available,
+                color: Color(0xFF10B981),
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Multiple Events Found',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'You\'re near multiple events. Select which one you want to sign in to:',
+                style: TextStyle(fontSize: 14, fontFamily: 'Roboto'),
+              ),
+              const SizedBox(height: 16),
+              ListView.builder(
+                shrinkWrap: true,
+                itemCount: events.length,
+                itemBuilder: (context, index) {
+                  final eventWithDistance = events[index];
+                  final event = eventWithDistance.event;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => Navigator.pop(context, eventWithDistance),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFF667EEA,
+                            ).withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(
+                                0xFF667EEA,
+                              ).withValues(alpha: 0.2),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFF667EEA),
+                                      Color(0xFF764BA2),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(
+                                  Icons.event,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      event.title,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        fontFamily: 'Roboto',
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.location_on,
+                                          size: 14,
+                                          color: Colors.grey[600],
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          eventWithDistance.formattedDistance,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.grey[600],
+                                            fontFamily: 'Roboto',
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Icon(
+                                          Icons.access_time,
+                                          size: 14,
+                                          color: Colors.grey[600],
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Expanded(
+                                          child: Text(
+                                            eventWithDistance.timeUntilEvent,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.grey[600],
+                                              fontFamily: 'Roboto',
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.arrow_forward_ios,
+                                size: 16,
+                                color: Colors.grey[400],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(foregroundColor: Colors.grey[600]),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Handle facial recognition for a specific event
+  Future<void> _handleFacialRecognitionForEvent(EventModel event) async {
+    try {
+      // Check if user is logged in
+      if (CustomerController.logeInCustomer == null) {
+        ShowToast().showNormalToast(
+          msg: 'Please log in to use facial recognition.',
+        );
+        return;
+      }
+
+      // Check if user is enrolled for facial recognition for this event
+      final faceService = FaceRecognitionService();
+      final isEnrolled = await faceService.isUserEnrolled(
+        userId: CustomerController.logeInCustomer!.uid,
+        eventId: event.id,
+      );
+
+      if (!mounted) return;
+
+      if (isEnrolled) {
+        // Navigate to face recognition scanner
+        final result = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                FaceRecognitionScannerScreen(eventModel: event),
+          ),
+        );
+
+        if (result == true && mounted) {
+          // Successful sign-in
+          ShowToast().showNormalToast(
+            msg: 'Successfully signed in to ${event.title}!',
+          );
+
+          // Navigate to event details after a short delay
+          await Future.delayed(const Duration(milliseconds: 800));
+          if (!mounted) return;
+
+          RouterClass.nextScreenAndReplacement(
+            context,
+            SingleEventScreen(eventModel: event),
+          );
+        }
+      } else {
+        // Show enrollment dialog
+        _showFaceEnrollmentDialogForEvent(event);
+      }
+    } catch (e) {
+      ShowToast().showNormalToast(
+        msg: 'Error during facial recognition: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Show face enrollment dialog for a specific event
+  void _showFaceEnrollmentDialogForEvent(EventModel event) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.face, color: Color(0xFF10B981), size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Face Recognition Setup',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.face_retouching_natural,
+              size: 64,
+              color: Color(0xFF10B981),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'To use facial recognition sign-in for ${event.title}, you need to enroll your face first.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 15,
+                height: 1.5,
+                fontFamily: 'Roboto',
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF667EEA).withValues(alpha: 0.2),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.security,
+                    color: Color(0xFF667EEA),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'This is a one-time setup. Your face data is encrypted and stored securely.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey[700],
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(foregroundColor: Colors.grey[600]),
+            child: const Text('Not Now'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _navigateToFaceEnrollment(event);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            child: const Text(
+              'Enroll Now',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Navigate to face enrollment screen
+  void _navigateToFaceEnrollment(EventModel event) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FaceEnrollmentScreen(eventModel: event),
+      ),
+    );
+  }
+}
