@@ -34,19 +34,35 @@ class GeofenceEventDetector {
         'User location: ${position.latitude}, ${position.longitude}',
       );
 
-      // Get all active events with geofence enabled
+      // Get all events with geofence enabled
       final now = DateTime.now();
       final timeBufferDuration = timeBuffer ?? const Duration(hours: 24);
 
+      // Query events with geofence enabled (removed status filter for better compatibility)
       final eventsSnapshot = await FirebaseFirestore.instance
           .collection(EventModel.firebaseKey)
           .where('getLocation', isEqualTo: true)
-          .where('status', isEqualTo: 'active')
           .get();
 
       Logger.debug(
         'Found ${eventsSnapshot.docs.length} events with geofence enabled',
       );
+      
+      // Log all events found for debugging
+      if (eventsSnapshot.docs.isEmpty) {
+        Logger.warning('No events found with getLocation=true. Please ensure events have geofence enabled in database.');
+      } else {
+        for (final doc in eventsSnapshot.docs) {
+          try {
+            final data = doc.data();
+            Logger.debug(
+              'Event found: ${data['title']} | getLocation: ${data['getLocation']} | lat: ${data['latitude']} | lng: ${data['longitude']} | radius: ${data['radius']} | status: ${data['status']}',
+            );
+          } catch (e) {
+            Logger.debug('Error logging event data: $e');
+          }
+        }
+      }
 
       List<EventWithDistance> nearbyEvents = [];
 
@@ -56,25 +72,26 @@ class GeofenceEventDetector {
 
           // Check if event is happening now or soon
           final eventTime = event.selectedDateTime;
-          final eventEndTime = eventTime.add(const Duration(hours: 12)); // Assume event lasts up to 12 hours
+          final eventEndTime = eventTime.add(Duration(hours: event.eventDuration)); // Use actual event duration
           
           // Event must be either:
           // 1. Starting within the time buffer (24 hours by default)
-          // 2. Currently happening (between start time and end time)
+          // 2. Currently happening (between start time and end time + 1 hour buffer)
           final isUpcoming = eventTime.isAfter(now) && 
               eventTime.difference(now) <= timeBufferDuration;
-          final isHappening = now.isAfter(eventTime) && now.isBefore(eventEndTime);
+          final isHappening = now.isAfter(eventTime) && 
+              now.isBefore(eventEndTime.add(const Duration(hours: 1)));
           
           if (!isUpcoming && !isHappening) {
             Logger.debug(
-              'Event ${event.title} is outside time window (starts: $eventTime, now: $now)',
+              'Event ${event.title} is outside time window (starts: $eventTime, ends: $eventEndTime, now: $now)',
             );
             continue;
           }
 
           // Check if event has valid geofence coordinates
           if (event.latitude == 0 && event.longitude == 0) {
-            Logger.debug('Event ${event.title} has no geofence coordinates');
+            Logger.warning('Event ${event.title} has no geofence coordinates (lat/lng = 0,0)');
             continue;
           }
 
@@ -85,17 +102,25 @@ class GeofenceEventDetector {
             eventLocation,
           );
 
+          Logger.debug(
+            'Event ${event.title}: distance=${distance.toStringAsFixed(1)}m, radius=${event.radius}ft (${(event.radius * 0.3048).toStringAsFixed(1)}m)',
+          );
+
           // Check if user is within geofence
           final radiusInMeters = event.radius * 0.3048; // Convert feet to meters
           if (distance <= radiusInMeters) {
             Logger.success(
-              'User is within geofence of event: ${event.title} (${distance.toStringAsFixed(1)}m away)',
+              '✓ User is within geofence of event: ${event.title} (${distance.toStringAsFixed(1)}m away, within ${radiusInMeters.toStringAsFixed(1)}m radius)',
             );
             nearbyEvents.add(EventWithDistance(
               event: event,
               distance: distance,
               isWithinGeofence: true,
             ));
+          } else {
+            Logger.debug(
+              '✗ User is outside geofence of event: ${event.title} (${distance.toStringAsFixed(1)}m away, needs to be within ${radiusInMeters.toStringAsFixed(1)}m)',
+            );
           }
         } catch (e) {
           Logger.error('Error processing event: $e');
