@@ -457,39 +457,36 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
                   ),
                 ),
                 bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(60),
+                  preferredSize: const Size.fromHeight(
+                    48,
+                  ), // Tab height (46) + indicator weight (2)
                   child: Container(
                     color: Theme.of(context).scaffoldBackgroundColor,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: TabBar(
-                        controller: _tabController,
-                        isScrollable: false,
-                        tabAlignment: TabAlignment.fill,
-                        labelColor: const Color(0xFF667EEA),
-                        unselectedLabelColor: Theme.of(
-                          context,
-                        ).textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
-                        indicatorColor: const Color(0xFF667EEA),
-                        indicatorWeight: 3,
-                        labelStyle: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                        ),
-                        unselectedLabelStyle: const TextStyle(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 15,
-                        ),
-                        labelPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        tabs: const [
-                          Tab(text: 'Feed'),
-                          Tab(text: 'Members'),
-                          Tab(text: 'About'),
-                        ],
+                    child: TabBar(
+                      controller: _tabController,
+                      isScrollable: false,
+                      tabAlignment: TabAlignment.fill,
+                      labelColor: const Color(0xFF667EEA),
+                      unselectedLabelColor: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
+                      indicatorColor: const Color(0xFF667EEA),
+                      indicatorWeight: 2,
+                      labelStyle: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
                       ),
+                      unselectedLabelStyle: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                      padding: EdgeInsets.zero,
+                      indicatorPadding: EdgeInsets.zero,
+                      tabs: const [
+                        Tab(text: 'Feed', height: 46),
+                        Tab(text: 'Members', height: 46),
+                        Tab(text: 'About', height: 46),
+                      ],
                     ),
                   ),
                 ),
@@ -1940,7 +1937,7 @@ class _AboutTabState extends State<_AboutTab> {
 
   void _onScroll() {
     if (_scrollController == null || !_scrollController!.hasClients) return;
-    
+
     final currentScrollPosition = _scrollController!.position.pixels;
     final isScrollingDown = currentScrollPosition > _lastScrollPosition;
 
