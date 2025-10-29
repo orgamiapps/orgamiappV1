@@ -4,6 +4,8 @@ import 'package:attendus/Services/subscription_service.dart';
 import 'package:attendus/Utils/app_app_bar_view.dart';
 import 'package:attendus/screens/Home/analytics_dashboard_screen.dart';
 import 'package:attendus/screens/Home/attendee_notification_screen.dart';
+import 'package:attendus/screens/Groups/create_group_screen.dart';
+import 'package:attendus/screens/Groups/manage_groups_screen.dart';
 import 'package:attendus/Utils/router.dart';
 
 class PremiumFeaturesScreen extends StatefulWidget {
@@ -177,6 +179,32 @@ class _PremiumFeaturesScreenState extends State<PremiumFeaturesScreen> {
                         subtitle: 'SMS & In-App Alerts',
                         color: const Color(0xFF10B981),
                         onTap: () => _openSendNotifications(),
+                      ),
+                    ]),
+
+                    const SizedBox(height: 24),
+
+                    // Community Management
+                    _buildSectionHeader(
+                      title: 'Community Management',
+                      icon: Icons.groups,
+                      color: const Color(0xFFF59E0B),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildCompactActionsGrid([
+                      _PremiumFeatureAction(
+                        icon: Icons.add_business,
+                        title: 'Create Group',
+                        subtitle: 'Build Your Community',
+                        color: const Color(0xFFF59E0B),
+                        onTap: () => _openCreateGroup(),
+                      ),
+                      _PremiumFeatureAction(
+                        icon: Icons.admin_panel_settings,
+                        title: 'Manage Groups',
+                        subtitle: 'Admin Dashboard',
+                        color: const Color(0xFF8B5CF6),
+                        onTap: () => _openManageGroups(),
                       ),
                     ]),
 
@@ -357,6 +385,20 @@ class _PremiumFeaturesScreenState extends State<PremiumFeaturesScreen> {
 
   void _openSendNotifications() {
     RouterClass.nextScreenNormal(context, const AttendeeNotificationScreen());
+  }
+
+  void _openCreateGroup() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
+    );
+  }
+
+  void _openManageGroups() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ManageGroupsScreen()),
+    );
   }
 }
 

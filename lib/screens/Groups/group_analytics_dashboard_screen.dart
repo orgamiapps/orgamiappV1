@@ -424,6 +424,7 @@ class _GroupAnalyticsDashboardScreenState
           ),
           backgroundColor: Colors.white,
           foregroundColor: Colors.black87,
+          iconTheme: const IconThemeData(color: Colors.black87),
           elevation: 0,
           surfaceTintColor: Colors.transparent,
         ),
@@ -473,6 +474,7 @@ class _GroupAnalyticsDashboardScreenState
           ),
           backgroundColor: Colors.white,
           foregroundColor: Colors.black87,
+          iconTheme: const IconThemeData(color: Colors.black87),
           elevation: 0,
           surfaceTintColor: Colors.transparent,
         ),
@@ -609,6 +611,7 @@ class _GroupAnalyticsDashboardScreenState
                 backgroundColor: AppThemeColor.darkBlueColor,
                 foregroundColor: AppThemeColor.pureWhiteColor,
                 surfaceTintColor: AppThemeColor.darkBlueColor,
+                iconTheme: const IconThemeData(color: Colors.white),
                 actions: [
                   IconButton(
                     icon: const Icon(Icons.download),
