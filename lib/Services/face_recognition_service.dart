@@ -367,11 +367,54 @@ class FaceRecognitionService {
         return null;
       }
 
-      // For NV21/YUV420, use the first plane (Y plane) for better performance
-      final plane = cameraImage.planes.first;
+      // Handle image data based on format
+      Uint8List bytes;
+      int bytesPerRow;
+      
+      // Check if this is NV21/YUV420 format
+      if (format == InputImageFormat.nv21 || format == InputImageFormat.yuv420) {
+        // For NV21/YUV420, combine Y, U, and V planes properly
+        if (cameraImage.planes.length >= 1) {
+          // Calculate expected size for NV21
+          final int ySize = cameraImage.planes[0].bytes.length;
+          final int uvSize = cameraImage.planes.length > 1 
+              ? cameraImage.planes.skip(1).fold<int>(0, (sum, plane) => sum + plane.bytes.length)
+              : 0;
+          
+          // Create a properly sized buffer
+          bytes = Uint8List(ySize + uvSize);
+          
+          // Copy Y plane
+          bytes.setRange(0, ySize, cameraImage.planes[0].bytes);
+          
+          // Copy UV planes if they exist
+          if (cameraImage.planes.length > 1) {
+            int offset = ySize;
+            for (int i = 1; i < cameraImage.planes.length; i++) {
+              final plane = cameraImage.planes[i];
+              final planeBytes = plane.bytes;
+              if (offset + planeBytes.length <= bytes.length) {
+                bytes.setRange(offset, offset + planeBytes.length, planeBytes);
+                offset += planeBytes.length;
+              }
+            }
+          }
+          
+          bytesPerRow = cameraImage.planes[0].bytesPerRow;
+        } else {
+          Logger.error('Invalid number of planes for NV21/YUV420 format');
+          return null;
+        }
+      } else {
+        // For other formats, use the first plane
+        bytes = cameraImage.planes[0].bytes;
+        bytesPerRow = cameraImage.planes[0].bytesPerRow;
+      }
+      
+      Logger.debug('Converting camera image: format=$format, size=${cameraImage.width}x${cameraImage.height}, rotation=$rotation, bytesLength=${bytes.length}');
 
       return InputImage.fromBytes(
-        bytes: plane.bytes,
+        bytes: bytes,
         metadata: InputImageMetadata(
           size: Size(
             cameraImage.width.toDouble(),
@@ -379,11 +422,18 @@ class FaceRecognitionService {
           ),
           rotation: rotation,
           format: format,
-          bytesPerRow: plane.bytesPerRow,
+          bytesPerRow: bytesPerRow,
         ),
       );
-    } catch (e) {
+    } catch (e, stack) {
       Logger.error('Failed to convert camera image: $e');
+      Logger.error('Stack trace: $stack');
+      Logger.error('Camera image info: width=${cameraImage.width}, height=${cameraImage.height}, format=${cameraImage.format.raw}, planes=${cameraImage.planes.length}');
+      if (cameraImage.planes.isNotEmpty) {
+        for (int i = 0; i < cameraImage.planes.length; i++) {
+          Logger.error('Plane $i: bytesLength=${cameraImage.planes[i].bytes.length}, bytesPerRow=${cameraImage.planes[i].bytesPerRow}');
+        }
+      }
       return null;
     }
   }

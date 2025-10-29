@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'package:camera/camera.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import '../../Controller/customer_controller.dart';
 import '../../Permissions/permissions_helper.dart';
 import '../../Services/face_recognition_service.dart';
@@ -173,9 +173,17 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     }
 
     Logger.info('Starting image stream for face enrollment');
+    Logger.info('Camera info: width=${_cameraController!.value.previewSize?.width}, height=${_cameraController!.value.previewSize?.height}');
     _isStreamActive = true;
     _updateStatusMessage('Look straight at the camera');
-    _cameraController!.startImageStream(_processCameraImage);
+    
+    try {
+      _cameraController!.startImageStream(_processCameraImage);
+      Logger.info('Image stream started successfully');
+    } catch (e) {
+      Logger.error('Failed to start image stream: $e');
+      _showErrorAndExit('Failed to start camera stream');
+    }
   }
 
   void _stopImageStream() {
@@ -205,18 +213,23 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     _lastCaptureTime = now;
 
     try {
+      Logger.debug('Processing camera image: format=${cameraImage.format.group}, width=${cameraImage.width}, height=${cameraImage.height}, planes=${cameraImage.planes.length}');
+      
       // Convert camera image to ML Kit input image
       final inputImage = _faceService.convertCameraImage(cameraImage, _camera!);
       
       if (inputImage == null) {
-        if (mounted) {
-          _updateStatusMessage('Processing image...');
-        }
+        Logger.warning('Failed to convert camera image to InputImage - trying next frame');
+        // Don't show error to user, just try next frame
         return;
       }
+      
+      Logger.debug('Successfully converted to InputImage');
 
       // Detect faces
+      Logger.debug('Attempting face detection...');
       final faces = await _faceService.detectFaces(inputImage);
+      Logger.debug('Face detection complete: found ${faces.length} face(s)');
 
       if (faces.isEmpty) {
         if (mounted) {
@@ -228,9 +241,14 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
       }
 
       final face = faces.first;
+      Logger.debug('Face detected: boundingBox=${face.boundingBox}, headAngleY=${face.headEulerAngleY}, headAngleZ=${face.headEulerAngleZ}');
 
       // Check if face is suitable for enrollment
       if (!_faceService.isFaceSuitable(face)) {
+        Logger.debug('Face not suitable for enrollment - checking requirements');
+        Logger.debug('Face area: ${face.boundingBox.width * face.boundingBox.height}');
+        Logger.debug('Head angles: Y=${face.headEulerAngleY}, Z=${face.headEulerAngleZ}');
+        Logger.debug('Eye open probability: left=${face.leftEyeOpenProbability}, right=${face.rightEyeOpenProbability}');
         if (mounted) {
           _updateStatusMessage(
             'Please look straight at the camera and keep still.',
@@ -238,6 +256,8 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
         }
         return;
       }
+      
+      Logger.debug('Face is suitable for enrollment');
 
       // Extract features
       final features = _faceService.extractFaceFeatures(face);
@@ -325,14 +345,25 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
       } else {
         // Use logged-in user
         final currentUser = CustomerController.logeInCustomer;
-        if (currentUser == null) {
-          Logger.error('No logged-in user found for enrollment');
-          _showErrorAndExit('Please log in to enroll your face.');
-          return;
+        if (currentUser != null) {
+          userId = currentUser.uid;
+          userName = currentUser.name;
+          Logger.info('Enrolling logged-in user: $userName (ID: $userId)');
+        } else {
+          // Fallback: Try to get user from Firebase Auth directly
+          Logger.warning('CustomerController.logeInCustomer is null, checking Firebase Auth...');
+          
+          final firebaseUser = FirebaseAuth.instance.currentUser;
+          if (firebaseUser != null) {
+            userId = firebaseUser.uid;
+            userName = firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? 'User';
+            Logger.success('Using Firebase Auth user: $userName (ID: $userId)');
+          } else {
+            Logger.error('No Firebase Auth user found');
+            _showErrorAndExit('Please log in to enroll your face.');
+            return;
+          }
         }
-        userId = currentUser.uid;
-        userName = currentUser.name;
-        Logger.info('Enrolling logged-in user: $userName (ID: $userId)');
       }
 
       Logger.info('Enrolling face for event: ${widget.eventModel.id} (${widget.eventModel.title})');

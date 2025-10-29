@@ -12,7 +12,7 @@ import '../../models/event_model.dart';
 import '../../Utils/logger.dart';
 import '../../Utils/toast.dart';
 import '../QRScanner/ans_questions_to_sign_in_event_screen.dart';
-import 'face_enrollment_screen.dart';
+import 'picture_face_enrollment_screen.dart';
 
 /// Professional face recognition scanner for event attendance
 class FaceRecognitionScannerScreen extends StatefulWidget {
@@ -395,7 +395,7 @@ class _FaceRecognitionScannerScreenState
       context,
       MaterialPageRoute(
         builder: (context) =>
-            FaceEnrollmentScreen(eventModel: widget.eventModel),
+            PictureFaceEnrollmentScreen(eventModel: widget.eventModel),
       ),
     );
   }

@@ -156,8 +156,10 @@ class AuthService extends ChangeNotifier {
         name: user.displayName ?? '',
         email: user.email ?? '',
         createdAt: DateTime.now(),
+        profilePictureUrl: user.photoURL,
       );
       CustomerController.logeInCustomer = minimalCustomer;
+      Logger.info('Set minimal customer model for user: ${user.uid}');
       notifyListeners();
     } catch (e) {
       Logger.warning('Failed to set minimal customer model: $e');
@@ -349,12 +351,27 @@ class AuthService extends ChangeNotifier {
   ) async {
     try {
       await _ensureFirebaseInitialized();
+      
+      // Check if currently signed in anonymously (guest mode)
+      final wasAnonymous = _auth.currentUser?.isAnonymous ?? false;
+      
       final credential = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
       if (credential.user != null) {
+        // Log the transition from anonymous to authenticated
+        if (wasAnonymous) {
+          Logger.info('Guest user successfully signed in with email/password');
+        }
+        
+        // Set minimal customer model immediately for fast navigation
+        // This prevents the app from freezing when trying to access user data
+        if (CustomerController.logeInCustomer == null) {
+          _setMinimalCustomerFromFirebaseUser(credential.user!);
+        }
+        
         // Do remaining work in background to avoid blocking UI
         Future.microtask(() => _completePostSignIn(credential.user!));
       }
@@ -478,11 +495,17 @@ class AuthService extends ChangeNotifier {
 
   /// Enhanced method to handle social login with profile data extraction
   /// Optimized for fast login - defers profile updates to background
+  /// Handles account linking for anonymous users (guests)
   Future<void> handleSocialLoginSuccessWithProfileData(
     Map<String, dynamic> profileData,
   ) async {
     try {
       final user = profileData['user'] as User;
+      
+      // Log if this was an anonymous user upgrade
+      if (profileData.containsKey('wasAnonymous') && profileData['wasAnonymous'] == true) {
+        Logger.info('Guest user successfully upgraded to authenticated account via social login');
+      }
 
       // Check if user exists in Firestore with timeout
       final userData = await FirebaseFirestoreHelper()

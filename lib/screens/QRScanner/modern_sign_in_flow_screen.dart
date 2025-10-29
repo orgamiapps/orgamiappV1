@@ -13,7 +13,7 @@ import 'package:attendus/Services/geofence_event_detector.dart';
 import 'package:attendus/Utils/location_helper.dart';
 import 'package:attendus/screens/FaceRecognition/face_recognition_scanner_screen.dart';
 import 'package:attendus/Services/face_recognition_service.dart';
-import 'package:attendus/screens/FaceRecognition/face_enrollment_screen.dart';
+import 'package:attendus/screens/FaceRecognition/picture_face_enrollment_screen.dart';
 import 'package:attendus/Services/guest_mode_service.dart';
 
 /// Modern, streamlined sign-in flow screen
@@ -181,10 +181,11 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: (isGuestMode
-                    ? const Color(0xFF10B981)
-                    : const Color(0xFF667EEA))
-                .withValues(alpha: 0.3),
+            color:
+                (isGuestMode
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFF667EEA))
+                    .withValues(alpha: 0.3),
             offset: const Offset(0, 8),
             blurRadius: 24,
           ),
@@ -221,8 +222,8 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
             isLoggedIn
                 ? 'Welcome back, ${CustomerController.logeInCustomer!.name}!'
                 : isGuestMode
-                    ? 'Enter your name for each sign-in'
-                    : 'Choose your sign-in method below',
+                ? 'Enter your name for each sign-in'
+                : 'Choose your sign-in method below',
             style: TextStyle(
               fontSize: 15,
               color: Colors.white.withValues(alpha: 0.9),
@@ -428,13 +429,17 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
                   children: [
                     Row(
                       children: [
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1A1A1A),
-                            fontFamily: 'Roboto',
+                        Flexible(
+                          child: Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1A1A1A),
+                              fontFamily: 'Roboto',
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
                         if (badge != null) ...[
@@ -1559,7 +1564,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => FaceEnrollmentScreen(eventModel: event),
+        builder: (context) => PictureFaceEnrollmentScreen(eventModel: event),
       ),
     );
   }
@@ -1572,9 +1577,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
     return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
             Container(
@@ -1671,9 +1674,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.grey[600],
-            ),
+            style: TextButton.styleFrom(foregroundColor: Colors.grey[600]),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
@@ -1708,9 +1709,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
             Container(
@@ -1741,11 +1740,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.face,
-              size: 64,
-              color: Color(0xFF10B981),
-            ),
+            const Icon(Icons.face, size: 64, color: Color(0xFF10B981)),
             const SizedBox(height: 16),
             Text(
               'Hi $guestName!',
@@ -1827,9 +1822,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.grey[600],
-            ),
+            style: TextButton.styleFrom(foregroundColor: Colors.grey[600]),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
@@ -1862,11 +1855,11 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
   void _navigateToGuestFaceEnrollment(EventModel event, String guestName) {
     // For guests, we'll use a special guest ID based on timestamp
     final guestId = 'guest_${DateTime.now().millisecondsSinceEpoch}';
-    
+
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => FaceEnrollmentScreen(
+        builder: (context) => PictureFaceEnrollmentScreen(
           eventModel: event,
           guestUserId: guestId,
           guestUserName: guestName,

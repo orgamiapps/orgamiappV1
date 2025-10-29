@@ -2,9 +2,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper function to check if user is authenticated
+    // Helper function to check if user is authenticated (includes anonymous users)
     function isAuthenticated() {
       return request.auth != null;
+    }
+    
+    // Helper function to check if user is authenticated and not anonymous
+    function isFullyAuthenticated() {
+      return request.auth != null && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
     
     // DEVELOPMENT RULES - More permissive for testing
@@ -12,39 +17,52 @@ service cloud.firestore {
     
     // Organizations collection rules
     match /Organizations/{orgId} {
-      // Allow read/write for all authenticated users
-      allow read, write: if isAuthenticated();
+      // Allow read for all authenticated users (including anonymous/guest)
+      // Write requires full authentication (not anonymous)
+      allow read: if isAuthenticated();
+      allow write: if isFullyAuthenticated();
       
       // Members subcollection
       match /Members/{memberId} {
-        allow read, write: if isAuthenticated();
+        allow read: if isAuthenticated();
+        allow write: if isFullyAuthenticated();
       }
       
       // Feed subcollection - PERMISSIVE for testing
       match /Feed/{feedId} {
-        // Allow all authenticated users to read and write
-        allow read, write: if isAuthenticated();
+        // Allow authenticated users to read, write requires full auth
+        allow read: if isAuthenticated();
+        allow write: if isFullyAuthenticated();
       }
       
       // Join Requests subcollection
       match /JoinRequests/{requestId} {
-        allow read, write: if isAuthenticated();
+        allow read: if isAuthenticated();
+        allow write: if isFullyAuthenticated();
       }
     }
     
     // Events collection rules
     match /Events/{eventId} {
-      allow read, write: if isAuthenticated();
+      // Allow read for all authenticated users (including anonymous/guest)
+      // Write requires full authentication (not anonymous)
+      allow read: if isAuthenticated();
+      allow write: if isFullyAuthenticated();
       
       match /Attendees/{attendeeId} {
-        allow read, write: if isAuthenticated();
+        // Allow authenticated users to read attendees
+        // Allow write for check-ins (both guest and registered users)
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
       }
     }
     
     // Users/Customers collection rules
     match /Customers/{userId} {
+      // Allow authenticated users to read customer profiles (including anonymous for viewing event organizers)
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && request.auth.uid == userId;
+      // Only allow users to write their own profile, and must be fully authenticated (not anonymous)
+      allow write: if isFullyAuthenticated() && request.auth.uid == userId;
       
       // Followers subcollection - allow users to follow/unfollow
       match /followers/{followerId} {

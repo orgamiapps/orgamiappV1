@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:attendus/Utils/logger.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 /// Service to manage guest mode functionality
 /// Allows users to explore the app without creating an account
@@ -17,6 +18,8 @@ class GuestModeService extends ChangeNotifier {
     ),
   );
 
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
   // Storage keys
   static const String _keyIsGuestMode = 'is_guest_mode';
   static const String _keyGuestSessionId = 'guest_session_id';
@@ -31,7 +34,9 @@ class GuestModeService extends ChangeNotifier {
   Future<void> initialize() async {
     try {
       final storedGuestMode = await _secureStorage.read(key: _keyIsGuestMode);
-      final storedSessionId = await _secureStorage.read(key: _keyGuestSessionId);
+      final storedSessionId = await _secureStorage.read(
+        key: _keyGuestSessionId,
+      );
 
       _isGuestMode = storedGuestMode == 'true';
       _guestSessionId = storedSessionId;
@@ -46,23 +51,61 @@ class GuestModeService extends ChangeNotifier {
 
   /// Enable guest mode
   /// Creates a temporary session for the guest user
+  /// Signs in anonymously to Firebase to allow Firestore access
   Future<void> enableGuestMode() async {
     try {
       _isGuestMode = true;
       _guestSessionId = 'guest_${DateTime.now().millisecondsSinceEpoch}';
 
+      // Sign in anonymously to Firebase to allow Firestore access
+      // This is required because Firestore security rules require authentication
+      Logger.info('Signing in anonymously to Firebase for guest mode...');
+      final userCredential = await _auth.signInAnonymously();
+      Logger.info('Anonymous sign-in successful: ${userCredential.user?.uid}');
+
       await _secureStorage.write(key: _keyIsGuestMode, value: 'true');
-      await _secureStorage.write(key: _keyGuestSessionId, value: _guestSessionId);
+      await _secureStorage.write(
+        key: _keyGuestSessionId,
+        value: _guestSessionId,
+      );
 
       Logger.info('Guest mode enabled with session: $_guestSessionId');
       notifyListeners();
     } catch (e) {
       Logger.error('Error enabling guest mode', e);
+
+      // Check if this is the anonymous auth not enabled error
+      final errorMessage = e.toString();
+      if (errorMessage.contains('admin-restricted-operation')) {
+        Logger.error(
+          '🚨 CRITICAL: Anonymous Authentication is NOT enabled in Firebase Console!',
+        );
+        Logger.error(
+          '📝 TO FIX: Go to Firebase Console → Authentication → Sign-in method → Enable "Anonymous"',
+        );
+      }
+
+      // Even if anonymous sign-in fails, set guest mode flag
+      // This allows the app to show guest UI, but Firestore access will be limited
+      _isGuestMode = true;
+      _guestSessionId = 'guest_${DateTime.now().millisecondsSinceEpoch}';
+      await _secureStorage.write(key: _keyIsGuestMode, value: 'true');
+      await _secureStorage.write(
+        key: _keyGuestSessionId,
+        value: _guestSessionId,
+      );
+      notifyListeners();
+
+      // Rethrow to let the caller know there was an issue
+      rethrow;
     }
   }
 
   /// Disable guest mode
   /// Called when user creates an account or logs in
+  /// Note: We don't sign out the anonymous user here because the user
+  /// is likely already signing in with a real account, which will replace
+  /// the anonymous session
   Future<void> disableGuestMode() async {
     try {
       _isGuestMode = false;
@@ -80,7 +123,8 @@ class GuestModeService extends ChangeNotifier {
 
   /// Check if a feature is available in guest mode
   bool isFeatureAvailable(GuestFeature feature) {
-    if (!_isGuestMode) return true; // All features available for logged-in users
+    if (!_isGuestMode)
+      return true; // All features available for logged-in users
 
     switch (feature) {
       case GuestFeature.viewEvents:
@@ -133,4 +177,3 @@ enum GuestFeature {
   viewMyEvents,
   analytics,
 }
-

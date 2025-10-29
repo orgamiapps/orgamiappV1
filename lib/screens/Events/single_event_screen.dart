@@ -64,7 +64,7 @@ import 'package:attendus/screens/Events/Widget/access_list_management_widget.dar
 import 'package:url_launcher/url_launcher.dart';
 import 'package:attendus/screens/Events/Widget/pre_registered_horizontal_list.dart';
 import 'package:attendus/screens/FaceRecognition/face_recognition_scanner_screen.dart';
-import 'package:attendus/screens/FaceRecognition/face_enrollment_screen.dart';
+import 'package:attendus/screens/FaceRecognition/picture_face_enrollment_screen.dart';
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 import 'package:attendus/screens/Events/Widget/delete_event_dialogue.dart';
 import 'package:attendus/services/event_flyer_generator.dart';
@@ -2761,7 +2761,7 @@ Join us at: $eventUrl
         break;
     }
   }
-  
+
   /// Handles the Most Secure sign-in method (geofence + facial recognition)
   void _handleMostSecureSignIn() async {
     // Check if user is logged in
@@ -2872,9 +2872,7 @@ Join us at: $eventUrl
       }
 
       // Show loading message
-      ShowToast().showNormalToast(
-        msg: 'Preparing facial recognition...',
-      );
+      ShowToast().showNormalToast(msg: 'Preparing facial recognition...');
 
       // Check if user is enrolled for facial recognition for this event
       final faceService = FaceRecognitionService();
@@ -2890,9 +2888,8 @@ Join us at: $eventUrl
         final result = await Navigator.push<bool>(
           context,
           MaterialPageRoute(
-            builder: (context) => FaceRecognitionScannerScreen(
-              eventModel: eventModel,
-            ),
+            builder: (context) =>
+                FaceRecognitionScannerScreen(eventModel: eventModel),
           ),
         );
 
@@ -3011,9 +3008,7 @@ Join us at: $eventUrl
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
             Container(
@@ -3022,11 +3017,7 @@ Join us at: $eventUrl
                 color: const Color(0xFF10B981).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(
-                Icons.face,
-                color: Color(0xFF10B981),
-                size: 24,
-              ),
+              child: const Icon(Icons.face, color: Color(0xFF10B981), size: 24),
             ),
             const SizedBox(width: 12),
             const Expanded(
@@ -3095,9 +3086,7 @@ Join us at: $eventUrl
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.grey[600],
-            ),
+            style: TextButton.styleFrom(foregroundColor: Colors.grey[600]),
             child: const Text('Later'),
           ),
           ElevatedButton(
@@ -3111,10 +3100,7 @@ Join us at: $eventUrl
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             ),
             child: const Text(
               'Enroll Now',
@@ -3134,7 +3120,8 @@ Join us at: $eventUrl
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => FaceEnrollmentScreen(eventModel: eventModel),
+        builder: (context) =>
+            PictureFaceEnrollmentScreen(eventModel: eventModel),
       ),
     );
 
@@ -3211,7 +3198,8 @@ Join us at: $eventUrl
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) => FaceEnrollmentScreen(eventModel: eventModel),
+        builder: (context) =>
+            PictureFaceEnrollmentScreen(eventModel: eventModel),
       ),
     );
 
