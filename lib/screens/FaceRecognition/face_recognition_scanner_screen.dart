@@ -69,7 +69,6 @@ class _FaceRecognitionScannerScreenState
     milliseconds: 1500,
   ); // Reduced frequency
   static const Duration _successDelay = Duration(seconds: 2);
-  static const Duration _enrollmentCacheExpiry = Duration(minutes: 5);
 
   @override
   void initState() {

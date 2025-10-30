@@ -180,6 +180,60 @@ class AuthService extends ChangeNotifier {
       return false;
     }
   }
+  
+  /// Ensure user data is fully loaded before facial recognition flows
+  /// This method will wait for CustomerController to be populated from Firestore
+  Future<bool> ensureUserDataLoaded() async {
+    try {
+      Logger.info('Ensuring user data is loaded for facial recognition...');
+      
+      // If already loaded, return immediately
+      if (CustomerController.logeInCustomer != null) {
+        Logger.info('User data already loaded: ${CustomerController.logeInCustomer!.name}');
+        return true;
+      }
+      
+      // Check Firebase Auth
+      final user = _auth.currentUser;
+      if (user == null) {
+        Logger.warning('No Firebase Auth user found');
+        return false;
+      }
+      
+      // Try to load from Firestore with timeout
+      Logger.info('Loading user data from Firestore...');
+      CustomerModel? userData;
+      
+      try {
+        userData = await FirebaseFirestoreHelper()
+            .getSingleCustomer(customerId: user.uid)
+            .timeout(
+              const Duration(seconds: 5),
+              onTimeout: () {
+                Logger.warning('User data fetch timed out after 5 seconds');
+                return null;
+              },
+            );
+      } catch (e) {
+        Logger.warning('Failed to load user data from Firestore: $e');
+      }
+      
+      if (userData != null) {
+        CustomerController.logeInCustomer = userData;
+        Logger.success('User data loaded successfully: ${userData.name}');
+        notifyListeners();
+        return true;
+      } else {
+        // Fallback: Set minimal customer model
+        _setMinimalCustomerFromFirebaseUser(user);
+        Logger.info('Using minimal customer model for ${user.email}');
+        return true;
+      }
+    } catch (e) {
+      Logger.error('Error ensuring user data loaded: $e');
+      return false;
+    }
+  }
 
   /// Handle Firebase auth state changes
   void _onAuthStateChanged(User? user) async {

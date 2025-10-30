@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/Services/subscription_service.dart';
+import 'package:attendus/Services/auth_service.dart';
 import 'package:attendus/widgets/upgrade_prompt_dialog.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -2824,7 +2825,11 @@ Join us at: $eventUrl
   }
 
   void _handleFacialRecognitionSignIn() async {
-    if (CustomerController.logeInCustomer == null) {
+    // Ensure user data is loaded
+    final authService = AuthService();
+    final userDataLoaded = await authService.ensureUserDataLoaded();
+    
+    if (!userDataLoaded || CustomerController.logeInCustomer == null) {
       ShowToast().showNormalToast(
         msg: 'Please log in to use facial recognition.',
       );
@@ -2863,8 +2868,11 @@ Join us at: $eventUrl
   /// Handle facial recognition sign-in triggered from geofence popup
   void _handleGeofenceFacialRecognitionSignIn() async {
     try {
-      // Check if user is logged in
-      if (CustomerController.logeInCustomer == null) {
+      // Ensure user data is loaded
+      final authService = AuthService();
+      final userDataLoaded = await authService.ensureUserDataLoaded();
+      
+      if (!userDataLoaded || CustomerController.logeInCustomer == null) {
         ShowToast().showNormalToast(
           msg: 'Please log in to use facial recognition.',
         );

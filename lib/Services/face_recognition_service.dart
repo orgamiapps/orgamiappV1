@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import '../Utils/logger.dart';
+import 'user_identity_service.dart';
 
 /// Professional facial recognition service for event attendance
 /// Handles face detection, enrollment, matching, and secure storage
@@ -203,24 +204,93 @@ class FaceRecognitionService {
       // Calculate average features for better accuracy
       final avgFeatures = _calculateAverageFeatures(faceFeatures);
 
-      // Store in Firestore
-      await FirebaseFirestore.instance
-          .collection('FaceEnrollments')
-          .doc('$eventId-$userId')
-          .set({
-            'userId': userId,
-            'userName': userName,
-            'eventId': eventId,
-            'faceFeatures': avgFeatures,
-            'sampleCount': faceFeatures.length,
-            'enrolledAt': FieldValue.serverTimestamp(),
-            'version': '1.0', // For future compatibility
-          });
+      // Generate consistent document ID
+      final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(eventId, userId);
+      
+      // Store in Firestore with retry logic
+      const maxRetries = 3;
+      int attempts = 0;
+      bool saved = false;
+      
+      while (!saved && attempts < maxRetries) {
+        attempts++;
+        try {
+          await FirebaseFirestore.instance
+              .collection('FaceEnrollments')
+              .doc(enrollmentDocId)
+              .set({
+                'userId': userId,
+                'userName': userName,
+                'eventId': eventId,
+                'faceFeatures': avgFeatures,
+                'sampleCount': faceFeatures.length,
+                'enrolledAt': FieldValue.serverTimestamp(),
+                'version': '1.0', // For future compatibility
+              });
+          saved = true;
+          Logger.info('Enrollment saved to Firestore: FaceEnrollments/$enrollmentDocId (attempt $attempts)');
+        } catch (e) {
+          Logger.warning('Failed to save enrollment (attempt $attempts/$maxRetries): $e');
+          if (attempts < maxRetries) {
+            await Future.delayed(Duration(milliseconds: 500 * attempts)); // Exponential backoff
+          }
+        }
+      }
+      
+      if (!saved) {
+        Logger.error('Failed to save enrollment after $maxRetries attempts');
+        return false;
+      }
 
-      Logger.info('User $userId enrolled successfully for event $eventId');
-      return true;
+      // Verify enrollment was saved
+      final verified = await verifyEnrollmentSaved(
+        userId: userId,
+        eventId: eventId,
+      );
+      
+      if (verified) {
+        Logger.success('✅ User $userId enrolled successfully for event $eventId - verified!');
+        return true;
+      } else {
+        Logger.error('❌ Enrollment verification failed for user $userId');
+        return false;
+      }
     } catch (e) {
       Logger.error('Face enrollment failed: $e');
+      return false;
+    }
+  }
+  
+  /// Verify that enrollment was saved successfully
+  Future<bool> verifyEnrollmentSaved({
+    required String userId,
+    required String eventId,
+  }) async {
+    try {
+      final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(eventId, userId);
+      Logger.debug('Verifying enrollment saved at: FaceEnrollments/$enrollmentDocId');
+      
+      final doc = await FirebaseFirestore.instance
+          .collection('FaceEnrollments')
+          .doc(enrollmentDocId)
+          .get();
+      
+      if (doc.exists) {
+        final data = doc.data();
+        if (data != null && 
+            data['userId'] == userId && 
+            data['eventId'] == eventId &&
+            data['faceFeatures'] != null &&
+            (data['faceFeatures'] as List).isNotEmpty) {
+          Logger.success('✅ Enrollment verification successful');
+          return true;
+        }
+      }
+      
+      Logger.error('❌ Enrollment verification failed - document not found or invalid');
+      return false;
+    } catch (e) {
+      Logger.error('Error verifying enrollment: $e');
       return false;
     }
   }
@@ -306,11 +376,18 @@ class FaceRecognitionService {
     required String eventId,
   }) async {
     try {
+      final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(eventId, userId);
+      Logger.debug('Checking enrollment at: FaceEnrollments/$enrollmentDocId');
+      
       final doc = await FirebaseFirestore.instance
           .collection('FaceEnrollments')
-          .doc('$eventId-$userId')
+          .doc(enrollmentDocId)
           .get();
-      return doc.exists;
+      
+      final exists = doc.exists;
+      Logger.info('Enrollment status for user $userId at event $eventId: $exists');
+      
+      return exists;
     } catch (e) {
       Logger.error('Failed to check enrollment status: $e');
       return false;
@@ -323,11 +400,14 @@ class FaceRecognitionService {
     required String eventId,
   }) async {
     try {
+      final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(eventId, userId);
+      
       await FirebaseFirestore.instance
           .collection('FaceEnrollments')
-          .doc('$eventId-$userId')
+          .doc(enrollmentDocId)
           .delete();
-      Logger.info('Deleted enrollment for user $userId in event $eventId');
+      
+      Logger.info('Deleted enrollment for user $userId in event $eventId (doc: $enrollmentDocId)');
       return true;
     } catch (e) {
       Logger.error('Failed to delete enrollment: $e');

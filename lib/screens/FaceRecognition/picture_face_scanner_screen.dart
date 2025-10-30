@@ -3,12 +3,11 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
-import '../../Controller/customer_controller.dart';
 import '../../Services/face_recognition_service.dart';
+import '../../Services/user_identity_service.dart';
 import '../../models/attendance_model.dart';
 import '../../models/event_model.dart';
 import '../../Utils/logger.dart';
@@ -51,6 +50,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
   ScanState _currentState = ScanState.INITIALIZING;
   String _statusMessage = 'Initializing scanner...';
   String _errorMessage = '';
+  UserIdentityResult? _currentUserIdentity;
 
   // Camera
   CameraController? _cameraController;
@@ -130,48 +130,36 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
 
   Future<bool> _checkEnrollmentStatus() async {
     try {
-      // Get user ID - must match enrollment logic exactly
-      String? userId = widget.guestUserId;
-      String? userName = widget.guestUserName;
+      // Get user identity using centralized service
+      final userIdentity = await UserIdentityService.getCurrentUserIdentity(
+        guestUserId: widget.guestUserId,
+        guestUserName: widget.guestUserName,
+      );
 
-      if (userId == null) {
-        final currentUser = CustomerController.logeInCustomer;
-        if (currentUser != null) {
-          userId = currentUser.uid;
-          userName = currentUser.name;
-          _logTimestamp('Using CustomerController user: $userName (ID: $userId)');
-        } else {
-          // Fallback: Try to get user from Firebase Auth directly (same as enrollment)
-          _logTimestamp('WARNING: CustomerController.logeInCustomer is null, checking Firebase Auth...');
-          
-          try {
-            final firebaseUser = FirebaseAuth.instance.currentUser;
-            if (firebaseUser != null) {
-              userId = firebaseUser.uid;
-              userName = firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? 'User';
-              _logTimestamp('SUCCESS: Using Firebase Auth user: $userName (ID: $userId)');
-            } else {
-              _logTimestamp('ERROR: No Firebase Auth user found');
-              return false;
-            }
-          } catch (e) {
-            _logTimestamp('ERROR: Failed to get Firebase Auth user: $e');
-            return false;
-          }
-        }
-      } else {
-        _logTimestamp('Using guest user for scanner: $userName (ID: $userId)');
+      if (userIdentity == null) {
+        _logTimestamp('ERROR: No user identity available');
+        return false;
       }
 
-      _logTimestamp('Checking enrollment for: userId=$userId, userName=$userName, eventId=${widget.eventModel.id}');
-      _logTimestamp('Looking for document: FaceEnrollments/${widget.eventModel.id}-$userId');
+      // Log identity details for debugging
+      UserIdentityService.logIdentityDetails(userIdentity, 'Scanner Check');
+      
+      final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(
+        widget.eventModel.id,
+        userIdentity.userId,
+      );
+      _logTimestamp('Checking enrollment at: FaceEnrollments/$enrollmentDocId');
 
       final isEnrolled = await _faceService.isUserEnrolled(
-        userId: userId,
+        userId: userIdentity.userId,
         eventId: widget.eventModel.id,
       );
 
-      _logTimestamp('Enrollment status for $userName: $isEnrolled');
+      _logTimestamp('Enrollment status for ${userIdentity.userName}: $isEnrolled');
+      
+      // Store user identity for later use
+      _currentUserIdentity = userIdentity;
+      
       return isEnrolled;
     } catch (e) {
       _logTimestamp('Error checking enrollment: $e');
@@ -696,6 +684,13 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
             _debugRow('Scan Attempts', _scanAttempts.toString()),
             _debugRow('Elapsed', elapsedStr),
             _debugRow('Event', widget.eventModel.title),
+            if (_currentUserIdentity != null) ...[
+              Divider(color: Colors.white24, height: 20),
+              _debugRow('User ID', _currentUserIdentity!.userId),
+              _debugRow('User Name', _currentUserIdentity!.userName),
+              _debugRow('Identity Source', _currentUserIdentity!.source.name),
+              _debugRow('Is Guest', _currentUserIdentity!.isGuest.toString()),
+            ],
           ],
         ),
       ),

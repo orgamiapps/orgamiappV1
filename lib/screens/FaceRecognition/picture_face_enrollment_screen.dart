@@ -2,13 +2,12 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:camera/camera.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
-import '../../Controller/customer_controller.dart';
 import '../../Permissions/permissions_helper.dart';
 import '../../Services/face_recognition_service.dart';
+import '../../Services/user_identity_service.dart';
 import '../../models/event_model.dart';
 import '../../Utils/logger.dart';
 import '../../Utils/toast.dart';
@@ -326,46 +325,29 @@ class _PictureFaceEnrollmentScreenState
     _timeoutTimer?.cancel();
 
     try {
-      // Get user ID - prioritize actual user, then guest
-      String? userId = widget.guestUserId;
-      String? userName = widget.guestUserName;
+      // Get user identity using centralized service
+      final userIdentity = await UserIdentityService.getCurrentUserIdentity(
+        guestUserId: widget.guestUserId,
+        guestUserName: widget.guestUserName,
+      );
 
-      // If not guest mode, get logged-in user
-      if (userId == null) {
-        final currentUser = CustomerController.logeInCustomer;
-        if (currentUser != null) {
-          userId = currentUser.uid;
-          userName = currentUser.name;
-          _logTimestamp('Using logged-in user: $userName (ID: $userId)');
-        } else {
-          // Fallback: Try to get user from Firebase Auth directly
-          _logTimestamp('WARNING: CustomerController.logeInCustomer is null, checking Firebase Auth...');
-          
-          try {
-            // Import needed: import 'package:firebase_auth/firebase_auth.dart';
-            final firebaseUser = FirebaseAuth.instance.currentUser;
-            if (firebaseUser != null) {
-              userId = firebaseUser.uid;
-              userName = firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? 'User';
-              _logTimestamp('SUCCESS: Using Firebase Auth user: $userName (ID: $userId)');
-            } else {
-              _logTimestamp('ERROR: No Firebase Auth user found');
-              throw Exception('User not logged in. Please sign in first.');
-            }
-          } catch (e) {
-            _logTimestamp('ERROR: Failed to get Firebase Auth user: $e');
-            throw Exception('User not logged in. Please sign in first.');
-          }
-        }
-      } else {
-        _logTimestamp('Using guest user: $userName (ID: $userId)');
+      if (userIdentity == null) {
+        _logTimestamp('ERROR: No user identity available');
+        throw Exception('User not logged in. Please sign in first.');
       }
 
-      _logTimestamp('Enrolling face for: userId=$userId, userName=$userName, eventId=${widget.eventModel.id}');
+      // Log identity details for debugging
+      UserIdentityService.logIdentityDetails(userIdentity, 'Enrollment');
+      
+      final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(
+        widget.eventModel.id,
+        userIdentity.userId,
+      );
+      _logTimestamp('Enrollment will be saved to: FaceEnrollments/$enrollmentDocId');
 
       final success = await _faceService.enrollUserFace(
-        userId: userId,
-        userName: userName ?? 'Unknown User',
+        userId: userIdentity.userId,
+        userName: userIdentity.userName,
         eventId: widget.eventModel.id,
         faceFeatures: _faceFeatures,
       );
@@ -374,7 +356,7 @@ class _PictureFaceEnrollmentScreenState
         throw Exception('Failed to save enrollment to Firestore');
       }
 
-      _logTimestamp('✅ Enrollment saved to Firestore: FaceEnrollments/${widget.eventModel.id}-$userId');
+      _logTimestamp('✅ Enrollment saved and verified successfully!');
       
       _updateState(EnrollmentState.COMPLETE);
       _updateStatus('Enrollment successful!');

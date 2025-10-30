@@ -2,12 +2,11 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'package:camera/camera.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../Controller/customer_controller.dart';
 import '../../Permissions/permissions_helper.dart';
 import '../../Services/face_recognition_service.dart';
+import '../../Services/user_identity_service.dart';
 import '../../models/event_model.dart';
 import '../../Utils/logger.dart';
 import '../../Utils/toast.dart';
@@ -331,48 +330,34 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     _updateStatusMessage('Processing enrollment...');
 
     try {
-      // Determine if this is a guest enrollment
-      final isGuest = widget.guestUserId != null;
-      
-      String userId;
-      String userName;
-      
-      if (isGuest) {
-        // Use guest parameters
-        userId = widget.guestUserId!;
-        userName = widget.guestUserName ?? 'Guest';
-        Logger.info('Enrolling guest: $userName (ID: $userId)');
-      } else {
-        // Use logged-in user
-        final currentUser = CustomerController.logeInCustomer;
-        if (currentUser != null) {
-          userId = currentUser.uid;
-          userName = currentUser.name;
-          Logger.info('Enrolling logged-in user: $userName (ID: $userId)');
-        } else {
-          // Fallback: Try to get user from Firebase Auth directly
-          Logger.warning('CustomerController.logeInCustomer is null, checking Firebase Auth...');
-          
-          final firebaseUser = FirebaseAuth.instance.currentUser;
-          if (firebaseUser != null) {
-            userId = firebaseUser.uid;
-            userName = firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? 'User';
-            Logger.success('Using Firebase Auth user: $userName (ID: $userId)');
-          } else {
-            Logger.error('No Firebase Auth user found');
-            _showErrorAndExit('Please log in to enroll your face.');
-            return;
-          }
-        }
+      // Get user identity using centralized service
+      final userIdentity = await UserIdentityService.getCurrentUserIdentity(
+        guestUserId: widget.guestUserId,
+        guestUserName: widget.guestUserName,
+      );
+
+      if (userIdentity == null) {
+        Logger.error('No user identity available');
+        _showErrorAndExit('Please log in to enroll your face.');
+        return;
       }
+
+      // Log identity details for debugging
+      UserIdentityService.logIdentityDetails(userIdentity, 'Face Enrollment');
+      
+      final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(
+        widget.eventModel.id,
+        userIdentity.userId,
+      );
+      Logger.info('Enrollment will be saved to: FaceEnrollments/$enrollmentDocId');
 
       Logger.info('Enrolling face for event: ${widget.eventModel.id} (${widget.eventModel.title})');
       Logger.info('Collected ${_collectedFeatures.length} face feature samples');
 
       // Enroll face with collected features
       final success = await _faceService.enrollUserFace(
-        userId: userId,
-        userName: userName,
+        userId: userIdentity.userId,
+        userName: userIdentity.userName,
         eventId: widget.eventModel.id,
         faceFeatures: _collectedFeatures,
       );
@@ -393,8 +378,8 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
               MaterialPageRoute(
                 builder: (context) => FaceRecognitionScannerScreen(
                   eventModel: widget.eventModel,
-                  guestUserId: isGuest ? userId : null,
-                  guestUserName: isGuest ? userName : null,
+                  guestUserId: userIdentity.isGuest ? userIdentity.userId : null,
+                  guestUserName: userIdentity.isGuest ? userIdentity.userName : null,
                 ),
               ),
             );
