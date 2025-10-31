@@ -22,7 +22,7 @@ class FaceRecognitionService {
 
   // Face detection configuration
   static const double _minFaceSize = 0.15;
-  static const double _matchingThreshold = 0.7;
+  static const double _matchingThreshold = 0.65; // Lowered for better recognition
   static const int _requiredFacesForEnrollment = 3;
 
   // Performance mode - can be toggled for real-time vs accuracy
@@ -99,21 +99,25 @@ class FaceRecognitionService {
   bool isFaceSuitable(Face face) {
     // Check face size
     final faceArea = face.boundingBox.width * face.boundingBox.height;
-    if (faceArea < 10000) return false; // Too small
+    if (faceArea < 8000) return false; // Slightly more lenient (was 10000)
 
-    // Check if face is looking forward (head angles)
+    // Check if face is looking forward (head angles) - more lenient
     final headEulerAngleY = face.headEulerAngleY;
     final headEulerAngleZ = face.headEulerAngleZ;
 
-    if (headEulerAngleY != null && headEulerAngleY.abs() > 30) return false;
-    if (headEulerAngleZ != null && headEulerAngleZ.abs() > 30) return false;
+    // Allow up to 35 degrees (was 30) for smoother recognition
+    if (headEulerAngleY != null && headEulerAngleY.abs() > 35) return false;
+    if (headEulerAngleZ != null && headEulerAngleZ.abs() > 35) return false;
 
-    // Check if eyes are open (if classification available)
+    // Check if eyes are open - more lenient, allow at least one eye open
     final leftEyeOpen = face.leftEyeOpenProbability;
     final rightEyeOpen = face.rightEyeOpenProbability;
 
-    if (leftEyeOpen != null && leftEyeOpen < 0.5) return false;
-    if (rightEyeOpen != null && rightEyeOpen < 0.5) return false;
+    // At least one eye should be open (more lenient than requiring both)
+    if (leftEyeOpen != null && rightEyeOpen != null) {
+      final maxEyeOpen = leftEyeOpen > rightEyeOpen ? leftEyeOpen : rightEyeOpen;
+      if (maxEyeOpen < 0.3) return false; // Lowered from 0.5
+    }
 
     return true;
   }
@@ -326,9 +330,11 @@ class FaceRecognitionService {
         );
       }
 
-      // Find best match
+      // Find best match - cache user names to avoid redundant lookups
       FaceMatchResult? bestMatch;
       double highestSimilarity = 0.0;
+      String? bestUserId;
+      String? bestUserName;
 
       for (final doc in enrolledSnapshot.docs) {
         final data = doc.data();
@@ -338,19 +344,25 @@ class FaceRecognitionService {
           enrolledFeatures,
         );
 
-        Logger.debug('Similarity with ${data['userName']}: $similarity');
+        final userName = data['userName'] as String?;
+        Logger.debug('Similarity with ${userName ?? "Unknown"}: ${(similarity * 100).toStringAsFixed(1)}%');
 
-        if (similarity > highestSimilarity &&
-            similarity >= _matchingThreshold) {
+        if (similarity > highestSimilarity) {
           highestSimilarity = similarity;
-          bestMatch = FaceMatchResult(
-            matched: true,
-            userId: data['userId'],
-            userName: data['userName'],
-            confidence: similarity,
-            reason: 'Face matched successfully',
-          );
+          bestUserId = data['userId'] as String?;
+          bestUserName = userName;
         }
+      }
+
+      // Only create match if above threshold
+      if (highestSimilarity >= _matchingThreshold && bestUserId != null) {
+        bestMatch = FaceMatchResult(
+          matched: true,
+          userId: bestUserId,
+          userName: bestUserName ?? 'Unknown User',
+          confidence: highestSimilarity,
+          reason: 'Face matched successfully',
+        );
       }
 
       return bestMatch ??

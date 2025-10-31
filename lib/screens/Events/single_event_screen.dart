@@ -64,7 +64,7 @@ import 'package:attendus/screens/Events/Widget/qr_dialogue.dart';
 import 'package:attendus/screens/Events/Widget/access_list_management_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:attendus/screens/Events/Widget/pre_registered_horizontal_list.dart';
-import 'package:attendus/screens/FaceRecognition/face_recognition_scanner_screen.dart';
+import 'package:attendus/screens/FaceRecognition/picture_face_scanner_screen.dart';
 import 'package:attendus/screens/FaceRecognition/picture_face_enrollment_screen.dart';
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 import 'package:attendus/screens/Events/Widget/delete_event_dialogue.dart';
@@ -1957,9 +1957,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                             eventModel.selectedDateTime,
                                         eventDurationHours:
                                             eventModel.eventDuration,
+                                        eventModel: eventModel,
                                       ),
                                 ),
-                              ).then((_) => _showEventManagementModal());
+                              );
                             },
                           ),
                         ]),
@@ -2131,72 +2132,73 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                           ]),
                         ],
 
+                        // Delete Event button at bottom of scrollable content
+                        if (eventModel.hasManagementPermissions(
+                          FirebaseAuth.instance.currentUser!.uid,
+                        )) ...[
+                          const SizedBox(height: 24),
+                          Container(
+                            width: double.infinity,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: const Color(0xFFFF5722),
+                                width: 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFFFF5722,
+                                  ).withValues(alpha: 0.08),
+                                  spreadRadius: 0,
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () => showDialog(
+                                  context: context,
+                                  builder: (context) =>
+                                      DeleteEventDialoge(singleEvent: eventModel),
+                                ),
+                                child: const Center(
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.delete_forever,
+                                        color: Color(0xFFFF5722),
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Delete Event',
+                                        style: TextStyle(
+                                          color: Color(0xFFFF5722),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                          fontFamily: 'Roboto',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+
                         const SizedBox(height: 32), // Extra space at bottom
                       ],
                     ),
                   ),
                 ),
-                if (eventModel.hasManagementPermissions(
-                  FirebaseAuth.instance.currentUser!.uid,
-                ))
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                    child: Container(
-                      width: double.infinity,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: const Color(0xFFFF5722),
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(
-                              0xFFFF5722,
-                            ).withValues(alpha: 0.08),
-                            spreadRadius: 0,
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(16),
-                          onTap: () => showDialog(
-                            context: context,
-                            builder: (context) =>
-                                DeleteEventDialoge(singleEvent: eventModel),
-                          ),
-                          child: const Center(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.delete_forever,
-                                  color: Color(0xFFFF5722),
-                                  size: 20,
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Delete Event',
-                                  style: TextStyle(
-                                    color: Color(0xFFFF5722),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                    fontFamily: 'Roboto',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
               ],
             ),
           ),
@@ -2846,12 +2848,12 @@ Join us at: $eventUrl
     if (!mounted) return;
 
     if (isEnrolled) {
-      // Navigate to face recognition scanner
+      // Navigate to face recognition scanner - use PictureFaceScannerScreen for better reliability
       final result = await Navigator.push<bool>(
         context,
         MaterialPageRoute(
           builder: (context) =>
-              FaceRecognitionScannerScreen(eventModel: eventModel),
+              PictureFaceScannerScreen(eventModel: eventModel),
         ),
       );
 
@@ -2892,12 +2894,12 @@ Join us at: $eventUrl
       if (!mounted) return;
 
       if (isEnrolled) {
-        // User is enrolled, launch face scanner
+        // User is enrolled, launch face scanner - use PictureFaceScannerScreen for better reliability
         final result = await Navigator.push<bool>(
           context,
           MaterialPageRoute(
             builder: (context) =>
-                FaceRecognitionScannerScreen(eventModel: eventModel),
+                PictureFaceScannerScreen(eventModel: eventModel),
           ),
         );
 

@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:attendus/screens/Events/add_questions_prompt_screen.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/app_app_bar_view.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/Utils/toast.dart';
 
 class ChoseLocationInMapScreen extends StatefulWidget {
   final DateTime? selectedDateTime;
@@ -14,6 +18,7 @@ class ChoseLocationInMapScreen extends StatefulWidget {
   final String? manualCode;
   final String? preselectedOrganizationId;
   final bool forceOrganizationEvent;
+  final EventModel? eventModel; // Add this for editing existing events
 
   const ChoseLocationInMapScreen({
     super.key,
@@ -23,6 +28,7 @@ class ChoseLocationInMapScreen extends StatefulWidget {
     this.manualCode,
     this.preselectedOrganizationId,
     this.forceOrganizationEvent = false,
+    this.eventModel, // Add this parameter
   });
 
   @override
@@ -44,6 +50,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
   // Location state management
   bool _isLocationLoading = false;
   bool _locationRequestInProgress = false;
+  bool _isSaving = false;
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -234,9 +241,98 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
     });
   }
 
+  Future<String> _getAddressFromLatLng(LatLng location) async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        location.latitude,
+        location.longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks[0];
+        return '${place.street ?? ''}, ${place.locality ?? ''}, ${place.administrativeArea ?? ''} ${place.postalCode ?? ''}'
+            .replaceAll(RegExp(r',\s*,'), ',')
+            .trim();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error getting address: $e');
+      }
+    }
+    return 'Lat: ${location.latitude.toStringAsFixed(6)}, Lng: ${location.longitude.toStringAsFixed(6)}';
+  }
+
+  Future<void> _saveLocationToEvent() async {
+    if (selectedLocation == null || widget.eventModel == null) {
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      // Get address from coordinates
+      final address = await _getAddressFromLatLng(selectedLocation!);
+
+      // Update event in Firestore
+      await FirebaseFirestore.instance
+          .collection(EventModel.firebaseKey)
+          .doc(widget.eventModel!.id)
+          .update({
+        'latitude': selectedLocation!.latitude,
+        'longitude': selectedLocation!.longitude,
+        'radius': radius,
+        'location': address,
+        'getLocation': true,
+      });
+
+      if (kDebugMode) {
+        debugPrint('✅ SUCCESS: Event location updated successfully');
+      }
+
+      if (!mounted) return;
+
+      ShowToast().showNormalToast(
+        msg: 'Location updated successfully!',
+      );
+
+      // Wait a moment for the toast to show, then pop
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ ERROR: Failed to update event location: $e');
+      }
+
+      if (!mounted) return;
+
+      ShowToast().showNormalToast(
+        msg: 'Failed to update location: $e',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+
+    // If editing an existing event, initialize with its location and radius
+    if (widget.eventModel != null) {
+      final event = widget.eventModel!;
+      if (event.latitude != 0 && event.longitude != 0) {
+        selectedLocation = LatLng(event.latitude, event.longitude);
+        radius = event.radius;
+        _addMarker(selectedLocation!);
+      }
+    }
 
     // Initialize animations
     _fadeController = AnimationController(
@@ -267,6 +363,17 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
         Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted) {
             _getCurrentLocation();
+          }
+        });
+      } else {
+        // If we have a location (from existing event), center the map on it
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            mapController.animateCamera(
+              CameraUpdate.newCameraPosition(
+                CameraPosition(target: selectedLocation!, zoom: 15),
+              ),
+            );
           }
         });
       }
@@ -542,7 +649,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
               ),
             ),
             const SizedBox(height: 24),
-            // Continue button
+            // Save/Continue button
             Container(
               width: double.infinity,
               height: 56,
@@ -566,39 +673,56 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
                 color: Colors.transparent,
                 child: InkWell(
                   borderRadius: BorderRadius.circular(16),
-                  onTap: () {
+                  onTap: _isSaving ? null : () {
                     if (kDebugMode) {
                       debugPrint('Selected Location: $selectedLocation');
                       debugPrint('Selected Radius: $radius feet');
                     }
 
-                    RouterClass.nextScreenNormal(
-                      context,
-                      AddQuestionsPromptScreen(
-                        selectedDateTime: widget.selectedDateTime,
-                        eventDurationHours: widget.eventDurationHours,
-                        selectedLocation: selectedLocation!,
-                        radios: radius,
-                        selectedSignInMethods:
-                            widget.selectedSignInMethods ??
-                            const ['qr_code', 'manual_code'],
-                        manualCode: widget.manualCode,
-                        preselectedOrganizationId:
-                            widget.preselectedOrganizationId,
-                        forceOrganizationEvent: widget.forceOrganizationEvent,
-                      ),
-                    );
+                    // If editing an existing event, save the location
+                    if (widget.eventModel != null) {
+                      _saveLocationToEvent();
+                    } else {
+                      // Otherwise, continue to next screen in event creation flow
+                      RouterClass.nextScreenNormal(
+                        context,
+                        AddQuestionsPromptScreen(
+                          selectedDateTime: widget.selectedDateTime,
+                          eventDurationHours: widget.eventDurationHours,
+                          selectedLocation: selectedLocation!,
+                          radios: radius,
+                          selectedSignInMethods:
+                              widget.selectedSignInMethods ??
+                              const ['qr_code', 'manual_code'],
+                          manualCode: widget.manualCode,
+                          preselectedOrganizationId:
+                              widget.preselectedOrganizationId,
+                          forceOrganizationEvent: widget.forceOrganizationEvent,
+                        ),
+                      );
+                    }
                   },
-                  child: const Center(
-                    child: Text(
-                      'Continue',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
+                  child: Center(
+                    child: _isSaving
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                        : Text(
+                            widget.eventModel != null ? 'Save' : 'Continue',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
                   ),
                 ),
               ),

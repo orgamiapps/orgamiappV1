@@ -11,7 +11,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/Services/geofence_event_detector.dart';
 import 'package:attendus/Utils/location_helper.dart';
-import 'package:attendus/screens/FaceRecognition/face_recognition_scanner_screen.dart';
+import 'package:attendus/screens/FaceRecognition/picture_face_scanner_screen.dart';
 import 'package:attendus/Services/face_recognition_service.dart';
 import 'package:attendus/screens/FaceRecognition/picture_face_enrollment_screen.dart';
 import 'package:attendus/Services/guest_mode_service.dart';
@@ -1412,12 +1412,13 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
       if (!mounted) return;
 
       if (isEnrolled) {
-        // Navigate to face recognition scanner
+        // Navigate to face recognition scanner - use PictureFaceScannerScreen for better reliability
         final result = await Navigator.push<bool>(
           context,
           MaterialPageRoute(
-            builder: (context) =>
-                FaceRecognitionScannerScreen(eventModel: event),
+            builder: (context) => PictureFaceScannerScreen(
+              eventModel: event,
+            ),
           ),
         );
 

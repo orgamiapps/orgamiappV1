@@ -7,10 +7,23 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:attendus/Utils/app_constants.dart';
 
+// Model to return both location and radius
+class LocationPickerResult {
+  final LatLng location;
+  final double radius;
+
+  LocationPickerResult({required this.location, required this.radius});
+}
+
 class LocationPickerScreen extends StatefulWidget {
   final LatLng? initialLocation;
+  final double? initialRadius;
 
-  const LocationPickerScreen({super.key, this.initialLocation});
+  const LocationPickerScreen({
+    super.key,
+    this.initialLocation,
+    this.initialRadius,
+  });
 
   @override
   State<LocationPickerScreen> createState() => _LocationPickerScreenState();
@@ -22,6 +35,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen>
   bool _mapReady = false;
   LatLng? _selectedLocation;
   Set<Marker> _markers = {};
+  Set<Circle> _circles = {};
+  double _radius = 100.0; // Default radius in feet
 
   // Search state
   final TextEditingController _searchController = TextEditingController();
@@ -34,6 +49,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen>
   void initState() {
     super.initState();
     _selectedLocation = widget.initialLocation;
+    _radius = widget.initialRadius ?? 100.0;
     if (_selectedLocation != null) {
       _addMarker(_selectedLocation!);
     }
@@ -42,7 +58,35 @@ class _LocationPickerScreenState extends State<LocationPickerScreen>
   void _addMarker(LatLng latLng) {
     setState(() {
       _markers = {Marker(markerId: const MarkerId('picked'), position: latLng)};
+      _circles = {
+        Circle(
+          circleId: const CircleId('radius-circle'),
+          center: latLng,
+          radius: _radius * 0.3048, // Convert feet to meters
+          fillColor: const Color(0xFF667EEA).withValues(alpha: 0.2),
+          strokeColor: const Color(0xFF667EEA),
+          strokeWidth: 2,
+        ),
+      };
       _selectedLocation = latLng;
+    });
+  }
+
+  void _updateRadius(double newRadius) {
+    setState(() {
+      _radius = newRadius;
+      if (_selectedLocation != null) {
+        _circles = {
+          Circle(
+            circleId: const CircleId('radius-circle'),
+            center: _selectedLocation!,
+            radius: _radius * 0.3048, // Convert feet to meters
+            fillColor: const Color(0xFF667EEA).withValues(alpha: 0.2),
+            strokeColor: const Color(0xFF667EEA),
+            strokeWidth: 2,
+          ),
+        };
+      }
     });
   }
 
@@ -172,6 +216,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen>
               }
             },
             markers: _markers,
+            circles: _circles,
           ),
           // Search bar
           Positioned(
@@ -265,32 +310,120 @@ class _LocationPickerScreenState extends State<LocationPickerScreen>
           ),
         ],
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: SizedBox(
-            height: 56,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+      bottomNavigationBar: _selectedLocation == null
+          ? null
+          : SafeArea(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 20,
+                      offset: const Offset(0, -4),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Radius slider section
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.radio_button_checked,
+                          color: Color(0xFF667EEA),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Geofence Radius',
+                          style: TextStyle(
+                            color: Color(0xFF1A1A1A),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${_radius.round()} ft',
+                            style: const TextStyle(
+                              color: Color(0xFF667EEA),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        activeTrackColor: const Color(0xFF667EEA),
+                        inactiveTrackColor: Colors.grey.withValues(alpha: 0.3),
+                        thumbColor: const Color(0xFF667EEA),
+                        overlayColor: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                        overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                        trackHeight: 4,
+                      ),
+                      child: Slider(
+                        value: _radius,
+                        min: 10,
+                        max: 1000,
+                        divisions: 99,
+                        onChanged: _updateRadius,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Use this location button
+                    SizedBox(
+                      height: 56,
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF667EEA),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 0,
+                        ),
+                        onPressed: () {
+                          final result = LocationPickerResult(
+                            location: LatLng(
+                              _selectedLocation!.latitude,
+                              _selectedLocation!.longitude,
+                            ),
+                            radius: _radius,
+                          );
+                          Navigator.of(context).pop<LocationPickerResult>(result);
+                        },
+                        child: const Text(
+                          'Use this location',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              onPressed: _selectedLocation == null
-                  ? null
-                  : () {
-                      // Ensure we return a concrete LatLng value
-                      final LatLng result = LatLng(
-                        _selectedLocation!.latitude,
-                        _selectedLocation!.longitude,
-                      );
-                      Navigator.of(context).pop<LatLng>(result);
-                    },
-              child: const Text('Use this location'),
             ),
-          ),
-        ),
-      ),
     );
   }
 }

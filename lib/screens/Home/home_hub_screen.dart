@@ -42,9 +42,13 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   void initState() {
     super.initState();
     Logger.debug('🏠 HomeHubScreen: initState started');
-    // OPTIMIZATION: Start loading immediately instead of waiting for post-frame callback
-    // This gives us a head start on data fetching
-    _loadOrgs();
+    // PERFORMANCE FIX: Defer data loading to after first frame to prevent blocking
+    // This prevents the heavy Firestore query from blocking app startup
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadOrgs();
+      }
+    });
     Logger.debug('🏠 HomeHubScreen: initState finished');
   }
 
@@ -53,32 +57,31 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
     Logger.debug('🏠 HomeHubScreen: _loadOrgs started');
 
     try {
-      // Skip user orgs loading on initial login to prevent freeze
-      // This is a temporary optimization - load user orgs in background later
-      Logger.debug(
-        '🏠 HomeHubScreen: Skipping user orgs for faster initial load...',
-      );
+      // Set initial empty state for immediate UI render
+      if (mounted) {
+        setState(() {
+          _myOrgs = [];
+          _searching = true; // Show loading indicator
+        });
+      }
+
+      // Defer discover query slightly to allow UI to render first
+      await Future.delayed(const Duration(milliseconds: 100));
 
       if (mounted) {
-        setState(() => _myOrgs = []);
-        Logger.debug(
-          '🏠 HomeHubScreen: State updated with empty user orgs, starting discover...',
-        );
-
-        // Start discover immediately without delay for faster UI
-        if (mounted) {
-          Logger.debug('🏠 HomeHubScreen: Starting _discover...');
-          _discover();
-        }
-
-        // Load user orgs in background after UI is rendered
-        _loadUserOrgsInBackground();
+        Logger.debug('🏠 HomeHubScreen: Starting _discover...');
+        _discover();
       }
+
+      // Load user orgs in background after discover starts
+      _loadUserOrgsInBackground();
     } catch (e) {
       Logger.error('Error in _loadOrgs', e);
       if (mounted) {
-        setState(() => _myOrgs = []);
-        _discover();
+        setState(() {
+          _myOrgs = [];
+          _searching = false;
+        });
       }
     }
   }
@@ -319,19 +322,19 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
           ),
           const SizedBox(width: 6),
           _roundIconButton(
-            icon: Icons.event,
-            onTap: () {
-              RouterClass.nextScreenNormal(context, const CalendarScreen());
-            },
-          ),
-          const SizedBox(width: 6),
-          _roundIconButton(
             icon: Icons.fact_check,
             onTap: () {
               RouterClass.nextScreenNormal(
                 context,
                 const QRScannerFlowScreen(),
               );
+            },
+          ),
+          const SizedBox(width: 6),
+          _roundIconButton(
+            icon: Icons.event,
+            onTap: () {
+              RouterClass.nextScreenNormal(context, const CalendarScreen());
             },
           ),
           const SizedBox(width: 6),
@@ -572,14 +575,29 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
           return _buildNoEventsYet();
         }
 
-        // Merge docs, filter to upcoming, then sort by selectedDateTime
-        final DateTime threshold = DateTime.now().subtract(
-          const Duration(hours: 3),
-        );
+        // Merge docs, filter to upcoming/active events, then sort by selectedDateTime
+        // Calculate cutoff time: show events that haven't ended more than 3 hours ago
+        final DateTime now = DateTime.now();
+        final DateTime cutoffTime = now.subtract(const Duration(hours: 3));
+        
         final docs =
             snapshot.data!.expand((qs) => qs.docs).where((d) {
-              final dt = (d.data()['selectedDateTime'] as Timestamp?)?.toDate();
-              return dt == null || dt.isAfter(threshold);
+              final data = d.data();
+              final startTime = (data['selectedDateTime'] as Timestamp?)?.toDate();
+              
+              // If no start time, exclude the event
+              if (startTime == null) {
+                return false;
+              }
+              
+              // Get event duration (default to 2 hours if not specified)
+              final eventDuration = (data['eventDuration'] as num?)?.toInt() ?? 2;
+              
+              // Calculate event end time: start time + duration
+              final eventEndTime = startTime.add(Duration(hours: eventDuration));
+              
+              // Include event if it hasn't ended more than 3 hours ago
+              return eventEndTime.isAfter(cutoffTime);
             }).toList()..sort((a, b) {
               final ad =
                   (a.data()['selectedDateTime'] as Timestamp?)?.toDate() ??

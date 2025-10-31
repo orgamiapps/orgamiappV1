@@ -984,16 +984,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     Stream<QuerySnapshot> eventsStream;
 
     try {
-      // Filter events to show only those that haven't ended more than 3 hours ago
-      final threeHoursAgo = DateTime.now().subtract(const Duration(hours: 3));
+      // Query for events that might still be active
+      // Use a generous window (last 48 hours) to account for long-duration events
+      // Post-processing will filter based on actual end times (start + duration)
+      final generousWindow = DateTime.now().subtract(const Duration(hours: 48));
 
       eventsStream = FirebaseFirestore.instance
           .collection(EventModel.firebaseKey)
           .where('private', isEqualTo: false) // Filter out private events
           .where(
             'selectedDateTime',
-            isGreaterThan: Timestamp.fromDate(threeHoursAgo),
-          ) // Show recent events
+            isGreaterThan: Timestamp.fromDate(generousWindow),
+          ) // Query wider window, actual filtering happens in post-processing
           .snapshots();
     } catch (e) {
       // Fallback: return simple error widget if stream creation fails
@@ -1061,11 +1063,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
         List<EventModel> neededEventList = [];
         final now = DateTime.now();
-        final cutoffTime = now.subtract(const Duration(hours: 2));
+        // Show events that haven't ended more than 3 hours ago (consistent with Private tab)
+        final cutoffTime = now.subtract(const Duration(hours: 3));
 
         try {
           for (var element in eventsList) {
-            // Filter out events that ended more than 2 hours ago with error handling
+            // Filter out events that ended more than 3 hours ago with error handling
             try {
               final eventEndTime = element.selectedDateTime.add(
                 Duration(hours: element.eventDuration),

@@ -21,26 +21,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late int _selectedIndex;
   bool _hasScrolledContent = false;
 
-  // Pre-built screens list - IndexedStack keeps widget state and improves performance
-  late final List<Widget> _screens;
+  // Track which screens have been visited to preserve their state
+  final Map<int, Widget> _screenCache = {};
+  final Set<int> _visitedScreens = {};
 
   @override
   void initState() {
     super.initState();
     Logger.debug('📱 DashboardScreen: initState started');
     _selectedIndex = widget.initialIndex;
-    
-    // Initialize screens list once - IndexedStack will handle caching
-    _screens = const [
-      HomeHubScreen(),
-      GroupsScreen(),
-      MessagingScreen(),
-      MyProfileScreen(showBackButton: false),
-      NotificationsScreen(),
-      AccountScreen(),
-    ];
-    
-    Logger.debug('📱 DashboardScreen: initState finished - rendering immediately');
+    // Mark the initial screen as visited
+    _visitedScreens.add(_selectedIndex);
+    Logger.debug('📱 DashboardScreen: initState finished - lazy loading enabled');
   }
 
   @override
@@ -62,21 +54,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       bottomNavigationBar: AppBottomNavigation(
         selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) => setState(() {
-          _selectedIndex = index;
-        }),
+        onDestinationSelected: (index) {
+          setState(() {
+            _selectedIndex = index;
+            // Mark screen as visited when user navigates to it
+            _visitedScreens.add(index);
+          });
+        },
         hasScrolledContent: _hasScrolledContent,
       ),
     );
   }
 
   Widget _bodyView() {
-    // OPTIMIZATION: IndexedStack with StackFit.expand handles sizing automatically
-    // No need for MediaQuery or explicit SizedBox dimensions
+    // PERFORMANCE FIX: Use lazy loading instead of IndexedStack
+    // Only build screens that have been visited to prevent all tabs from
+    // loading simultaneously and blocking the main thread
+    // This fixes the "Skipped 418 frames" issue
     return IndexedStack(
       index: _selectedIndex,
       sizing: StackFit.expand,
-      children: _screens,
+      children: List.generate(6, (index) {
+        // Only build the screen if it has been visited
+        if (_visitedScreens.contains(index)) {
+          // Cache the screen widget to preserve its state
+          return _screenCache.putIfAbsent(index, () => _buildScreen(index));
+        }
+        // Return a placeholder for unvisited screens
+        return const SizedBox.shrink();
+      }),
     );
+  }
+
+  Widget _buildScreen(int index) {
+    Logger.debug('📱 DashboardScreen: Building screen $index');
+    switch (index) {
+      case 0:
+        return const HomeHubScreen();
+      case 1:
+        return const GroupsScreen();
+      case 2:
+        return const MessagingScreen();
+      case 3:
+        return const MyProfileScreen(showBackButton: false);
+      case 4:
+        return const NotificationsScreen();
+      case 5:
+        return const AccountScreen();
+      default:
+        return const SizedBox.shrink();
+    }
   }
 }

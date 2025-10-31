@@ -152,18 +152,24 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
   // Location selection state
   LatLng? _selectedLocationInternal;
+  double? _selectedRadius;
   String? _resolvedAddress;
   bool _isResolvingAddress = false;
 
   Future<void> _pickLocation() async {
-    final picked = await Navigator.of(context).push<LatLng>(
+    final picked = await Navigator.of(context).push<LocationPickerResult>(
       MaterialPageRoute(
-        builder: (_) =>
-            LocationPickerScreen(initialLocation: _selectedLocationInternal),
+        builder: (_) => LocationPickerScreen(
+          initialLocation: _selectedLocationInternal,
+          initialRadius: _selectedRadius,
+        ),
       ),
     );
     if (picked != null) {
-      setState(() => _selectedLocationInternal = picked);
+      setState(() {
+        _selectedLocationInternal = picked.location;
+        _selectedRadius = picked.radius;
+      });
       await _reverseGeocodeSelectedLocation();
     }
   }
@@ -460,7 +466,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           eventGenerateTime: DateTime.now(),
           status: eventStatus,
           getLocation: hasLocation,
-          radius: widget.radios,
+          radius: _selectedRadius ?? widget.radios,
           longitude: hasLocation ? _selectedLocationInternal!.longitude : 0.0,
           latitude: hasLocation ? _selectedLocationInternal!.latitude : 0.0,
           private: privateEvent,
@@ -561,6 +567,10 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   @override
   void initState() {
     super.initState();
+
+    // Initialize location and radius
+    _selectedLocationInternal = widget.selectedLocation;
+    _selectedRadius = widget.radios;
 
     // Initialize sign-in tier and methods
     _selectedSignInTier = widget.selectedSignInTier ?? 'regular';

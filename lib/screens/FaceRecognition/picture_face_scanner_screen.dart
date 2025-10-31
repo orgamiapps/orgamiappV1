@@ -12,6 +12,7 @@ import '../../models/attendance_model.dart';
 import '../../models/event_model.dart';
 import '../../Utils/logger.dart';
 import '../../Utils/toast.dart';
+import '../QRScanner/ans_questions_to_sign_in_event_screen.dart';
 import 'picture_face_enrollment_screen.dart';
 
 /// Picture-based Face Recognition Scanner
@@ -65,6 +66,9 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
   bool _isScanning = false;
   int _scanAttempts = 0;
   Timer? _autoScanTimer;
+  
+  // Caching enrollments with user names for faster matching
+  Map<String, EnrollmentCache>? _cachedEnrollments;
 
   // Animation
   late AnimationController _pulseController;
@@ -200,6 +204,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
         orElse: () => cameras.first,
       );
 
+      // Initialize with medium resolution for better balance of speed and quality
       _cameraController = CameraController(
         _selectedCamera!,
         ResolutionPreset.medium,
@@ -221,15 +226,15 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
   }
 
   void _startAutoScan() {
-    // Auto-scan every 2 seconds
-    _autoScanTimer = Timer.periodic(Duration(seconds: 2), (timer) {
+    // Auto-scan every 1.5 seconds for faster recognition (reduced from 2 seconds)
+    _autoScanTimer = Timer.periodic(Duration(milliseconds: 1500), (timer) {
       if (mounted && _currentState == ScanState.READY && !_isScanning) {
         _scanFace();
       }
     });
 
     // Also scan immediately after initialization
-    Future.delayed(Duration(milliseconds: 500), () {
+    Future.delayed(Duration(milliseconds: 300), () {
       if (mounted && _currentState == ScanState.READY) {
         _scanFace();
       }
@@ -289,27 +294,42 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
 
       if (faces.isEmpty) {
         _updateState(ScanState.READY);
-        _updateStatus('No face detected - please position your face');
+        _updateStatus('No face detected - position your face in the frame');
         return;
       }
 
       final face = faces.first;
 
-      // Check if face is suitable
+      // Check if face is suitable with helpful feedback
       if (!_faceService.isFaceSuitable(face)) {
         _updateState(ScanState.READY);
         _updateStatus('Please look straight at the camera');
         return;
       }
 
-      // Match face
+      // Match face - use cached enrollments if available
       _updateState(ScanState.MATCHING);
       _updateStatus('Matching face...');
 
-      final matchResult = await _faceService.matchFace(
-        detectedFace: face,
-        eventId: widget.eventModel.id,
-      );
+      // Load enrollments cache if not already loaded
+      if (_cachedEnrollments == null) {
+        await _loadEnrollmentsCache();
+      }
+
+      FaceMatchResult? matchResult;
+      
+      // Try matching with cache first for faster performance
+      if (_cachedEnrollments != null && _cachedEnrollments!.isNotEmpty) {
+        matchResult = await _matchFaceWithCache(face);
+      }
+      
+      // Fallback to service method if cache matching fails
+      if (matchResult == null || !matchResult.matched) {
+        matchResult = await _faceService.matchFace(
+          detectedFace: face,
+          eventId: widget.eventModel.id,
+        );
+      }
 
       _logTimestamp('Match result: $matchResult');
 
@@ -335,22 +355,27 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
     _logTimestamp('  - UserID: ${matchResult.userId}');
     _logTimestamp('  - Confidence: ${(matchResult.confidence * 100).toStringAsFixed(1)}%');
 
-    // Haptic feedback
-    HapticFeedback.heavyImpact();
+    // Haptic feedback - use medium impact for smoother feel
+    HapticFeedback.mediumImpact();
 
     try {
-      // Sign in the user
+      // Sign in the user - this will handle questions if needed and save attendance
       _logTimestamp('Recording attendance for ${matchResult.userName}...');
       await _signInUser(matchResult.userId!, matchResult.userName!);
 
-      ShowToast().showNormalToast(
-        msg: 'Welcome, ${matchResult.userName}! Signed in successfully.',
-      );
+      // Only show success toast and navigate if we're still on this screen
+      // (if questions exist, we'll have navigated away)
+      if (mounted && _currentState == ScanState.SUCCESS) {
+        ShowToast().showNormalToast(
+          msg: 'Welcome, ${matchResult.userName}! Signed in successfully.',
+        );
 
-      await Future.delayed(Duration(seconds: 2));
+        // Wait a moment to show success, then navigate back
+        await Future.delayed(Duration(milliseconds: 1500));
 
-      if (mounted) {
-        Navigator.pop(context, true);
+        if (mounted) {
+          Navigator.pop(context, true);
+        }
       }
     } catch (e) {
       _logTimestamp('Sign-in error: $e');
@@ -360,12 +385,18 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
 
   void _handleNoMatch(FaceMatchResult? matchResult) {
     _updateState(ScanState.NO_MATCH);
-    _updateStatus('Face not recognized. Please try again.');
+    
+    // Provide helpful feedback based on similarity score
+    if (matchResult != null && matchResult.confidence > 0.5) {
+      _updateStatus('Almost there! Please adjust your position.');
+    } else {
+      _updateStatus('Face not recognized. Please try again.');
+    }
 
     _logTimestamp('No match found: ${matchResult?.reason}');
 
-    // Reset to ready after delay
-    Future.delayed(Duration(seconds: 2), () {
+    // Reset to ready after shorter delay for faster retry
+    Future.delayed(Duration(milliseconds: 1500), () {
       if (mounted && _currentState == ScanState.NO_MATCH) {
         _updateState(ScanState.READY);
         _updateStatus('Position your face to sign in');
@@ -376,8 +407,8 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
   Future<void> _signInUser(String userId, String userName) async {
     try {
       final now = DateTime.now();
-      final attendanceId =
-          '${widget.eventModel.id}-$userId-${now.millisecondsSinceEpoch}';
+      // Use consistent ID format for better tracking
+      final attendanceId = '${widget.eventModel.id}-$userId';
 
       _logTimestamp('Creating attendance record:');
       _logTimestamp('  - AttendanceID: $attendanceId');
@@ -392,23 +423,168 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
         eventId: widget.eventModel.id,
         customerUid: userId,
         attendanceDateTime: now,
-        answers: [], // No questions for facial recognition
+        answers: [], // Will be populated if questions exist
         isAnonymous: false,
         signInMethod: 'facial_recognition',
-        entryTimestamp: now,
+        entryTimestamp: widget.eventModel.getLocation ? now : null,
+        dwellStatus: widget.eventModel.getLocation ? 'active' : null,
+        dwellNotes: 'Facial recognition sign-in',
       );
 
-      await FirebaseFirestore.instance
-          .collection('Attendance')
-          .doc(attendanceId)
-          .set(attendance.toJson());
+      // Check for sign-in questions first
+      final eventQuestions = await FirebaseFirestore.instance
+          .collection('EventQuestions')
+          .where('eventId', isEqualTo: widget.eventModel.id)
+          .get();
 
-      _logTimestamp('✅ Attendance saved to Firestore: Attendance/$attendanceId');
+      if (eventQuestions.docs.isNotEmpty) {
+        // Navigate to questions screen - it will handle saving attendance
+        _logTimestamp('Event has questions, navigating to questions screen');
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AnsQuestionsToSignInEventScreen(
+                eventModel: widget.eventModel,
+                newAttendance: attendance,
+                nextPageRoute: 'event_details',
+              ),
+            ),
+          );
+        }
+        return; // Exit early - questions screen will handle saving
+      }
+
+      // No questions - save attendance directly
+      _logTimestamp('No event questions, saving attendance directly');
+      
+      // Save with retry logic for reliability
+      const maxRetries = 3;
+      int attempts = 0;
+      bool saved = false;
+      
+      while (!saved && attempts < maxRetries) {
+        attempts++;
+        try {
+          await FirebaseFirestore.instance
+              .collection(AttendanceModel.firebaseKey)
+              .doc(attendanceId)
+              .set(attendance.toJson(), SetOptions(merge: false));
+          
+          // Verify the save was successful
+          final savedDoc = await FirebaseFirestore.instance
+              .collection(AttendanceModel.firebaseKey)
+              .doc(attendanceId)
+              .get();
+          
+          if (savedDoc.exists) {
+            saved = true;
+            final savedData = savedDoc.data();
+            _logTimestamp('✅ Attendance saved to Firestore: ${AttendanceModel.firebaseKey}/$attendanceId (attempt $attempts)');
+            _logTimestamp('✅ Verified - UserName in saved doc: ${savedData?['userName']}');
+            _logTimestamp('✅ Verified - EventID in saved doc: ${savedData?['eventId']}');
+          } else {
+            throw Exception('Document was not saved - verification failed');
+          }
+        } catch (e) {
+          _logTimestamp('⚠️ Failed to save attendance (attempt $attempts/$maxRetries): $e');
+          if (attempts < maxRetries) {
+            await Future.delayed(Duration(milliseconds: 500 * attempts));
+          }
+        }
+      }
+      
+      if (!saved) {
+        throw Exception('Failed to save attendance after $maxRetries attempts');
+      }
+
       _logTimestamp('✅ User $userName signed in successfully via facial recognition');
     } catch (e) {
       _logTimestamp('❌ Failed to record attendance: $e');
       throw e;
     }
+  }
+  
+  /// Load enrollments into cache with user names for faster matching
+  Future<void> _loadEnrollmentsCache() async {
+    try {
+      final enrolledSnapshot = await FirebaseFirestore.instance
+          .collection('FaceEnrollments')
+          .where('eventId', isEqualTo: widget.eventModel.id)
+          .get();
+
+      _cachedEnrollments = {};
+      for (final doc in enrolledSnapshot.docs) {
+        final data = doc.data();
+        final userId = data['userId'] as String;
+        final userName = data['userName'] as String?;
+        final features = List<double>.from(data['faceFeatures']);
+        _cachedEnrollments![userId] = EnrollmentCache(
+          userId: userId,
+          userName: userName ?? 'Unknown User',
+          features: features,
+        );
+      }
+
+      _logTimestamp('Cached ${_cachedEnrollments!.length} enrollments with user names');
+    } catch (e) {
+      _logTimestamp('Failed to load enrollments cache: $e');
+      _cachedEnrollments = {};
+    }
+  }
+  
+  /// Match face using cached enrollments (faster than querying Firebase)
+  Future<FaceMatchResult?> _matchFaceWithCache(Face detectedFace) async {
+    if (_cachedEnrollments == null || _cachedEnrollments!.isEmpty) {
+      return null;
+    }
+
+    if (!_faceService.isFaceSuitable(detectedFace)) {
+      return FaceMatchResult(
+        matched: false,
+        confidence: 0.0,
+        reason: 'Face not suitable for recognition',
+      );
+    }
+
+    // Extract features from detected face
+    final detectedFeatures = _faceService.extractFaceFeatures(detectedFace);
+
+    // Find best match from cache
+    FaceMatchResult? bestMatch;
+    double highestSimilarity = 0.0;
+    const matchingThreshold = 0.65;
+
+    for (final entry in _cachedEnrollments!.entries) {
+      final cache = entry.value;
+      final similarity = _faceService.calculateSimilarity(
+        detectedFeatures,
+        cache.features,
+      );
+
+      if (similarity > highestSimilarity) {
+        highestSimilarity = similarity;
+        
+        if (similarity >= matchingThreshold) {
+          bestMatch = FaceMatchResult(
+            matched: true,
+            userId: cache.userId,
+            userName: cache.userName,
+            confidence: similarity,
+            reason: 'Face matched successfully',
+          );
+        }
+      }
+    }
+
+    return bestMatch ??
+        FaceMatchResult(
+          matched: false,
+          confidence: highestSimilarity,
+          reason: highestSimilarity > 0
+              ? 'No matching face found (highest similarity: ${(highestSimilarity * 100).toStringAsFixed(1)}%)'
+              : 'No enrolled faces for this event',
+        );
   }
 
   void _showEnrollmentPrompt() {
@@ -858,6 +1034,19 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
       ),
     );
   }
+}
+
+/// Cache entry for enrollment data
+class EnrollmentCache {
+  final String userId;
+  final String userName;
+  final List<double> features;
+
+  EnrollmentCache({
+    required this.userId,
+    required this.userName,
+    required this.features,
+  });
 }
 
 /// Custom Painter for Scanner Guide

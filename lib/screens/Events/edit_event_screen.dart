@@ -66,6 +66,7 @@ class _EditEventScreenState extends State<EditEventScreen>
 
   // Location selection
   LatLng? _selectedLocationInternal;
+  double? _selectedRadius;
   String? _resolvedAddress;
   bool _isResolvingAddress = false;
 
@@ -140,8 +141,9 @@ class _EditEventScreenState extends State<EditEventScreen>
     _selectedSignInMethods = List.from(event.signInMethods);
     _manualCode = event.manualCode;
 
-    // Initialize location
+    // Initialize location and radius
     _selectedLocationInternal = LatLng(event.latitude, event.longitude);
+    _selectedRadius = event.radius;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _reverseGeocodeSelectedLocation();
     });
@@ -182,15 +184,18 @@ class _EditEventScreenState extends State<EditEventScreen>
   }
 
   Future<void> _pickLocation() async {
-    final picked = await Navigator.of(context).push<LatLng>(
+    final picked = await Navigator.of(context).push<LocationPickerResult>(
       MaterialPageRoute(
-        builder: (_) =>
-            LocationPickerScreen(initialLocation: _selectedLocationInternal),
+        builder: (_) => LocationPickerScreen(
+          initialLocation: _selectedLocationInternal,
+          initialRadius: _selectedRadius,
+        ),
       ),
     );
     if (picked != null) {
       setState(() {
-        _selectedLocationInternal = picked;
+        _selectedLocationInternal = picked.location;
+        _selectedRadius = picked.radius;
         _hasChanges = true;
       });
       await _reverseGeocodeSelectedLocation();
@@ -329,7 +334,7 @@ class _EditEventScreenState extends State<EditEventScreen>
           categories: _selectedCategories,
           private: privateEvent,
           getLocation: widget.eventModel.getLocation,
-          radius: widget.eventModel.radius,
+          radius: _selectedRadius ?? widget.eventModel.radius,
           ticketsEnabled: widget.eventModel.ticketsEnabled,
           maxTickets: widget.eventModel.maxTickets,
           issuedTickets: widget.eventModel.issuedTickets,

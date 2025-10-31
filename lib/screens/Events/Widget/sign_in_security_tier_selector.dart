@@ -246,6 +246,38 @@ class _SignInSecurityTierSelectorState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Badge row at the top
+                if (tier['badge'] != null)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: tier['badgeColor'].withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: tier['badgeColor'].withValues(alpha: 0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          tier['badge'],
+                          style: TextStyle(
+                            color: tier['badgeColor'],
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                if (tier['badge'] != null) const SizedBox(height: 12),
+                // Main content row
                 Row(
                   children: [
                     // Icon with gradient
@@ -281,44 +313,17 @@ class _SignInSecurityTierSelectorState
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Text(
-                                tier['title'],
-                                style: TextStyle(
-                                  color: isSelected
-                                      ? tier['gradient'][0]
-                                      : const Color(0xFF1A1A1A),
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 18,
-                                  fontFamily: 'Roboto',
-                                  letterSpacing: -0.5,
-                                ),
-                              ),
-                              if (tier['badge'] != null) ...[
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: tier['badgeColor']
-                                        .withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    tier['badge'],
-                                    style: TextStyle(
-                                      color: tier['badgeColor'],
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
+                          Text(
+                            tier['title'],
+                            style: TextStyle(
+                              color: isSelected
+                                  ? tier['gradient'][0]
+                                  : const Color(0xFF1A1A1A),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 18,
+                              fontFamily: 'Roboto',
+                              letterSpacing: -0.5,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -352,9 +357,9 @@ class _SignInSecurityTierSelectorState
                               ? tier['gradient'][0]
                               : Colors.grey.withValues(alpha: 0.4),
                           width: 2,
-                        ),
-                      ),
-                      child: isSelected
+                            ),
+                          ),
+                          child: isSelected
                           ? const Icon(
                               Icons.check,
                               color: Colors.white,
@@ -409,15 +414,18 @@ class _SignInSecurityTierSelectorState
                                 : Colors.grey[600],
                           ),
                           const SizedBox(width: 6),
-                          Text(
-                            method['text'],
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: isSelected
-                                  ? tier['gradient'][0]
-                                  : Colors.grey[700],
-                              fontFamily: 'Roboto',
+                          Flexible(
+                            child: Text(
+                              method['text'],
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: isSelected
+                                    ? tier['gradient'][0]
+                                    : Colors.grey[700],
+                                fontFamily: 'Roboto',
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
