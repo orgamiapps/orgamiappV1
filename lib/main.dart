@@ -79,12 +79,10 @@ void main() async {
   // Use lazy initialization for providers to improve startup time
   // OPTIMIZATION: Create ThemeProvider synchronously to avoid async SharedPreferences call on startup
   final themeProvider = ThemeProvider();
-  
+
   final Widget appWidget = MultiProvider(
     providers: [
-      ChangeNotifierProvider.value(
-        value: themeProvider,
-      ),
+      ChangeNotifierProvider.value(value: themeProvider),
       ChangeNotifierProvider(
         create: (context) => SubscriptionService(),
         lazy: true, // Lazy load - only initialize when first accessed
@@ -141,7 +139,9 @@ void main() async {
               listen: false,
             );
             creationLimitService.initialize().catchError((e) {
-              Logger.warning('Creation limit service initialization failed: $e');
+              Logger.warning(
+                'Creation limit service initialization failed: $e',
+              );
             });
           });
         }

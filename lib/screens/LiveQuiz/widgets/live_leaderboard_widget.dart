@@ -723,6 +723,8 @@ class FinalLeaderboardWidget extends StatelessWidget {
 
         return ListView.builder(
           padding: const EdgeInsets.all(20),
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
           itemCount: participants.length,
           itemBuilder: (context, index) {
             final participant = participants[index];
