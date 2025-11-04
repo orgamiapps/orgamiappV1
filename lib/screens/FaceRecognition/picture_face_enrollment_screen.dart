@@ -76,6 +76,9 @@ class _PictureFaceEnrollmentScreenState
   bool _showDebugPanel = true;
   int _attempts = 0;
   DateTime _startTime = DateTime.now();
+  
+  // Navigation state for smooth transitions
+  bool _isNavigating = false;
 
   @override
   void initState() {
@@ -364,18 +367,44 @@ class _PictureFaceEnrollmentScreenState
 
       ShowToast().showNormalToast(msg: 'Face enrolled successfully!');
 
-      await Future.delayed(Duration(seconds: 1));
+      // Show loading overlay and hide camera preview
+      if (mounted) {
+        setState(() {
+          _isNavigating = true;
+          _isCameraInitialized = false;
+        });
+      }
+      
+      // Short delay to show the "Preparing scanner..." message
+      await Future.delayed(Duration(milliseconds: 500));
+      
+      // Navigate with smooth fade transition - disposal will happen in background
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (context) => PictureFaceScannerScreen(
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => PictureFaceScannerScreen(
               eventModel: widget.eventModel,
               guestUserId: widget.guestUserId,
               guestUserName: widget.guestUserName,
             ),
+            transitionDuration: Duration(milliseconds: 400),
+            reverseTransitionDuration: Duration(milliseconds: 300),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(
+                opacity: CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeInOut,
+                ),
+                child: child,
+              );
+            },
           ),
-        );
+        ).then((_) {
+          // Dispose camera after navigation starts
+          _cameraController?.dispose();
+          _cameraController = null;
+        });
       }
     } catch (e) {
       _logTimestamp('Enrollment failed: $e');
@@ -433,8 +462,23 @@ class _PictureFaceEnrollmentScreenState
     _logTimestamp('Disposing enrollment screen');
     _timeoutTimer?.cancel();
     _pulseController.dispose();
-    _cameraController?.dispose();
-    _faceDetector?.close();
+    
+    // Only dispose if not already disposed (prevents double disposal during navigation)
+    if (_cameraController != null && _isCameraInitialized) {
+      _cameraController!.dispose().then((_) {
+        _logTimestamp('Camera controller disposed');
+      }).catchError((e) {
+        _logTimestamp('Error disposing camera: $e');
+      });
+    }
+    
+    // Close face detector
+    _faceDetector?.close().then((_) {
+      _logTimestamp('Face detector closed');
+    }).catchError((e) {
+      _logTimestamp('Error closing face detector: $e');
+    });
+    
     super.dispose();
   }
 
@@ -482,13 +526,13 @@ class _PictureFaceEnrollmentScreenState
       body: Stack(
         children: [
           // Camera Preview
-          if (_isCameraInitialized && _cameraController != null)
+          if (!_isNavigating && _isCameraInitialized && _cameraController != null)
             Positioned.fill(child: CameraPreview(_cameraController!))
-          else
+          else if (!_isNavigating)
             Center(child: CircularProgressIndicator(color: Colors.white)),
 
           // Face Guide
-          if (_currentState != EnrollmentState.ERROR)
+          if (!_isNavigating && _currentState != EnrollmentState.ERROR)
             CustomPaint(
               painter: FaceGuidePainter(
                 animation: _pulseAnimation,
@@ -499,20 +543,54 @@ class _PictureFaceEnrollmentScreenState
             ),
 
           // Status Panel
-          _buildStatusPanel(),
+          if (!_isNavigating) _buildStatusPanel(),
 
           // Debug Panel
-          if (_showDebugPanel) _buildDebugPanel(),
+          if (!_isNavigating && _showDebugPanel) _buildDebugPanel(),
 
           // Progress Indicators
-          _buildProgressIndicators(),
+          if (!_isNavigating) _buildProgressIndicators(),
 
           // Capture Button
-          if (_currentState == EnrollmentState.READY && !_isCapturing)
+          if (!_isNavigating && _currentState == EnrollmentState.READY && !_isCapturing)
             _buildCaptureButton(),
 
           // Error Dialog
-          if (_currentState == EnrollmentState.ERROR) _buildErrorDialog(),
+          if (!_isNavigating && _currentState == EnrollmentState.ERROR) _buildErrorDialog(),
+          
+          // Loading overlay during navigation
+          if (_isNavigating)
+            Container(
+              color: Colors.black,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 3,
+                    ),
+                    SizedBox(height: 24),
+                    Text(
+                      'Preparing scanner...',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      'This will only take a moment',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

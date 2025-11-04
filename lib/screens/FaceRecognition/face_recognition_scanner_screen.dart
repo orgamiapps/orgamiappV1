@@ -11,6 +11,7 @@ import '../../models/attendance_model.dart';
 import '../../models/event_model.dart';
 import '../../Utils/logger.dart';
 import '../../Utils/toast.dart';
+import '../../firebase/firebase_firestore_helper.dart';
 import '../QRScanner/ans_questions_to_sign_in_event_screen.dart';
 import 'picture_face_enrollment_screen.dart';
 
@@ -61,6 +62,7 @@ class _FaceRecognitionScannerScreenState
 
   // Timers and throttling
   Timer? _messageTimer;
+  Timer? _initializationTimeout;
   DateTime? _lastProcessTime;
   Map<String, List<double>>? _cachedEnrollments;
 
@@ -69,13 +71,31 @@ class _FaceRecognitionScannerScreenState
     milliseconds: 1500,
   ); // Reduced frequency
   static const Duration _successDelay = Duration(seconds: 2);
+  static const Duration SCANNER_INIT_TIMEOUT = Duration(seconds: 30);
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
-    _initializeServices();
-    _initializeCamera();
+    _startInitialization();
+  }
+  
+  void _startInitialization() async {
+    // Start initialization timeout
+    _initializationTimeout = Timer(SCANNER_INIT_TIMEOUT, () {
+      _handleInitializationTimeout();
+    });
+    
+    try {
+      await _initializeServices();
+      await _initializeCamera();
+      
+      // Cancel timeout - initialization succeeded
+      _initializationTimeout?.cancel();
+    } catch (e) {
+      _initializationTimeout?.cancel();
+      Logger.error('Initialization failed: $e');
+    }
   }
 
   void _initializeAnimations() {
@@ -106,7 +126,16 @@ class _FaceRecognitionScannerScreenState
 
   Future<void> _initializeServices() async {
     try {
-      await _faceService.initialize();
+      await _faceService.initialize(
+        onProgress: (message) {
+          Logger.debug('ML Kit: $message');
+          if (mounted) {
+            setState(() {
+              _statusMessage = message;
+            });
+          }
+        },
+      );
     } catch (e) {
       Logger.error('Failed to initialize face recognition service: $e');
       _showErrorState('Failed to initialize face recognition');
@@ -369,6 +398,14 @@ class _FaceRecognitionScannerScreenState
             .collection(AttendanceModel.firebaseKey)
             .doc(docId)
             .set(attendanceModel.toJson());
+            
+        // Clear attendance cache so the attendance sheet updates immediately
+        try {
+          FirebaseFirestoreHelper().clearAttendanceCache(widget.eventModel.id);
+          Logger.debug('Cleared attendance cache for event');
+        } catch (e) {
+          Logger.warning('Failed to clear attendance cache: $e');
+        }
 
         ShowToast().showNormalToast(
           msg: 'Signed in successfully with facial recognition!',
@@ -410,6 +447,18 @@ class _FaceRecognitionScannerScreenState
 
   void _showErrorState(String message) {
     _updateDetectionState(FaceDetectionState.error, message);
+  }
+  
+  void _handleInitializationTimeout() {
+    Logger.error('Face scanner initialization timeout after 30 seconds');
+    _showErrorState('Initialization timeout. Please try again.');
+    ShowToast().showNormalToast(
+      msg: 'Face scanner initialization timeout. Please try again.',
+    );
+    
+    // Clean up resources
+    _stopImageStream();
+    _cameraController?.dispose();
   }
 
   Color _getStatusColor() {
@@ -516,6 +565,7 @@ class _FaceRecognitionScannerScreenState
   @override
   void dispose() {
     _stopImageStream();
+    _initializationTimeout?.cancel();
     _messageTimer?.cancel();
     _scanAnimationController.dispose();
     _pulseAnimationController.dispose();

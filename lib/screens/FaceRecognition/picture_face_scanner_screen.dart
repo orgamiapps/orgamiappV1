@@ -12,6 +12,7 @@ import '../../models/attendance_model.dart';
 import '../../models/event_model.dart';
 import '../../Utils/logger.dart';
 import '../../Utils/toast.dart';
+import '../../firebase/firebase_firestore_helper.dart';
 import '../QRScanner/ans_questions_to_sign_in_event_screen.dart';
 import 'picture_face_enrollment_screen.dart';
 
@@ -66,9 +67,13 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
   bool _isScanning = false;
   int _scanAttempts = 0;
   Timer? _autoScanTimer;
+  Timer? _initializationTimeout;
   
   // Caching enrollments with user names for faster matching
   Map<String, EnrollmentCache>? _cachedEnrollments;
+  
+  // Constants
+  static const SCANNER_INIT_TIMEOUT = Duration(seconds: 30);
 
   // Animation
   late AnimationController _pulseController;
@@ -99,26 +104,47 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
 
   void _startScanning() async {
     _updateState(ScanState.INITIALIZING);
+    
+    // Start initialization timeout
+    _initializationTimeout = Timer(SCANNER_INIT_TIMEOUT, () {
+      _handleInitializationTimeout();
+    });
 
     try {
-      // Check if user is enrolled first
-      _updateStatus('Checking enrollment status...');
-      final isEnrolled = await _checkEnrollmentStatus();
-
+      _updateStatus('Initializing scanner...');
+      
+      // Run enrollment check and face detector initialization in parallel
+      final results = await Future.wait([
+        _checkEnrollmentStatus(),
+        _initializeFaceDetector().then((_) => true).catchError((e) {
+          _logTimestamp('Face detector init failed: $e');
+          return false;
+        }),
+      ]);
+      
+      final isEnrolled = results[0];
+      final faceDetectorReady = results[1];
+      
       if (!isEnrolled) {
+        _initializationTimeout?.cancel();
         _updateState(ScanState.NOT_ENROLLED);
         _updateStatus('Face not enrolled for this event');
         _showEnrollmentPrompt();
         return;
       }
+      
+      if (!faceDetectorReady) {
+        _initializationTimeout?.cancel();
+        _handleError('Failed to initialize face detection');
+        return;
+      }
 
-      // Initialize face detector
-      _updateStatus('Initializing face recognition...');
-      await _initializeFaceDetector();
-
-      // Initialize camera
+      // Initialize camera after parallel operations complete
       _updateStatus('Setting up camera...');
       await _initializeCamera();
+
+      // Cancel timeout - initialization succeeded
+      _initializationTimeout?.cancel();
 
       // Ready to scan
       _updateState(ScanState.READY);
@@ -127,12 +153,29 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
       // Start auto-scan
       _startAutoScan();
     } catch (e, stack) {
+      _initializationTimeout?.cancel();
       _logTimestamp('Initialization error: $e\n$stack');
       _handleError('Initialization failed: $e');
     }
   }
 
   Future<bool> _checkEnrollmentStatus() async {
+    try {
+      // Add overall timeout for enrollment check
+      return await Future.any([
+        _performEnrollmentCheck(),
+        Future.delayed(Duration(seconds: 15), () {
+          _logTimestamp('Enrollment check timeout after 15 seconds');
+          return false;
+        }),
+      ]);
+    } catch (e) {
+      _logTimestamp('Error checking enrollment: $e');
+      return false;
+    }
+  }
+  
+  Future<bool> _performEnrollmentCheck() async {
     try {
       // Get user identity using centralized service
       final userIdentity = await UserIdentityService.getCurrentUserIdentity(
@@ -166,29 +209,35 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
       
       return isEnrolled;
     } catch (e) {
-      _logTimestamp('Error checking enrollment: $e');
+      _logTimestamp('Error in enrollment check: $e');
       return false;
     }
   }
 
   Future<void> _initializeFaceDetector() async {
-    try {
-      final options = FaceDetectorOptions(
-        enableContours: false,
-        enableLandmarks: true,
-        enableClassification: true,
-        enableTracking: false,
-        minFaceSize: 0.1,
-        performanceMode: FaceDetectorMode.accurate,
-      );
+    final options = FaceDetectorOptions(
+      enableContours: false,
+      enableLandmarks: true,
+      enableClassification: true,
+      enableTracking: false,
+      minFaceSize: 0.1,
+      performanceMode: FaceDetectorMode.accurate,
+    );
 
-      _faceDetector = FaceDetector(options: options);
-      await _faceService.initialize(useFastMode: false);
+    _faceDetector = FaceDetector(options: options);
+    
+    // Initialize with progress updates
+    await _faceService.initialize(
+      useFastMode: false,
+      onProgress: (message) {
+        _logTimestamp('ML Kit: $message');
+        if (mounted) {
+          _updateStatus(message);
+        }
+      },
+    );
 
-      _logTimestamp('Face detector initialized for scanning');
-    } catch (e) {
-      throw Exception('Failed to initialize face detector: $e');
-    }
+    _logTimestamp('Face detector initialized for scanning');
   }
 
   Future<void> _initializeCamera() async {
@@ -498,6 +547,14 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
         throw Exception('Failed to save attendance after $maxRetries attempts');
       }
 
+      // Clear attendance cache so the attendance sheet updates immediately
+      try {
+        FirebaseFirestoreHelper().clearAttendanceCache(widget.eventModel.id);
+        _logTimestamp('Cleared attendance cache for event');
+      } catch (e) {
+        _logTimestamp('Warning: Failed to clear attendance cache: $e');
+      }
+
       _logTimestamp('✅ User $userName signed in successfully via facial recognition');
     } catch (e) {
       _logTimestamp('❌ Failed to record attendance: $e');
@@ -629,6 +686,21 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
     _errorMessage = message;
     ShowToast().showNormalToast(msg: message);
   }
+  
+  void _handleInitializationTimeout() {
+    _logTimestamp('Initialization timeout after 30 seconds');
+    _updateState(ScanState.ERROR);
+    _errorMessage = 'Initialization took too long. Please try again.';
+    _updateStatus('Timeout: Please go back and try again');
+    ShowToast().showNormalToast(
+      msg: 'Face scanner initialization timeout. Please try again.',
+    );
+    
+    // Clean up resources
+    _cameraController?.dispose();
+    _faceDetector?.close();
+    _autoScanTimer?.cancel();
+  }
 
   void _updateState(ScanState newState) {
     if (mounted) {
@@ -669,6 +741,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
   @override
   void dispose() {
     _logTimestamp('Disposing scanner screen');
+    _initializationTimeout?.cancel();
     _autoScanTimer?.cancel();
     _pulseController.dispose();
     _cameraController?.dispose();

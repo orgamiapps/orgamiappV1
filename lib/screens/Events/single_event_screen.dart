@@ -98,6 +98,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   bool _isCheckingTicket = false;
   bool _justSignedIn =
       false; // Flag to prevent showing sign-in dialog immediately after sign-in
+  bool _isFacialRecognitionInProgress =
+      false; // Flag to prevent repeated facial recognition dialogs
   // Tab index removed - no longer using tabs
 
   // RSVP state
@@ -166,6 +168,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     await FirebaseFirestoreHelper()
         .getPreRegisterAttendanceCount(eventId: eventModel.id)
         .then((countValue) {
+          if (!mounted) return;
           setState(() {
             preRegisteredCount = countValue;
           });
@@ -177,6 +180,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       final attendanceList = await FirebaseFirestoreHelper().getAttendance(
         eventId: eventModel.id,
       );
+      if (!mounted) return;
       setState(() {
         actualAttendanceCount = attendanceList.length;
       });
@@ -193,6 +197,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         eventId: eventModel.id,
       );
       final usedTickets = ticketsList.where((ticket) => ticket.isUsed).length;
+      if (!mounted) return;
       setState(() {
         usedTicketsCount = usedTickets;
       });
@@ -204,6 +209,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   }
 
   Future<void> loadEventSummary() async {
+    if (!mounted) return;
     setState(() {
       isLoadingSummary = true;
     });
@@ -214,6 +220,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       getUsedTicketsCount(),
     ]);
 
+    if (!mounted) return;
     setState(() {
       isLoadingSummary = false;
     });
@@ -388,6 +395,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       value,
     ) {
       Logger.debug('Exist value is $value');
+      
+      // Add mounted check before setState
+      if (!mounted) return;
+      
       setState(() {
         signedIn = value;
       });
@@ -2827,49 +2838,15 @@ Join us at: $eventUrl
   }
 
   void _handleFacialRecognitionSignIn() async {
-    // Ensure user data is loaded
-    final authService = AuthService();
-    final userDataLoaded = await authService.ensureUserDataLoaded();
-    
-    if (!userDataLoaded || CustomerController.logeInCustomer == null) {
-      ShowToast().showNormalToast(
-        msg: 'Please log in to use facial recognition.',
-      );
+    // Prevent multiple simultaneous facial recognition flows
+    if (_isFacialRecognitionInProgress) {
+      Logger.debug('Facial recognition already in progress, skipping');
       return;
     }
-
-    // Check if user is enrolled for facial recognition
-    final faceService = FaceRecognitionService();
-    final isEnrolled = await faceService.isUserEnrolled(
-      userId: CustomerController.logeInCustomer!.uid,
-      eventId: eventModel.id,
-    );
-
-    if (!mounted) return;
-
-    if (isEnrolled) {
-      // Navigate to face recognition scanner - use PictureFaceScannerScreen for better reliability
-      final result = await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(
-          builder: (context) =>
-              PictureFaceScannerScreen(eventModel: eventModel),
-        ),
-      );
-
-      if (result == true) {
-        // Successful sign-in, refresh attendance status
-        getAttendance();
-      }
-    } else {
-      // Show enrollment dialog
-      _showFaceEnrollmentDialog();
-    }
-  }
-
-  /// Handle facial recognition sign-in triggered from geofence popup
-  void _handleGeofenceFacialRecognitionSignIn() async {
+    
     try {
+      _isFacialRecognitionInProgress = true;
+      
       // Ensure user data is loaded
       final authService = AuthService();
       final userDataLoaded = await authService.ensureUserDataLoaded();
@@ -2878,6 +2855,73 @@ Join us at: $eventUrl
         ShowToast().showNormalToast(
           msg: 'Please log in to use facial recognition.',
         );
+        _isFacialRecognitionInProgress = false;
+        return;
+      }
+
+      // Check if user is enrolled for facial recognition
+      final faceService = FaceRecognitionService();
+      final isEnrolled = await faceService.isUserEnrolled(
+        userId: CustomerController.logeInCustomer!.uid,
+        eventId: eventModel.id,
+      );
+
+      if (!mounted) {
+        _isFacialRecognitionInProgress = false;
+        return;
+      }
+
+      if (isEnrolled) {
+        // Navigate to face recognition scanner - use PictureFaceScannerScreen for better reliability
+        final result = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                PictureFaceScannerScreen(eventModel: eventModel),
+          ),
+        );
+
+        _isFacialRecognitionInProgress = false;
+
+        if (result == true) {
+          // Successful sign-in, refresh attendance status
+          getAttendance();
+        }
+      } else {
+        // User not enrolled, reset flag BEFORE showing dialog so dialog can show
+        _isFacialRecognitionInProgress = false;
+        // Show enrollment dialog
+        _showFaceEnrollmentDialog();
+      }
+    } catch (e) {
+      _isFacialRecognitionInProgress = false;
+      Logger.error('Error during facial recognition: $e');
+      ShowToast().showNormalToast(
+        msg: 'Error during facial recognition. Please try again.',
+      );
+    }
+  }
+
+  /// Handle facial recognition sign-in triggered from geofence popup
+  void _handleGeofenceFacialRecognitionSignIn() async {
+    // Prevent multiple simultaneous facial recognition flows
+    if (_isFacialRecognitionInProgress) {
+      Logger.debug('Facial recognition already in progress, skipping');
+      return;
+    }
+    
+    try {
+      _isFacialRecognitionInProgress = true;
+      
+      // Ensure user data is loaded
+      final authService = AuthService();
+      final userDataLoaded = await authService.ensureUserDataLoaded();
+      
+      if (!userDataLoaded || CustomerController.logeInCustomer == null) {
+        ShowToast().showNormalToast(
+          msg: 'Please log in to use facial recognition.',
+        );
+        _isFacialRecognitionInProgress = false;
         return;
       }
 
@@ -2891,7 +2935,10 @@ Join us at: $eventUrl
         eventId: eventModel.id,
       );
 
-      if (!mounted) return;
+      if (!mounted) {
+        _isFacialRecognitionInProgress = false;
+        return;
+      }
 
       if (isEnrolled) {
         // User is enrolled, launch face scanner - use PictureFaceScannerScreen for better reliability
@@ -2902,6 +2949,8 @@ Join us at: $eventUrl
                 PictureFaceScannerScreen(eventModel: eventModel),
           ),
         );
+
+        _isFacialRecognitionInProgress = false;
 
         if (result == true && mounted) {
           // Successful facial recognition, now complete the sign-in
@@ -2916,10 +2965,13 @@ Join us at: $eventUrl
           await _completeFacialRecognitionSignIn();
         }
       } else {
-        // User not enrolled, show enrollment dialog
+        // User not enrolled, reset flag BEFORE showing dialog so dialog can show
+        _isFacialRecognitionInProgress = false;
+        // Show enrollment dialog
         _showGeofenceFaceEnrollmentDialog();
       }
     } catch (e) {
+      _isFacialRecognitionInProgress = false;
       Logger.error('Error during geofence facial recognition: $e');
       ShowToast().showNormalToast(
         msg: 'Error during facial recognition. Please try again.',
@@ -3095,12 +3147,16 @@ Join us at: $eventUrl
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              _isFacialRecognitionInProgress = false;
+              Navigator.pop(context);
+            },
             style: TextButton.styleFrom(foregroundColor: Colors.grey[600]),
             child: const Text('Later'),
           ),
           ElevatedButton(
             onPressed: () {
+              _isFacialRecognitionInProgress = true;
               Navigator.pop(context);
               _navigateToGeofenceFaceEnrollment();
             },
@@ -3135,13 +3191,19 @@ Join us at: $eventUrl
       ),
     );
 
-    // After enrollment, automatically launch face scanner
+    // Reset the flag when enrollment flow completes
+    _isFacialRecognitionInProgress = false;
+
+    // Note: Enrollment screen now automatically navigates to scanner using pushReplacement
+    // The scanner will handle sign-in and pop back with result when done
+    // No need to re-trigger facial recognition here as it's already handled in the enrollment flow
     if (result == true && mounted) {
+      // User completed the full flow (enrollment → scanner → sign-in)
+      // Refresh attendance to show they're signed in
+      getAttendance();
       ShowToast().showNormalToast(
-        msg: 'Enrollment complete! Now verifying your face...',
+        msg: 'Successfully signed in!',
       );
-      await Future.delayed(const Duration(milliseconds: 800));
-      _handleGeofenceFacialRecognitionSignIn();
     }
   }
 
@@ -3183,11 +3245,15 @@ Join us at: $eventUrl
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              _isFacialRecognitionInProgress = false;
+              Navigator.pop(context);
+            },
             child: const Text('Not Now'),
           ),
           ElevatedButton(
             onPressed: () {
+              _isFacialRecognitionInProgress = true;
               Navigator.pop(context);
               _navigateToFaceEnrollment();
             },
@@ -3212,6 +3278,9 @@ Join us at: $eventUrl
             PictureFaceEnrollmentScreen(eventModel: eventModel),
       ),
     );
+
+    // Reset the flag when enrollment flow completes
+    _isFacialRecognitionInProgress = false;
 
     if (result == true && mounted) {
       // After successful enrollment, refresh attendance status

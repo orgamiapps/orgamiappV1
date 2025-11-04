@@ -90,6 +90,9 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
   int _facesDetected = 0;
   int _facesNotSuitable = 0;
   DateTime _startTime = DateTime.now();
+  
+  // Navigation state for smooth transitions
+  bool _isNavigating = false;
 
   @override
   void initState() {
@@ -507,19 +510,53 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
       // Show success animation
       ShowToast().showNormalToast(msg: 'Face enrolled successfully!');
 
-      // Navigate to scanner screen
-      await Future.delayed(Duration(seconds: 1));
+      // Stop stream and show loading overlay
+      if (_isStreamActive && _cameraController != null) {
+        try {
+          _cameraController!.stopImageStream();
+          _isStreamActive = false;
+        } catch (e) {
+          _logWithTimestamp('Error stopping stream: $e');
+        }
+      }
+      
+      if (mounted) {
+        setState(() {
+          _isNavigating = true;
+          _isCameraInitialized = false;
+        });
+      }
+      
+      // Short delay to show the "Preparing scanner..." message
+      await Future.delayed(Duration(milliseconds: 500));
+
+      // Navigate with smooth fade transition - disposal will happen in background
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (context) => FaceRecognitionScannerScreen(
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => FaceRecognitionScannerScreen(
               eventModel: widget.eventModel,
               guestUserId: widget.guestUserId,
               guestUserName: widget.guestUserName,
             ),
+            transitionDuration: Duration(milliseconds: 400),
+            reverseTransitionDuration: Duration(milliseconds: 300),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(
+                opacity: CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeInOut,
+                ),
+                child: child,
+              );
+            },
           ),
-        );
+        ).then((_) {
+          // Dispose camera after navigation starts
+          _cameraController?.dispose();
+          _cameraController = null;
+        });
       }
     } catch (e) {
       _logWithTimestamp('Enrollment completion failed: $e');
@@ -604,8 +641,21 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
       }
     }
 
-    _cameraController?.dispose();
-    _faceDetector?.close();
+    // Only dispose if not already disposed (prevents double disposal during navigation)
+    if (_cameraController != null && _isCameraInitialized) {
+      _cameraController!.dispose().then((_) {
+        _logWithTimestamp('Camera controller disposed');
+      }).catchError((e) {
+        _logWithTimestamp('Error disposing camera: $e');
+      });
+    }
+    
+    // Close face detector
+    _faceDetector?.close().then((_) {
+      _logWithTimestamp('Face detector closed');
+    }).catchError((e) {
+      _logWithTimestamp('Error closing face detector: $e');
+    });
 
     super.dispose();
   }
@@ -675,27 +725,61 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
       body: Stack(
         children: [
           // Camera Preview or Placeholder
-          _buildCameraView(),
+          if (!_isNavigating) _buildCameraView(),
 
           // Face Guide Overlay
-          if (_currentState == EnrollmentState.CAPTURING ||
-              _currentState == EnrollmentState.READY)
+          if (!_isNavigating && (_currentState == EnrollmentState.CAPTURING ||
+              _currentState == EnrollmentState.READY))
             _buildFaceGuide(),
 
           // Status Panel
-          _buildStatusPanel(),
+          if (!_isNavigating) _buildStatusPanel(),
 
           // Debug Panel
-          if (_showDebugPanel) _buildDebugPanel(),
+          if (!_isNavigating && _showDebugPanel) _buildDebugPanel(),
 
           // Progress Indicator
-          _buildProgressIndicator(),
+          if (!_isNavigating) _buildProgressIndicator(),
 
           // Manual Capture Button
-          if (_useManualCapture) _buildManualCaptureButton(),
+          if (!_isNavigating && _useManualCapture) _buildManualCaptureButton(),
 
           // Error Dialog
-          if (_currentState == EnrollmentState.ERROR) _buildErrorDialog(),
+          if (!_isNavigating && _currentState == EnrollmentState.ERROR) _buildErrorDialog(),
+          
+          // Loading overlay during navigation
+          if (_isNavigating)
+            Container(
+              color: Colors.black,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 3,
+                    ),
+                    SizedBox(height: 24),
+                    Text(
+                      'Preparing scanner...',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      'This will only take a moment',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

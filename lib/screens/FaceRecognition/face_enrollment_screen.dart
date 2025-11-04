@@ -61,6 +61,9 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
 
   // Constants
   static const Duration _captureInterval = Duration(milliseconds: 1200); // Reduced frequency
+  
+  // Navigation state for smooth transitions
+  bool _isNavigating = false;
 
   @override
   void initState() {
@@ -369,22 +372,47 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
         );
         ShowToast().showNormalToast(msg: 'Face enrolled successfully!');
 
-        // Navigate to scanner or back
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            Logger.info('Navigating to face recognition scanner');
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => FaceRecognitionScannerScreen(
-                  eventModel: widget.eventModel,
-                  guestUserId: userIdentity.isGuest ? userIdentity.userId : null,
-                  guestUserName: userIdentity.isGuest ? userIdentity.userName : null,
-                ),
+        // Stop image stream and show loading overlay
+        _stopImageStream();
+        if (mounted) {
+          setState(() {
+            _isNavigating = true;
+            _isCameraInitialized = false;
+          });
+        }
+        
+        // Short delay to show the "Preparing scanner..." message
+        await Future.delayed(Duration(milliseconds: 500));
+
+        // Navigate with smooth fade transition - disposal will happen in background
+        if (mounted) {
+          Logger.info('Navigating to face recognition scanner');
+          Navigator.pushReplacement(
+            context,
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) => FaceRecognitionScannerScreen(
+                eventModel: widget.eventModel,
+                guestUserId: userIdentity.isGuest ? userIdentity.userId : null,
+                guestUserName: userIdentity.isGuest ? userIdentity.userName : null,
               ),
-            );
-          }
-        });
+              transitionDuration: Duration(milliseconds: 400),
+              reverseTransitionDuration: Duration(milliseconds: 300),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                return FadeTransition(
+                  opacity: CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeInOut,
+                  ),
+                  child: child,
+                );
+              },
+            ),
+          ).then((_) {
+            // Dispose camera after navigation starts
+            _cameraController?.dispose();
+            _cameraController = null;
+          });
+        }
       } else {
         Logger.error('Face enrollment failed - service returned false');
         _showErrorAndExit('Failed to enroll face. Please try again.');
@@ -418,7 +446,16 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     _stepTimer?.cancel();
     _progressAnimationController.dispose();
     _stepAnimationController.dispose();
-    _cameraController?.dispose();
+    
+    // Only dispose if not already disposed (prevents double disposal during navigation)
+    if (_cameraController != null && _isCameraInitialized) {
+      _cameraController!.dispose().then((_) {
+        Logger.debug('Camera controller disposed');
+      }).catchError((e) {
+        Logger.error('Error disposing camera: $e');
+      });
+    }
+    
     super.dispose();
   }
 
@@ -435,13 +472,13 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
       body: Stack(
         children: [
           // Camera preview
-          if (_isCameraInitialized && _cameraController != null)
+          if (!_isNavigating && _isCameraInitialized && _cameraController != null)
             Positioned.fill(child: CameraPreview(_cameraController!))
-          else
+          else if (!_isNavigating)
             const Center(child: CircularProgressIndicator(color: Colors.white)),
 
           // Face guide overlay
-          if (_isCameraInitialized)
+          if (!_isNavigating && _isCameraInitialized)
             CustomPaint(
               painter: EnrollmentGuidePainter(
                 currentStep: _currentStep,
@@ -452,20 +489,56 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
             ),
 
           // Progress card
-          Positioned(
-            top: 100,
-            left: 20,
-            right: 20,
-            child: _buildProgressCard(),
-          ),
+          if (!_isNavigating)
+            Positioned(
+              top: 100,
+              left: 20,
+              right: 20,
+              child: _buildProgressCard(),
+            ),
 
           // Instructions card
-          Positioned(
-            bottom: MediaQuery.of(context).padding.bottom + 100,
-            left: 20,
-            right: 20,
-            child: _buildInstructionsCard(),
-          ),
+          if (!_isNavigating)
+            Positioned(
+              bottom: MediaQuery.of(context).padding.bottom + 100,
+              left: 20,
+              right: 20,
+              child: _buildInstructionsCard(),
+            ),
+          
+          // Loading overlay during navigation
+          if (_isNavigating)
+            Container(
+              color: Colors.black,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 3,
+                    ),
+                    SizedBox(height: 24),
+                    Text(
+                      'Preparing scanner...',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      'This will only take a moment',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

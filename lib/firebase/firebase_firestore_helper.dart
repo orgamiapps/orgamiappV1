@@ -402,6 +402,17 @@ class FirebaseFirestoreHelper {
   static void clearCache() {
     _cache.clear();
   }
+  
+  // Clear attendance cache for a specific event
+  void clearAttendanceCache(String eventId) {
+    try {
+      final cacheKey = 'attendance_$eventId';
+      _cache.remove(cacheKey);
+      Logger.debug('Cleared attendance cache for event: $eventId');
+    } catch (e) {
+      Logger.warning('Error clearing attendance cache: $e');
+    }
+  }
 
   // Update customer data
   Future<void> updateCustomerData(

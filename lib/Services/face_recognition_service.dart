@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -29,15 +30,48 @@ class FaceRecognitionService {
   bool _useFastMode = true;
 
   /// Initialize the face detection service
-  Future<void> initialize({bool useFastMode = true}) async {
+  Future<void> initialize({
+    bool useFastMode = true, 
+    Function(String)? onProgress,
+  }) async {
     if (_isInitialized) {
       Logger.debug('FaceRecognitionService already initialized');
       return;
     }
 
     try {
+      onProgress?.call('Checking ML Kit availability...');
       Logger.info('Initializing FaceDetector with ML Kit...');
       _useFastMode = useFastMode;
+      
+      // First check if ML Kit is available with timeout
+      bool mlKitAvailable = false;
+      try {
+        onProgress?.call('Loading ML Kit models...');
+        
+        // Create a test detector to check if models are available
+        final testOptions = FaceDetectorOptions(
+          performanceMode: FaceDetectorMode.fast,
+          enableLandmarks: false,
+          enableClassification: false,
+        );
+        
+        final testDetector = FaceDetector(options: testOptions);
+        
+        // Test with a simple operation
+        await testDetector.close().timeout(
+          Duration(seconds: 5),
+          onTimeout: () {
+            throw TimeoutException('ML Kit model check timeout');
+          },
+        );
+        
+        mlKitAvailable = true;
+        onProgress?.call('ML Kit models ready');
+      } catch (e) {
+        Logger.warning('ML Kit availability check failed: $e');
+        onProgress?.call('ML Kit models need to be downloaded...');
+      }
 
       final options = FaceDetectorOptions(
         enableContours: false, // Disable for better performance
@@ -54,8 +88,18 @@ class FaceRecognitionService {
         'landmarks=true, classification=true, tracking=true, '
         'minFaceSize=$_minFaceSize, mode=${_useFastMode ? "fast" : "accurate"}');
 
+      onProgress?.call('Initializing face detector...');
       _faceDetector = FaceDetector(options: options);
+      
+      // If ML Kit wasn't initially available, it might download now
+      if (!mlKitAvailable) {
+        onProgress?.call('Downloading ML Kit models (this may take a moment)...');
+        // Give some time for model download
+        await Future.delayed(Duration(seconds: 2));
+      }
+      
       _isInitialized = true;
+      onProgress?.call('Face detection ready');
       Logger.info(
         'FaceRecognitionService initialized successfully (${_useFastMode ? "fast" : "accurate"} mode)',
       );
@@ -68,6 +112,7 @@ class FaceRecognitionService {
       Logger.error('2. Insufficient device storage');
       Logger.error('3. Google Play Services issue (Android)');
       Logger.error('4. Platform-specific configuration missing');
+      onProgress?.call('Failed to initialize face detection');
       rethrow;
     }
   }
@@ -270,33 +315,59 @@ class FaceRecognitionService {
     required String userId,
     required String eventId,
   }) async {
-    try {
-      final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(eventId, userId);
-      Logger.debug('Verifying enrollment saved at: FaceEnrollments/$enrollmentDocId');
-      
-      final doc = await FirebaseFirestore.instance
-          .collection('FaceEnrollments')
-          .doc(enrollmentDocId)
-          .get();
-      
-      if (doc.exists) {
-        final data = doc.data();
-        if (data != null && 
-            data['userId'] == userId && 
-            data['eventId'] == eventId &&
-            data['faceFeatures'] != null &&
-            (data['faceFeatures'] as List).isNotEmpty) {
-          Logger.success('✅ Enrollment verification successful');
-          return true;
+    const maxRetries = 3;
+    const timeout = Duration(seconds: 10);
+    int attempts = 0;
+    
+    while (attempts < maxRetries) {
+      attempts++;
+      try {
+        final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(eventId, userId);
+        Logger.debug('Verifying enrollment saved at: FaceEnrollments/$enrollmentDocId (attempt $attempts)');
+        
+        // Add timeout to Firebase query
+        final doc = await FirebaseFirestore.instance
+            .collection('FaceEnrollments')
+            .doc(enrollmentDocId)
+            .get()
+            .timeout(timeout, onTimeout: () {
+              throw TimeoutException('Enrollment verification timeout after ${timeout.inSeconds}s');
+            });
+        
+        if (doc.exists) {
+          final data = doc.data();
+          if (data != null && 
+              data['userId'] == userId && 
+              data['eventId'] == eventId &&
+              data['faceFeatures'] != null &&
+              (data['faceFeatures'] as List).isNotEmpty) {
+            Logger.success('✅ Enrollment verification successful');
+            return true;
+          }
+        }
+        
+        Logger.error('❌ Enrollment verification failed - document not found or invalid');
+        return false;
+      } on TimeoutException catch (e) {
+        Logger.warning('Enrollment verification timeout (attempt $attempts/$maxRetries): $e');
+        if (attempts < maxRetries) {
+          await Future.delayed(Duration(milliseconds: 500 * attempts)); // Exponential backoff
+        } else {
+          Logger.error('Failed to verify enrollment after $maxRetries attempts');
+          return false;
+        }
+      } catch (e) {
+        Logger.warning('Error verifying enrollment (attempt $attempts/$maxRetries): $e');
+        if (attempts < maxRetries) {
+          await Future.delayed(Duration(milliseconds: 500 * attempts)); // Exponential backoff
+        } else {
+          Logger.error('Failed to verify enrollment after $maxRetries attempts: $e');
+          return false;
         }
       }
-      
-      Logger.error('❌ Enrollment verification failed - document not found or invalid');
-      return false;
-    } catch (e) {
-      Logger.error('Error verifying enrollment: $e');
-      return false;
     }
+    
+    return false;
   }
 
   /// Find matching user for detected face
@@ -387,23 +458,49 @@ class FaceRecognitionService {
     required String userId,
     required String eventId,
   }) async {
-    try {
-      final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(eventId, userId);
-      Logger.debug('Checking enrollment at: FaceEnrollments/$enrollmentDocId');
-      
-      final doc = await FirebaseFirestore.instance
-          .collection('FaceEnrollments')
-          .doc(enrollmentDocId)
-          .get();
-      
-      final exists = doc.exists;
-      Logger.info('Enrollment status for user $userId at event $eventId: $exists');
-      
-      return exists;
-    } catch (e) {
-      Logger.error('Failed to check enrollment status: $e');
-      return false;
+    const maxRetries = 3;
+    const timeout = Duration(seconds: 10);
+    int attempts = 0;
+    
+    while (attempts < maxRetries) {
+      attempts++;
+      try {
+        final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(eventId, userId);
+        Logger.debug('Checking enrollment at: FaceEnrollments/$enrollmentDocId (attempt $attempts)');
+        
+        // Add timeout to Firebase query
+        final doc = await FirebaseFirestore.instance
+            .collection('FaceEnrollments')
+            .doc(enrollmentDocId)
+            .get()
+            .timeout(timeout, onTimeout: () {
+              throw TimeoutException('Enrollment check timeout after ${timeout.inSeconds}s');
+            });
+        
+        final exists = doc.exists;
+        Logger.info('Enrollment status for user $userId at event $eventId: $exists');
+        
+        return exists;
+      } on TimeoutException catch (e) {
+        Logger.warning('Enrollment check timeout (attempt $attempts/$maxRetries): $e');
+        if (attempts < maxRetries) {
+          await Future.delayed(Duration(milliseconds: 500 * attempts)); // Exponential backoff
+        } else {
+          Logger.error('Failed to check enrollment after $maxRetries attempts');
+          return false;
+        }
+      } catch (e) {
+        Logger.warning('Failed to check enrollment (attempt $attempts/$maxRetries): $e');
+        if (attempts < maxRetries) {
+          await Future.delayed(Duration(milliseconds: 500 * attempts)); // Exponential backoff
+        } else {
+          Logger.error('Failed to check enrollment status after $maxRetries attempts: $e');
+          return false;
+        }
+      }
     }
+    
+    return false;
   }
 
   /// Delete user enrollment for specific event
