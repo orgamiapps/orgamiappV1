@@ -11,6 +11,7 @@ import 'package:attendus/Services/firebase_initializer.dart';
 import 'package:attendus/firebase/firebase_google_auth_helper.dart';
 import 'package:attendus/Utils/firebase_retry_helper.dart';
 import 'package:attendus/Services/guest_mode_service.dart';
+import 'package:attendus/Services/navigation_state_service.dart';
 
 /// Authentication service that handles persistent login functionality
 /// using Firebase Auth and secure storage for enhanced security
@@ -392,6 +393,10 @@ class AuthService extends ChangeNotifier {
       await _secureStorage.delete(key: _keyUserEmail);
       await _secureStorage.delete(key: _keyLastLoginTime);
       CustomerController.logeInCustomer = null;
+      
+      // Clear navigation state on logout
+      await NavigationStateService().onLogout();
+      
       Logger.info('User session cleared');
     } catch (e) {
       Logger.error('Error clearing user session', e);

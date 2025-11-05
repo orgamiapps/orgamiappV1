@@ -22,6 +22,7 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:attendus/Utils/platform_helper.dart';
 import 'package:attendus/Utils/emulator_config.dart';
 import 'package:attendus/Services/firebase_initializer.dart';
+import 'package:attendus/Services/navigation_state_service.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -273,11 +274,66 @@ Future<void> _initializeBackgroundServices() async {
   }
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key, this.homeOverride});
 
   // Allows tests to inject a simple home to avoid heavy initialization in widgets
   final Widget? homeOverride;
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  final NavigationStateService _navStateService = NavigationStateService();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Initialize navigation state service
+    _navStateService.initialize();
+    Logger.debug('MyApp: Added lifecycle observer');
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    Logger.debug('MyApp: Removed lifecycle observer');
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    if (kDebugMode) {
+      Logger.debug('App lifecycle state changed to: $state');
+    }
+
+    switch (state) {
+      case AppLifecycleState.paused:
+        // App is going to background - navigation state is already saved by observer
+        Logger.info('App paused - navigation state should be saved');
+        break;
+      case AppLifecycleState.resumed:
+        // App is coming back to foreground
+        Logger.info('App resumed - navigation state will be restored on next launch');
+        break;
+      case AppLifecycleState.inactive:
+        // App is inactive (e.g., during phone call)
+        Logger.debug('App inactive');
+        break;
+      case AppLifecycleState.detached:
+        // App is detached
+        Logger.debug('App detached');
+        break;
+      case AppLifecycleState.hidden:
+        // App is hidden
+        Logger.debug('App hidden');
+        break;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -297,8 +353,8 @@ class MyApp extends StatelessWidget {
             GlobalCupertinoLocalizations.delegate,
           ],
           supportedLocales: const [Locale('en')],
-          home: homeOverride ?? const AuthGate(),
-          // Add navigation observer for debugging
+          home: widget.homeOverride ?? const AuthGate(),
+          // Add navigation observer for debugging and state tracking
           navigatorObservers: [_NavigationLogger()],
         );
       },
@@ -306,8 +362,10 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// Navigation observer for logging navigation events and catching errors
+/// Navigation observer for logging navigation events and saving state
 class _NavigationLogger extends NavigatorObserver {
+  final NavigationStateService _navStateService = NavigationStateService();
+
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
     if (kDebugMode) {
@@ -315,6 +373,9 @@ class _NavigationLogger extends NavigatorObserver {
         'Navigation: Pushed ${route.settings.name ?? 'unnamed route'}',
       );
     }
+    
+    // Save navigation state
+    _saveRouteState(route);
   }
 
   @override
@@ -323,6 +384,11 @@ class _NavigationLogger extends NavigatorObserver {
       Logger.debug(
         'Navigation: Popped ${route.settings.name ?? 'unnamed route'}',
       );
+    }
+    
+    // Save previous route state when popping
+    if (previousRoute != null) {
+      _saveRouteState(previousRoute);
     }
   }
 
@@ -341,6 +407,27 @@ class _NavigationLogger extends NavigatorObserver {
       Logger.debug(
         'Navigation: Replaced ${oldRoute?.settings.name ?? 'unnamed'} with ${newRoute?.settings.name ?? 'unnamed'}',
       );
+    }
+    
+    // Save new route state
+    if (newRoute != null) {
+      _saveRouteState(newRoute);
+    }
+  }
+
+  /// Save route state to NavigationStateService
+  void _saveRouteState(Route<dynamic> route) {
+    try {
+      // Skip modal routes and dialog routes
+      if (route is! ModalRoute || route is PopupRoute) {
+        return;
+      }
+      
+      _navStateService.trackRoute(route);
+    } catch (e) {
+      if (kDebugMode) {
+        Logger.error('Error saving route state: $e');
+      }
     }
   }
 }

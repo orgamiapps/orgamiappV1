@@ -7,6 +7,8 @@ import 'package:attendus/screens/Groups/groups_screen.dart';
 import 'package:attendus/screens/Home/account_screen.dart';
 import 'package:attendus/widgets/app_bottom_navigation.dart';
 import 'package:attendus/Utils/logger.dart';
+import 'package:attendus/Services/navigation_state_service.dart';
+import 'package:attendus/Utils/route_names.dart';
 
 class DashboardScreen extends StatefulWidget {
   final int initialIndex;
@@ -20,6 +22,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   late int _selectedIndex;
   bool _hasScrolledContent = false;
+  final NavigationStateService _navStateService = NavigationStateService();
 
   // Track which screens have been visited to preserve their state
   final Map<int, Widget> _screenCache = {};
@@ -29,10 +32,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     Logger.debug('📱 DashboardScreen: initState started');
+    
+    // Initialize navigation state service
+    _navStateService.initialize();
+    
+    // Initialize selected index synchronously with default or provided value
     _selectedIndex = widget.initialIndex;
+    
+    // Try to restore tab index from saved state asynchronously
+    _restoreTabIndexIfNeeded();
+    
     // Mark the initial screen as visited
     _visitedScreens.add(_selectedIndex);
     Logger.debug('📱 DashboardScreen: initState finished - lazy loading enabled');
+  }
+
+  /// Restore tab index from saved state if no explicit initial index was provided
+  Future<void> _restoreTabIndexIfNeeded() async {
+    // Only restore if using default index (0)
+    if (widget.initialIndex != 0) {
+      Logger.debug('📱 DashboardScreen: Using provided initialIndex: $_selectedIndex');
+      return;
+    }
+
+    // Try to restore from saved state
+    try {
+      final savedTabIndex = await _navStateService.restoreTabIndex();
+      if (savedTabIndex != null && savedTabIndex != _selectedIndex) {
+        setState(() {
+          _selectedIndex = savedTabIndex;
+          _visitedScreens.add(_selectedIndex);
+        });
+        Logger.debug('📱 DashboardScreen: Restored tab index: $_selectedIndex');
+      }
+    } catch (e) {
+      Logger.warning('Failed to restore tab index: $e');
+    }
   }
 
   @override
@@ -60,6 +95,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             // Mark screen as visited when user navigates to it
             _visitedScreens.add(index);
           });
+          
+          // Save tab index to navigation state
+          _saveTabChange(index);
         },
         hasScrolledContent: _hasScrolledContent,
       ),
@@ -103,6 +141,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return const AccountScreen();
       default:
         return const SizedBox.shrink();
+    }
+  }
+
+  /// Save tab change to navigation state service
+  void _saveTabChange(int index) {
+    try {
+      // Save just the tab index
+      _navStateService.saveTabIndex(index);
+      
+      // Also save with route name for the tab
+      String routeName = _getRouteNameForTab(index);
+      _navStateService.saveNavigationState(
+        routeName: routeName,
+        tabIndex: index,
+      );
+      
+      Logger.debug('📱 DashboardScreen: Saved tab change to index $index');
+    } catch (e) {
+      Logger.error('Failed to save tab change: $e');
+    }
+  }
+
+  /// Get route name for tab index
+  String _getRouteNameForTab(int index) {
+    switch (index) {
+      case 0:
+        return RouteNames.homeHub;
+      case 1:
+        return RouteNames.groups;
+      case 2:
+        return RouteNames.messaging;
+      case 3:
+        return RouteNames.myProfile;
+      case 4:
+        return RouteNames.notifications;
+      case 5:
+        return RouteNames.account;
+      default:
+        return RouteNames.dashboard;
     }
   }
 }

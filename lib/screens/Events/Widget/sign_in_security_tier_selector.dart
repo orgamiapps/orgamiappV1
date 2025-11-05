@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 /// Modern, professional sign-in security tier selector for event creation
-/// Provides three tiers: Most Secure, Regular, and All methods
+/// Provides four tiers: Most Secure, Geofence Only, Regular, and All methods
 class SignInSecurityTierSelector extends StatefulWidget {
-  final String selectedTier; // 'most_secure', 'regular', or 'all'
+  final String selectedTier; // 'most_secure', 'geofence_only', 'regular', or 'all'
   final Function(String) onTierChanged;
   final bool isEditing;
 
@@ -40,6 +40,20 @@ class _SignInSecurityTierSelectorState
       ],
       'badge': 'RECOMMENDED',
       'badgeColor': Color(0xFFFF6B6B),
+    },
+    {
+      'id': 'geofence_only',
+      'title': 'Geofence Only',
+      'subtitle': 'Location-based verification',
+      'icon': Icons.my_location,
+      'gradient': [const Color(0xFFF093FB), const Color(0xFFF5576C)],
+      'description':
+          'Attendees can sign in when they are within the event geofence location',
+      'methods': [
+        {'icon': Icons.location_on, 'text': 'Geofence'},
+      ],
+      'badge': null,
+      'badgeColor': null,
     },
     {
       'id': 'regular',
@@ -110,7 +124,7 @@ class _SignInSecurityTierSelectorState
         position: _slideAnimation,
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -127,9 +141,9 @@ class _SignInSecurityTierSelectorState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeader(),
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
               _buildTiersList(),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
               _buildInfoNote(),
             ],
           ),
@@ -142,15 +156,15 @@ class _SignInSecurityTierSelectorState
     return Row(
       children: [
         Container(
-          width: 44,
-          height: 44,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFF667EEA).withValues(alpha: 0.3),
@@ -159,9 +173,9 @@ class _SignInSecurityTierSelectorState
               ),
             ],
           ),
-          child: const Icon(Icons.security, color: Colors.white, size: 24),
+          child: const Icon(Icons.security, color: Colors.white, size: 20),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -171,17 +185,17 @@ class _SignInSecurityTierSelectorState
                 style: TextStyle(
                   color: Color(0xFF1A1A1A),
                   fontWeight: FontWeight.w700,
-                  fontSize: 18,
+                  fontSize: 16,
                   fontFamily: 'Roboto',
                   letterSpacing: -0.5,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 'Choose how attendees verify their attendance',
                 style: TextStyle(
                   color: Colors.grey[600],
-                  fontSize: 13,
+                  fontSize: 12,
                   fontFamily: 'Roboto',
                 ),
               ),
@@ -203,16 +217,16 @@ class _SignInSecurityTierSelectorState
 
   Widget _buildTierCard(Map<String, dynamic> tier, bool isSelected) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 8),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           onTap: () => _selectTier(tier['id']),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               gradient: isSelected
                   ? LinearGradient(
@@ -225,12 +239,12 @@ class _SignInSecurityTierSelectorState
                     )
                   : null,
               color: isSelected ? null : Colors.grey[50],
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: isSelected
                     ? tier['gradient'][0]
                     : Colors.grey.withValues(alpha: 0.3),
-                width: isSelected ? 2.5 : 1.5,
+                width: isSelected ? 2 : 1,
               ),
               boxShadow: isSelected
                   ? [
@@ -253,12 +267,12 @@ class _SignInSecurityTierSelectorState
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                          horizontal: 6,
+                          vertical: 3,
                         ),
                         decoration: BoxDecoration(
                           color: tier['badgeColor'].withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(5),
                           border: Border.all(
                             color: tier['badgeColor'].withValues(alpha: 0.3),
                             width: 1,
@@ -268,7 +282,7 @@ class _SignInSecurityTierSelectorState
                           tier['badge'],
                           style: TextStyle(
                             color: tier['badgeColor'],
-                            fontSize: 10,
+                            fontSize: 9,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 0.5,
                           ),
@@ -276,21 +290,21 @@ class _SignInSecurityTierSelectorState
                       ),
                     ],
                   ),
-                if (tier['badge'] != null) const SizedBox(height: 12),
+                if (tier['badge'] != null) const SizedBox(height: 8),
                 // Main content row
                 Row(
                   children: [
                     // Icon with gradient
                     Container(
-                      width: 56,
-                      height: 56,
+                      width: 42,
+                      height: 42,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: tier['gradient'],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(12),
                         boxShadow: isSelected
                             ? [
                                 BoxShadow(
@@ -305,10 +319,10 @@ class _SignInSecurityTierSelectorState
                       child: Icon(
                         tier['icon'],
                         color: Colors.white,
-                        size: 28,
+                        size: 24,
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -320,17 +334,17 @@ class _SignInSecurityTierSelectorState
                                   ? tier['gradient'][0]
                                   : const Color(0xFF1A1A1A),
                               fontWeight: FontWeight.w700,
-                              fontSize: 18,
+                              fontSize: 16,
                               fontFamily: 'Roboto',
                               letterSpacing: -0.5,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 2),
                           Text(
                             tier['subtitle'],
                             style: TextStyle(
                               color: Colors.grey[600],
-                              fontSize: 14,
+                              fontSize: 12,
                               fontFamily: 'Roboto',
                             ),
                           ),
@@ -340,8 +354,8 @@ class _SignInSecurityTierSelectorState
                     // Selection indicator
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
-                      width: 28,
-                      height: 28,
+                      width: 24,
+                      height: 24,
                       decoration: BoxDecoration(
                         gradient: isSelected
                             ? LinearGradient(
@@ -363,39 +377,39 @@ class _SignInSecurityTierSelectorState
                           ? const Icon(
                               Icons.check,
                               color: Colors.white,
-                              size: 18,
+                              size: 16,
                             )
                           : null,
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
                 // Description
                 Text(
                   tier['description'],
                   style: TextStyle(
                     color: Colors.grey[700],
-                    fontSize: 13,
-                    height: 1.4,
+                    fontSize: 11,
+                    height: 1.3,
                     fontFamily: 'Roboto',
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 8),
                 // Methods list
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: 6,
+                  runSpacing: 6,
                   children: (tier['methods'] as List).map((method) {
                     return Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
+                        horizontal: 8,
+                        vertical: 6,
                       ),
                       decoration: BoxDecoration(
                         color: isSelected
                             ? tier['gradient'][0].withValues(alpha: 0.1)
                             : Colors.white,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(7),
                         border: Border.all(
                           color: isSelected
                               ? tier['gradient'][0].withValues(alpha: 0.3)
@@ -408,17 +422,17 @@ class _SignInSecurityTierSelectorState
                         children: [
                           Icon(
                             method['icon'],
-                            size: 16,
+                            size: 14,
                             color: isSelected
                                 ? tier['gradient'][0]
                                 : Colors.grey[600],
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 5),
                           Flexible(
                             child: Text(
                               method['text'],
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w500,
                                 color: isSelected
                                     ? tier['gradient'][0]
@@ -443,10 +457,10 @@ class _SignInSecurityTierSelectorState
 
   Widget _buildInfoNote() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFF667EEA).withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: const Color(0xFF667EEA).withValues(alpha: 0.2),
           width: 1,
@@ -458,9 +472,9 @@ class _SignInSecurityTierSelectorState
           Icon(
             Icons.info_outline,
             color: const Color(0xFF667EEA),
-            size: 20,
+            size: 18,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -470,17 +484,17 @@ class _SignInSecurityTierSelectorState
                   style: TextStyle(
                     color: const Color(0xFF667EEA),
                     fontWeight: FontWeight.w600,
-                    fontSize: 14,
+                    fontSize: 13,
                     fontFamily: 'Roboto',
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   'Most Secure is recommended for high-value events. Attendees must be physically present within the event geofence and verify their identity with facial recognition.',
                   style: TextStyle(
                     color: Colors.grey[700],
-                    fontSize: 12,
-                    height: 1.4,
+                    fontSize: 11,
+                    height: 1.3,
                     fontFamily: 'Roboto',
                   ),
                 ),

@@ -1783,7 +1783,7 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Time Limit (seconds)',
+                      'Time Limit (sec)',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -1797,12 +1797,12 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
                       items: [10, 15, 20, 30, 45, 60, 90, 120].map((time) {
                         return DropdownMenuItem(
                           value: time,
-                          child: Text('$time seconds'),
+                          child: Text('${time}s'),
                         );
                       }).toList(),
                       decoration: InputDecoration(
                         contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
+                          horizontal: 10,
                           vertical: 12,
                         ),
                         filled: true,
@@ -1831,7 +1831,7 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
                   ],
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1856,7 +1856,7 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
                       }).toList(),
                       decoration: InputDecoration(
                         contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
+                          horizontal: 10,
                           vertical: 12,
                         ),
                         filled: true,

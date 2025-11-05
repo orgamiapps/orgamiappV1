@@ -8,6 +8,8 @@ import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/Services/auth_service.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Services/subscription_service.dart';
+import 'package:attendus/Services/navigation_state_service.dart';
+import 'package:attendus/Utils/route_builder.dart';
 import 'package:provider/provider.dart';
 
 /// AuthGate determines the initial screen based on Firebase Auth state
@@ -22,12 +24,16 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   bool _isChecking = true;
   bool _isLoggedIn = false;
+  Widget? _restoredWidget;
   StreamSubscription<User?>? _authStateSubscription;
+  final NavigationStateService _navStateService = NavigationStateService();
 
   @override
   void initState() {
     super.initState();
     Logger.debug('🚀 AuthGate: initState called');
+    // Initialize navigation state service
+    _navStateService.initialize();
     // Delay auth check to ensure Firebase is initialized
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAuthState();
@@ -107,7 +113,7 @@ class _AuthGateState extends State<AuthGate> {
     }
   }
 
-  void _setUserAndNavigate(User user) {
+  void _setUserAndNavigate(User user) async {
     if (!mounted || !_isChecking) return;
 
     // Set minimal customer model for immediate navigation
@@ -119,9 +125,31 @@ class _AuthGateState extends State<AuthGate> {
       profilePictureUrl: user.photoURL,
     );
 
+    // Try to restore navigation state
+    Widget? restoredScreen;
+    try {
+      final shouldRestore = await _navStateService.shouldRestore();
+      if (shouldRestore) {
+        Logger.info('AuthGate: Attempting to restore navigation state');
+        final savedRoute = await _navStateService.restoreNavigationState();
+        
+        if (savedRoute != null) {
+          restoredScreen = await RouteBuilder.buildRouteFromConfig(savedRoute);
+          Logger.success('AuthGate: Successfully restored route: ${savedRoute.routeName}');
+        }
+      } else {
+        Logger.debug('AuthGate: No valid navigation state to restore');
+      }
+    } catch (e) {
+      Logger.warning('AuthGate: Failed to restore navigation state: $e');
+    }
+
+    if (!mounted) return;
+
     setState(() {
       _isLoggedIn = true;
       _isChecking = false;
+      _restoredWidget = restoredScreen;
     });
 
     // Initialize AuthService and SubscriptionService in background for full functionality
@@ -191,8 +219,14 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     if (_isLoggedIn) {
-      Logger.debug('🏠 AuthGate: Navigating to Dashboard');
-      return const DashboardScreen();
+      // Return restored widget if available, otherwise default to dashboard
+      if (_restoredWidget != null) {
+        Logger.debug('🔄 AuthGate: Returning restored screen');
+        return _restoredWidget!;
+      } else {
+        Logger.debug('🏠 AuthGate: Navigating to Dashboard (no restored state)');
+        return const DashboardScreen();
+      }
     } else {
       Logger.debug('🔍 AuthGate: Navigating to Splash');
       return const SplashScreen();

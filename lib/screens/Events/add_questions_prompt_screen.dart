@@ -13,7 +13,7 @@ class AddQuestionsPromptScreen extends StatefulWidget {
   final double radios;
   final List<String> selectedSignInMethods;
   final String?
-  selectedSignInTier; // New: security tier ('most_secure', 'regular', 'all')
+  selectedSignInTier; // New: security tier ('most_secure', 'geofence_only', 'regular', 'all')
   final String? manualCode;
   final String? preselectedOrganizationId;
   final bool forceOrganizationEvent;

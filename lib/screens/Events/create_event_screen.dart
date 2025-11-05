@@ -94,7 +94,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   List<Map<String, String>> _userOrganizations = const [];
 
   // Sign-in security tier
-  String _selectedSignInTier = 'regular'; // 'most_secure', 'regular', or 'all'
+  String _selectedSignInTier = 'regular'; // 'most_secure', 'geofence_only', 'regular', or 'all'
   late List<String> _selectedSignInMethods; // Legacy support
   String? _manualCode;
 

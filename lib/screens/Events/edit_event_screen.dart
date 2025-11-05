@@ -60,7 +60,7 @@ class _EditEventScreenState extends State<EditEventScreen>
   String? _currentImageUrl;
 
   // Sign-in security tier
-  String _selectedSignInTier = 'regular'; // 'most_secure', 'regular', or 'all'
+  String _selectedSignInTier = 'regular'; // 'most_secure', 'geofence_only', 'regular', or 'all'
   List<String> _selectedSignInMethods = ['qr_code', 'manual_code'];
   String? _manualCode;
 
@@ -1067,6 +1067,9 @@ class _EditEventScreenState extends State<EditEventScreen>
           switch (tier) {
             case 'most_secure':
               _selectedSignInMethods = ['geofence', 'facial_recognition'];
+              break;
+            case 'geofence_only':
+              _selectedSignInMethods = ['geofence'];
               break;
             case 'regular':
               _selectedSignInMethods = ['qr_code', 'manual_code'];

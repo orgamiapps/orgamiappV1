@@ -35,7 +35,7 @@ class EventModel {
   List<String> signInMethods; 
   
   // New security tier system
-  // Options: 'most_secure', 'regular', 'all'
+  // Options: 'most_secure', 'geofence_only', 'regular', 'all'
   String? signInSecurityTier;
   
   String? manualCode; // Custom manual code for the event
@@ -201,6 +201,9 @@ class EventModel {
         case 'most_secure':
           // Most Secure: requires geofence AND facial recognition combo
           return method == 'geofence' || method == 'facial_recognition';
+        case 'geofence_only':
+          // Geofence Only: requires only geofence
+          return method == 'geofence';
         case 'regular':
           // Regular: QR code or manual code
           return method == 'qr_code' || method == 'manual_code';
@@ -222,6 +225,8 @@ class EventModel {
       switch (signInSecurityTier) {
         case 'most_secure':
           return ['most_secure']; // Special indicator for geofence + facial combo
+        case 'geofence_only':
+          return ['geofence'];
         case 'regular':
           return ['qr_code', 'manual_code'];
         case 'all':
@@ -238,6 +243,7 @@ class EventModel {
   /// Check if the event requires geofence-based sign-in
   bool get requiresGeofence {
     return signInSecurityTier == 'most_secure' || 
+           signInSecurityTier == 'geofence_only' ||
            signInSecurityTier == 'all' ||
            signInMethods.contains('geofence');
   }

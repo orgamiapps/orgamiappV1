@@ -118,6 +118,11 @@ class SignInMethodsDisplay extends StatelessWidget {
         tierColor = const Color(0xFFFF6B6B);
         tierIcon = Icons.verified_user;
         break;
+      case 'geofence_only':
+        tierText = 'Geofence Only';
+        tierColor = const Color(0xFFF093FB);
+        tierIcon = Icons.my_location;
+        break;
       case 'regular':
         tierText = 'Regular Security';
         tierColor = const Color(0xFF667EEA);

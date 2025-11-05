@@ -8,12 +8,16 @@ class QuizWaitingLobby extends StatefulWidget {
   final String quizId;
   final String? currentParticipantId;
   final String quizTitle;
+  final bool isHost;
+  final VoidCallback? onManageQuiz;
   
   const QuizWaitingLobby({
     super.key,
     required this.quizId,
     this.currentParticipantId,
     required this.quizTitle,
+    this.isHost = false,
+    this.onManageQuiz,
   });
 
   @override
@@ -115,6 +119,10 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
                 _buildWaitingAnimation(),
                 const SizedBox(height: 32),
                 _buildWelcomeMessage(),
+                if (widget.isHost && widget.onManageQuiz != null) ...[
+                  const SizedBox(height: 24),
+                  _buildManageQuizButton(),
+                ],
                 const SizedBox(height: 40),
                 _buildParticipantCounter(),
                 const SizedBox(height: 32),
@@ -236,6 +244,75 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildManageQuizButton() {
+    return Container(
+      width: double.infinity,
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF667EEA),
+            Color(0xFF764BA2),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+            spreadRadius: 0,
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: widget.onManageQuiz,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.edit_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Manage Quiz',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  Icons.arrow_forward_rounded,
+                  color: Colors.white.withValues(alpha: 0.8),
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 

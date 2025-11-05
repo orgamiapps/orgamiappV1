@@ -11,6 +11,7 @@ import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/screens/LiveQuiz/widgets/live_leaderboard_widget.dart';
 import 'package:attendus/screens/LiveQuiz/widgets/quiz_waiting_lobby.dart';
+import 'package:attendus/screens/LiveQuiz/quiz_builder_screen.dart';
 
 class QuizParticipantScreen extends StatefulWidget {
   final String quizId;
@@ -973,10 +974,16 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
   Widget _buildWaitingScreen(String title, String subtitle) {
     // Special handling for draft status - show waiting lobby
     if (_quiz?.isDraft == true) {
+      // Check if current user is the quiz creator
+      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+      final isCreator = currentUserId != null && currentUserId == _quiz?.creatorId;
+      
       return QuizWaitingLobby(
         quizId: widget.quizId,
         currentParticipantId: _participantId,
         quizTitle: _quiz?.title ?? 'Live Quiz',
+        isHost: isCreator,
+        onManageQuiz: isCreator ? _navigateToQuizBuilder : null,
       );
     }
     
@@ -2600,6 +2607,23 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
     if (rank == 2) return const Color(0xFFC0C0C0); // Silver
     if (rank == 3) return const Color(0xFFCD7F32); // Bronze
     return const Color(0xFF667EEA);
+  }
+
+  void _navigateToQuizBuilder() {
+    if (_quiz?.eventId == null) {
+      ShowToast().showNormalToast(msg: 'Unable to open quiz editor');
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => QuizBuilderScreen(
+          eventId: _quiz!.eventId,
+          existingQuizId: widget.quizId,
+        ),
+      ),
+    );
   }
 
   void _showLeaveConfirmation() {

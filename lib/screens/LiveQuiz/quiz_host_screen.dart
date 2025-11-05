@@ -8,6 +8,7 @@ import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/screens/LiveQuiz/widgets/live_leaderboard_widget.dart';
 import 'package:attendus/screens/LiveQuiz/widgets/quiz_waiting_lobby.dart';
+import 'package:attendus/screens/LiveQuiz/quiz_builder_screen.dart';
 
 class QuizHostScreen extends StatefulWidget {
   final String quizId;
@@ -356,6 +357,23 @@ class _QuizHostScreenState extends State<QuizHostScreen>
     } else {
       _showError('Failed to restart quiz');
     }
+  }
+
+  void _navigateToQuizBuilder() {
+    if (_quiz?.eventId == null) {
+      _showError('Unable to open quiz editor');
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => QuizBuilderScreen(
+          eventId: _quiz!.eventId,
+          existingQuizId: widget.quizId,
+        ),
+      ),
+    );
   }
 
   Future<String?> _showRestartQuizDialog() async {
@@ -1146,6 +1164,8 @@ class _QuizHostScreenState extends State<QuizHostScreen>
         child: QuizWaitingLobby(
           quizId: widget.quizId,
           quizTitle: _quiz?.title ?? 'Live Quiz',
+          isHost: true,
+          onManageQuiz: _navigateToQuizBuilder,
         ),
       );
     }

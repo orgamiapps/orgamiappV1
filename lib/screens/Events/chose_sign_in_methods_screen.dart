@@ -27,10 +27,10 @@ class ChoseSignInMethodsScreen extends StatefulWidget {
 class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
     with TickerProviderStateMixin {
   // New security tier system
-  String _selectedSignInTier = 'regular'; // 'most_secure', 'regular', or 'all'
+  String _selectedSignInTier = ''; // no default selected; 'most_secure', 'geofence_only', 'regular', or 'all'
 
   // Legacy method list for backward compatibility
-  List<String> _selectedSignInMethods = ['qr_code', 'manual_code'];
+  List<String> _selectedSignInMethods = [];
   String? _manualCode;
 
   // Animation controllers
@@ -138,6 +138,9 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
                         'geofence',
                         'facial_recognition',
                       ];
+                      break;
+                    case 'geofence_only':
+                      _selectedSignInMethods = ['geofence'];
                       break;
                     case 'regular':
                       _selectedSignInMethods = ['qr_code', 'manual_code'];
@@ -248,7 +251,7 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
                 selectedLocation: const LatLng(0, 0), // Placeholder
                 radios: 10.0, // Default radius
                 selectedSignInMethods: _selectedSignInMethods,
-                selectedSignInTier: _selectedSignInTier, // Pass the tier
+                selectedSignInTier: _selectedSignInTier.isEmpty ? null : _selectedSignInTier, // Pass null if none selected
                 manualCode: _manualCode,
                 preselectedOrganizationId: widget.preselectedOrganizationId,
                 forceOrganizationEvent: widget.forceOrganizationEvent,
