@@ -199,6 +199,98 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
     await _loadPosts(isRefresh: true);
   }
 
+  // Handle pin/unpin with optimistic UI updates
+  Future<void> _togglePin(String postId, bool isEvent, bool currentlyPinned) async {
+    if (!_isAdmin) return;
+
+    try {
+      // Optimistic update
+      setState(() {
+        final index = _posts.indexWhere((post) =>
+            post['id'] == postId &&
+            (isEvent ? post['type'] == 'event' : post['type'] == 'feed'));
+
+        if (index != -1) {
+          _posts[index]['data']['isPinned'] = !currentlyPinned;
+          _posts[index]['isPinned'] = !currentlyPinned;
+
+          // Re-sort posts: pinned first, then by timestamp
+          _posts.sort((a, b) {
+            if (a['isPinned'] != b['isPinned']) {
+              return a['isPinned'] ? -1 : 1;
+            }
+            final aTime = a['timestamp'];
+            final bTime = b['timestamp'];
+            if (aTime == null || bTime == null) return 0;
+            return bTime.compareTo(aTime);
+          });
+        }
+      });
+
+      // Update Firestore in background
+      final db = FirebaseFirestore.instance;
+      int nextOrder = 0;
+
+      if (!currentlyPinned) {
+        // Pinning: calculate next order
+        final collection = isEvent
+            ? db.collection('Events')
+            : db
+                .collection('Organizations')
+                .doc(widget.organizationId)
+                .collection('Feed');
+
+        final snap = await collection.where('isPinned', isEqualTo: true).get();
+        int maxOrder = 0;
+        for (final d in snap.docs) {
+          final data = (d.data() as Map<String, dynamic>?);
+          final int po = (data?['pinnedOrder'] ?? 0) as int;
+          if (po > maxOrder) maxOrder = po;
+        }
+        nextOrder = maxOrder + 1;
+      }
+
+      final docRef = isEvent
+          ? db.collection('Events').doc(postId)
+          : db
+              .collection('Organizations')
+              .doc(widget.organizationId)
+              .collection('Feed')
+              .doc(postId);
+
+      await docRef.update({
+        'isPinned': !currentlyPinned,
+        'pinnedOrder': nextOrder,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              currentlyPinned ? 'Post unpinned' : 'Post pinned to top',
+            ),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      // Revert optimistic update on error
+      await _loadPosts();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _toggleLike(String feedId) async {
     if (_currentUser == null) return;
 
@@ -643,8 +735,8 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                       organizationId: widget.organizationId,
                       currentUserId: _currentUser?.uid,
                       onLike: () => _toggleEventLike(postId),
+                      onPin: () => _togglePin(postId, true, postData['isPinned'] ?? false),
                       isAdmin: _isAdmin,
-                      checkIfAdmin: () async => _isAdmin,
                     ),
                   );
                 }
@@ -662,8 +754,8 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                       onVote: (optionIndex) => _votePoll(postId, optionIndex),
                       currentUserId: _currentUser?.uid,
                       isAdmin: _isAdmin,
-                      checkIfAdmin: () async => _isAdmin,
                       onLike: () => _toggleLike(postId),
+                      onPin: () => _togglePin(postId, false, postData['isPinned'] ?? false),
                     ),
                   );
                 } else if (feedType == 'photo') {
@@ -676,8 +768,8 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                       organizationId: widget.organizationId,
                       currentUserId: _currentUser?.uid,
                       onLike: () => _toggleLike(postId),
+                      onPin: () => _togglePin(postId, false, postData['isPinned'] ?? false),
                       isAdmin: _isAdmin,
-                      checkIfAdmin: () async => _isAdmin,
                     ),
                   );
                 } else {
@@ -689,8 +781,8 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                       docId: postId,
                       organizationId: widget.organizationId,
                       onLike: () => _toggleLike(postId),
+                      onPin: () => _togglePin(postId, false, postData['isPinned'] ?? false),
                       isAdmin: _isAdmin,
-                      checkIfAdmin: () async => _isAdmin,
                       currentUserId: _currentUser?.uid,
                     ),
                   );
@@ -722,8 +814,8 @@ class _PhotoPostCard extends StatefulWidget {
   final String organizationId;
   final String? currentUserId;
   final VoidCallback? onLike;
+  final VoidCallback? onPin;
   final bool isAdmin;
-  final Future<bool> Function() checkIfAdmin;
 
   const _PhotoPostCard({
     super.key,
@@ -732,8 +824,8 @@ class _PhotoPostCard extends StatefulWidget {
     required this.organizationId,
     this.currentUserId,
     this.onLike,
+    this.onPin,
     this.isAdmin = false,
-    required this.checkIfAdmin,
   });
 
   @override
@@ -807,7 +899,7 @@ class _PhotoPostCardState extends State<_PhotoPostCard>
             docId: widget.docId,
             organizationId: widget.organizationId,
             postType: 'photo',
-            checkIfAdmin: widget.checkIfAdmin,
+            onPin: widget.onPin,
           ),
 
           // Caption (moved above images for better readability)
@@ -1001,7 +1093,7 @@ class _UnifiedPostHeader extends StatelessWidget {
   final String docId;
   final String organizationId;
   final String postType; // 'photo', 'announcement', 'poll', 'event'
-  final Future<bool> Function() checkIfAdmin;
+  final VoidCallback? onPin;
 
   const _UnifiedPostHeader({
     required this.authorId,
@@ -1013,7 +1105,7 @@ class _UnifiedPostHeader extends StatelessWidget {
     required this.docId,
     required this.organizationId,
     required this.postType,
-    required this.checkIfAdmin,
+    this.onPin,
   });
 
   Future<String> _resolveAuthorName() async {
@@ -1153,74 +1245,12 @@ class _UnifiedPostHeader extends StatelessWidget {
           if (isAdmin)
             PopupMenuButton<String>(
               icon: Icon(Icons.more_vert, color: Colors.grey.shade600),
-              onSelected: (value) async {
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              onSelected: (value) {
                 if (value == 'pin' || value == 'unpin') {
-                  final isAdminCheck = await checkIfAdmin();
-                  if (!isAdminCheck) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Only admins can pin/unpin content'),
-                        ),
-                      );
-                    }
-                    return;
-                  }
-
-                  try {
-                    final db = FirebaseFirestore.instance;
-                    int nextOrder = 0;
-                    if (value == 'pin') {
-                      final collection = postType == 'event'
-                          ? db.collection('Events')
-                          : db
-                                .collection('Organizations')
-                                .doc(organizationId)
-                                .collection('Feed');
-
-                      final snap = await collection
-                          .where('isPinned', isEqualTo: true)
-                          .get();
-                      int maxOrder = 0;
-                      for (final d in snap.docs) {
-                        final data = (d.data() as Map<String, dynamic>?);
-                        final int po = (data?['pinnedOrder'] ?? 0) as int;
-                        if (po > maxOrder) maxOrder = po;
-                      }
-                      nextOrder = maxOrder + 1;
-                    }
-
-                    final docRef = postType == 'event'
-                        ? db.collection('Events').doc(docId)
-                        : db
-                              .collection('Organizations')
-                              .doc(organizationId)
-                              .collection('Feed')
-                              .doc(docId);
-
-                    await docRef.update({
-                      'isPinned': value == 'pin',
-                      'pinnedOrder': nextOrder,
-                    });
-
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            value == 'pin'
-                                ? '${postType.capitalize()} pinned'
-                                : '${postType.capitalize()} unpinned',
-                          ),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                    }
-                  }
+                  onPin?.call();
                 }
               },
               itemBuilder: (context) => [
@@ -1231,9 +1261,20 @@ class _UnifiedPostHeader extends StatelessWidget {
                       Icon(
                         isPinned ? Icons.push_pin_outlined : Icons.push_pin,
                         size: 20,
+                        color: isPinned
+                            ? Colors.grey.shade700
+                            : const Color(0xFF667EEA),
                       ),
-                      const SizedBox(width: 8),
-                      Text(isPinned ? 'Unpin' : 'Pin'),
+                      const SizedBox(width: 12),
+                      Text(
+                        isPinned ? 'Unpin Post' : 'Pin to Top',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: isPinned
+                              ? Colors.grey.shade700
+                              : const Color(0xFF667EEA),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -1487,8 +1528,8 @@ class _AnnouncementCard extends StatefulWidget {
   final String docId;
   final String organizationId;
   final VoidCallback? onLike;
+  final VoidCallback? onPin;
   final bool isAdmin;
-  final Future<bool> Function() checkIfAdmin;
   final String? currentUserId;
 
   const _AnnouncementCard({
@@ -1497,8 +1538,8 @@ class _AnnouncementCard extends StatefulWidget {
     required this.docId,
     required this.organizationId,
     this.onLike,
+    this.onPin,
     this.isAdmin = false,
-    required this.checkIfAdmin,
     this.currentUserId,
   });
 
@@ -1573,7 +1614,7 @@ class _AnnouncementCardState extends State<_AnnouncementCard>
             docId: widget.docId,
             organizationId: widget.organizationId,
             postType: 'announcement',
-            checkIfAdmin: widget.checkIfAdmin,
+            onPin: widget.onPin,
           ),
 
           // Announcement content
@@ -1663,8 +1704,8 @@ class _EventPostCard extends StatefulWidget {
   final String organizationId;
   final String? currentUserId;
   final VoidCallback? onLike;
+  final VoidCallback? onPin;
   final bool isAdmin;
-  final Future<bool> Function() checkIfAdmin;
 
   const _EventPostCard({
     super.key,
@@ -1673,8 +1714,8 @@ class _EventPostCard extends StatefulWidget {
     required this.organizationId,
     this.currentUserId,
     this.onLike,
+    this.onPin,
     this.isAdmin = false,
-    required this.checkIfAdmin,
   });
 
   @override
@@ -1760,7 +1801,7 @@ class _EventPostCardState extends State<_EventPostCard>
             docId: widget.docId,
             organizationId: widget.organizationId,
             postType: 'event',
-            checkIfAdmin: widget.checkIfAdmin,
+            onPin: widget.onPin,
           ),
 
           // Event image (if available)
@@ -1997,8 +2038,8 @@ class _PollCard extends StatefulWidget {
   final Function(int) onVote;
   final String? currentUserId;
   final bool isAdmin;
-  final Future<bool> Function() checkIfAdmin;
   final VoidCallback? onLike;
+  final VoidCallback? onPin;
 
   const _PollCard({
     super.key,
@@ -2008,8 +2049,8 @@ class _PollCard extends StatefulWidget {
     required this.onVote,
     this.currentUserId,
     this.isAdmin = false,
-    required this.checkIfAdmin,
     this.onLike,
+    this.onPin,
   });
 
   @override
@@ -2089,7 +2130,7 @@ class _PollCardState extends State<_PollCard>
             docId: widget.docId,
             organizationId: widget.organizationId,
             postType: 'poll',
-            checkIfAdmin: widget.checkIfAdmin,
+            onPin: widget.onPin,
           ),
 
           // Poll content
