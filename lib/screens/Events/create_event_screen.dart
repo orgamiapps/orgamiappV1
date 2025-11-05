@@ -451,6 +451,44 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                   ? locationNameEdtController.text.trim()
                   : '');
 
+        // Get current user info for author fields
+        final currentUser = FirebaseAuth.instance.currentUser!;
+        final currentUserData = CustomerController.logeInCustomer;
+        final authorName = currentUserData?.name ?? 
+                          currentUserData?.username ?? 
+                          groupNameEdtController.text;
+        
+        // Determine author role if this is an organization event
+        String authorRole = 'member';
+        if (_selectedOrganizationId != null && _selectedOrganizationId!.isNotEmpty) {
+          try {
+            final orgDoc = await FirebaseFirestore.instance
+                .collection('Organizations')
+                .doc(_selectedOrganizationId!)
+                .get();
+            
+            if (orgDoc.exists) {
+              final orgData = orgDoc.data()!;
+              if (orgData['createdBy'] == currentUser.uid) {
+                authorRole = 'owner';
+              } else {
+                final memberDoc = await FirebaseFirestore.instance
+                    .collection('Organizations')
+                    .doc(_selectedOrganizationId!)
+                    .collection('Members')
+                    .doc(currentUser.uid)
+                    .get();
+                
+                if (memberDoc.exists) {
+                  authorRole = memberDoc.data()?['role'] ?? 'member';
+                }
+              }
+            }
+          } catch (e) {
+            debugPrint('Error getting author role: $e');
+          }
+        }
+
         EventModel newEvent = EventModel(
           id: docId,
           groupName: groupNameEdtController.text,
@@ -460,7 +498,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           locationName: locationNameEdtController.text.isNotEmpty
               ? locationNameEdtController.text
               : null,
-          customerUid: FirebaseAuth.instance.currentUser!.uid,
+          customerUid: currentUser.uid,
           imageUrl: thumbnailUrlCtlr.text,
           selectedDateTime: _startDateTime,
           eventGenerateTime: DateTime.now(),
@@ -474,7 +512,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           eventDuration: _durationHours,
           organizationId: _selectedOrganizationId,
           accessList: privateEvent
-              ? [FirebaseAuth.instance.currentUser!.uid]
+              ? [currentUser.uid]
               : const [],
           signInMethods: _selectedSignInMethods,
           signInSecurityTier: _selectedSignInTier, // Add security tier
@@ -482,6 +520,14 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         );
 
         Map<String, dynamic> data = newEvent.toJson();
+        
+        // Add author info and engagement fields for unified post display
+        data['authorId'] = currentUser.uid;
+        data['authorName'] = authorName;
+        data['authorRole'] = authorRole;
+        data['likes'] = [];
+        data['commentCount'] = 0;
+        data['createdAt'] = FieldValue.serverTimestamp();
 
         await FirebaseFirestore.instance
             .collection(EventModel.firebaseKey)

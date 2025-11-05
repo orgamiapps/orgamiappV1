@@ -67,6 +67,7 @@ dependencies:
   webview_flutter: ^4.13.0
   url_launcher: ^6.3.2
   carousel_slider: ^5.1.1
+  pull_to_refresh: ^2.0.0
   shimmer: ^3.0.0
   fl_chart: ^1.0.0
   csv: ^6.0.0

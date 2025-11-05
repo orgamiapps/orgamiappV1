@@ -27,21 +27,43 @@ class PhotoViewerScreen extends StatefulWidget {
   State<PhotoViewerScreen> createState() => _PhotoViewerScreenState();
 }
 
-class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
+class _PhotoViewerScreenState extends State<PhotoViewerScreen>
+    with SingleTickerProviderStateMixin {
   late PageController _pageController;
   late int _currentIndex;
   bool _showUI = true;
+  
+  // Drag gesture state
+  double _dragOffset = 0.0;
+  double _backgroundOpacity = 1.0;
+  late AnimationController _snapBackController;
+  late Animation<double> _snapBackAnimation;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
     _pageController = PageController(initialPage: widget.initialIndex);
+    
+    // Initialize snap-back animation
+    _snapBackController = AnimationController(
+      duration: const Duration(milliseconds: 250),
+      vsync: this,
+    );
+    _snapBackAnimation = Tween<double>(begin: 0.0, end: 0.0).animate(
+      CurvedAnimation(parent: _snapBackController, curve: Curves.easeOut),
+    )..addListener(() {
+        setState(() {
+          _dragOffset = _snapBackAnimation.value;
+          _backgroundOpacity = 1.0 - (_dragOffset.abs() / 400).clamp(0.0, 1.0);
+        });
+      });
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _snapBackController.dispose();
     super.dispose();
   }
 
@@ -64,37 +86,81 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     );
   }
 
+  void _handleVerticalDragStart(DragStartDetails details) {
+    // Initialize drag - no state change needed
+  }
+
+  void _handleVerticalDragUpdate(DragUpdateDetails details) {
+    setState(() {
+      // Only allow dragging down, not up
+      _dragOffset += details.delta.dy;
+      if (_dragOffset < 0) {
+        _dragOffset = 0;
+      }
+      // Calculate opacity based on drag distance
+      _backgroundOpacity = 1.0 - (_dragOffset / 400).clamp(0.0, 1.0);
+    });
+  }
+
+  void _handleVerticalDragEnd(DragEndDetails details) {
+    const double dismissThreshold = 150.0;
+    const double dismissVelocity = 500.0;
+    
+    final velocity = details.velocity.pixelsPerSecond.dy;
+    
+    // Dismiss if dragged down enough or with sufficient velocity
+    if (_dragOffset > dismissThreshold || velocity > dismissVelocity) {
+      // Animate out and dismiss
+      Navigator.pop(context);
+    } else {
+      // Snap back to original position
+      _snapBackAnimation = Tween<double>(
+        begin: _dragOffset,
+        end: 0.0,
+      ).animate(
+        CurvedAnimation(parent: _snapBackController, curve: Curves.easeOut),
+      );
+      _snapBackController.forward(from: 0.0);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // Photo PageView
-          GestureDetector(
-            onTap: _toggleUI,
-            child: PageView.builder(
-              controller: _pageController,
-              onPageChanged: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
-              itemCount: widget.imageUrls.length,
-              itemBuilder: (context, index) {
-                return Center(
-                  child: InteractiveViewer(
-                    minScale: 0.5,
-                    maxScale: 4.0,
-                    child: SafeNetworkImage(
-                      imageUrl: widget.imageUrls[index],
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+      backgroundColor: Colors.black.withValues(alpha: _backgroundOpacity),
+      body: GestureDetector(
+        onVerticalDragStart: _handleVerticalDragStart,
+        onVerticalDragUpdate: _handleVerticalDragUpdate,
+        onVerticalDragEnd: _handleVerticalDragEnd,
+        child: Transform.translate(
+          offset: Offset(0, _dragOffset),
+          child: Stack(
+            children: [
+              // Photo PageView
+              GestureDetector(
+                onTap: _toggleUI,
+                child: PageView.builder(
+                  controller: _pageController,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentIndex = index;
+                    });
+                  },
+                  itemCount: widget.imageUrls.length,
+                  itemBuilder: (context, index) {
+                    return Center(
+                      child: InteractiveViewer(
+                        minScale: 0.5,
+                        maxScale: 4.0,
+                        child: SafeNetworkImage(
+                          imageUrl: widget.imageUrls[index],
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
 
           // Top bar with gradient
           if (_showUI)
@@ -277,7 +343,9 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                 ),
               ),
             ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
