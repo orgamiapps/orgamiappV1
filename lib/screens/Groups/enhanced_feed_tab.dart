@@ -791,18 +791,6 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
             ),
           ),
         ),
-
-        // Floating action button for creating posts
-        if (_currentUser != null)
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: FloatingActionButton.extended(
-              onPressed: () => _showCreateOptions(context),
-              icon: const Icon(Icons.add),
-              label: const Text('Create'),
-              backgroundColor: const Color(0xFF667EEA),
-            ),
-          ),
       ],
     );
   }
