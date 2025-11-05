@@ -52,7 +52,6 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
   ScanState _currentState = ScanState.INITIALIZING;
   String _statusMessage = 'Initializing scanner...';
   String _errorMessage = '';
-  UserIdentityResult? _currentUserIdentity;
 
   // Camera
   CameraController? _cameraController;
@@ -79,9 +78,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
-  // Debug
-  bool _showDebugPanel = true;
-  DateTime _startTime = DateTime.now();
+  
 
   @override
   void initState() {
@@ -204,8 +201,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
 
       _logTimestamp('Enrollment status for ${userIdentity.userName}: $isEnrolled');
       
-      // Store user identity for later use
-      _currentUserIdentity = userIdentity;
+      // Identity resolved; proceed to enrollment check
       
       return isEnrolled;
     } catch (e) {
@@ -729,7 +725,6 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
       _currentState = ScanState.INITIALIZING;
       _scanAttempts = 0;
       _errorMessage = '';
-      _startTime = DateTime.now();
     });
     _startScanning();
   }
@@ -801,19 +796,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
           'Face Recognition Sign-In',
           style: TextStyle(color: Colors.white),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              _showDebugPanel ? Icons.bug_report : Icons.bug_report_outlined,
-              color: Colors.white,
-            ),
-            onPressed: () {
-              setState(() {
-                _showDebugPanel = !_showDebugPanel;
-              });
-            },
-          ),
-        ],
+        actions: const [],
       ),
       body: Stack(
         children: [
@@ -833,8 +816,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
           // Status Panel
           _buildStatusPanel(),
 
-          // Debug Panel
-          if (_showDebugPanel) _buildDebugPanel(),
+          
 
           // Manual Scan Button
           if (_currentState == ScanState.READY && !_isScanning)
@@ -900,74 +882,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
     );
   }
 
-  Widget _buildDebugPanel() {
-    final elapsed = DateTime.now().difference(_startTime);
-    final elapsedStr =
-        '${elapsed.inMinutes}:${(elapsed.inSeconds % 60).toString().padLeft(2, '0')}';
-
-    return Positioned(
-      bottom: 100,
-      left: 20,
-      right: 20,
-      child: Container(
-        padding: EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: Colors.black87,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.green, width: 1),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '🐛 DEBUG PANEL (Scanner)',
-              style: TextStyle(
-                color: Colors.green,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
-            ),
-            SizedBox(height: 10),
-            _debugRow('State', _currentState.toString().split('.').last),
-            _debugRow('Scan Attempts', _scanAttempts.toString()),
-            _debugRow('Elapsed', elapsedStr),
-            _debugRow('Event', widget.eventModel.title),
-            if (_currentUserIdentity != null) ...[
-              Divider(color: Colors.white24, height: 20),
-              _debugRow('User ID', _currentUserIdentity!.userId),
-              _debugRow('User Name', _currentUserIdentity!.userName),
-              _debugRow('Identity Source', _currentUserIdentity!.source.name),
-              _debugRow('Is Guest', _currentUserIdentity!.isGuest.toString()),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _debugRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text('$label:', style: TextStyle(color: Colors.white70, fontSize: 12)),
-          Flexible(
-            child: Text(
-              value,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  
 
   Widget _buildScanButton() {
     return Positioned(

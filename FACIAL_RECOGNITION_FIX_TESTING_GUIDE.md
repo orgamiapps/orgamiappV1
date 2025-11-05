@@ -20,7 +20,6 @@ This guide covers comprehensive testing procedures for the improved facial recog
 ### 3. **Improved Scanner**
 - Uses same identity resolution as enrollment
 - Pre-checks enrollment with detailed logging
-- Debug panel shows current user identity
 - Enhanced error messages
 
 ### 4. **Session Management**
@@ -195,23 +194,7 @@ Face matched successfully!
 ✅ Attendance saved to Firestore: Attendance/EVENT123-abc123-1234567890
 ```
 
-## Debug Panel Usage
-
-1. **Enable Debug Panel:**
-   - Tap bug icon in scanner screen app bar
-
-2. **Check Identity Info:**
-   ```
-   User ID: abc123...
-   User Name: John Doe
-   Identity Source: customerController
-   Is Guest: false
-   ```
-
-3. **Monitor State:**
-   - State: READY / SCANNING / SUCCESS
-   - Scan Attempts: X
-   - Event: Event Name
+ 
 
 ## Firebase Console Verification
 
@@ -336,7 +319,7 @@ flutter run --verbose | grep -E "(UserIdentityService|Enrollment|Scanner|Face|Id
 - [ ] Enrollment saves with correct user ID
 - [ ] Enrollment verification confirms save
 - [ ] Scanner uses same identity resolution
-- [ ] Debug panel shows identity info
+ 
 - [ ] Session management ensures data loaded
 - [ ] All test scenarios pass
 - [ ] Console logs are comprehensive

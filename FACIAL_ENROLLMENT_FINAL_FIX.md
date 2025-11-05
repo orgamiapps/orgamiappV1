@@ -101,12 +101,7 @@ final faces = await _faceDetector.processImage(inputImage); // ✅ SUCCESS
 - **Color-coded states** (Blue → Green → Orange → Purple → Green)
 - **Haptic feedback** on each capture
 
-### Debug Panel:
-- Toggle with bug icon in app bar
-- Shows current state
-- Displays attempt count
-- Shows elapsed time
-- Indicates "Picture Capture" method
+
 
 ### Error Handling:
 - Timeout after 45 seconds
@@ -163,12 +158,7 @@ final faces = await _faceDetector.processImage(inputImage); // ✅ SUCCESS
 ## 📱 Production Deployment
 
 ### Before Deploying:
-1. **Hide debug panel by default:**
-   ```dart
-   bool _showDebugPanel = false; // Change to false
-   ```
-
-2. **Test on physical device:**
+1. **Test on physical device:**
    ```bash
    flutter run --release
    ```
@@ -213,7 +203,7 @@ final faces = await _faceDetector.processImage(inputImage); // ✅ SUCCESS
 - ✅ **Enrollment completes** and saves to Firestore
 - ✅ **Navigation works** to scanner screen
 - ✅ **Error handling** with retry options
-- ✅ **Debug panel** for troubleshooting
+
 - ✅ **Timeout protection** (45 seconds)
 
 ## 📈 Performance Metrics

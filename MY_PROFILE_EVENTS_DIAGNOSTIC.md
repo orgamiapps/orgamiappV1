@@ -13,9 +13,8 @@ Added comprehensive debug logging throughout the `my_profile_screen.dart` to tra
 - Timeout and error conditions
 - Individual event details when fetched
 
-### 2. Added Diagnostic Tools
+### 2. Added Tools
 - **Refresh Button**: Manually trigger data reload
-- **Test Button**: Runs a direct Firebase query to verify database access
 - **Enhanced Error Messages**: Toast notifications for timeout and error conditions
 
 ### 3. Improved Error Handling
@@ -51,11 +50,7 @@ Added comprehensive debug logging throughout the `my_profile_screen.dart` to tra
    ✅ Saved events count: [NUMBER]
    ```
 
-### Step 2: Use the Test Button
-1. On the My Profile screen, tap the "Test" button (bug icon)
-2. This will run a direct Firebase query and show results
-3. Check the toast message showing how many events were found
-4. Check the debug logs for detailed event information
+ 
 
 ### Step 3: Check for Errors
 Look for any of these error indicators:
@@ -105,8 +100,7 @@ When working correctly:
 ## Next Steps
 
 1. Run the app and check the debug logs
-2. Use the Test button to verify Firebase access
-3. Share the debug output with the development team
+2. Share the debug output with the development team
 4. Based on the logs, we can identify the specific issue:
    - Authentication problem
    - Query timeout
@@ -154,7 +148,6 @@ UIDs Match: false
   - Added Firestore import
   - Added user ID verification
   - Added enhanced debug logging
-  - Added diagnostic test method
-  - Added refresh and test buttons
+  - Added refresh button
   - Improved error handling with toast notifications
 

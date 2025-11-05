@@ -72,11 +72,9 @@ class _PictureFaceEnrollmentScreenState
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
-  // Debug
-  bool _showDebugPanel = true;
+  // Debug counters (no UI)
   int _attempts = 0;
-  DateTime _startTime = DateTime.now();
-  
+
   // Navigation state for smooth transitions
   bool _isNavigating = false;
 
@@ -341,12 +339,14 @@ class _PictureFaceEnrollmentScreenState
 
       // Log identity details for debugging
       UserIdentityService.logIdentityDetails(userIdentity, 'Enrollment');
-      
+
       final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(
         widget.eventModel.id,
         userIdentity.userId,
       );
-      _logTimestamp('Enrollment will be saved to: FaceEnrollments/$enrollmentDocId');
+      _logTimestamp(
+        'Enrollment will be saved to: FaceEnrollments/$enrollmentDocId',
+      );
 
       final success = await _faceService.enrollUserFace(
         userId: userIdentity.userId,
@@ -360,7 +360,7 @@ class _PictureFaceEnrollmentScreenState
       }
 
       _logTimestamp('✅ Enrollment saved and verified successfully!');
-      
+
       _updateState(EnrollmentState.COMPLETE);
       _updateStatus('Enrollment successful!');
       _logTimestamp('Enrollment completed successfully');
@@ -374,31 +374,33 @@ class _PictureFaceEnrollmentScreenState
           _isCameraInitialized = false;
         });
       }
-      
+
       // Short delay to show the "Preparing scanner..." message
       await Future.delayed(Duration(milliseconds: 500));
-      
+
       // Navigate with smooth fade transition - disposal will happen in background
       if (mounted) {
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => PictureFaceScannerScreen(
-              eventModel: widget.eventModel,
-              guestUserId: widget.guestUserId,
-              guestUserName: widget.guestUserName,
-            ),
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                PictureFaceScannerScreen(
+                  eventModel: widget.eventModel,
+                  guestUserId: widget.guestUserId,
+                  guestUserName: widget.guestUserName,
+                ),
             transitionDuration: Duration(milliseconds: 400),
             reverseTransitionDuration: Duration(milliseconds: 300),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(
-                opacity: CurvedAnimation(
-                  parent: animation,
-                  curve: Curves.easeInOut,
-                ),
-                child: child,
-              );
-            },
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(
+                    opacity: CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeInOut,
+                    ),
+                    child: child,
+                  );
+                },
           ),
         ).then((_) {
           // Dispose camera after navigation starts
@@ -447,7 +449,6 @@ class _PictureFaceEnrollmentScreenState
       _faceFeatures.clear();
       _attempts = 0;
       _errorMessage = '';
-      _startTime = DateTime.now();
     });
     _startEnrollment();
   }
@@ -462,23 +463,29 @@ class _PictureFaceEnrollmentScreenState
     _logTimestamp('Disposing enrollment screen');
     _timeoutTimer?.cancel();
     _pulseController.dispose();
-    
+
     // Only dispose if not already disposed (prevents double disposal during navigation)
     if (_cameraController != null && _isCameraInitialized) {
-      _cameraController!.dispose().then((_) {
-        _logTimestamp('Camera controller disposed');
-      }).catchError((e) {
-        _logTimestamp('Error disposing camera: $e');
-      });
+      _cameraController!
+          .dispose()
+          .then((_) {
+            _logTimestamp('Camera controller disposed');
+          })
+          .catchError((e) {
+            _logTimestamp('Error disposing camera: $e');
+          });
     }
-    
+
     // Close face detector
-    _faceDetector?.close().then((_) {
-      _logTimestamp('Face detector closed');
-    }).catchError((e) {
-      _logTimestamp('Error closing face detector: $e');
-    });
-    
+    _faceDetector
+        ?.close()
+        .then((_) {
+          _logTimestamp('Face detector closed');
+        })
+        .catchError((e) {
+          _logTimestamp('Error closing face detector: $e');
+        });
+
     super.dispose();
   }
 
@@ -509,24 +516,14 @@ class _PictureFaceEnrollmentScreenState
           'Face Enrollment (Picture Mode)',
           style: TextStyle(color: Colors.white),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              _showDebugPanel ? Icons.bug_report : Icons.bug_report_outlined,
-              color: Colors.white,
-            ),
-            onPressed: () {
-              setState(() {
-                _showDebugPanel = !_showDebugPanel;
-              });
-            },
-          ),
-        ],
+        actions: const [],
       ),
       body: Stack(
         children: [
           // Camera Preview
-          if (!_isNavigating && _isCameraInitialized && _cameraController != null)
+          if (!_isNavigating &&
+              _isCameraInitialized &&
+              _cameraController != null)
             Positioned.fill(child: CameraPreview(_cameraController!))
           else if (!_isNavigating)
             Center(child: CircularProgressIndicator(color: Colors.white)),
@@ -545,19 +542,19 @@ class _PictureFaceEnrollmentScreenState
           // Status Panel
           if (!_isNavigating) _buildStatusPanel(),
 
-          // Debug Panel
-          if (!_isNavigating && _showDebugPanel) _buildDebugPanel(),
-
           // Progress Indicators
           if (!_isNavigating) _buildProgressIndicators(),
 
           // Capture Button
-          if (!_isNavigating && _currentState == EnrollmentState.READY && !_isCapturing)
+          if (!_isNavigating &&
+              _currentState == EnrollmentState.READY &&
+              !_isCapturing)
             _buildCaptureButton(),
 
           // Error Dialog
-          if (!_isNavigating && _currentState == EnrollmentState.ERROR) _buildErrorDialog(),
-          
+          if (!_isNavigating && _currentState == EnrollmentState.ERROR)
+            _buildErrorDialog(),
+
           // Loading overlay during navigation
           if (_isNavigating)
             Container(
@@ -582,10 +579,7 @@ class _PictureFaceEnrollmentScreenState
                     SizedBox(height: 12),
                     Text(
                       'This will only take a moment',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(color: Colors.white70, fontSize: 14),
                     ),
                   ],
                 ),
@@ -642,69 +636,6 @@ class _PictureFaceEnrollmentScreenState
             ],
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildDebugPanel() {
-    final elapsed = DateTime.now().difference(_startTime);
-    final elapsedStr =
-        '${elapsed.inMinutes}:${(elapsed.inSeconds % 60).toString().padLeft(2, '0')}';
-
-    return Positioned(
-      bottom: 100,
-      left: 20,
-      right: 20,
-      child: Container(
-        padding: EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: Colors.black87,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.green, width: 1),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '🐛 DEBUG PANEL (Picture Mode)',
-              style: TextStyle(
-                color: Colors.green,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
-            ),
-            SizedBox(height: 10),
-            _debugRow('State', _currentState.toString().split('.').last),
-            _debugRow('Attempts', _attempts.toString()),
-            _debugRow('Samples', '$_capturedSamples / $REQUIRED_SAMPLES'),
-            _debugRow('Elapsed', elapsedStr),
-            _debugRow('Method', 'Picture Capture'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _debugRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            '$label:',
-            style: TextStyle(color: Colors.white70, fontSize: 12),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
       ),
     );
   }

@@ -73,7 +73,6 @@ The video stream approach was failing because ML Kit couldn't process raw YUV420
 - ✅ Progress bar: 0% → 20% → 40% → 60% → 80% → 100%
 - ✅ Sample indicators: 5 circles around face guide
 - ✅ Haptic feedback on each capture
-- ✅ Debug panel (toggle with bug icon)
 
 ---
 
@@ -120,12 +119,7 @@ if (faces.isNotEmpty && _faceService.isFaceSuitable(faces.first)) {
 - **COMPLETE** (Green) → Success!
 - **ERROR** (Red) → Something went wrong
 
-### Debug Panel Shows:
-- Current state
-- Number of capture attempts
-- Samples captured (X/5)
-- Elapsed time
-- Method: "Picture Capture"
+
 
 ---
 
@@ -193,11 +187,7 @@ The camera plugin provides raw image data in YUV420 or NV21 format. Converting t
 - [ ] "Enrollment successful!" appears
 - [ ] Navigates to scanner screen
 
-### Debug Test:
-- [ ] Toggle debug panel (bug icon)
-- [ ] Verify state transitions
-- [ ] Check sample count
-- [ ] Monitor elapsed time
+
 
 ### Error Test:
 - [ ] Deny camera permission → Error message appears
@@ -224,9 +214,7 @@ The camera plugin provides raw image data in YUV420 or NV21 format. Converting t
    - Stream-based enrollment (has issues, deprecated)
    - Kept for reference/simulation mode
 
-3. **`lib/screens/FaceRecognition/test_face_enrollment_screen.dart`**
-   - Test harness for all modes
-   - Easy access for development
+
 
 ### Navigation Updated:
 4. **`lib/screens/FaceRecognition/face_recognition_scanner_screen.dart`**
@@ -284,7 +272,7 @@ The new `PictureFaceEnrollmentScreen` provides:
 - ✅ **Guaranteed reliability** - No more ML Kit conversion errors
 - ✅ **Smooth user experience** - Auto-capture, clear feedback
 - ✅ **Production-ready** - Proper error handling, timeout protection
-- ✅ **Easy to debug** - Debug panel, extensive logging
+- ✅ **Easy to debug** - Extensive logging
 - ✅ **Works everywhere** - Android, iOS, emulator, physical devices
 
 ### Test it right now:
@@ -302,8 +290,7 @@ Then navigate to: **Any Event → Location & Facial Recognition**
 
 If you encounter any issues:
 1. Check the console logs
-2. Toggle the debug panel (bug icon)
-3. Look for timestamped messages starting with `[2025-10-28T...]`
-4. The logs will show exactly where any issue occurs
+2. Look for timestamped messages starting with `[2025-10-28T...]`
+3. The logs will show exactly where any issue occurs
 
 But honestly, it should just work now! 🎉

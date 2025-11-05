@@ -93,7 +93,6 @@ All routes now use `PictureFaceEnrollmentScreen`:
 - 📊 Progress bar (0% to 100%)
 - ⚪ Sample indicators (5 circles)
 - ✨ Pulsing animations
-- 🐛 Debug panel (toggleable)
 
 ---
 
@@ -119,17 +118,8 @@ All routes now use `PictureFaceEnrollmentScreen`:
 
 ---
 
-## 🐛 Debug Features
-
-### Debug Panel Shows:
-- Current state (READY, CAPTURING, etc.)
-- Attempt count
-- Samples captured (X/5)
-- Elapsed time
-- Method: "Picture Capture"
-
 ### Console Logging:
-Every action logged with timestamps:
+Every action is logged with timestamps:
 ```
 [2025-10-28T20:30:00] PictureFaceEnrollmentScreen: initState
 [2025-10-28T20:30:01] Camera permission granted
@@ -288,10 +278,9 @@ This solution:
 
 ### If Issues Occur:
 1. **Check console** for timestamped logs
-2. **Toggle debug panel** (bug icon)
-3. **Try simulation mode** first
-4. **Verify camera permission** is granted
-5. **Ensure good lighting** for face detection
+2. **Try simulation mode** first
+3. **Verify camera permission** is granted
+4. **Ensure good lighting** for face detection
 
 ### Common Issues:
 | Issue | Solution |

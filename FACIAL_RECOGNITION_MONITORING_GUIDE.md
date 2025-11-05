@@ -107,72 +107,7 @@ facial_recognition_metrics:
 }
 ```
 
-## Debug Tools Implementation
-
-### 1. **Enhanced Debug Panel**
-
-Add to scanner screens:
-
-```dart
-Widget _buildEnhancedDebugPanel() {
-  return Container(
-    padding: EdgeInsets.all(15),
-    child: Column(
-      children: [
-        Text('🔍 DIAGNOSTIC INFO', style: TextStyle(fontWeight: FontWeight.bold)),
-        Divider(),
-        
-        // Identity Info
-        if (_currentUserIdentity != null) ...[
-          _debugSection('User Identity', [
-            'ID: ${_currentUserIdentity!.userId}',
-            'Name: ${_currentUserIdentity!.userName}',
-            'Source: ${_currentUserIdentity!.source.name}',
-            'Guest: ${_currentUserIdentity!.isGuest}',
-          ]),
-        ],
-        
-        // Enrollment Info
-        _debugSection('Enrollment', [
-          'Doc ID: ${UserIdentityService.generateEnrollmentDocumentId(eventId, userId)}',
-          'Status: ${_enrollmentStatus}',
-          'Last Check: ${_lastEnrollmentCheck}',
-        ]),
-        
-        // Performance Metrics
-        _debugSection('Performance', [
-          'Identity Resolution: ${_identityResolutionTime}ms',
-          'Enrollment Check: ${_enrollmentCheckTime}ms',
-          'Face Detection: ${_faceDetectionTime}ms',
-          'Match Time: ${_matchTime}ms',
-        ]),
-        
-        // Error Log
-        if (_recentErrors.isNotEmpty) ...[
-          _debugSection('Recent Errors', _recentErrors),
-        ],
-      ],
-    ),
-  );
-}
-```
-
-### 2. **Diagnostic Mode Toggle**
-
-```dart
-// Add to app settings
-class DiagnosticSettings {
-  static bool verboseLogging = false;
-  static bool showDebugOverlays = false;
-  static bool captureMetrics = true;
-  static bool logToFile = false;
-}
-
-// Usage in code
-if (DiagnosticSettings.verboseLogging) {
-  Logger.debug('Detailed enrollment data: ${enrollment.toJson()}');
-}
-```
+ 
 
 ### 3. **Network Request Inspector**
 

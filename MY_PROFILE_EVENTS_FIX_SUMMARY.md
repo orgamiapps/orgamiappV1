@@ -34,12 +34,7 @@ Added comprehensive debug logging in `_buildTabContent()` to track:
 This will help identify where events are being lost in the display pipeline.
 
 ### 2. Improved Empty State
-Enhanced the empty state widget to display:
-- Debug information (User ID, Email)
-- Event counts for all three tabs
-- Two action buttons:
-  - **Refresh**: Manually reload profile data
-  - **Run Diagnostics**: Execute comprehensive diagnostics and log results
+Enhanced the empty state widget with clearer messaging and a manual refresh action.
 
 ### 3. Manual Refresh Button
 Added a "Refresh" button in the tab bar action buttons that:
@@ -59,8 +54,7 @@ The empty state now shows real-time information about:
 2. **Check each tab** (Created, Attended, Saved)
 3. **If events don't appear**:
    - Click the **Refresh** button in the tab bar
-   - Check the debug info in the empty state
-   - Click **Run Diagnostics** and check console logs
+   - Check console logs
 4. **Review console logs** for detailed information:
    - Look for lines starting with `🔍` (build/display debugging)
    - Look for lines starting with `MY_PROFILE_SCREEN:` (data fetching)
@@ -78,10 +72,7 @@ The empty state now shows real-time information about:
    - Check if the same events appear
    - Compare event counts in tabs
 
-3. **Use diagnostic tools**:
-   - If events don't appear, click "Run Diagnostics"
-   - Check Flutter console for detailed logs
-   - Look for the diagnostic output section
+ 
 
 4. **Manual refresh**:
    - Try clicking the "Refresh" button
@@ -127,7 +118,7 @@ Testing created events query...
 3. Permission issues (check Firestore security rules)
 4. User ID mismatch (check diagnostic output)
 
-**Solution**: Click "Run Diagnostics" to verify Firebase queries work
+**Solution**: Use the Refresh button and review console logs to verify Firebase queries
 
 ### Issue: Events show in public profile but not My Profile
 **Possible causes**:
@@ -156,7 +147,7 @@ Testing created events query...
 ### File: `lib/screens/MyProfile/my_profile_screen.dart`
 
 1. **_buildTabContent()**: Added comprehensive debug logging
-2. **_buildEmptyState()**: Added debug info display and diagnostics button  
+2. **_buildEmptyState()**: Improved messaging and refresh action  
 3. **_buildTabBar()**: Added manual refresh button
 
 ## Next Steps if Issue Persists
@@ -216,7 +207,5 @@ Testing created events query...
 - [ ] Events visible in Attended tab (if user has attended events)
 - [ ] Events visible in Saved tab (if user has saved events)
 - [ ] Event counts match between My Profile and public profile
-- [ ] Diagnostics run without errors
 - [ ] Manual refresh works correctly
-- [ ] Debug info displays correct user ID and email
 

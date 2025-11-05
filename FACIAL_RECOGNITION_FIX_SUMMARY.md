@@ -84,7 +84,6 @@ Modified scanner screens:
 
 **Changes:**
 - Use same UserIdentityService for consistency
-- Added debug panel showing current user identity
 - Enhanced enrollment status checking
 - Improved error messages
 
@@ -155,7 +154,6 @@ FaceEnrollments/
    - Scanner enrollment checks
 
 2. **Debug Tools:**
-   - Debug panel in scanner shows user identity
    - Console logs with timestamps
    - Detailed error messages
 

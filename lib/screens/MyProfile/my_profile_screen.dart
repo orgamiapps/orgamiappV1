@@ -16,7 +16,6 @@ import 'package:attendus/Services/badge_service.dart';
 import 'package:attendus/screens/Home/account_details_screen_v2.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:attendus/Utils/profile_diagnostics.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Enum for sort options
@@ -356,101 +355,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     }
   }
 
-  Future<void> _runComprehensiveDiagnostics() async {
-    try {
-      debugPrint(
-        '🔬 ============== MY PROFILE COMPREHENSIVE DEBUG STARTED ==============',
-      );
-
-      final user = CustomerController.logeInCustomer;
-      if (user == null) {
-        debugPrint('🔬 ❌ No logged in user found');
-        return;
-      }
-
-      debugPrint('🔬 User ID: ${user.uid}');
-      debugPrint('🔬 User Email: ${user.email}');
-      debugPrint('🔬 User Name: ${user.name}');
-      debugPrint(
-        '🔬 Current state - Created: ${createdEvents.length}, Attended: ${attendedEvents.length}, Saved: ${savedEvents.length}',
-      );
-
-      // Test each Firebase method individually
-      debugPrint('🔬 Testing Created Events...');
-      try {
-        final createdResult = await FirebaseFirestoreHelper()
-            .getEventsCreatedByUser(user.uid, limit: 50);
-        final createdEvents = createdResult['events'] as List;
-        debugPrint('🔬 ✅ Created Events: ${createdEvents.length}');
-        for (int i = 0; i < createdEvents.take(3).length; i++) {
-          debugPrint(
-            '🔬   - ${createdEvents[i].title} (${createdEvents[i].id})',
-          );
-        }
-      } catch (e) {
-        debugPrint('🔬 ❌ Created Events Error: $e');
-      }
-
-      debugPrint('🔬 Testing Attended Events...');
-      try {
-        final attendedResult = await FirebaseFirestoreHelper()
-            .getEventsAttendedByUser(user.uid, limit: 50);
-        final attendedEvents = attendedResult['events'] as List;
-        debugPrint('🔬 ✅ Attended Events: ${attendedEvents.length}');
-        for (int i = 0; i < attendedEvents.take(3).length; i++) {
-          debugPrint(
-            '🔬   - ${attendedEvents[i].title} (${attendedEvents[i].id})',
-          );
-        }
-      } catch (e) {
-        debugPrint('🔬 ❌ Attended Events Error: $e');
-      }
-
-      debugPrint('🔬 Testing Saved Events...');
-      try {
-        final savedResult = await FirebaseFirestoreHelper().getFavoritedEvents(
-          userId: user.uid,
-          limit: 50,
-        );
-        final savedEvents = savedResult['events'] as List;
-        debugPrint('🔬 ✅ Saved Events: ${savedEvents.length}');
-        for (int i = 0; i < savedEvents.take(3).length; i++) {
-          debugPrint('🔬   - ${savedEvents[i].title} (${savedEvents[i].id})');
-        }
-      } catch (e) {
-        debugPrint('🔬 ❌ Saved Events Error: $e');
-      }
-
-      // Test direct Firebase queries
-      debugPrint('🔬 Testing Direct Firebase Queries...');
-      final directQuery = FirebaseFirestore.instance
-          .collection('Events')
-          .where('customerUid', isEqualTo: user.uid);
-      final directResult = await directQuery.get();
-      debugPrint('🔬 Direct query found ${directResult.docs.length} events');
-
-      // Run ProfileDiagnostics as well
-      debugPrint('🔬 Running ProfileDiagnostics...');
-      await ProfileDiagnostics.runFullDiagnostics();
-
-      debugPrint(
-        '🔬 ============== MY PROFILE COMPREHENSIVE DEBUG FINISHED ==============',
-      );
-
-      // Automatically reload data after diagnostics to show any fixes
-      debugPrint('🔬 Reloading profile data after diagnostics...');
-      await _loadProfileData(isRefresh: true);
-
-      // Final comparison
-      debugPrint('🔬 FINAL COMPARISON:');
-      debugPrint('🔬   My Profile Created Events: ${createdEvents.length}');
-      debugPrint('🔬   My Profile Attended Events: ${attendedEvents.length}');
-      debugPrint('🔬   My Profile Saved Events: ${savedEvents.length}');
-    } catch (e, stackTrace) {
-      debugPrint('🔬 ❌ Comprehensive diagnostics failed: $e');
-      debugPrint('🔬 ❌ Stack trace: $stackTrace');
-    }
-  }
+  
 
   @override
   Widget build(BuildContext context) {
@@ -1547,9 +1452,6 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   }
 
   Widget _buildEmptyState(String message, IconData icon) {
-    final user = CustomerController.logeInCustomer;
-    final userId = user?.uid ?? 'No User ID';
-    final userEmail = user?.email ?? 'No Email';
 
     return Container(
       padding: const EdgeInsets.all(40),
@@ -1592,54 +1494,6 @@ class _MyProfileScreenState extends State<MyProfileScreen>
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
-          // Debug info section
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Color(0xFFF3F4F6),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Color(0xFFE5E7EB)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Debug Info:',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF6B7280),
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'User ID: ${userId.substring(0, userId.length > 20 ? 20 : userId.length)}...',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Color(0xFF9CA3AF),
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-                Text(
-                  'Email: $userEmail',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Color(0xFF9CA3AF),
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-                Text(
-                  'Created: ${createdEvents.length}, Attended: ${attendedEvents.length}, Saved: ${savedEvents.length}',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Color(0xFF9CA3AF),
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -1656,28 +1510,6 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF667EEA),
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                ),
-              ),
-              SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: () async {
-                  await _runComprehensiveDiagnostics();
-                  ShowToast().showNormalToast(
-                    msg: 'Check console logs for diagnostic results',
-                  );
-                },
-                icon: Icon(Icons.bug_report, size: 18),
-                label: Text('Run Full Diagnostics'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF667EEA),
-                  side: BorderSide(color: Color(0xFF667EEA)),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),

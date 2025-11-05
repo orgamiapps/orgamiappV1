@@ -49,7 +49,6 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
   // State Management
   EnrollmentState _currentState = EnrollmentState.INITIALIZING;
   String _statusMessage = 'Initializing camera...';
-  String _debugInfo = '';
   String _errorMessage = '';
 
   // Camera Related
@@ -83,13 +82,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
   // UI Elements
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  bool _showDebugPanel = true; // Show by default for debugging
   bool _useManualCapture = false;
-
-  // Statistics
-  int _facesDetected = 0;
-  int _facesNotSuitable = 0;
-  DateTime _startTime = DateTime.now();
   
   // Navigation state for smooth transitions
   bool _isNavigating = false;
@@ -134,7 +127,6 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
   void _startSimulation() {
     _updateState(EnrollmentState.READY);
     _updateStatus('SIMULATION MODE - Face detection simulated');
-    _updateDebugInfo('Running in simulation mode for testing');
 
     // Initialize dummy camera for visual feedback
     _initializeDummyCamera();
@@ -151,7 +143,6 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
             'Simulated capture $simulatedCaptures of $REQUIRED_SAMPLES',
           );
           _frameCounter++;
-          _facesDetected++;
         });
 
         _logWithTimestamp('Simulated capture: $simulatedCaptures');
@@ -334,11 +325,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
         // Update frame counter display
         if (_frameCounter % 30 == 0) {
           // Update UI every 30 frames
-          setState(() {
-            _updateDebugInfo(
-              'Frames: $_frameCounter | Faces: $_facesDetected | Unsuitable: $_facesNotSuitable',
-            );
-          });
+          setState(() {});
         }
       });
 
@@ -383,12 +370,10 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
         return;
       }
 
-      _facesDetected++;
       final face = faces.first;
 
       // Check if face is suitable
       if (!_faceService.isFaceSuitable(face)) {
-        _facesNotSuitable++;
         _updateStatus('Please look straight at the camera');
         return;
       }
@@ -591,11 +576,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
     });
   }
 
-  void _updateDebugInfo(String info) {
-    setState(() {
-      _debugInfo = info;
-    });
-  }
+  
 
   void _logWithTimestamp(String message) {
     final timestamp = DateTime.now().toIso8601String();
@@ -611,10 +592,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
       _capturedSamples = 0;
       _faceFeatures.clear();
       _frameCounter = 0;
-      _facesDetected = 0;
-      _facesNotSuitable = 0;
       _errorMessage = '';
-      _startTime = DateTime.now();
     });
 
     _startEnrollmentProcess();
@@ -708,19 +686,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
               : 'Face Enrollment',
           style: TextStyle(color: Colors.white),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              _showDebugPanel ? Icons.bug_report : Icons.bug_report_outlined,
-              color: Colors.white,
-            ),
-            onPressed: () {
-              setState(() {
-                _showDebugPanel = !_showDebugPanel;
-              });
-            },
-          ),
-        ],
+        actions: const [],
       ),
       body: Stack(
         children: [
@@ -735,8 +701,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
           // Status Panel
           if (!_isNavigating) _buildStatusPanel(),
 
-          // Debug Panel
-          if (!_isNavigating && _showDebugPanel) _buildDebugPanel(),
+          
 
           // Progress Indicator
           if (!_isNavigating) _buildProgressIndicator(),
@@ -897,94 +862,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
     );
   }
 
-  Widget _buildDebugPanel() {
-    final elapsed = DateTime.now().difference(_startTime);
-    final elapsedStr =
-        '${elapsed.inMinutes}:${(elapsed.inSeconds % 60).toString().padLeft(2, '0')}';
-
-    return Positioned(
-      bottom: 100,
-      left: 20,
-      right: 20,
-      child: Container(
-        padding: EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: Colors.black87,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.green, width: 1),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '🐛 DEBUG PANEL',
-              style: TextStyle(
-                color: Colors.green,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
-            ),
-            SizedBox(height: 10),
-            _debugRow('State', _currentState.toString().split('.').last),
-            _debugRow('Frames', _frameCounter.toString()),
-            _debugRow('Faces Detected', _facesDetected.toString()),
-            _debugRow('Unsuitable', _facesNotSuitable.toString()),
-            _debugRow('Samples', '$_capturedSamples / $REQUIRED_SAMPLES'),
-            _debugRow('Elapsed', elapsedStr),
-            if (_debugInfo.isNotEmpty) ...[
-              SizedBox(height: 5),
-              Text(
-                _debugInfo,
-                style: TextStyle(color: Colors.white70, fontSize: 11),
-              ),
-            ],
-            if (widget.simulationMode) ...[
-              SizedBox(height: 5),
-              Container(
-                padding: EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  color: Colors.orange,
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: Text(
-                  'SIMULATION MODE',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 10,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _debugRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            '$label:',
-            style: TextStyle(color: Colors.white70, fontSize: 12),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  
 
   Widget _buildProgressIndicator() {
     return Positioned(

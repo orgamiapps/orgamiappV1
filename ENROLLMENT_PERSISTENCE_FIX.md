@@ -194,11 +194,7 @@ Both screens now log:
 - **If enrollment not found:** Prompts to enroll
 - **If sign-in fails:** Retry option available
 
-### Debug Features:
-- **Debug panel** shows user info
-- **Toggle with bug icon** in app bar
-- **Real-time state updates**
-- **Attempt counters**
+ 
 
 ---
 

@@ -13,19 +13,16 @@ I've implemented comprehensive fixes and debugging tools to resolve the issue wh
   - 🔄 = State update logs
   - ✅/❌ = Success/error indicators
 
-### 2. Visual Debug Tools
-- **Debug Info Panel**: Shows in empty state with user ID, email, and event counts
+### 2. Visual Aids
 - **Refresh Button**: Manual data reload in tab bar
-- **Run Diagnostics Button**: Comprehensive Firebase query testing
 
 ### 3. Force Rebuild Mechanism
 - Added post-frame callback to ensure UI updates after data loads
 - Prevents potential state/rendering synchronization issues
 
 ### 4. Improved Empty State
-- Now shows debugging information even when empty
-- Provides actionable buttons for troubleshooting
-- Displays real event counts to verify data is loaded
+- Clear messaging when there are no events
+- Provides a Refresh action for troubleshooting
 
 ## How to Test
 
@@ -50,33 +47,14 @@ Test all three event tabs:
 
 ### Step 4: If Events Don't Appear
 
-#### A. Check Debug Info
-If you see the empty state, look at the debug info box which shows:
-- Your User ID
-- Your Email  
-- Event counts: Created: X, Attended: Y, Saved: Z
-
-**If counts show 0 for all**: You genuinely have no events yet
-**If counts show numbers > 0**: Events are loaded but not displaying
+ 
 
 #### B. Try Manual Refresh
 1. Click the **Refresh** button in the tab bar (top right area)
 2. Wait for loading to complete
 3. Check if events now appear
 
-#### C. Run Diagnostics
-1. Click **Run Diagnostics** button in the empty state
-2. Check the Flutter console/terminal for detailed output
-3. Look for the diagnostic section that shows:
-   ```
-   ========================================
-   PROFILE DIAGNOSTICS
-   ========================================
-   User ID: ...
-   User Email: ...
-   Testing created events query...
-   ✅ Created events: X (Yms)
-   ```
+ 
 
 ### Step 5: Check Console Logs
 
@@ -138,18 +116,16 @@ State - savedEvents.length: 2
 **Diagnosis**: Potential user ID mismatch or state synchronization issue.
 
 **Solution**:
-1. Check debug info panel for your User ID and Email
-2. Navigate to public profile and compare data
-3. Click Refresh in My Profile
-4. If issue persists, log out and log back in
+1. Navigate to public profile and compare data
+2. Click Refresh in My Profile
+3. If issue persists, log out and log back in
 
 ### Issue 3: Some Tabs Work, Others Don't
 **Diagnosis**: Specific Firebase query is failing.
 
 **Solution**:
-1. Run Diagnostics to see which query fails
-2. Check console for specific error messages
-3. Verify Firebase indexes are set up (see below)
+1. Check console for specific error messages
+2. Verify Firebase indexes are set up (see below)
 
 ### Issue 4: Events Appear After Refresh But Not on Initial Load
 **Diagnosis**: Timing/initialization issue.
@@ -216,8 +192,7 @@ flutter run | grep -E "(MY_PROFILE_SCREEN|🔍|🏗️|🔄|Created events|Atten
 flutter run | grep -E "(❌|⚠️|ERROR|PERMISSION)"
 ```
 
-### Run Diagnostics Manually
-The diagnostic utility is built into the UI (Run Diagnostics button), but you can also trigger it programmatically if needed.
+ 
 
 ## Verification Checklist
 
@@ -227,9 +202,7 @@ The diagnostic utility is built into the UI (Run Diagnostics button), but you ca
 - [ ] Tab badges show correct event counts
 - [ ] Clicking tabs switches between event lists
 - [ ] Events display correctly (if you have any)
-- [ ] Empty state shows debug info when no events
 - [ ] Refresh button triggers data reload
-- [ ] Run Diagnostics shows console output
 - [ ] Pull-to-refresh works on the screen
 - [ ] Events match what's shown in public profile
 
@@ -238,9 +211,7 @@ The diagnostic utility is built into the UI (Run Diagnostics button), but you ca
 If after following this guide events still don't appear:
 
 1. **Collect Information**:
-   - Take screenshot of empty state with debug info
-   - Save console output from diagnostic run
-   - Note your User ID and Email
+   - Save console output from a fresh run
    - Note what works in public profile vs My Profile
 
 2. **Verify Firebase Data**:

@@ -93,7 +93,7 @@ The subprocess invocation is where the issue occurs - Gradle can't properly exec
 - APK installation via `adb install`
 - App runs on emulator
 - Hot reload via `flutter attach`
-- All My Profile events debugging features are active
+ 
 
 ### ❌ Not Working:
 - `flutter run` command
@@ -209,10 +209,7 @@ Now that the app is installed and running, test the events display:
    # In a separate terminal
    flutter logs -d emulator-5554 | grep -E "(🏗️|🔍|🔄|MY_PROFILE)"
    ```
-5. **Use the debug tools**:
-   - Click **Refresh** button in tab bar
-   - Check **Debug Info** panel in empty state
-   - Click **Run Diagnostics** button
+5. Click **Refresh** if needed and monitor logs for issues.
 
 ## Quick Reference
 
@@ -251,7 +248,7 @@ adb -s emulator-5554 shell am force-stop com.attendus
 ## Summary
 
 - ✅ **The app builds and runs successfully** using the workaround
-- ✅ **All My Profile events debugging features are active**
+ 
 - ✅ **Hot reload is available** via `flutter attach`
 - ❌ **`flutter run` has an issue** but doesn't block development
 - 🔧 **Use `./run_app.sh`** for the smoothest experience

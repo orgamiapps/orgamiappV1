@@ -11,7 +11,6 @@ import 'package:attendus/Utils/responsive_helper.dart';
 import 'package:attendus/firebase/firebase_storage_helper.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:attendus/controller/customer_controller.dart';
@@ -1369,25 +1368,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   ),
                 ),
                 SizedBox(width: 12),
-                ElevatedButton.icon(
-                  onPressed: () async {
-                    debugPrint('🔬 Deep debug requested for Created Events');
-                    await _debugUserEvents();
-                  },
-                  icon: Icon(Icons.bug_report, size: 18),
-                  label: Text('Debug'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF9800),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                  ),
-                ),
+                
               ],
             ),
           ),
@@ -1743,85 +1724,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     ShowToast().showNormalToast(msg: 'Profile link copied to clipboard');
   }
 
-  Future<void> _debugUserEvents() async {
-    try {
-      debugPrint('🔬 ============== DEEP DEBUG STARTED ==============');
-      debugPrint('🔬 User ID: ${widget.user.uid}');
-      debugPrint('🔬 User Email: ${widget.user.email}');
-      debugPrint('🔬 User Name: ${widget.user.name}');
-      debugPrint('🔬 Current _createdEvents length: ${_createdEvents.length}');
-      debugPrint(
-        '🔬 Current _attendedEvents length: ${_attendedEvents.length}',
-      );
-
-      // Test Firebase connection
-      debugPrint('🔬 Testing Firebase connection...');
-      final testQuery = FirebaseFirestore.instance
-          .collection('Events')
-          .limit(1);
-      final testSnapshot = await testQuery.get();
-      debugPrint(
-        '🔬 Firebase connection test: ${testSnapshot.docs.length > 0 ? "SUCCESS" : "FAILED"}',
-      );
-
-      if (testSnapshot.docs.isNotEmpty) {
-        final testDoc = testSnapshot.docs.first;
-        final testData = testDoc.data();
-        debugPrint('🔬 Sample event structure: ${testData.keys.toList()}');
-        debugPrint('🔬 Sample event customerUid: ${testData['customerUid']}');
-      }
-
-      // Test direct query for this user
-      debugPrint('🔬 Testing direct query for user events...');
-      final userQuery = FirebaseFirestore.instance
-          .collection('Events')
-          .where('customerUid', isEqualTo: widget.user.uid)
-          .limit(10);
-      final userSnapshot = await userQuery.get();
-      debugPrint(
-        '🔬 Direct user query result: ${userSnapshot.docs.length} events',
-      );
-
-      for (var doc in userSnapshot.docs) {
-        final data = doc.data();
-        debugPrint('🔬 Found event: ${data['title']} (ID: ${doc.id})');
-        debugPrint('🔬   customerUid: ${data['customerUid']}');
-        debugPrint('🔬   eventGenerateTime: ${data['eventGenerateTime']}');
-      }
-
-      // Test with FirebaseFirestoreHelper
-      debugPrint(
-        '🔬 Testing with FirebaseFirestoreHelper (after index fix)...',
-      );
-      final helperResult = await FirebaseFirestoreHelper()
-          .getEventsCreatedByUser(widget.user.uid, limit: 50);
-      debugPrint('🔬 FirebaseFirestoreHelper result: ${helperResult}');
-
-      final helperEvents = helperResult['events'] as List<dynamic>;
-      debugPrint(
-        '🔬 FirebaseFirestoreHelper events count: ${helperEvents.length}',
-      );
-      for (int i = 0; i < helperEvents.take(3).length; i++) {
-        final event = helperEvents[i];
-        debugPrint('🔬 Helper Event $i: ${event.title} (ID: ${event.id})');
-      }
-
-      debugPrint('🔬 ============== DEEP DEBUG FINISHED ==============');
-
-      // Final comparison
-      debugPrint('🔬 FINAL COMPARISON:');
-      debugPrint('🔬   User Profile Created Events: ${_createdEvents.length}');
-      debugPrint(
-        '🔬   User Profile Attended Events: ${_attendedEvents.length}',
-      );
-
-      ShowToast().showNormalToast(msg: 'Debug complete - check console logs');
-    } catch (e, stackTrace) {
-      debugPrint('🔬 ❌ Debug failed: $e');
-      debugPrint('🔬 ❌ Stack trace: $stackTrace');
-      ShowToast().showNormalToast(msg: 'Debug failed: $e');
-    }
-  }
+  
 
   void _showEditProfileModal() {
     final nameController = TextEditingController(text: widget.user.name);

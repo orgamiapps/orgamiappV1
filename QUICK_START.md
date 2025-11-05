@@ -57,9 +57,7 @@ flutter logs -d emulator-5554 | grep -E "(🏗️|🔍|🔄|MY_PROFILE)"
 2. Navigate to **My Profile** tab
 3. Check the three tabs: **Created**, **Attended**, **Saved**
 4. If events don't appear:
-   - Check **Debug Info** panel in empty state
    - Click **Refresh** button
-   - Click **Run Diagnostics** button
    - Check console logs for detailed output
 
 ## 🛠️ Troubleshooting

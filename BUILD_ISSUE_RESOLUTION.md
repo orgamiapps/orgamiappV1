@@ -100,11 +100,9 @@ Now that dependencies are fixed, you should be able to run from Android Studio:
 
 1. ✅ Check that the app is running on the emulator
 2. ✅ Navigate to the **My Profile** screen
-3. ✅ Verify the new debugging features are working:
+3. ✅ Verify profile loads:
    - Debug logging in console
    - Refresh button in tab bar
-   - Debug info in empty state
-   - Run Diagnostics button
 
 ## Testing the My Profile Events Fix
 
@@ -119,9 +117,7 @@ Now that the app is running, you can test the events display fix:
    - `✅/❌` - Success/error indicators
 
 4. **If events don't appear**:
-   - Check the **Debug Info** panel in empty state
    - Click **Refresh** button
-   - Click **Run Diagnostics** button
    - Review console output
 
 5. **Compare with public profile**:
@@ -133,7 +129,7 @@ Now that the app is running, you can test the events display fix:
 
 - The Gradle build succeeded when run directly, confirming the code is correct
 - The issue was purely a dependency/cache problem, not related to our code changes
-- All debugging tools we added are now active and ready to help diagnose any display issues
+ 
 
 ## Related Documentation
 
