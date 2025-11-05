@@ -36,12 +36,6 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final User? _currentUser = FirebaseAuth.instance.currentUser;
 
-  // UI state
-  ScrollController? _scrollController;
-  bool _isScrollingDown = false;
-  static const double _appBarHeight = 56.0;
-  Timer? _scrollDebouncer;
-
   // Filter state
   String _selectedFilter = 'All';
   final List<String> _filterOptions = [
@@ -67,45 +61,13 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
   @override
   void initState() {
     super.initState();
-    _initializeScrollController();
     _loadInitialData();
   }
 
   @override
   void dispose() {
     _refreshController.dispose();
-    _scrollController?.dispose();
-    _scrollDebouncer?.cancel();
     super.dispose();
-  }
-
-  void _initializeScrollController() {
-    _scrollController = ScrollController();
-    _scrollController!.addListener(() {
-      _scrollDebouncer?.cancel();
-      _scrollDebouncer = Timer(const Duration(milliseconds: 100), () {
-        _checkScrollDirection();
-      });
-    });
-  }
-
-  void _checkScrollDirection() {
-    if (_scrollController == null || !_scrollController!.hasClients || !mounted)
-      return;
-
-    final currentOffset = _scrollController!.offset;
-    final shouldBeScrollingDown = currentOffset > _appBarHeight;
-
-    if (shouldBeScrollingDown != _isScrollingDown) {
-      _isScrollingDown = shouldBeScrollingDown;
-      if (mounted) {
-        scheduleMicrotask(() {
-          if (mounted) {
-            widget.onScrollChange?.call(_isScrollingDown);
-          }
-        });
-      }
-    }
   }
 
   Future<void> _loadInitialData() async {
@@ -658,7 +620,6 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
             controller: _refreshController,
             onRefresh: _onRefresh,
             child: ListView.builder(
-              controller: _scrollController,
               padding: EdgeInsets.only(
                 left: 16,
                 right: 16,
@@ -1072,23 +1033,6 @@ class _UnifiedPostHeader extends StatelessWidget {
     return 'Unknown';
   }
 
-  String _getTimeAgo(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-
-    if (difference.inDays > 7) {
-      return DateFormat.yMMMd().format(dateTime);
-    } else if (difference.inDays > 0) {
-      return '${difference.inDays}d ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m ago';
-    } else {
-      return 'Just now';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -1198,25 +1142,6 @@ class _UnifiedPostHeader extends StatelessWidget {
                               ],
                             ],
                           ),
-                          const SizedBox(height: 2),
-                          if (timestamp != null)
-                            Text(
-                              _getTimeAgo(timestamp!.toDate()),
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            )
-                          else
-                            Text(
-                              'Just now',
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
                         ],
                       ),
                     ),

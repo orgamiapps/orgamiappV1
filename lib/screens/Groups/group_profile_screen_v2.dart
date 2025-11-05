@@ -230,9 +230,9 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
           body: NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) => [
               SliverAppBar(
-                pinned: true,
+                pinned: false,
                 floating: true,
-                snap: false,
+                snap: true,
                 expandedHeight: 260,
                 elevation: 0,
                 surfaceTintColor: Colors.transparent,
