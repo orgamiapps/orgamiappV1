@@ -1,0 +1,290 @@
+--- a/lib/screens/Home/search_screen.dart
++++ b/lib/screens/Home/search_screen.dart
+@@ -644,7 +644,7 @@
+       if (widget.searchQuery.isEmpty) {
+         _usingAi = false;
+         _filteredEvents = List.from(_allEvents);
+       } else {
+-        _searchWithAi(widget.searchQuery);
++        _searchWithHybridAi(widget.searchQuery);
+       }
+     });
+   }
+@@ -652,7 +652,7 @@
+-  Future<void> _searchWithAi(String query) async {
++  Future<void> _searchWithHybridAi(String query) async {
+     if (!mounted) return;
+     setState(() {
+       _isLoading = true;
+@@ -660,6 +660,18 @@
+     });
+
+     try {
++      // HYBRID SEARCH STRATEGY:
++      // 1. Instant exact name matching (0ms latency)
++      // 2. AI semantic search for complex queries
++      // 3. Intelligent result merging with deduplication
++      // 4. Smart ranking: exact matches first, then AI results
++      
++      final exactMatches = _getExactNameMatches(query);
++      final isSimpleQuery = _isSimpleQuery(query);
++      
++      // For simple queries with exact matches, show them immediately
++      if (exactMatches.isNotEmpty && isSimpleQuery) {
++        // Show exact matches first, then enhance with AI in background
++        if (!mounted) return;
++        setState(() {
++          _filteredEvents = exactMatches;
++          _isLoading = false;
++        });
++        
++        // Enhance with AI results in background
++        _enhanceWithAiResults(query, exactMatches);
++        return;
++      }
++      
++      // For complex natural language queries, use AI with exact match boost
++      final aiResults = await _getAiResults(query);
++      final combinedResults = _mergeSearchResults(exactMatches, aiResults, query);
++      
++      if (!mounted) return;
++      setState(() {
++        _filteredEvents = combinedResults.isNotEmpty
++            ? combinedResults
++            : _fallbackFilter(query);
++        _isLoading = false;
++      });
++    } catch (e) {
++      if (!mounted) return;
++      setState(() {
++        _filteredEvents = _fallbackFilter(query);
++        _isLoading = false;
++        _usingAi = false;
++      });
++    }
++  }
++  
++  /// Get events that exactly match the query in name/title
++  List<EventModel> _getExactNameMatches(String query) {
++    final queryLower = query.toLowerCase().trim();
++    if (queryLower.length < 2) return [];
++    
++    final matches = <EventModel>[];
++    final partialMatches = <EventModel>[];
++    
++    for (final event in _allEvents) {
++      final titleLower = event.title.toLowerCase();
++      final descriptionLower = event.description.toLowerCase();
++      
++      // Priority 1: Exact title match
++      if (titleLower == queryLower) {
++        matches.insert(0, event);
++        continue;
++      }
++      
++      // Priority 2: Title starts with query (great for autocomplete)
++      if (titleLower.startsWith(queryLower)) {
++        matches.add(event);
++        continue;
++      }
++      
++      // Priority 3: Title contains query as whole word
++      if (_containsWholeWord(titleLower, queryLower)) {
++        matches.add(event);
++        continue;
++      }
++      
++      // Priority 4: Description contains query as whole word
++      if (_containsWholeWord(descriptionLower, queryLower)) {
++        partialMatches.add(event);
++        continue;
++      }
++      
++      // Priority 5: Partial matches in title
++      if (titleLower.contains(queryLower)) {
++        partialMatches.add(event);
++      }
++    }
++    
++    // Return exact matches first, then partial matches
++    return [...matches, ...partialMatches.take(10)];
++  }
++  
++  /// Check if text contains query as whole word
++  bool _containsWholeWord(String text, String query) {
++    return text.contains(' $query ') || 
++           text.startsWith('$query ') ||
++           text.endsWith(' $query') ||
++           text == query;
++  }
++  
++  /// Determine if query is simple (likely looking for specific event name)
++  bool _isSimpleQuery(String query) {
++    final words = query.trim().split(RegExp(r'\s+'));
++    
++    // Single word or short phrase without natural language indicators
++    if (words.length <= 2) return true;
++    
++    // Contains natural language patterns = complex AI query
++    final naturalLanguagePatterns = [
++      'find', 'search', 'show', 'get', 'looking for', 'i want',
++      'near me', 'close by', 'around me', 'nearby', 'local',
++      'this weekend', 'tomorrow', 'today', 'next week', 'tonight',
++      'within', 'events', 'event', 'happening', 'going on'
++    ];
++    
++    final queryLower = query.toLowerCase();
++    return !naturalLanguagePatterns.any((pattern) => queryLower.contains(pattern));
++  }
++  
++  /// Enhance exact matches with AI results in background
++  Future<void> _enhanceWithAiResults(String query, List<EventModel> exactMatches) async {
++    try {
++      final aiResults = await _getAiResults(query);
++      final enhanced = _mergeSearchResults(exactMatches, aiResults, query);
++      
++      // Only update if results are actually better (more results)
++      if (mounted && enhanced.length > exactMatches.length) {
++        setState(() {
++          _filteredEvents = enhanced;
++        });
++      }
++    } catch (e) {
++      // Silent fail - exact matches are already shown
++    }
++  }
++  
++  /// Get AI-powered search results
++  Future<List<EventModel>> _getAiResults(String query) async {
++    try {
+       // Initialize ONNX NLP service
+       final onnxService = OnnxNlpService.instance;
+       await onnxService.initialize();
+@@ -687,7 +699,7 @@
+       final cachedResults = await onnxService.queryEvents(
+         intent: intent,
+         userLat: lat,
+         userLng: lng,
+-        limit: 50,
++        limit: 25, // Leave room for exact matches
+       );
+       
+-      List<EventModel> aiEvents = [];
+-      
+       if (cachedResults.isNotEmpty) {
+-        // Convert cached results to EventModel
+-        aiEvents = cachedResults.map((data) {
+-          return EventModel.fromJson(data);
+-        }).toList();
+-      } else {
+-        // Fall back to Firestore search with AI intent
+-        final helper = FirebaseFirestoreHelper();
+-        aiEvents = await helper.aiSearchEvents(
+-          query: query,
+-          latitude: lat,
+-          longitude: lng,
+-          limit: 50,
+-        );
+-        
+-        // Cache the results for future searches
+-        if (aiEvents.isNotEmpty) {
+-          final eventsData = aiEvents.map((e) => e.toJson()).toList();
+-          await onnxService.cacheEvents(eventsData);
+-        }
++        return cachedResults.map((data) => EventModel.fromJson(data)).toList();
+       }
+-
+-      if (!mounted) return;
+-      setState(() {
+-        _filteredEvents = aiEvents.isNotEmpty
+-            ? aiEvents
+-            : _fallbackFilter(query);
+-        _isLoading = false;
+-      });
++      
++      // Fall back to Firestore with AI intent
++      final helper = FirebaseFirestoreHelper();
++      final aiEvents = await helper.aiSearchEvents(
++        query: query,
++        latitude: lat,
++        longitude: lng,
++        limit: 25,
++      );
++      
++      // Cache results for future searches
++      if (aiEvents.isNotEmpty) {
++        final eventsData = aiEvents.map((e) => e.toJson()).toList();
++        await onnxService.cacheEvents(eventsData);
++      }
++      
++      return aiEvents;
+     } catch (e) {
+-      if (!mounted) return;
+-      setState(() {
+-        _filteredEvents = _fallbackFilter(query);
+-        _isLoading = false;
+-        _usingAi = false;
+-      });
++      return [];
++    }
++  }
++  
++  /// Intelligently merge exact matches and AI results
++  List<EventModel> _mergeSearchResults(
++    List<EventModel> exactMatches,
++    List<EventModel> aiResults,
++    String query,
++  ) {
++    final resultMap = <String, EventModel>{};
++    final finalResults = <EventModel>[];
++    
++    // Add exact matches first (highest priority)
++    for (final event in exactMatches) {
++      if (!resultMap.containsKey(event.id)) {
++        resultMap[event.id] = event;
++        finalResults.add(event);
++      }
++    }
++    
++    // Add AI results that aren't duplicates
++    for (final event in aiResults) {
++      if (!resultMap.containsKey(event.id)) {
++        resultMap[event.id] = event;
++        finalResults.add(event);
++      }
++    }
++    
++    // Sort by relevance: exact matches stay at top, AI results by date
++    final exactCount = exactMatches.length;
++    if (finalResults.length > exactCount) {
++      final exactPart = finalResults.take(exactCount).toList();
++      final aiPart = finalResults.skip(exactCount).toList();
++      
++      // Sort AI results by date (upcoming first)
++      aiPart.sort((a, b) => a.selectedDateTime.compareTo(b.selectedDateTime));
++      
++      return [...exactPart, ...aiPart].take(50).toList();
+     }
++    
++    return finalResults.take(50).toList();
++  }
++  
++  /// Get contextual empty state message
++  String _getSmartEmptyMessage(String query) {
++    if (_isSimpleQuery(query)) {
++      return 'No events found matching "$query". Try a different event name or use natural language like "find concerts near me"';
++    } else {
++      return 'Smart search analyzed "$query" but found no matching events. Try different keywords or check back later';
++    }
+   }
+
+@@ -984,7 +996,7 @@
+             Text(
+               widget.searchQuery.isEmpty
+                   ? 'Check back later for exciting events!'
+                   : (_usingAi
+-                        ? 'The AI analyzed "${widget.searchQuery}" but found no matches'
++                        ? _getSmartEmptyMessage(widget.searchQuery)
+                         : 'Try adjusting your search terms'),
+               style: const TextStyle(
+                 fontSize: 15,

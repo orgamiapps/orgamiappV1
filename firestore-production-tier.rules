@@ -1,0 +1,236 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isUser(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function getUserSubscription() {
+      return get(/databases/$(database)/documents/subscriptions/$(request.auth.uid));
+    }
+    
+    function hasActiveSubscription() {
+      let sub = getUserSubscription();
+      return sub != null && 
+             sub.data.status == 'active' && 
+             request.time < sub.data.currentPeriodEnd;
+    }
+    
+    function hasPremiumTier() {
+      let sub = getUserSubscription();
+      return hasActiveSubscription() && sub.data.tier == 'premium';
+    }
+    
+    function hasBasicTier() {
+      let sub = getUserSubscription();
+      return hasActiveSubscription() && sub.data.tier == 'basic';
+    }
+    
+    function hasAnyPaidTier() {
+      return hasBasicTier() || hasPremiumTier();
+    }
+    
+    function isEventOwner(eventId) {
+      let event = get(/databases/$(database)/documents/Events/$(eventId));
+      return event != null && event.data.customerUid == request.auth.uid;
+    }
+    
+    function isOrgAdmin(orgId) {
+      let member = get(/databases/$(database)/documents/Organizations/$(orgId)/Members/$(request.auth.uid));
+      return member != null && member.data.role == 'Admin';
+    }
+    
+    function isOrgMember(orgId) {
+      let member = get(/databases/$(database)/documents/Organizations/$(orgId)/Members/$(request.auth.uid));
+      return member != null && member.data.status == 'approved';
+    }
+    
+    // ============================================
+    // SUBSCRIPTIONS COLLECTION
+    // ============================================
+    
+    match /subscriptions/{userId} {
+      allow read: if isUser(userId);
+      allow write: if isUser(userId);
+    }
+    
+    // ============================================
+    // CUSTOMERS COLLECTION
+    // ============================================
+    
+    match /Customers/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isUser(userId);
+      
+      // Followers subcollection
+      match /followers/{followerId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated() && request.auth.uid == followerId;
+      }
+      
+      // Following subcollection
+      match /following/{followingId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated() && request.auth.uid == userId;
+      }
+      
+      // Other subcollections
+      match /{subcollection}/{document} {
+        allow read: if isAuthenticated();
+        allow write: if isUser(userId);
+      }
+    }
+    
+    // ============================================
+    // EVENTS COLLECTION
+    // ============================================
+    
+    match /Events/{eventId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && isEventOwner(eventId);
+      
+      // Attendees subcollection
+      match /Attendees/{attendeeId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
+      }
+      
+      // Questions subcollection
+      match /Questions/{questionId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated() && isEventOwner(eventId);
+      }
+      
+      // Other event subcollections
+      match /{subcollection}/{document} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated() && isEventOwner(eventId);
+      }
+    }
+    
+    // ============================================
+    // EVENT ANALYTICS - PREMIUM ONLY
+    // ============================================
+    
+    match /eventAnalytics/{analyticsId} {
+      // Only Premium users can access analytics
+      allow read: if isAuthenticated() && hasPremiumTier();
+      allow write: if isAuthenticated() && hasPremiumTier();
+    }
+    
+    // ============================================
+    // ORGANIZATIONS (GROUPS) - PREMIUM ONLY FOR CREATION
+    // ============================================
+    
+    match /Organizations/{orgId} {
+      allow read: if isAuthenticated();
+      // Only Premium users can create groups
+      allow create: if isAuthenticated() && hasPremiumTier();
+      allow update, delete: if isAuthenticated() && isOrgAdmin(orgId);
+      
+      // Members subcollection
+      match /Members/{memberId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() && (isOrgAdmin(orgId) || request.auth.uid == memberId);
+        allow update, delete: if isAuthenticated() && (isOrgAdmin(orgId) || request.auth.uid == memberId);
+      }
+      
+      // Feed subcollection
+      match /Feed/{feedId} {
+        allow read: if isAuthenticated() && isOrgMember(orgId);
+        allow create: if isAuthenticated() && isOrgMember(orgId);
+        allow update, delete: if isAuthenticated() && 
+                                 (isOrgAdmin(orgId) || 
+                                  get(/databases/$(database)/documents/Organizations/$(orgId)/Feed/$(feedId)).data.createdBy == request.auth.uid);
+      }
+      
+      // Join Requests subcollection
+      match /JoinRequests/{requestId} {
+        allow read: if isAuthenticated() && (isOrgAdmin(orgId) || request.auth.uid == requestId);
+        allow create: if isAuthenticated();
+        allow update, delete: if isAuthenticated() && isOrgAdmin(orgId);
+      }
+      
+      // Other organization subcollections
+      match /{subcollection}/{document} {
+        allow read: if isAuthenticated() && isOrgMember(orgId);
+        allow write: if isAuthenticated() && isOrgAdmin(orgId);
+      }
+    }
+    
+    // Organization Names (for uniqueness check) - Premium only
+    match /OrganizationNames/{name} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && hasPremiumTier();
+      allow delete: if isAuthenticated();
+    }
+    
+    // ============================================
+    // CONVERSATIONS (MESSAGING)
+    // ============================================
+    
+    match /Conversations/{conversationId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+      
+      match /Messages/{messageId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update, delete: if isAuthenticated();
+      }
+    }
+    
+    // ============================================
+    // ATTENDANCE RECORDS
+    // ============================================
+    
+    match /Attendance/{attendanceId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
+    }
+    
+    // ============================================
+    // NOTIFICATIONS
+    // ============================================
+    
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
+    }
+    
+    // ============================================
+    // MESSAGES (LEGACY)
+    // ============================================
+    
+    match /Messages/{messageId} {
+      allow read, write: if isAuthenticated();
+      
+      match /messages/{subMessageId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+    
+    // ============================================
+    // DEFAULT DENY ALL OTHER COLLECTIONS
+    // ============================================
+    
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

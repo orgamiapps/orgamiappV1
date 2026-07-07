@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>AttendUs</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIconFile</key>
+	<string></string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>attendus</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>AttendUs needs camera access to scan QR codes for event check-ins, ticket verification, facial recognition sign-in, and activating NFC badges at events you attend.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>AttendUs uses facial recognition to provide secure and convenient sign-in to events you attend. Your biometric data is processed locally and stored securely.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>AttendUs uses your location to help you discover nearby events, show event locations on the map, and provide location-based event recommendations.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>AttendUs needs access to your photo library to let you upload profile pictures, event photos, and images for the events and groups you create.</string>
+	<key>NFCReaderUsageDescription</key>
+	<string>AttendUs uses NFC to activate and verify your event tickets by tapping your badge or phone at event entrances for contactless check-in.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.951311475019-vrmcjm9inlpdi66qupst3op5c81e74el</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>AttendUs needs permission to save event tickets, QR codes, and event photos to your photo library for easy offline access and sharing.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>GMSApiKey</key>
+	<string>AIzaSyAf1t5cToh1UoF7R52vTSJxMajw8CvmVUA</string>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<true/>
+</dict>
+</plist>

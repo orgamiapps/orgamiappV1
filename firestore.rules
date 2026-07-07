@@ -1,0 +1,118 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated (includes anonymous users)
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user is authenticated and not anonymous
+    function isFullyAuthenticated() {
+      return request.auth != null && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+    
+    // DEVELOPMENT RULES - More permissive for testing
+    // WARNING: Do not use in production!
+    
+    // Organizations collection rules
+    match /Organizations/{orgId} {
+      // Allow read for all authenticated users (including anonymous/guest)
+      // Write requires full authentication (not anonymous)
+      allow read: if isAuthenticated();
+      allow write: if isFullyAuthenticated();
+      
+      // Members subcollection
+      match /Members/{memberId} {
+        allow read: if isAuthenticated();
+        allow write: if isFullyAuthenticated();
+      }
+      
+      // Feed subcollection - PERMISSIVE for testing
+      match /Feed/{feedId} {
+        // Allow authenticated users to read, write requires full auth
+        allow read: if isAuthenticated();
+        allow write: if isFullyAuthenticated();
+      }
+      
+      // Join Requests subcollection
+      match /JoinRequests/{requestId} {
+        allow read: if isAuthenticated();
+        allow write: if isFullyAuthenticated();
+      }
+    }
+    
+    // Events collection rules
+    match /Events/{eventId} {
+      // Allow read for all authenticated users (including anonymous/guest)
+      // Write requires full authentication (not anonymous)
+      allow read: if isAuthenticated();
+      allow write: if isFullyAuthenticated();
+      
+      match /Attendees/{attendeeId} {
+        // Allow authenticated users to read attendees
+        // Allow write for check-ins (both guest and registered users)
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
+      }
+    }
+    
+    // Users/Customers collection rules
+    match /Customers/{userId} {
+      // Allow authenticated users to read customer profiles (including anonymous for viewing event organizers)
+      allow read: if isAuthenticated();
+      // Only allow users to write their own profile, and must be fully authenticated (not anonymous)
+      allow write: if isFullyAuthenticated() && request.auth.uid == userId;
+      
+      // Followers subcollection - allow users to follow/unfollow
+      match /followers/{followerId} {
+        allow read: if isAuthenticated();
+        // Allow write if the authenticated user is the follower being added/removed
+        allow write: if isAuthenticated() && request.auth.uid == followerId;
+      }
+      
+      // Following subcollection - allow users to manage who they follow  
+      match /following/{followingId} {
+        allow read: if isAuthenticated();
+        // Allow write if the authenticated user is the one doing the following
+        allow write: if isAuthenticated() && request.auth.uid == userId;
+      }
+      
+      // Other subcollections
+      match /{subcollection}/{document} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
+    }
+    
+    // Messages collection rules
+    match /Messages/{messageId} {
+      allow read, write: if isAuthenticated();
+      
+      match /messages/{subMessageId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+    
+    // User Analytics collection - optimized aggregated analytics per user
+    match /user_analytics/{userId} {
+      // Users can read their own analytics
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      // Only Cloud Functions can write (via admin SDK)
+      allow write: if false;
+    }
+    
+    // Event Analytics collection
+    match /event_analytics/{eventId} {
+      // Users can read analytics for events they have access to
+      allow read: if isAuthenticated();
+      // Only Cloud Functions can write (via admin SDK)
+      allow write: if false;
+    }
+    
+    // Temporary catch-all for development
+    match /{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+  }
+}

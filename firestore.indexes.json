@@ -1,0 +1,135 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "Events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "customerUid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "Events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "start_date",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "Attendance",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "customerUid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "attendanceDateTime",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "Organizations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "category_lowercase",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "name_lowercase",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "QuizQuestions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "quizId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "orderIndex",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "QuizParticipants",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "isActive",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "quizId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "currentScore",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "QuizParticipants",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "quizId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "QuizResponses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "participantId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "questionId",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "QuizResponses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "quizId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "questionId",
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

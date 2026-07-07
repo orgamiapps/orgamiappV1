@@ -1,0 +1,701 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:math';
+import 'dart:typed_data';
+import 'package:camera/camera.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import '../Utils/logger.dart';
+import 'user_identity_service.dart';
+
+/// Professional facial recognition service for event attendance
+/// Handles face detection, enrollment, matching, and secure storage
+class FaceRecognitionService {
+  static final FaceRecognitionService _instance =
+      FaceRecognitionService._internal();
+  factory FaceRecognitionService() => _instance;
+  FaceRecognitionService._internal();
+
+  late FaceDetector _faceDetector;
+  bool _isInitialized = false;
+
+  // Face detection configuration
+  static const double _minFaceSize = 0.15;
+  static const double _matchingThreshold = 0.65; // Lowered for better recognition
+  static const int _requiredFacesForEnrollment = 3;
+
+  // Performance mode - can be toggled for real-time vs accuracy
+  bool _useFastMode = true;
+
+  /// Initialize the face detection service
+  Future<void> initialize({
+    bool useFastMode = true, 
+    Function(String)? onProgress,
+  }) async {
+    if (_isInitialized) {
+      Logger.debug('FaceRecognitionService already initialized');
+      return;
+    }
+
+    try {
+      onProgress?.call('Checking ML Kit availability...');
+      Logger.info('Initializing FaceDetector with ML Kit...');
+      _useFastMode = useFastMode;
+      
+      // First check if ML Kit is available with timeout
+      bool mlKitAvailable = false;
+      try {
+        onProgress?.call('Loading ML Kit models...');
+        
+        // Create a test detector to check if models are available
+        final testOptions = FaceDetectorOptions(
+          performanceMode: FaceDetectorMode.fast,
+          enableLandmarks: false,
+          enableClassification: false,
+        );
+        
+        final testDetector = FaceDetector(options: testOptions);
+        
+        // Test with a simple operation
+        await testDetector.close().timeout(
+          Duration(seconds: 5),
+          onTimeout: () {
+            throw TimeoutException('ML Kit model check timeout');
+          },
+        );
+        
+        mlKitAvailable = true;
+        onProgress?.call('ML Kit models ready');
+      } catch (e) {
+        Logger.warning('ML Kit availability check failed: $e');
+        onProgress?.call('ML Kit models need to be downloaded...');
+      }
+
+      final options = FaceDetectorOptions(
+        enableContours: false, // Disable for better performance
+        enableLandmarks: true,
+        enableClassification: true,
+        enableTracking: true,
+        minFaceSize: _minFaceSize,
+        performanceMode: _useFastMode
+            ? FaceDetectorMode.fast
+            : FaceDetectorMode.accurate,
+      );
+
+      Logger.debug('Creating FaceDetector with options: '
+        'landmarks=true, classification=true, tracking=true, '
+        'minFaceSize=$_minFaceSize, mode=${_useFastMode ? "fast" : "accurate"}');
+
+      onProgress?.call('Initializing face detector...');
+      _faceDetector = FaceDetector(options: options);
+      
+      // If ML Kit wasn't initially available, it might download now
+      if (!mlKitAvailable) {
+        onProgress?.call('Downloading ML Kit models (this may take a moment)...');
+        // Give some time for model download
+        await Future.delayed(Duration(seconds: 2));
+      }
+      
+      _isInitialized = true;
+      onProgress?.call('Face detection ready');
+      Logger.info(
+        'FaceRecognitionService initialized successfully (${_useFastMode ? "fast" : "accurate"} mode)',
+      );
+      Logger.info('ML Kit face detection model loaded and ready');
+    } catch (e, stackTrace) {
+      Logger.error('Failed to initialize FaceRecognitionService: $e');
+      Logger.error('Stack trace: $stackTrace');
+      Logger.error('This could be due to:');
+      Logger.error('1. ML Kit model not downloaded (requires internet on first use)');
+      Logger.error('2. Insufficient device storage');
+      Logger.error('3. Google Play Services issue (Android)');
+      Logger.error('4. Platform-specific configuration missing');
+      onProgress?.call('Failed to initialize face detection');
+      rethrow;
+    }
+  }
+
+  /// Detect faces in the provided image
+  Future<List<Face>> detectFaces(InputImage inputImage) async {
+    if (!_isInitialized) {
+      Logger.warning('FaceDetector not initialized, initializing now...');
+      await initialize();
+    }
+
+    try {
+      final faces = await _faceDetector.processImage(inputImage);
+      if (faces.isNotEmpty) {
+        Logger.debug('Detected ${faces.length} face(s) in image');
+      } else {
+        Logger.debug('No faces detected in current frame');
+      }
+      return faces;
+    } catch (e, stackTrace) {
+      Logger.error('Face detection failed: $e');
+      Logger.error('Stack trace: $stackTrace');
+      Logger.error('Input image metadata: size=${inputImage.metadata?.size}, format=${inputImage.metadata?.format}, rotation=${inputImage.metadata?.rotation}');
+      return [];
+    }
+  }
+
+  /// Check if a face is suitable for enrollment/recognition
+  bool isFaceSuitable(Face face) {
+    // Check face size
+    final faceArea = face.boundingBox.width * face.boundingBox.height;
+    if (faceArea < 8000) return false; // Slightly more lenient (was 10000)
+
+    // Check if face is looking forward (head angles) - more lenient
+    final headEulerAngleY = face.headEulerAngleY;
+    final headEulerAngleZ = face.headEulerAngleZ;
+
+    // Allow up to 35 degrees (was 30) for smoother recognition
+    if (headEulerAngleY != null && headEulerAngleY.abs() > 35) return false;
+    if (headEulerAngleZ != null && headEulerAngleZ.abs() > 35) return false;
+
+    // Check if eyes are open - more lenient, allow at least one eye open
+    final leftEyeOpen = face.leftEyeOpenProbability;
+    final rightEyeOpen = face.rightEyeOpenProbability;
+
+    // At least one eye should be open (more lenient than requiring both)
+    if (leftEyeOpen != null && rightEyeOpen != null) {
+      final maxEyeOpen = leftEyeOpen > rightEyeOpen ? leftEyeOpen : rightEyeOpen;
+      if (maxEyeOpen < 0.3) return false; // Lowered from 0.5
+    }
+
+    return true;
+  }
+
+  /// Extract facial features for comparison
+  List<double> extractFaceFeatures(Face face) {
+    List<double> features = [];
+
+    // Normalize bounding box relative to image size (assumed 1000x1000 for normalization)
+    features.add(face.boundingBox.left / 1000.0);
+    features.add(face.boundingBox.top / 1000.0);
+    features.add(face.boundingBox.width / 1000.0);
+    features.add(face.boundingBox.height / 1000.0);
+
+    // Add landmark positions if available
+    final landmarks = [
+      FaceLandmarkType.leftEye,
+      FaceLandmarkType.rightEye,
+      FaceLandmarkType.noseBase,
+      FaceLandmarkType.leftMouth,
+      FaceLandmarkType.rightMouth,
+      FaceLandmarkType.leftEar,
+      FaceLandmarkType.rightEar,
+      FaceLandmarkType.leftCheek,
+      FaceLandmarkType.rightCheek,
+    ];
+
+    for (final landmarkType in landmarks) {
+      final landmark = face.landmarks[landmarkType];
+      if (landmark != null) {
+        features.add(landmark.position.x / 1000.0);
+        features.add(landmark.position.y / 1000.0);
+      } else {
+        features.addAll([0.0, 0.0]); // Fill missing landmarks with zeros
+      }
+    }
+
+    // Add head pose angles
+    features.add((face.headEulerAngleX ?? 0.0) / 90.0); // Normalize to [-1, 1]
+    features.add((face.headEulerAngleY ?? 0.0) / 90.0);
+    features.add((face.headEulerAngleZ ?? 0.0) / 90.0);
+
+    // Add face classification scores
+    features.add(face.leftEyeOpenProbability ?? 0.5);
+    features.add(face.rightEyeOpenProbability ?? 0.5);
+    features.add(face.smilingProbability ?? 0.5);
+
+    return features;
+  }
+
+  /// Calculate similarity between two face feature vectors
+  double calculateSimilarity(List<double> features1, List<double> features2) {
+    if (features1.length != features2.length) {
+      Logger.warning('Feature vectors have different lengths');
+      return 0.0;
+    }
+
+    // Calculate cosine similarity
+    double dotProduct = 0.0;
+    double norm1 = 0.0;
+    double norm2 = 0.0;
+
+    for (int i = 0; i < features1.length; i++) {
+      dotProduct += features1[i] * features2[i];
+      norm1 += features1[i] * features1[i];
+      norm2 += features2[i] * features2[i];
+    }
+
+    if (norm1 == 0.0 || norm2 == 0.0) return 0.0;
+
+    final similarity = dotProduct / (sqrt(norm1) * sqrt(norm2));
+    return similarity.clamp(0.0, 1.0);
+  }
+
+  /// Enroll a user's face for an event
+  Future<bool> enrollUserFace({
+    required String userId,
+    required String userName,
+    required String eventId,
+    required List<List<double>> faceFeatures, // Multiple face samples
+  }) async {
+    try {
+      if (faceFeatures.length < _requiredFacesForEnrollment) {
+        Logger.warning('Insufficient face samples for enrollment');
+        return false;
+      }
+
+      // Calculate average features for better accuracy
+      final avgFeatures = _calculateAverageFeatures(faceFeatures);
+
+      // Generate consistent document ID
+      final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(eventId, userId);
+      
+      // Store in Firestore with retry logic
+      const maxRetries = 3;
+      int attempts = 0;
+      bool saved = false;
+      
+      while (!saved && attempts < maxRetries) {
+        attempts++;
+        try {
+          await FirebaseFirestore.instance
+              .collection('FaceEnrollments')
+              .doc(enrollmentDocId)
+              .set({
+                'userId': userId,
+                'userName': userName,
+                'eventId': eventId,
+                'faceFeatures': avgFeatures,
+                'sampleCount': faceFeatures.length,
+                'enrolledAt': FieldValue.serverTimestamp(),
+                'version': '1.0', // For future compatibility
+              });
+          saved = true;
+          Logger.info('Enrollment saved to Firestore: FaceEnrollments/$enrollmentDocId (attempt $attempts)');
+        } catch (e) {
+          Logger.warning('Failed to save enrollment (attempt $attempts/$maxRetries): $e');
+          if (attempts < maxRetries) {
+            await Future.delayed(Duration(milliseconds: 500 * attempts)); // Exponential backoff
+          }
+        }
+      }
+      
+      if (!saved) {
+        Logger.error('Failed to save enrollment after $maxRetries attempts');
+        return false;
+      }
+
+      // Verify enrollment was saved
+      final verified = await verifyEnrollmentSaved(
+        userId: userId,
+        eventId: eventId,
+      );
+      
+      if (verified) {
+        Logger.success('✅ User $userId enrolled successfully for event $eventId - verified!');
+        return true;
+      } else {
+        Logger.error('❌ Enrollment verification failed for user $userId');
+        return false;
+      }
+    } catch (e) {
+      Logger.error('Face enrollment failed: $e');
+      return false;
+    }
+  }
+  
+  /// Verify that enrollment was saved successfully
+  Future<bool> verifyEnrollmentSaved({
+    required String userId,
+    required String eventId,
+  }) async {
+    const maxRetries = 3;
+    const timeout = Duration(seconds: 10);
+    int attempts = 0;
+    
+    while (attempts < maxRetries) {
+      attempts++;
+      try {
+        final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(eventId, userId);
+        Logger.debug('Verifying enrollment saved at: FaceEnrollments/$enrollmentDocId (attempt $attempts)');
+        
+        // Add timeout to Firebase query
+        final doc = await FirebaseFirestore.instance
+            .collection('FaceEnrollments')
+            .doc(enrollmentDocId)
+            .get()
+            .timeout(timeout, onTimeout: () {
+              throw TimeoutException('Enrollment verification timeout after ${timeout.inSeconds}s');
+            });
+        
+        if (doc.exists) {
+          final data = doc.data();
+          if (data != null && 
+              data['userId'] == userId && 
+              data['eventId'] == eventId &&
+              data['faceFeatures'] != null &&
+              (data['faceFeatures'] as List).isNotEmpty) {
+            Logger.success('✅ Enrollment verification successful');
+            return true;
+          }
+        }
+        
+        Logger.error('❌ Enrollment verification failed - document not found or invalid');
+        return false;
+      } on TimeoutException catch (e) {
+        Logger.warning('Enrollment verification timeout (attempt $attempts/$maxRetries): $e');
+        if (attempts < maxRetries) {
+          await Future.delayed(Duration(milliseconds: 500 * attempts)); // Exponential backoff
+        } else {
+          Logger.error('Failed to verify enrollment after $maxRetries attempts');
+          return false;
+        }
+      } catch (e) {
+        Logger.warning('Error verifying enrollment (attempt $attempts/$maxRetries): $e');
+        if (attempts < maxRetries) {
+          await Future.delayed(Duration(milliseconds: 500 * attempts)); // Exponential backoff
+        } else {
+          Logger.error('Failed to verify enrollment after $maxRetries attempts: $e');
+          return false;
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  /// Find matching user for detected face
+  Future<FaceMatchResult?> matchFace({
+    required Face detectedFace,
+    required String eventId,
+  }) async {
+    try {
+      if (!isFaceSuitable(detectedFace)) {
+        return FaceMatchResult(
+          matched: false,
+          confidence: 0.0,
+          reason: 'Face not suitable for recognition',
+        );
+      }
+
+      // Extract features from detected face
+      final detectedFeatures = extractFaceFeatures(detectedFace);
+
+      // Get all enrolled faces for this event
+      final enrolledSnapshot = await FirebaseFirestore.instance
+          .collection('FaceEnrollments')
+          .where('eventId', isEqualTo: eventId)
+          .get();
+
+      if (enrolledSnapshot.docs.isEmpty) {
+        return FaceMatchResult(
+          matched: false,
+          confidence: 0.0,
+          reason: 'No enrolled faces for this event',
+        );
+      }
+
+      // Find best match - cache user names to avoid redundant lookups
+      FaceMatchResult? bestMatch;
+      double highestSimilarity = 0.0;
+      String? bestUserId;
+      String? bestUserName;
+
+      for (final doc in enrolledSnapshot.docs) {
+        final data = doc.data();
+        final enrolledFeatures = List<double>.from(data['faceFeatures']);
+        final similarity = calculateSimilarity(
+          detectedFeatures,
+          enrolledFeatures,
+        );
+
+        final userName = data['userName'] as String?;
+        Logger.debug('Similarity with ${userName ?? "Unknown"}: ${(similarity * 100).toStringAsFixed(1)}%');
+
+        if (similarity > highestSimilarity) {
+          highestSimilarity = similarity;
+          bestUserId = data['userId'] as String?;
+          bestUserName = userName;
+        }
+      }
+
+      // Only create match if above threshold
+      if (highestSimilarity >= _matchingThreshold && bestUserId != null) {
+        bestMatch = FaceMatchResult(
+          matched: true,
+          userId: bestUserId,
+          userName: bestUserName ?? 'Unknown User',
+          confidence: highestSimilarity,
+          reason: 'Face matched successfully',
+        );
+      }
+
+      return bestMatch ??
+          FaceMatchResult(
+            matched: false,
+            confidence: highestSimilarity,
+            reason:
+                'No matching face found (highest similarity: ${(highestSimilarity * 100).toStringAsFixed(1)}%)',
+          );
+    } catch (e) {
+      Logger.error('Face matching failed: $e');
+      return FaceMatchResult(
+        matched: false,
+        confidence: 0.0,
+        reason: 'Error during face matching: $e',
+      );
+    }
+  }
+
+  /// Check if user is enrolled for specific event
+  Future<bool> isUserEnrolled({
+    required String userId,
+    required String eventId,
+  }) async {
+    const maxRetries = 3;
+    const timeout = Duration(seconds: 10);
+    int attempts = 0;
+    
+    while (attempts < maxRetries) {
+      attempts++;
+      try {
+        final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(eventId, userId);
+        Logger.debug('Checking enrollment at: FaceEnrollments/$enrollmentDocId (attempt $attempts)');
+        
+        // Add timeout to Firebase query
+        final doc = await FirebaseFirestore.instance
+            .collection('FaceEnrollments')
+            .doc(enrollmentDocId)
+            .get()
+            .timeout(timeout, onTimeout: () {
+              throw TimeoutException('Enrollment check timeout after ${timeout.inSeconds}s');
+            });
+        
+        final exists = doc.exists;
+        Logger.info('Enrollment status for user $userId at event $eventId: $exists');
+        
+        return exists;
+      } on TimeoutException catch (e) {
+        Logger.warning('Enrollment check timeout (attempt $attempts/$maxRetries): $e');
+        if (attempts < maxRetries) {
+          await Future.delayed(Duration(milliseconds: 500 * attempts)); // Exponential backoff
+        } else {
+          Logger.error('Failed to check enrollment after $maxRetries attempts');
+          return false;
+        }
+      } catch (e) {
+        Logger.warning('Failed to check enrollment (attempt $attempts/$maxRetries): $e');
+        if (attempts < maxRetries) {
+          await Future.delayed(Duration(milliseconds: 500 * attempts)); // Exponential backoff
+        } else {
+          Logger.error('Failed to check enrollment status after $maxRetries attempts: $e');
+          return false;
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  /// Delete user enrollment for specific event
+  Future<bool> deleteUserEnrollment({
+    required String userId,
+    required String eventId,
+  }) async {
+    try {
+      final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(eventId, userId);
+      
+      await FirebaseFirestore.instance
+          .collection('FaceEnrollments')
+          .doc(enrollmentDocId)
+          .delete();
+      
+      Logger.info('Deleted enrollment for user $userId in event $eventId (doc: $enrollmentDocId)');
+      return true;
+    } catch (e) {
+      Logger.error('Failed to delete enrollment: $e');
+      return false;
+    }
+  }
+
+  /// Convert CameraImage to InputImage for ML Kit processing
+  InputImage? convertCameraImage(
+    CameraImage cameraImage,
+    CameraDescription camera,
+  ) {
+    try {
+      // Get image rotation
+      final sensorOrientation = camera.sensorOrientation;
+      InputImageRotation? rotation;
+
+      if (Platform.isIOS) {
+        rotation = InputImageRotationValue.fromRawValue(sensorOrientation);
+      } else if (Platform.isAndroid) {
+        var rotationCompensation = _orientations[camera.lensDirection]!;
+        rotationCompensation += sensorOrientation;
+        rotation = InputImageRotationValue.fromRawValue(
+          rotationCompensation % 360,
+        );
+      }
+
+      if (rotation == null) {
+        Logger.warning('Could not determine image rotation');
+        return null;
+      }
+
+      // Get image format
+      final format = InputImageFormatValue.fromRawValue(cameraImage.format.raw);
+      if (format == null) {
+        Logger.warning('Unsupported image format: ${cameraImage.format.raw}');
+        return null;
+      }
+
+      // Handle image data based on format
+      Uint8List bytes;
+      int bytesPerRow;
+      
+      // Check if this is NV21/YUV420 format
+      if (format == InputImageFormat.nv21 || format == InputImageFormat.yuv420) {
+        // For NV21/YUV420, combine Y, U, and V planes properly
+        if (cameraImage.planes.length >= 1) {
+          // Calculate expected size for NV21
+          final int ySize = cameraImage.planes[0].bytes.length;
+          final int uvSize = cameraImage.planes.length > 1 
+              ? cameraImage.planes.skip(1).fold<int>(0, (sum, plane) => sum + plane.bytes.length)
+              : 0;
+          
+          // Create a properly sized buffer
+          bytes = Uint8List(ySize + uvSize);
+          
+          // Copy Y plane
+          bytes.setRange(0, ySize, cameraImage.planes[0].bytes);
+          
+          // Copy UV planes if they exist
+          if (cameraImage.planes.length > 1) {
+            int offset = ySize;
+            for (int i = 1; i < cameraImage.planes.length; i++) {
+              final plane = cameraImage.planes[i];
+              final planeBytes = plane.bytes;
+              if (offset + planeBytes.length <= bytes.length) {
+                bytes.setRange(offset, offset + planeBytes.length, planeBytes);
+                offset += planeBytes.length;
+              }
+            }
+          }
+          
+          bytesPerRow = cameraImage.planes[0].bytesPerRow;
+        } else {
+          Logger.error('Invalid number of planes for NV21/YUV420 format');
+          return null;
+        }
+      } else {
+        // For other formats, use the first plane
+        bytes = cameraImage.planes[0].bytes;
+        bytesPerRow = cameraImage.planes[0].bytesPerRow;
+      }
+      
+      Logger.debug('Converting camera image: format=$format, size=${cameraImage.width}x${cameraImage.height}, rotation=$rotation, bytesLength=${bytes.length}');
+
+      return InputImage.fromBytes(
+        bytes: bytes,
+        metadata: InputImageMetadata(
+          size: Size(
+            cameraImage.width.toDouble(),
+            cameraImage.height.toDouble(),
+          ),
+          rotation: rotation,
+          format: format,
+          bytesPerRow: bytesPerRow,
+        ),
+      );
+    } catch (e, stack) {
+      Logger.error('Failed to convert camera image: $e');
+      Logger.error('Stack trace: $stack');
+      Logger.error('Camera image info: width=${cameraImage.width}, height=${cameraImage.height}, format=${cameraImage.format.raw}, planes=${cameraImage.planes.length}');
+      if (cameraImage.planes.isNotEmpty) {
+        for (int i = 0; i < cameraImage.planes.length; i++) {
+          Logger.error('Plane $i: bytesLength=${cameraImage.planes[i].bytes.length}, bytesPerRow=${cameraImage.planes[i].bytesPerRow}');
+        }
+      }
+      return null;
+    }
+  }
+
+  /// Calculate average features from multiple samples
+  List<double> _calculateAverageFeatures(List<List<double>> featuresList) {
+    if (featuresList.isEmpty) return [];
+
+    final featureLength = featuresList.first.length;
+    final avgFeatures = List<double>.filled(featureLength, 0.0);
+
+    for (final features in featuresList) {
+      for (int i = 0; i < features.length; i++) {
+        avgFeatures[i] += features[i];
+      }
+    }
+
+    for (int i = 0; i < avgFeatures.length; i++) {
+      avgFeatures[i] /= featuresList.length;
+    }
+
+    return avgFeatures;
+  }
+
+  /// Dispose of resources
+  Future<void> dispose() async {
+    if (_isInitialized) {
+      try {
+        await _faceDetector.close();
+        _isInitialized = false;
+        Logger.debug('FaceRecognitionService disposed');
+      } catch (e) {
+        Logger.error('Error disposing FaceRecognitionService: $e');
+      }
+    }
+  }
+
+  // Camera rotation mappings
+  static const _orientations = {
+    CameraLensDirection.back: 90,
+    CameraLensDirection.front: 270,
+    CameraLensDirection.external: 0,
+  };
+}
+
+/// Result of a face matching operation
+class FaceMatchResult {
+  final bool matched;
+  final String? userId;
+  final String? userName;
+  final double confidence;
+  final String reason;
+
+  FaceMatchResult({
+    required this.matched,
+    this.userId,
+    this.userName,
+    required this.confidence,
+    required this.reason,
+  });
+
+  @override
+  String toString() {
+    return 'FaceMatchResult{matched: $matched, userId: $userId, userName: $userName, confidence: ${(confidence * 100).toStringAsFixed(1)}%, reason: $reason}';
+  }
+}
+
+/// Enum for face detection states
+enum FaceDetectionState {
+  searching,
+  detected,
+  processing,
+  matched,
+  notMatched,
+  error,
+}

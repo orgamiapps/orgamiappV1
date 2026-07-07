@@ -1,0 +1,181 @@
+name: attendus
+description: "AttendUs - Event attendance management app."
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+# The following defines the version and build number for your application.
+# A version number is three numbers separated by dots, like 1.2.43
+# followed by an optional build number separated by a +.
+# Both the version and the builder number may be overridden in flutter
+# build by specifying --build-name and --build-number, respectively.
+# In Android, build-name is used as versionName while build-number used as versionCode.
+# Read more about Android versioning at https://developer.android.com/studio/publish/versioning
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.8.1 <4.0.0'
+
+# Dependencies specify other packages that your package needs in order to work.
+# To automatically upgrade your package dependencies to the latest versions
+# consider running `flutter pub upgrade --major-versions`. Alternatively,
+# dependencies can be manually updated by changing the version numbers below to
+# the latest version available on pub.dev. To see which dependencies have newer
+# versions available, run `flutter pub outdated`.
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # iOS-style icon glyphs (required for CupertinoIcons to render correctly)
+  cupertino_icons: ^1.0.8
+
+  firebase_storage: ^13.0.0
+  firebase_core: ^4.0.0
+  firebase_auth: ^6.0.0
+  firebase_messaging: ^16.0.0
+  firebase_app_check: ^0.4.0
+  flutter_local_notifications: ^19.4.0
+  timezone: ^0.10.1
+  google_sign_in: ^7.1.1
+  sign_in_with_apple: ^7.0.1  # Updated for compatibility
+  # flutter_facebook_auth: ^7.1.1  # Facebook authentication - disabled due to SDK initialization issues
+  # twitter_login: ^4.4.2  # X (Twitter) authentication - disabled due to namespace issues
+  cloud_firestore: ^6.0.0
+  rounded_loading_button_plus: ^3.0.1
+  fluttertoast: ^9.0.0
+  font_awesome_flutter: ^11.0.0
+  dotted_border: ^3.1.0
+  image_picker: ^1.2.0
+  firebase_ui_firestore: ^2.0.0
+  cached_network_image: ^3.3.1
+  flashy_tab_bar2: ^0.0.10
+  qr_code_scanner_plus: ^2.0.9+1
+  qr_flutter: ^4.1.0
+  screenshot: ^3.0.0
+  share_plus: ^10.1.0
+  path_provider: ^2.1.5
+  image: ^4.5.4
+  # Removed 'excel' package due to conflict with Syncfusion v30; using Syncfusion XLSIO only.
+  # excel: ^4.0.6
+  syncfusion_flutter_xlsio: ^31.1.21
+  google_maps_flutter: ^2.13.1
+  geolocator: ^14.0.2
+  geocoding: ^4.0.0
+  permission_handler: ^12.0.1
+  webview_flutter: ^4.13.0
+  url_launcher: ^6.3.2
+  carousel_slider: ^5.1.1
+  pull_to_refresh: ^2.0.0
+  shimmer: ^3.0.0
+  fl_chart: ^1.0.0
+  csv: ^6.0.0
+  flutter_staggered_grid_view: ^0.7.0
+  # AI and ML dependencies
+  # firebase_ml_kit: ^0.16.3  # Removed due to compatibility issues
+  # firebase_ml_model_downloader: ^0.2.3+8  # Removed due to compatibility issues
+  # PDF generation
+  pdf: ^3.10.7
+  printing: ^5.11.1
+  # HTTP for API calls
+  http: ^1.2.2
+  cloud_functions: ^6.0.0
+  # Date formatting
+  intl: ^0.20.2
+  # Natural language processing
+  # natural: ^0.2.0  # Removed due to compatibility issues
+  # Theme management
+  shared_preferences: ^2.2.2
+  provider: ^6.1.2
+  # Secure storage for authentication tokens
+  flutter_secure_storage: ^9.2.4
+  mobile_scanner: ^7.0.1
+  calendar_view: ^1.4.0
+  connectivity_plus: ^7.0.0
+  # Payment processing
+  flutter_stripe: ^12.0.2
+  
+  # On-device AI/ML
+  sqflite: ^2.3.3  # For SQLite database caching
+  
+  # Facial Recognition ML Kit
+  google_mlkit_face_detection: ^0.11.0  # Face detection for attendance - using stable version
+  camera: ^0.10.5+9  # Camera access for face scanning - using stable version to avoid CameraX issues
+  
+  # NFC functionality for badge activation (temporarily disabled due to plugin registration issue)
+  # nfc_manager: ^4.1.1
+
+  path: ^1.9.0
+  # ndef_record: ^1.3.3  # Depends on nfc_manager
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # The "flutter_lints" package below contains a set of recommended lints to
+  # encourage good coding practices. The lint set provided by the package is
+  # activated in the `analysis_options.yaml` file located at the root of your
+  # package. See that file for information about deactivating specific lint
+  # rules and activating additional ones.
+  flutter_lints: ^6.0.0
+
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
+
+# The following section is specific to Flutter packages.
+flutter:
+  generate: true
+
+  # The following line ensures that the Material Icons font is
+  # included with your application, so that you can use the icons in
+  # the material Icons class.
+  uses-material-design: true
+
+  # To add assets to your application, add an assets section, like this:
+  assets:
+    - images/
+    - attendus_logo.png
+    - attendus_logo_only.png
+    - attendus_logo_withText.png
+  #   - images/a_dot_ham.jpeg
+
+  # An image asset can refer to one or more resolution-specific "variants", see
+  # https://flutter.dev/to/resolution-aware-images
+
+  # For details regarding adding assets from package dependencies, see
+  # https://flutter.dev/to/asset-from-package
+
+  # To add custom fonts to your application, add a fonts section here,
+  # in this "flutter" section. Each entry in this list should have a
+  # "family" key with the font family name, and a "fonts" key with a
+  # list giving the asset and other descriptors for the font. For
+  # example:
+  # fonts:
+  #   - family: Schyler
+  #     fonts:
+  #       - asset: fonts/Schyler-Regular.ttf
+  #       - asset: fonts/Schyler-Italic.ttf
+  #         style: italic
+  #   - family: Trajan Pro
+  #     fonts:
+  #       - asset: fonts/TrajanPro.ttf
+  #       - asset: fonts/TrajanPro_Bold.ttf
+  #         weight: 700
+  #
+  # For details regarding fonts from package dependencies,
+  # see https://flutter.dev/to/font-from-package
+
+dependency_overrides:
+  # Relax selected transitive dependencies to latest compatible versions
+  # to keep the project up-to-date without direct API impact.
+  characters: ^1.4.1
+  meta: ^1.17.0
+  material_color_utilities: ^0.13.0
+  vector_math: ^2.2.0
+  vm_service: ^15.0.2
+  xml: ^7.0.1
+  petitparser: ^7.0.0
+  leak_tracker: ^11.0.1
+  leak_tracker_flutter_testing: ^3.0.10
+  leak_tracker_testing: ^3.0.2
+  test_api: ^0.7.7

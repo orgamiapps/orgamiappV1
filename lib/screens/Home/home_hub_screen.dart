@@ -1,0 +1,887 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:attendus/screens/Home/home_screen.dart' as legacy;
+import 'package:attendus/screens/Home/search_screen.dart';
+import 'package:attendus/screens/QRScanner/qr_scanner_flow_screen.dart';
+import 'package:attendus/firebase/organization_helper.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:attendus/Utils/router.dart';
+import 'package:attendus/Utils/images.dart';
+import 'package:attendus/Utils/theme_provider.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/screens/Events/single_event_screen.dart';
+import 'package:attendus/Utils/logger.dart';
+import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
+import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
+import 'package:attendus/screens/Home/calendar_screen.dart';
+import 'package:attendus/Utils/firebase_retry_helper.dart';
+import 'package:attendus/screens/Events/global_events_map_screen.dart';
+import 'package:attendus/Services/guest_mode_service.dart';
+import 'package:attendus/screens/Authentication/create_account/create_account_screen.dart';
+
+class HomeHubScreen extends StatefulWidget {
+  const HomeHubScreen({super.key});
+
+  @override
+  State<HomeHubScreen> createState() => _HomeHubScreenState();
+}
+
+class _HomeHubScreenState extends State<HomeHubScreen> {
+  int _tabIndex = 0; // 0: Public, 1: Private
+  final TextEditingController _searchCtlr = TextEditingController();
+  bool _searching = false;
+  List<Map<String, String>> _myOrgs = [];
+  List<Map<String, dynamic>> _discoverOrgs = [];
+  String? _selectedCategoryLower;
+  // Removed unused _categoryOptions (old UI)
+
+  @override
+  void initState() {
+    super.initState();
+    Logger.debug('🏠 HomeHubScreen: initState started');
+    // PERFORMANCE FIX: Defer data loading to after first frame to prevent blocking
+    // This prevents the heavy Firestore query from blocking app startup
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadOrgs();
+      }
+    });
+    Logger.debug('🏠 HomeHubScreen: initState finished');
+  }
+
+  Future<void> _loadOrgs() async {
+    if (!mounted) return;
+    Logger.debug('🏠 HomeHubScreen: _loadOrgs started');
+
+    try {
+      // Set initial empty state for immediate UI render
+      if (mounted) {
+        setState(() {
+          _myOrgs = [];
+          _searching = true; // Show loading indicator
+        });
+      }
+
+      // Defer discover query slightly to allow UI to render first
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      if (mounted) {
+        Logger.debug('🏠 HomeHubScreen: Starting _discover...');
+        _discover();
+      }
+
+      // Load user orgs in background after discover starts
+      _loadUserOrgsInBackground();
+    } catch (e) {
+      Logger.error('Error in _loadOrgs', e);
+      if (mounted) {
+        setState(() {
+          _myOrgs = [];
+          _searching = false;
+        });
+      }
+    }
+  }
+
+  /// Load user organizations in background after initial UI render
+  void _loadUserOrgsInBackground() {
+    // OPTIMIZATION: Reduced delay from 2s to 1s for faster user org loading
+    Future.delayed(const Duration(seconds: 1), () async {
+      if (!mounted) return;
+
+      try {
+        Logger.debug('🏠 HomeHubScreen: Loading user orgs in background...');
+        final helper = OrganizationHelper();
+
+        final my = await helper.getUserOrganizationsLite();
+
+        Logger.debug(
+          '🏠 HomeHubScreen: Background load completed, got ${my.length} orgs',
+        );
+
+        if (mounted && my.isNotEmpty) {
+          setState(() => _myOrgs = my);
+          Logger.debug(
+            '🏠 HomeHubScreen: Background state updated with user orgs',
+          );
+        }
+      } catch (e) {
+        Logger.error('Error loading user orgs in background', e);
+      }
+    });
+  }
+
+  Future<void> _discover() async {
+    if (!mounted) return;
+    Logger.debug('🏠 HomeHubScreen: _discover started');
+
+    setState(() => _searching = true);
+    try {
+      Logger.debug('🏠 HomeHubScreen: Creating Firestore query...');
+      Query query = FirebaseFirestore.instance
+          .collection('Organizations')
+          .limit(
+            20,
+          ); // OPTIMIZATION: Increased from 10 to 20 for better initial content
+
+      final q = _searchCtlr.text.trim().toLowerCase();
+      if (_selectedCategoryLower != null &&
+          _selectedCategoryLower!.isNotEmpty) {
+        query = query.where(
+          'category_lowercase',
+          isEqualTo: _selectedCategoryLower,
+        );
+      }
+      if (q.isNotEmpty) {
+        final String end =
+            q.substring(0, q.length - 1) +
+            String.fromCharCode(q.codeUnitAt(q.length - 1) + 1);
+        query = query.orderBy('name_lowercase').startAt([q]).endBefore([end]);
+      } else {
+        query = query.orderBy('name_lowercase');
+      }
+
+      Logger.debug('🏠 HomeHubScreen: Executing Firestore query...');
+      final snap = await FirebaseRetryHelper.executeQueryWithRetry(
+        query,
+        timeout: const Duration(seconds: 10),
+        operationName: 'Organizations discovery',
+      );
+
+      Logger.debug(
+        '🏠 HomeHubScreen: Query completed, got ${snap.docs.length} organizations',
+      );
+
+      final list = snap.docs.map((d) {
+        final data = d.data() as Map<String, dynamic>;
+        data['id'] = d.id;
+        return data;
+      }).toList();
+
+      if (mounted) {
+        setState(() => _discoverOrgs = list);
+        Logger.debug('🏠 HomeHubScreen: State updated with discovered orgs');
+      }
+    } catch (e) {
+      Logger.error('❌ ERROR: Error discovering organizations');
+      Logger.error('Error details: $e');
+      if (mounted) {
+        setState(() => _discoverOrgs = []);
+      }
+      // Show user-friendly error message
+      final errorMessage = FirebaseRetryHelper.getUserFriendlyErrorMessage(e);
+      Logger.info('User-friendly error: $errorMessage');
+    } finally {
+      if (mounted) {
+        setState(() => _searching = false);
+        Logger.debug('🏠 HomeHubScreen: _discover completed');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isGuestMode = GuestModeService().isGuestMode;
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      floatingActionButton: _tabIndex == 1 ? _buildCreateFab() : null,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildSimpleHeader(),
+            if (isGuestMode) _buildGuestBanner(),
+            const SizedBox(height: 12),
+            // Hide Private tab in guest mode
+            if (!isGuestMode) _buildSegmentedTabs(),
+            if (!isGuestMode) const SizedBox(height: 12),
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child: (_tabIndex == 0 || isGuestMode)
+                    ? const legacy.HomeScreen(showHeader: false)
+                    : _buildOrgsTab(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCreateFab() {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isGuestMode = GuestModeService().isGuestMode;
+
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: themeProvider.getGradientColors(context),
+        ),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+            spreadRadius: 2,
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(28),
+          onTap: () {
+            if (isGuestMode) {
+              _showGuestRestrictionDialog(GuestFeature.createEvent);
+            } else {
+              RouterClass.nextScreenNormal(
+                context,
+                const PremiumEventCreationWrapper(),
+              );
+            }
+          },
+          child: Icon(
+            Icons.add,
+            color: Theme.of(context).colorScheme.onPrimary,
+            size: 28,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSimpleHeader() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            Image.asset(Images.inAppLogo, width: 32, height: 32),
+            const SizedBox(width: 12),
+            _quickAction(
+              icon: Icons.public,
+              label: 'Map',
+              onTap: () {
+                RouterClass.nextScreenNormal(
+                  context,
+                  const GlobalEventsMapScreen(),
+                );
+              },
+              emphasized: true,
+            ),
+            _quickAction(
+              icon: Icons.fact_check,
+              label: 'Check in',
+              onTap: () {
+                RouterClass.nextScreenNormal(
+                  context,
+                  const QRScannerFlowScreen(),
+                );
+              },
+            ),
+            _quickAction(
+              icon: Icons.event,
+              label: 'Calendar',
+              onTap: () {
+                RouterClass.nextScreenNormal(context, const CalendarScreen());
+              },
+            ),
+            _quickAction(
+              icon: Icons.search,
+              label: 'Search',
+              onTap: () {
+                RouterClass.nextScreenNormal(context, const SearchScreen());
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _quickAction({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool emphasized = false,
+  }) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ActionChip(
+        avatar: Icon(
+          icon,
+          size: 18,
+          color: emphasized
+              ? theme.colorScheme.onPrimary
+              : theme.colorScheme.primary,
+        ),
+        label: Text(label),
+        labelStyle: TextStyle(
+          color: emphasized
+              ? theme.colorScheme.onPrimary
+              : theme.colorScheme.onSurface,
+          fontWeight: FontWeight.w700,
+        ),
+        backgroundColor: emphasized
+            ? theme.colorScheme.primary
+            : theme.colorScheme.surfaceContainerHighest,
+        side: BorderSide(
+          color: emphasized
+              ? theme.colorScheme.primary
+              : theme.colorScheme.outlineVariant,
+        ),
+        onPressed: onTap,
+      ),
+    );
+  }
+
+  Widget _buildSegmentedTabs() {
+    final Color primary = const Color(0xFF667EEA);
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          _segButton('Public', 0, primary, Icons.public),
+          _segButton('Private', 1, primary, Icons.diversity_3),
+        ],
+      ),
+    );
+  }
+
+  Widget _segButton(String label, int idx, Color primary, IconData icon) {
+    final selected = _tabIndex == idx;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _tabIndex = idx),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected
+                ? primary.withValues(alpha: 0.1)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: selected ? primary : const Color(0xFF6B7280),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? primary : const Color(0xFF6B7280),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrgsTab() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_searching) const LinearProgressIndicator(minHeight: 2),
+          if (_discoverOrgs.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 4),
+              child: Text(
+                'Groups: ${_discoverOrgs.length}',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+              ),
+            ),
+          Expanded(child: _orgEventsList()),
+        ],
+      ),
+    );
+  }
+
+  // Empty state matching the Public tab's "No Events Yet" design
+  Widget _buildNoEventsYet() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(40),
+              ),
+              child: const Icon(
+                Icons.event_busy,
+                size: 40,
+                color: Color(0xFF667EEA),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'No Events Yet',
+              style: TextStyle(
+                color: Color(0xFF1A1A1A),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Events will appear here once they are created.\nCheck back soon!',
+              style: TextStyle(
+                color: Color(0xFF6B7280),
+                fontSize: 16,
+                fontFamily: 'Roboto',
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _orgEventsList() {
+    if (_myOrgs.isEmpty) {
+      return Center(
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: _cardDeco(),
+          child: const Text('Join an organization to see its events here'),
+        ),
+      );
+    }
+
+    final List<String> orgIds = _myOrgs.map((o) => o['id']!).toList();
+
+    // Firestore whereIn supports up to 10 items; split into chunks and merge streams.
+    List<List<String>> chunks = [];
+    for (var i = 0; i < orgIds.length; i += 10) {
+      chunks.add(
+        orgIds.sublist(i, i + 10 > orgIds.length ? orgIds.length : i + 10),
+      );
+    }
+
+    return FutureBuilder<List<QuerySnapshot<Map<String, dynamic>>>>(
+      future: Future.wait(
+        chunks.map(
+          (chunk) => FirebaseFirestore.instance
+              .collection('Events')
+              .where('organizationId', whereIn: chunk)
+              .limit(100)
+              .get(),
+        ),
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return _buildNoEventsYet();
+        }
+
+        // Merge docs, filter to upcoming/active events, then sort by selectedDateTime
+        // Calculate cutoff time: show events that haven't ended more than 3 hours ago
+        final DateTime now = DateTime.now();
+        final DateTime cutoffTime = now.subtract(const Duration(hours: 3));
+        
+        final docs =
+            snapshot.data!.expand((qs) => qs.docs).where((d) {
+              final data = d.data();
+              final startTime = (data['selectedDateTime'] as Timestamp?)?.toDate();
+              
+              // If no start time, exclude the event
+              if (startTime == null) {
+                return false;
+              }
+              
+              // Get event duration (default to 2 hours if not specified)
+              final eventDuration = (data['eventDuration'] as num?)?.toInt() ?? 2;
+              
+              // Calculate event end time: start time + duration
+              final eventEndTime = startTime.add(Duration(hours: eventDuration));
+              
+              // Include event if it hasn't ended more than 3 hours ago
+              return eventEndTime.isAfter(cutoffTime);
+            }).toList()..sort((a, b) {
+              final ad =
+                  (a.data()['selectedDateTime'] as Timestamp?)?.toDate() ??
+                  DateTime(2100);
+              final bd =
+                  (b.data()['selectedDateTime'] as Timestamp?)?.toDate() ??
+                  DateTime(2100);
+              return ad.compareTo(bd);
+            });
+
+        if (docs.isEmpty) {
+          return _buildNoEventsYet();
+        }
+
+        return ListView.separated(
+          itemCount: docs.length,
+          separatorBuilder: (_, index) => const SizedBox(height: 12),
+          itemBuilder: (context, i) {
+            final data = docs[i].data();
+            final model = _eventFromMap(docs[i].id, data);
+            return _eventTile(model);
+          },
+        );
+      },
+    );
+  }
+
+  Map<String, dynamic> _safe(Map<String, dynamic>? input) => input ?? {};
+
+  dynamic _getOrDefault(
+    Map<String, dynamic> map,
+    String key,
+    dynamic fallback,
+  ) {
+    return map.containsKey(key) ? map[key] : fallback;
+  }
+
+  EventModel _eventFromMap(String id, Map<String, dynamic>? raw) {
+    final map = _safe(raw);
+    return EventModel(
+      id: id,
+      groupName: _getOrDefault(map, 'groupName', ''),
+      title: _getOrDefault(map, 'title', ''),
+      description: _getOrDefault(map, 'description', ''),
+      location: _getOrDefault(map, 'location', ''),
+      customerUid: _getOrDefault(map, 'customerUid', ''),
+      imageUrl: _getOrDefault(map, 'imageUrl', ''),
+      selectedDateTime:
+          (_getOrDefault(map, 'selectedDateTime', null) as Timestamp?)
+              ?.toDate() ??
+          DateTime.now(),
+      eventGenerateTime:
+          (_getOrDefault(map, 'eventGenerateTime', null) as Timestamp?)
+              ?.toDate() ??
+          DateTime.now(),
+      status: _getOrDefault(map, 'status', ''),
+      getLocation: _getOrDefault(map, 'getLocation', true) == true,
+      radius: (_getOrDefault(map, 'radius', 0) as num).toDouble(),
+      longitude: (_getOrDefault(map, 'longitude', 0) as num).toDouble(),
+      latitude: (_getOrDefault(map, 'latitude', 0) as num).toDouble(),
+      private: _getOrDefault(map, 'private', false) == true,
+      categories: List<String>.from(_getOrDefault(map, 'categories', const [])),
+      eventDuration: _getOrDefault(map, 'eventDuration', 2),
+      signInMethods: List<String>.from(
+        _getOrDefault(map, 'signInMethods', const ['qr_code', 'manual_code']),
+      ),
+      manualCode: map['manualCode'],
+      organizationId: map['organizationId'],
+      accessList: List<String>.from(_getOrDefault(map, 'accessList', const [])),
+    );
+  }
+
+  Widget _eventTile(EventModel model) {
+    return SingleEventListViewItem(
+      eventModel: model,
+      onTap: () {
+        RouterClass.nextScreenNormal(
+          context,
+          SingleEventScreen(eventModel: model),
+        );
+      },
+    );
+  }
+
+  BoxDecoration _cardDeco() => BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(16),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: 0.06),
+        blurRadius: 16,
+        offset: const Offset(0, 8),
+      ),
+    ],
+  );
+
+  // Removed unused _pill helper
+
+  /// Build guest mode banner with account creation CTA
+  Widget _buildGuestBanner() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+            offset: const Offset(0, 4),
+            blurRadius: 12,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.explore_outlined,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Browsing as Guest',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Create an account for full access',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 13,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                RouterClass.nextScreenNormal(
+                  context,
+                  const CreateAccountScreen(),
+                );
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Sign Up',
+                  style: TextStyle(
+                    color: Color(0xFF667EEA),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Show dialog explaining guest mode restrictions
+  void _showGuestRestrictionDialog(GuestFeature feature) {
+    final message = GuestModeService().getFeatureRestrictionMessage(feature);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.lock_outline,
+                color: Color(0xFF667EEA),
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Account Required',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.person_add_outlined,
+              size: 64,
+              color: Color(0xFF667EEA),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 15,
+                height: 1.5,
+                fontFamily: 'Roboto',
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.check_circle_outline,
+                        color: Color(0xFF10B981),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Free account with instant access',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[700],
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.check_circle_outline,
+                        color: Color(0xFF10B981),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Create events, join groups & more',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[700],
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.grey[600],
+            ),
+            child: const Text('Maybe Later'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              RouterClass.nextScreenNormal(
+                context,
+                const CreateAccountScreen(),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF667EEA),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            child: const Text(
+              'Create Account',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -1,0 +1,75 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id "dev.flutter.flutter-gradle-plugin"
+    id "com.google.gms.google-services"
+}
+
+def kotlin_version = '2.1.0'
+
+android {
+    namespace = "com.stormdeve.orgami"
+    compileSdk = 36
+    ndkVersion = "27.0.12077973"
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled = true
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    defaultConfig {
+        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        applicationId = "com.stormdeve.orgami"
+        // You can update the following values to match your application needs.
+        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        minSdkVersion = project.findProperty('android.minSdkVersion')?.toInteger() ?: 24
+        targetSdk = rootProject.ext.targetSdkVersion
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+    }
+
+    buildTypes {
+        release {
+            // TODO: Add your own signing config for the release build.
+            // Signing with the debug keys for now, so `flutter run --release` works.
+            signingConfig = signingConfigs.debug
+            // Disable code shrinking to avoid R8 missing classes for Stripe push provisioning
+            minifyEnabled false
+            shrinkResources false
+        }
+    }
+
+    // Build only arm64 to reduce build size/time
+    packagingOptions {
+        jniLibs {
+            excludes += [
+                "**/armeabi/**",
+                "**/armeabi-v7a/**",
+                "**/x86/**",
+                "**/x86_64/**"
+            ]
+        }
+    }
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.5"
+    // Facebook SDK - disabled due to flutter_facebook_auth plugin being unused
+    // implementation 'com.facebook.android:facebook-android-sdk:17.0.2'
+    // ONNX Runtime Mobile temporarily disabled due to missing model files
+    // TODO: Re-enable after adding model files to assets/models/
+    // implementation 'com.microsoft.onnxruntime:onnxruntime-mobile:1.16.3'
+    // Coroutines for async operations
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
+}
+
+flutter {
+    source = "../.."
+}
