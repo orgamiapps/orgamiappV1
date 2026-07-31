@@ -5,52 +5,52 @@ import 'package:attendus/Utils/logger.dart';
 /// Helper class to detect platform-specific conditions
 class PlatformHelper {
   static bool? _isEmulator;
-  
+
   /// Check if the app is running on an emulator/simulator
   static Future<bool> isEmulator() async {
     // Cache the result
     if (_isEmulator != null) return _isEmulator!;
-    
+
     try {
       if (kIsWeb) {
         _isEmulator = false;
         return false;
       }
-      
+
       if (Platform.isAndroid) {
         // Check for common Android emulator properties
         // Note: This is a simplified check. In production, you might want to
         // check more properties or use a package like device_info_plus
-        final bool isAndroidEmulator = 
+        final bool isAndroidEmulator =
             Platform.resolvedExecutable.contains('emulator') ||
             Platform.resolvedExecutable.contains('simulator') ||
             (Platform.environment['ANDROID_EMULATOR_HOME'] != null) ||
-            (Platform.environment['ANDROID_SDK_ROOT'] != null && 
-             Platform.environment['USER']?.toLowerCase() == 'runner');
-        
+            (Platform.environment['ANDROID_SDK_ROOT'] != null &&
+                Platform.environment['USER']?.toLowerCase() == 'runner');
+
         _isEmulator = isAndroidEmulator;
-        
+
         if (isAndroidEmulator) {
           Logger.info('Running on Android emulator - adjusting configurations');
         }
-        
+
         return isAndroidEmulator;
       } else if (Platform.isIOS) {
         // Check for iOS simulator
         // On iOS simulator, the architecture is typically x86_64 or i386
-        final bool isIOSSimulator = 
+        final bool isIOSSimulator =
             Platform.environment['SIMULATOR_DEVICE_NAME'] != null ||
             Platform.environment['SIMULATOR_RUNTIME'] != null;
-        
+
         _isEmulator = isIOSSimulator;
-        
+
         if (isIOSSimulator) {
           Logger.info('Running on iOS simulator - adjusting configurations');
         }
-        
+
         return isIOSSimulator;
       }
-      
+
       _isEmulator = false;
       return false;
     } catch (e) {
@@ -59,7 +59,7 @@ class PlatformHelper {
       return false;
     }
   }
-  
+
   /// Check if location services should be initialized
   /// Returns false for emulators to prevent hanging
   static Future<bool> shouldInitializeLocationServices() async {
@@ -69,7 +69,7 @@ class PlatformHelper {
     }
     return true;
   }
-  
+
   /// Get appropriate timeouts based on platform
   static Duration getLocationTimeout() {
     if (_isEmulator == true) {
@@ -79,14 +79,20 @@ class PlatformHelper {
     // Normal timeout for real devices
     return const Duration(seconds: 10);
   }
-  
+
   /// Get Firebase initialization timeout
   static Duration getFirebaseTimeout() {
+    // FlutterFire loads its JavaScript modules on the first web visit. Slow or
+    // cold browser caches can legitimately take longer than five seconds, and
+    // rejecting that in-flight initialization produces a false startup error.
+    if (kIsWeb) {
+      return const Duration(seconds: 20);
+    }
+
     if (_isEmulator == true) {
       // Reduced timeout to prevent app from appearing frozen
       return const Duration(seconds: 5);
     }
-    // Reduced timeout for faster failure recovery
-    return const Duration(seconds: 5);
+    return const Duration(seconds: 10);
   }
 }
