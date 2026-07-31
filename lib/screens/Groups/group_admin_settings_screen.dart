@@ -10,7 +10,8 @@ import 'package:attendus/screens/Groups/manage_feed_posts_screen.dart';
 import 'package:attendus/screens/Groups/group_analytics_dashboard_screen.dart';
 import 'package:attendus/screens/Groups/group_location_settings_screen.dart';
 import 'package:attendus/screens/Groups/pending_events_screen.dart';
-import 'package:attendus/Utils/app_app_bar_view.dart';
+import 'package:attendus/Utils/attendus_theme.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class GroupAdminSettingsScreen extends StatefulWidget {
   final String organizationId;
@@ -94,16 +95,16 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
           child: Column(
             children: [
-              AppAppBarView.modernHeader(
-                context: context,
+              const AttendUsTopBar(
                 title: 'Admin Settings',
                 subtitle: 'Manage group settings and content',
               ),
               const Expanded(
-                child: Center(child: CircularProgressIndicator()),
+                child: AttendUsLoadingState(label: 'Loading admin tools'),
               ),
             ],
           ),
@@ -113,36 +114,19 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
 
     if (!_isAdmin || _organization == null) {
       return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
           child: Column(
             children: [
-              AppAppBarView.modernHeader(
-                context: context,
+              const AttendUsTopBar(
                 title: 'Admin Settings',
                 subtitle: 'Manage group settings and content',
               ),
               const Expanded(
-                child: Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.lock_outline, size: 64, color: Colors.grey),
-                        SizedBox(height: 16),
-                        Text(
-                          'Access Denied',
-                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'You need admin privileges to access this page.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  ),
+                child: AttendUsEmptyState(
+                  icon: Icons.lock_outline,
+                  title: 'Access denied',
+                  message: 'You need admin privileges to access this page.',
                 ),
               ),
             ],
@@ -152,123 +136,123 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
     }
 
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
-            AppAppBarView.modernHeader(
-              context: context,
+            const AttendUsTopBar(
               title: 'Admin Settings',
               subtitle: 'Manage group settings and content',
             ),
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Quick Actions Grid (Most Used)
-                    _buildSectionHeader(
-                      title: 'Quick Actions',
-                      icon: Icons.flash_on,
-                      color: const Color(0xFF667EEA),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildCompactActionsGrid([
-                      _CompactAction(
-                        icon: Icons.edit,
-                        title: 'Edit Group',
-                        subtitle: 'Details & Info',
-                        color: const Color(0xFF667EEA),
-                        onTap: () => _editGroupDetails(),
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: AttendUsTokens.pageMaxWidth,
+                  ),
+                  child: ListView(
+                    padding: AttendUsTokens.pagePadding,
+                    children: [
+                      _buildOrganizationSummary(),
+                      const SizedBox(height: 16),
+                      _buildAdminSection(
+                        title: 'Community Operations',
+                        subtitle: 'Member access, group details, and requests.',
+                        icon: Icons.admin_panel_settings_outlined,
+                        actions: [
+                          _CompactAction(
+                            icon: Icons.edit_outlined,
+                            title: 'Edit Group',
+                            subtitle: 'Details and branding',
+                            color: Theme.of(context).colorScheme.primary,
+                            onTap: _editGroupDetails,
+                            isPremium: false,
+                            isDisabled: false,
+                          ),
+                          _CompactAction(
+                            icon: Icons.people_outline,
+                            title: 'Members',
+                            subtitle: 'Roles and access',
+                            color: Theme.of(context).colorScheme.secondary,
+                            onTap: _manageMembers,
+                          ),
+                          _CompactAction(
+                            icon: Icons.person_add_alt_1_outlined,
+                            title: 'Join Requests',
+                            subtitle: 'Approve or decline',
+                            color: Theme.of(context).colorScheme.tertiary,
+                            onTap: _manageJoinRequests,
+                          ),
+                        ],
                       ),
-                      _CompactAction(
-                        icon: Icons.people,
-                        title: 'Members',
-                        subtitle: 'Manage Access',
-                        color: const Color(0xFF10B981),
-                        onTap: () => _manageMembers(),
+                      const SizedBox(height: 16),
+                      _buildAdminSection(
+                        title: 'Content & Events',
+                        subtitle: 'Moderate feed posts and event publishing.',
+                        icon: Icons.campaign_outlined,
+                        actions: [
+                          _CompactAction(
+                            icon: Icons.feed_outlined,
+                            title: 'Feed Posts',
+                            subtitle: 'Pin, hide, remove',
+                            color: Theme.of(context).colorScheme.primary,
+                            onTap: _manageFeedPosts,
+                          ),
+                          _CompactAction(
+                            icon: Icons.event_outlined,
+                            title: 'Event Settings',
+                            subtitle: 'Default visibility',
+                            color: Theme.of(context).colorScheme.secondary,
+                            onTap: _editEventSettings,
+                          ),
+                          _CompactAction(
+                            icon: Icons.event_note_outlined,
+                            title: 'Pending Events',
+                            subtitle: 'Review submissions',
+                            color: Theme.of(context).colorScheme.tertiary,
+                            onTap: _managePendingEvents,
+                          ),
+                          _CompactAction(
+                            icon: Icons.location_on_outlined,
+                            title: 'Location',
+                            subtitle: 'Group place details',
+                            color: Theme.of(context).colorScheme.error,
+                            onTap: _editLocation,
+                          ),
+                        ],
                       ),
-                      _CompactAction(
-                        icon: Icons.feed,
-                        title: 'Feed Posts',
-                        subtitle: 'Moderate Content',
-                        color: const Color(0xFFEC4899),
-                        onTap: () => _manageFeedPosts(),
+                      const SizedBox(height: 16),
+                      _buildAdminSection(
+                        title: 'Insights',
+                        subtitle: 'Understand group activity and growth.',
+                        icon: Icons.trending_up_outlined,
+                        actions: [
+                          _CompactAction(
+                            icon: Icons.analytics_outlined,
+                            title: 'Analytics',
+                            subtitle: 'View insights',
+                            color: Theme.of(context).colorScheme.secondary,
+                            onTap: _viewStatistics,
+                          ),
+                        ],
                       ),
-                      _CompactAction(
-                        icon: Icons.person_add_alt_1,
-                        title: 'Join Requests',
-                        subtitle: 'Review Pending',
-                        color: const Color(0xFFFF9800),
-                        onTap: () => _manageJoinRequests(),
+                      const SizedBox(height: 16),
+                      AttendUsPageSection(
+                        title: 'Danger Zone',
+                        subtitle: 'Destructive actions require confirmation.',
+                        icon: Icons.warning_amber_outlined,
+                        framed: true,
+                        child: AttendUsActionTile(
+                          icon: Icons.delete_forever_outlined,
+                          title: 'Delete Group',
+                          subtitle: 'Permanent removal',
+                          onTap: _showDeleteGroupDialog,
+                        ),
                       ),
-                    ]),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Content & Events Management
-                    _buildSectionHeader(
-                      title: 'Content & Events',
-                      icon: Icons.campaign,
-                      color: const Color(0xFF8B5CF6),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildCompactActionsGrid([
-                      _CompactAction(
-                        icon: Icons.event,
-                        title: 'Event Settings',
-                        subtitle: 'Default Visibility',
-                        color: const Color(0xFF3B82F6),
-                        onTap: () => _editEventSettings(),
-                      ),
-                      _CompactAction(
-                        icon: Icons.event_note,
-                        title: 'Pending Events',
-                        subtitle: 'Approve Events',
-                        color: const Color(0xFF06B6D4),
-                        onTap: () => _managePendingEvents(),
-                      ),
-                      _CompactAction(
-                        icon: Icons.location_on,
-                        title: 'Location',
-                        subtitle: 'Update Place',
-                        color: const Color(0xFFEF4444),
-                        onTap: () => _editLocation(),
-                      ),
-                    ]),
-
-                    const SizedBox(height: 24),
-
-                    // Analytics & Insights
-                    _buildSectionHeader(
-                      title: 'Insights & Growth',
-                      icon: Icons.trending_up,
-                      color: const Color(0xFF10B981),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildCompactActionsGrid([
-                      _CompactAction(
-                        icon: Icons.analytics,
-                        title: 'Analytics',
-                        subtitle: 'View Insights',
-                        color: const Color(0xFF059669),
-                        onTap: () => _viewStatistics(),
-                      ),
-                    ]),
-
-                    const SizedBox(height: 24),
-
-                    // Danger Zone
-                    _buildSectionHeader(
-                      title: 'Danger Zone',
-                      icon: Icons.warning,
-                      color: const Color(0xFFEF4444),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDangerZoneCompact(),
-
-                    const SizedBox(height: 32), // Extra space at bottom
-                  ],
+                      const SizedBox(height: 24),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -278,6 +262,71 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
     );
   }
 
+  Widget _buildOrganizationSummary() {
+    final org = _organization!;
+    return AttendUsPageSection(
+      title: org.name,
+      subtitle: 'Admin workspace',
+      icon: Icons.groups_2_outlined,
+      framed: true,
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          AttendUsStatusBadge(
+            label: org.category.isEmpty ? 'Group' : org.category,
+            tone: AttendUsStatusTone.info,
+          ),
+          AttendUsStatusBadge(
+            label: _isAdmin ? 'Admin access' : 'Limited access',
+            tone: _isAdmin
+                ? AttendUsStatusTone.success
+                : AttendUsStatusTone.warning,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdminSection({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required List<_CompactAction> actions,
+  }) {
+    return AttendUsPageSection(
+      title: title,
+      subtitle: subtitle,
+      icon: icon,
+      framed: true,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth >= 720;
+          return Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: actions
+                .map(
+                  (action) => SizedBox(
+                    width: isWide
+                        ? (constraints.maxWidth - 12) / 2
+                        : constraints.maxWidth,
+                    child: AttendUsActionTile(
+                      icon: action.icon,
+                      title: action.title,
+                      subtitle: action.subtitle,
+                      onTap: action.onTap,
+                    ),
+                  ),
+                )
+                .toList(),
+          );
+        },
+      ),
+    );
+  }
+
+  // ignore: unused_element
   Widget _buildSectionHeader({
     required String title,
     required IconData icon,
@@ -334,8 +383,8 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: action.isDisabled ?? false 
-              ? const Color(0xFFE5E7EB) 
+          color: action.isDisabled ?? false
+              ? const Color(0xFFE5E7EB)
               : action.color.withValues(alpha: 0.15),
           width: 1.5,
         ),
@@ -442,6 +491,7 @@ class _GroupAdminSettingsScreenState extends State<GroupAdminSettingsScreen> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildDangerZoneCompact() {
     return _buildCompactActionsGrid([
       _CompactAction(

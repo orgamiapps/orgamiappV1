@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:attendus/Services/subscription_service.dart';
-import 'package:attendus/screens/Events/chose_sign_in_methods_screen.dart';
+import 'package:attendus/screens/Events/create_event_screen.dart';
 import 'package:attendus/screens/Premium/premium_upgrade_screen.dart';
 import 'package:attendus/Utils/router.dart';
 
@@ -33,7 +33,7 @@ class PremiumEventCreationWrapper extends StatelessWidget {
 
         // If user has premium, allow event creation
         if (subscriptionService.canCreateEvents()) {
-          return ChoseSignInMethodsScreen(
+          return CreateEventScreen(
             selectedDateTime: selectedDateTime,
             eventDurationHours: eventDurationHours,
             preselectedOrganizationId: preselectedOrganizationId,

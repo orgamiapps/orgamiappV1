@@ -8,6 +8,7 @@ import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class PendingEventsScreen extends StatefulWidget {
   final String organizationId;
@@ -40,52 +41,21 @@ class _PendingEventsScreenState extends State<PendingEventsScreen> {
         future: _checkIfApprovalEnabled(),
         builder: (context, approvalSnapshot) {
           if (approvalSnapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const AttendUsLoadingState(label: 'Checking event approval');
           }
 
           final approvalEnabled = approvalSnapshot.data ?? false;
 
           if (!approvalEnabled) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.event_available,
-                      size: 80,
-                      color: Colors.grey.shade300,
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Event Approval Disabled',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Event approval is currently disabled for this group. Member events go live immediately.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    FilledButton.icon(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.settings),
-                      label: const Text('Go to Event Settings'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF667EEA),
-                      ),
-                    ),
-                  ],
-                ),
+            return AttendUsEmptyState(
+              icon: Icons.event_available,
+              title: 'Event approval disabled',
+              message:
+                  'Member events go live immediately because approval is not enabled for this group.',
+              action: AttendUsButton.secondary(
+                label: 'Back to settings',
+                icon: Icons.settings,
+                onPressed: () => Navigator.pop(context),
               ),
             );
           }
@@ -140,7 +110,9 @@ class _PendingEventsScreenState extends State<PendingEventsScreen> {
               }
 
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return const AttendUsLoadingState(
+                  label: 'Loading pending events',
+                );
               }
 
               // Handle both no data and empty results as "no pending events"

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:geocoding/geocoding.dart';
+import 'package:attendus/Utils/geocoding_compat.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -110,7 +110,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: FadeTransition(opacity: _fadeAnimation, child: _bodyView()),
       ),
@@ -650,7 +650,11 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(CupertinoIcons.share, color: Colors.white, size: 20),
+                    const Icon(
+                      CupertinoIcons.share,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       'Share Location',
@@ -800,10 +804,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
           'Maps: https://www.google.com/maps/search/?api=1&query=$lat,$lng';
 
       // Use the existing share functionality
-      await Share.share(
-        shareText,
-        subject: 'Event Location: $eventTitle',
-      );
+      await Share.share(shareText, subject: 'Event Location: $eventTitle');
     } catch (e) {
       if (!mounted) return;
       ShowToast().showSnackBar('Unable to share location', context);

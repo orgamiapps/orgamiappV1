@@ -12,6 +12,7 @@ import '../../models/event_model.dart';
 import '../../Utils/logger.dart';
 import '../../Utils/toast.dart';
 import '../../firebase/firebase_firestore_helper.dart';
+import '../../widgets/attendus_design_system.dart';
 import '../QRScanner/ans_questions_to_sign_in_event_screen.dart';
 import 'picture_face_enrollment_screen.dart';
 
@@ -79,17 +80,17 @@ class _FaceRecognitionScannerScreenState
     _initializeAnimations();
     _startInitialization();
   }
-  
+
   void _startInitialization() async {
     // Start initialization timeout
     _initializationTimeout = Timer(SCANNER_INIT_TIMEOUT, () {
       _handleInitializationTimeout();
     });
-    
+
     try {
       await _initializeServices();
       await _initializeCamera();
-      
+
       // Cancel timeout - initialization succeeded
       _initializationTimeout?.cancel();
     } catch (e) {
@@ -398,7 +399,7 @@ class _FaceRecognitionScannerScreenState
             .collection(AttendanceModel.firebaseKey)
             .doc(docId)
             .set(attendanceModel.toJson());
-            
+
         // Clear attendance cache so the attendance sheet updates immediately
         try {
           FirebaseFirestoreHelper().clearAttendanceCache(widget.eventModel.id);
@@ -448,34 +449,17 @@ class _FaceRecognitionScannerScreenState
   void _showErrorState(String message) {
     _updateDetectionState(FaceDetectionState.error, message);
   }
-  
+
   void _handleInitializationTimeout() {
     Logger.error('Face scanner initialization timeout after 30 seconds');
     _showErrorState('Initialization timeout. Please try again.');
     ShowToast().showNormalToast(
       msg: 'Face scanner initialization timeout. Please try again.',
     );
-    
+
     // Clean up resources
     _stopImageStream();
     _cameraController?.dispose();
-  }
-
-  Color _getStatusColor() {
-    switch (_detectionState) {
-      case FaceDetectionState.searching:
-        return Colors.blue;
-      case FaceDetectionState.detected:
-        return Colors.orange;
-      case FaceDetectionState.processing:
-        return Colors.purple;
-      case FaceDetectionState.matched:
-        return Colors.green;
-      case FaceDetectionState.notMatched:
-        return Colors.red;
-      case FaceDetectionState.error:
-        return Colors.red;
-    }
   }
 
   /// Load face enrollments into cache for faster matching
@@ -579,10 +563,13 @@ class _FaceRecognitionScannerScreenState
       backgroundColor: Colors.black,
       appBar: AppBar(
         title: Text(
-          widget.isEnrollment ? 'Enroll Face' : 'Face Recognition Sign-In',
+          widget.isEnrollment
+              ? 'Secure face enrollment'
+              : 'Face recognition check-in',
         ),
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
       ),
       body: Stack(
@@ -629,59 +616,45 @@ class _FaceRecognitionScannerScreenState
           scale: _detectionState == FaceDetectionState.processing
               ? _pulseAnimation.value
               : 1.0,
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: _getStatusColor().withValues(alpha: 0.9),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: _getStatusColor().withValues(alpha: 0.3),
-                  blurRadius: 10,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                _buildStatusIcon(),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    _statusMessage,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          child: AttendUsCameraOverlayPanel(
+            icon: _statusIcon(),
+            title: _statusMessage,
+            tone: _statusTone(),
           ),
         );
       },
     );
   }
 
-  Widget _buildStatusIcon() {
+  IconData _statusIcon() {
     switch (_detectionState) {
       case FaceDetectionState.searching:
-        return const Icon(Icons.search, color: Colors.white, size: 24);
+        return Icons.search;
       case FaceDetectionState.detected:
-        return const Icon(Icons.face, color: Colors.white, size: 24);
+        return Icons.face;
       case FaceDetectionState.processing:
-        return const SizedBox(
-          width: 24,
-          height: 24,
-          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-        );
+        return Icons.hourglass_top;
       case FaceDetectionState.matched:
-        return const Icon(Icons.check_circle, color: Colors.white, size: 24);
+        return Icons.check_circle;
       case FaceDetectionState.notMatched:
-        return const Icon(Icons.person_off, color: Colors.white, size: 24);
+        return Icons.person_off;
       case FaceDetectionState.error:
-        return const Icon(Icons.error, color: Colors.white, size: 24);
+        return Icons.error_outline;
+    }
+  }
+
+  AttendUsStatusTone _statusTone() {
+    switch (_detectionState) {
+      case FaceDetectionState.matched:
+        return AttendUsStatusTone.success;
+      case FaceDetectionState.notMatched:
+      case FaceDetectionState.error:
+        return AttendUsStatusTone.danger;
+      case FaceDetectionState.processing:
+        return AttendUsStatusTone.warning;
+      case FaceDetectionState.searching:
+      case FaceDetectionState.detected:
+        return AttendUsStatusTone.info;
     }
   }
 

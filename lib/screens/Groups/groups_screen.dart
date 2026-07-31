@@ -4,6 +4,7 @@ import 'package:attendus/firebase/organization_helper.dart';
 import 'package:attendus/screens/Groups/group_profile_screen_v2.dart';
 import 'package:attendus/screens/Groups/create_group_screen.dart';
 import 'package:attendus/Utils/cached_image.dart';
+import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
 import 'dart:async';
 
@@ -179,155 +180,213 @@ class _GroupsScreenState extends State<GroupsScreen> {
       return const AttendUsLoadingState(label: 'Loading groups');
     }
 
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Manage communities and discover new groups.',
-                            style: Theme.of(context).textTheme.bodyMedium,
+        child: Column(
+          children: [
+            AttendUsTopBar(
+              title: 'Groups',
+              subtitle: 'Manage communities and discover organizer spaces.',
+              actions: [
+                AttendUsButton.primary(
+                  label: 'Create group',
+                  icon: Icons.add,
+                  onPressed: _goToCreate,
+                ),
+              ],
+            ),
+            Expanded(
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: AttendUsTokens.pageMaxWidth,
+                  ),
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: AttendUsTokens.pagePadding,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSearchAndFilters(),
+                              const SizedBox(height: 18),
+                              _buildMyGroupsSection(),
+                              const SizedBox(height: 18),
+                              AttendUsSectionHeader(
+                                title: 'Discover Groups',
+                                subtitle:
+                                    'Find public communities by name or category.',
+                                icon: Icons.travel_explore_outlined,
+                                actions: [
+                                  AttendUsStatusBadge(
+                                    label: '${_discoverOrgs.length} shown',
+                                    tone: AttendUsStatusTone.neutral,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
+                            ],
                           ),
                         ),
-                        AttendUsButton.primary(
-                          label: 'Create',
-                          icon: Icons.add,
-                          onPressed: _goToCreate,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    AttendUsTextField(
-                      controller: _searchCtlr,
-                      hintText: 'Search groups',
-                      prefixIcon: Icons.search,
-                      onChanged: (value) {
-                        _debounce?.cancel();
-                        _debounce = Timer(
-                          const Duration(milliseconds: 300),
-                          _discover,
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'My Groups',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    _isLoadingMyOrgs
-                        ? SizedBox(
-                            height: 110,
-                            child: Center(
-                              child: SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            ),
-                          )
-                        : (_myOrgs.isEmpty
-                              ? _EmptyStateCard(onCreate: _goToCreate)
-                              : SizedBox(
-                                  height: 110,
-                                  child: ListView.separated(
-                                    scrollDirection: Axis.horizontal,
-                                    itemCount: _myOrgs.length,
-                                    separatorBuilder: (_, index) =>
-                                        const SizedBox(width: 12),
-                                    itemBuilder: (context, i) {
-                                      final org = _myOrgs[i];
-                                      return GestureDetector(
-                                        onTap: () {
-                                          final orgId = org['id'];
-                                          if (orgId == null || orgId.isEmpty) {
-                                            return;
-                                          }
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) =>
-                                                  GroupProfileScreenV2(
-                                                    organizationId: orgId,
-                                                  ),
-                                            ),
-                                          );
-                                        },
-                                        child: _pill(
-                                          org['name'] ?? '',
-                                          icon: Icons.apartment,
-                                          imageUrl: org['logoUrl'],
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                )),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Discover',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildCategoryChips(),
-                    const SizedBox(height: 8),
-                  ],
+                      ),
+                      _buildDiscoverSliver(),
+                      const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                    ],
+                  ),
                 ),
               ),
-              _isLoadingDiscover
-                  ? const SliverToBoxAdapter(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 32),
-                        child: AttendUsLoadingState(label: 'Finding groups'),
-                      ),
-                    )
-                  : SliverList.separated(
-                      itemCount: _discoverOrgs.length,
-                      separatorBuilder: (_, index) =>
-                          const SizedBox(height: 12),
-                      itemBuilder: (context, i) {
-                        final o = _discoverOrgs[i];
-                        final String logoUrl = (o['logoUrl'] ?? '').toString();
-                        return Container(
-                          decoration: _cardDeco(),
-                          child: ListTile(
-                            leading: _orgAvatar(logoUrl, size: 40, icon: Icons.apartment),
-                            title: Text(o['name']?.toString() ?? ''),
-                            subtitle: Text(
-                              o['category']?.toString() ?? 'Other',
-                            ),
-                            onTap: () {
-                              final String? orgId = o['id']?.toString();
-                              if (orgId == null || orgId.isEmpty) return;
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => GroupProfileScreenV2(
-                                    organizationId: orgId,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        );
-                      },
-                    ),
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
       floatingActionButton: null,
+    );
+  }
+
+  Widget _buildSearchAndFilters() {
+    return AttendUsPageSection(
+      title: 'Community Directory',
+      subtitle: 'Search across your groups and discover new communities.',
+      icon: Icons.groups_2_outlined,
+      framed: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AttendUsSearchField(
+            controller: _searchCtlr,
+            hintText: 'Search groups',
+            onChanged: (value) {
+              _debounce?.cancel();
+              _debounce = Timer(const Duration(milliseconds: 300), _discover);
+            },
+          ),
+          const SizedBox(height: 14),
+          _buildCategoryChips(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMyGroupsSection() {
+    if (_isLoadingMyOrgs) {
+      return const SizedBox(
+        height: 132,
+        child: AttendUsLoadingState(label: 'Loading your groups'),
+      );
+    }
+
+    return AttendUsPageSection(
+      title: 'My Groups',
+      subtitle: 'Groups where you are a member or organizer.',
+      icon: Icons.account_tree_outlined,
+      framed: true,
+      actions: [
+        AttendUsStatusBadge(
+          label: '${_myOrgs.length}',
+          tone: AttendUsStatusTone.info,
+        ),
+      ],
+      child: _myOrgs.isEmpty
+          ? _EmptyStateCard(onCreate: _goToCreate)
+          : SizedBox(
+              height: 112,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _myOrgs.length,
+                separatorBuilder: (_, index) => const SizedBox(width: 12),
+                itemBuilder: (context, i) {
+                  final org = _myOrgs[i];
+                  return _pill(
+                    org['name'] ?? '',
+                    icon: Icons.apartment,
+                    imageUrl: org['logoUrl'],
+                    onTap: () => _openGroup(org['id']),
+                  );
+                },
+              ),
+            ),
+    );
+  }
+
+  Widget _buildDiscoverSliver() {
+    if (_isLoadingDiscover) {
+      return const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 32),
+          child: AttendUsLoadingState(label: 'Finding groups'),
+        ),
+      );
+    }
+
+    if (_discoverOrgs.isEmpty) {
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: AttendUsEmptyState(
+            icon: Icons.search_off_outlined,
+            title: 'No groups found',
+            message: 'Try a different search term or category.',
+            action: AttendUsButton.secondary(
+              label: 'Clear filters',
+              icon: Icons.refresh,
+              onPressed: () {
+                _searchCtlr.clear();
+                setState(() => _selectedCategoryLower = null);
+                _discover();
+              },
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      sliver: SliverLayoutBuilder(
+        builder: (context, constraints) {
+          final crossAxisCount = constraints.crossAxisExtent >= 1040
+              ? 3
+              : constraints.crossAxisExtent >= 720
+              ? 2
+              : 1;
+          return SliverGrid(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              childAspectRatio: crossAxisCount == 1 ? 4.4 : 2.4,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            delegate: SliverChildBuilderDelegate((context, i) {
+              final org = _discoverOrgs[i];
+              return AttendUsGroupCard(
+                name: org['name']?.toString() ?? 'Untitled group',
+                description: org['description']?.toString(),
+                imageUrl: org['logoUrl']?.toString(),
+                statusLabel: org['category']?.toString() ?? 'Other',
+                memberCountLabel: org['memberCount'] == null
+                    ? null
+                    : '${org['memberCount']} members',
+                onTap: () => _openGroup(org['id']?.toString()),
+              );
+            }, childCount: _discoverOrgs.length),
+          );
+        },
+      ),
+    );
+  }
+
+  void _openGroup(String? orgId) {
+    if (orgId == null || orgId.isEmpty) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => GroupProfileScreenV2(organizationId: orgId),
+      ),
     );
   }
 
@@ -358,22 +417,15 @@ class _GroupsScreenState extends State<GroupsScreen> {
     );
   }
 
-  BoxDecoration _cardDeco() => BoxDecoration(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(16),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.black.withValues(alpha: 0.06),
-        blurRadius: 16,
-        offset: const Offset(0, 8),
-      ),
-    ],
-  );
-
-  Widget _pill(String text, {IconData? icon, String? imageUrl}) {
-    return Container(
+  Widget _pill(
+    String text, {
+    IconData? icon,
+    String? imageUrl,
+    VoidCallback? onTap,
+  }) {
+    return AttendUsCard(
+      onTap: onTap,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: _cardDeco(),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -390,7 +442,11 @@ class _GroupsScreenState extends State<GroupsScreen> {
     );
   }
 
-  Widget _orgAvatar(String imageUrl, {double size = 24, IconData icon = Icons.apartment}) {
+  Widget _orgAvatar(
+    String imageUrl, {
+    double size = 24,
+    IconData icon = Icons.apartment,
+  }) {
     if (imageUrl.isEmpty) {
       return CircleAvatar(
         radius: size / 2,
@@ -420,26 +476,19 @@ class _EmptyStateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AttendUsCard(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline, color: Color(0xFF6B7280)),
+          const Icon(Icons.info_outline),
           const SizedBox(width: 12),
           const Expanded(child: Text('You have not joined any groups yet.')),
           const SizedBox(width: 12),
-          FilledButton(onPressed: onCreate, child: const Text('Create')),
+          AttendUsButton.secondary(
+            label: 'Create',
+            icon: Icons.add,
+            onPressed: onCreate,
+          ),
         ],
       ),
     );

@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:attendus/Utils/colors.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class StepProfessionalInfo extends StatefulWidget {
-  const StepProfessionalInfo({super.key, required this.onSkip, required this.onNext});
+  const StepProfessionalInfo({
+    super.key,
+    required this.onSkip,
+    required this.onNext,
+  });
   final VoidCallback onSkip;
   final VoidCallback onNext;
 
@@ -59,18 +63,9 @@ class _StepProfessionalInfoState extends State<StepProfessionalInfo> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppThemeColor.darkBlueColor,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                    elevation: 0,
-                  ),
+                child: AttendUsButton.primary(
+                  label: 'Next',
                   onPressed: widget.onNext,
-                  child: const Text(
-                    'Next',
-                    style: TextStyle(color: Colors.white),
-                  ),
                 ),
               ),
             ],
@@ -90,36 +85,13 @@ class _StepProfessionalInfoState extends State<StepProfessionalInfo> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: TextStyle(
-              color: AppThemeColor.darkBlueColor,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            )),
-        const SizedBox(height: 8),
-        TextFormField(
+        AttendUsFormTextField(
           controller: controller,
           textCapitalization: capitalization,
           inputFormatters: inputFormatters,
-          decoration: InputDecoration(
-            hintText: 'Enter $label (optional)',
-            filled: true,
-            fillColor: Colors.grey.withValues(alpha: 0.04),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide:
-                  BorderSide(color: AppThemeColor.darkBlueColor, width: 2),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 18,
-            ),
-            prefixIcon: Icon(icon, color: AppThemeColor.lightGrayColor),
-          ),
+          labelText: label,
+          hintText: 'Enter $label (optional)',
+          prefixIcon: icon,
         ),
       ],
     );
@@ -129,44 +101,15 @@ class _StepProfessionalInfoState extends State<StepProfessionalInfo> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Bio',
-            style: TextStyle(
-              color: AppThemeColor.darkBlueColor,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            )),
-        const SizedBox(height: 8),
-        TextFormField(
+        AttendUsFormTextField(
           controller: _bioController,
           maxLines: 4,
           inputFormatters: [LengthLimitingTextInputFormatter(500)],
-          decoration: InputDecoration(
-            hintText: 'Add a short bio about yourself (optional)',
-            filled: true,
-            fillColor: Colors.grey.withValues(alpha: 0.04),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide:
-                  BorderSide(color: AppThemeColor.darkBlueColor, width: 2),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 18,
-            ),
-            prefixIcon: Padding(
-              padding: const EdgeInsets.only(bottom: 40),
-              child: Icon(Icons.edit_note_outlined,
-                  color: AppThemeColor.lightGrayColor),
-            ),
-          ),
+          labelText: 'Bio',
+          hintText: 'Add a short bio about yourself (optional)',
+          prefixIcon: Icons.edit_note_outlined,
         ),
       ],
     );
   }
 }
-
-

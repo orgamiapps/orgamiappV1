@@ -88,9 +88,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       // Load user's created events
       List<EventModel> createdEvents = [];
       try {
-        debugPrint('🔄 Loading created events for user: ${widget.user.uid}');
-        debugPrint('🔄 User email: ${widget.user.email}');
-        debugPrint('🔄 User name: ${widget.user.name}');
+        debugPrint('?? Loading created events for user: ${widget.user.uid}');
+        debugPrint('?? User email: ${widget.user.email}');
+        debugPrint('?? User name: ${widget.user.name}');
 
         final createdResult = await FirebaseFirestoreHelper()
             .getEventsCreatedByUser(
@@ -98,23 +98,23 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               limit: 50,
             ); // Consistent with My Profile screen
 
-        debugPrint('🔍 Raw createdResult: $createdResult');
-        debugPrint('🔍 createdResult type: ${createdResult.runtimeType}');
-        debugPrint('🔍 createdResult keys: ${createdResult.keys.toList()}');
+        debugPrint('?? Raw createdResult: $createdResult');
+        debugPrint('?? createdResult type: ${createdResult.runtimeType}');
+        debugPrint('?? createdResult keys: ${createdResult.keys.toList()}');
 
         createdEvents = createdResult['events'] as List<EventModel>;
-        debugPrint('🔍 Parsed createdEvents length: ${createdEvents.length}');
-        debugPrint('🔍 createdEvents type: ${createdEvents.runtimeType}');
+        debugPrint('?? Parsed createdEvents length: ${createdEvents.length}');
+        debugPrint('?? createdEvents type: ${createdEvents.runtimeType}');
 
         // Events are already sorted by the Firebase helper method
         debugPrint(
-          '✅ Loaded ${createdEvents.length} created events after sorting',
+          '? Loaded ${createdEvents.length} created events after sorting',
         );
         for (int i = 0; i < createdEvents.take(5).length; i++) {
           final event = createdEvents[i];
-          debugPrint('📝 Created Event $i: ${event.title} (ID: ${event.id})');
-          debugPrint('    📅 Date: ${event.selectedDateTime}');
-          debugPrint('    👤 Creator: ${event.customerUid}');
+          debugPrint('?? Created Event $i: ${event.title} (ID: ${event.id})');
+          debugPrint('    ?? Date: ${event.selectedDateTime}');
+          debugPrint('    ?? Creator: ${event.customerUid}');
         }
         // Save created events immediately
         if (mounted) {
@@ -122,12 +122,12 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             _createdEvents = createdEvents;
           });
           debugPrint(
-            '💾 Saved ${createdEvents.length} created events to _createdEvents',
+            '?? Saved ${createdEvents.length} created events to _createdEvents',
           );
         }
       } catch (e, stackTrace) {
-        debugPrint('❌ Error loading created events: $e');
-        debugPrint('❌ Stack trace: $stackTrace');
+        debugPrint('? Error loading created events: $e');
+        debugPrint('? Stack trace: $stackTrace');
         createdEvents = [];
         if (mounted) {
           setState(() {
@@ -139,7 +139,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       // Load user's attended events
       List<EventModel> attendedEvents = [];
       try {
-        debugPrint('🔄 Loading attended events for user: ${widget.user.uid}');
+        debugPrint('?? Loading attended events for user: ${widget.user.uid}');
         final attendedResult = await FirebaseFirestoreHelper()
             .getEventsAttendedByUser(
               widget.user.uid,
@@ -150,9 +150,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         attendedEvents.sort(
           (a, b) => b.selectedDateTime.compareTo(a.selectedDateTime),
         );
-        debugPrint('✅ Loaded ${attendedEvents.length} attended events');
+        debugPrint('? Loaded ${attendedEvents.length} attended events');
         for (int i = 0; i < attendedEvents.take(3).length; i++) {
-          debugPrint('📝 Attended Event $i: ${attendedEvents[i].title}');
+          debugPrint('?? Attended Event $i: ${attendedEvents[i].title}');
         }
         // Save attended events immediately
         if (mounted) {
@@ -161,7 +161,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           });
         }
       } catch (e) {
-        debugPrint('❌ Error loading attended events: $e');
+        debugPrint('? Error loading attended events: $e');
         attendedEvents = [];
         if (mounted) {
           setState(() {
@@ -216,7 +216,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         debugPrint('User data loaded successfully');
       }
     } catch (e) {
-      debugPrint('❌ Error loading user data: $e');
+      debugPrint('? Error loading user data: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -237,7 +237,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   Widget build(BuildContext context) {
     // Reduced build logging to prevent main thread blocking
     if (_isLoading && _createdEvents.isEmpty) {
-      debugPrint('🏗️ UserProfileScreen: Loading profile for ${widget.user.email}');
+      debugPrint(
+        '??? UserProfileScreen: Loading profile for ${widget.user.email}',
+      );
     }
 
     if (_isLoading) {
@@ -299,7 +301,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             child: CustomScrollView(
               key: PageStorageKey<String>('user_profile_${widget.user.uid}'),
               slivers: [
-                // Profile header removed – show compact info row directly
+                // Profile header removed � show compact info row directly
                 SliverToBoxAdapter(child: _buildProfileHeaderUser()),
                 // Stats Section
                 SliverToBoxAdapter(child: _buildStatsSection()),
@@ -1319,20 +1321,20 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   Widget _buildCreatedEventsTab() {
     debugPrint(
-      '🎭 Building created events tab with ${_createdEvents.length} events',
+      '?? Building created events tab with ${_createdEvents.length} events',
     );
 
     // Debug: Print first few event titles if available
     if (_createdEvents.isNotEmpty) {
       for (int i = 0; i < _createdEvents.take(3).length; i++) {
         debugPrint(
-          '🎭 Created Event $i: ${_createdEvents[i].title} (ID: ${_createdEvents[i].id})',
+          '?? Created Event $i: ${_createdEvents[i].title} (ID: ${_createdEvents[i].id})',
         );
       }
     }
 
     if (_createdEvents.isEmpty) {
-      debugPrint('🎭 Created events list is empty - showing empty state');
+      debugPrint('?? Created events list is empty - showing empty state');
       return Column(
         children: [
           _buildEmptyState(
@@ -1349,7 +1351,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                 ElevatedButton.icon(
                   onPressed: () async {
                     debugPrint(
-                      '🔄 Manual refresh requested for Created Events',
+                      '?? Manual refresh requested for Created Events',
                     );
                     await _loadUserData();
                   },
@@ -1368,7 +1370,6 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   ),
                 ),
                 SizedBox(width: 12),
-                
               ],
             ),
           ),
@@ -1409,7 +1410,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             padding: const EdgeInsets.all(16),
             child: ElevatedButton.icon(
               onPressed: () async {
-                debugPrint('🔄 Manual refresh requested for Attended Events');
+                debugPrint('?? Manual refresh requested for Attended Events');
                 await _loadUserData();
               },
               icon: Icon(Icons.refresh, size: 18),
@@ -1604,7 +1605,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   void _shareProfile() {
-    Share.share('Check out ${_getDisplayName()}\'s profile on AttendUs!');
+    Share.share('Check out ${_getDisplayName()}\'s profile on Attendus!');
   }
 
   void _showProfileOptions(BuildContext context) {
@@ -1719,12 +1720,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   void _copyProfileLink() {
     Clipboard.setData(
-      ClipboardData(text: 'https://orgami.app/profile/${widget.user.uid}'),
+      ClipboardData(text: 'https://attendus.app/profile/${widget.user.uid}'),
     );
     ShowToast().showNormalToast(msg: 'Profile link copied to clipboard');
   }
-
-  
 
   void _showEditProfileModal() {
     final nameController = TextEditingController(text: widget.user.name);
@@ -2186,7 +2185,7 @@ class _EditMediaSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Banner removed – only avatar editing remains
+        // Banner removed � only avatar editing remains
         Row(
           children: [
             // Avatar preview

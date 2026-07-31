@@ -4,7 +4,7 @@ import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Events/add_questions_to_event_screen.dart';
 import 'package:attendus/screens/Events/create_event_screen.dart';
 import 'package:attendus/Utils/router.dart';
-import 'package:attendus/Utils/app_app_bar_view.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class AddQuestionsPromptScreen extends StatefulWidget {
   final DateTime? selectedDateTime;
@@ -117,49 +117,34 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
       position: _slideAnimation,
       child: SingleChildScrollView(
         controller: _scrollController,
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 16),
-            // Subtitle
-            Text(
-              'Would you like to collect information from attendees when they sign in?',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 16,
-                fontFamily: 'Roboto',
-                height: 1.4,
-              ),
+        padding: const EdgeInsets.all(20),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 920),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AttendUsPageSection(
+                  title: 'Tickets & questions',
+                  subtitle:
+                      'Add optional sign-in prompts to collect attendee context before check-in.',
+                  icon: Icons.quiz_outlined,
+                  child: _buildQuestionOptions(),
+                ),
+                const SizedBox(height: 16),
+                _buildInfoCard(),
+              ],
             ),
-            const SizedBox(height: 24),
-            // Question Options
-            _buildQuestionOptions(),
-            const SizedBox(height: 24),
-            // Info Card
-            _buildInfoCard(),
-          ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildQuestionOptions() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            spreadRadius: 0,
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+    return AttendUsCard(
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -179,15 +164,10 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
                 ),
               ),
               const SizedBox(width: 16),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Choose Your Option',
-                  style: TextStyle(
-                    color: Color(0xFF1A1A1A),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 18,
-                    fontFamily: 'Roboto',
-                  ),
+                  'Choose an option',
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
             ],
@@ -357,72 +337,24 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
   }
 
   Widget _buildInfoCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF667EEA).withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFF667EEA).withValues(alpha: 0.15),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.info_outline,
-                  color: Color(0xFF667EEA),
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Why add sign-in prompts?',
-                style: TextStyle(
-                  color: Color(0xFF1A1A1A),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  fontFamily: 'Roboto',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Sign-in prompts help you collect valuable information from attendees, such as dietary preferences, special requirements, feedback, or contact preferences. You can always add or modify prompts later.',
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 14,
-              fontFamily: 'Roboto',
-              height: 1.4,
-            ),
-          ),
-        ],
-      ),
+    return const AttendUsActionTile(
+      icon: Icons.info_outline,
+      title: 'Why add sign-in prompts?',
+      subtitle:
+          'Prompts can collect dietary needs, accessibility requests, attendee goals, or follow-up preferences. You can always add or modify prompts later.',
+      tone: AttendUsStatusTone.info,
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnimation,
           child: Column(
             children: [
-              // Modern header with animation for hide/show
               AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeInOut,
@@ -430,14 +362,19 @@ class _AddQuestionsPromptScreenState extends State<AddQuestionsPromptScreen>
                 child: AnimatedOpacity(
                   duration: const Duration(milliseconds: 300),
                   opacity: _showHeader ? 1.0 : 0.0,
-                  child: AppAppBarView.modernHeader(
-                    context: context,
-                    title: 'Create Event',
-                    subtitle: 'Step 2 of 3',
+                  child: AttendUsTopBar(
+                    title: 'Create event',
+                    subtitle: 'Step 2: tickets and attendee questions',
+                    actions: [
+                      IconButton(
+                        tooltip: 'Back',
+                        onPressed: () => Navigator.maybePop(context),
+                        icon: const Icon(Icons.arrow_back),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              // Content
               Expanded(child: _contentView()),
             ],
           ),

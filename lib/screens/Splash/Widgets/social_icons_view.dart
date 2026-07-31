@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:attendus/firebase/firebase_google_auth_helper.dart';
 import 'package:attendus/Services/auth_service.dart';
-import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
+import 'package:attendus/widgets/attendus_auth_layout.dart';
 
 class SocialLoginView extends StatefulWidget {
   const SocialLoginView({super.key});
@@ -18,8 +18,15 @@ class _SocialLoginViewState extends State<SocialLoginView> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () async {
+    return AttendUsSocialButton(
+      icon: const FaIcon(
+        FontAwesomeIcons.google,
+        color: Color(0xFF4285F4),
+        size: 18,
+      ),
+      label: 'Continue with Google',
+      loading: _googleBtnLoading,
+      onPressed: () async {
         try {
           if (!_googleBtnLoading) {
             setState(() {
@@ -45,13 +52,19 @@ class _SocialLoginViewState extends State<SocialLoginView> {
               }
             } else {
               if (!FirebaseGoogleAuthHelper.lastGoogleCancelled) {
-                ShowToast().showNormalToast(msg: 'Google sign-in failed');
+                ShowToast().showNormalToast(
+                  msg:
+                      FirebaseGoogleAuthHelper.lastGoogleErrorMessage ??
+                      'Google sign-in failed.',
+                );
               }
             }
           }
         } catch (e) {
           ShowToast().showNormalToast(
-            msg: 'Google sign-in error: ${e.toString()}',
+            msg:
+                FirebaseGoogleAuthHelper.lastGoogleErrorMessage ??
+                'Google sign-in error: ${e.toString()}',
           );
         } finally {
           if (mounted) {
@@ -61,42 +74,6 @@ class _SocialLoginViewState extends State<SocialLoginView> {
           }
         }
       },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [AppThemeColor.darkBlueColor, Color(0xFF1E4A8C)],
-          ),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Center(
-          child: _googleBtnLoading
-              ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AppThemeColor.pureWhiteColor,
-                    ),
-                  ),
-                )
-              : FaIcon(
-                  FontAwesomeIcons.google,
-                  color: AppThemeColor.pureWhiteColor,
-                  size: 20,
-                ),
-        ),
-      ),
     );
   }
 }

@@ -7,6 +7,7 @@ import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class TicketRevenueScreen extends StatefulWidget {
   final EventModel? eventModel; // If provided, show revenue for specific event
@@ -47,7 +48,7 @@ class _TicketRevenueScreenState extends State<TicketRevenueScreen> {
         final revenue = await TicketPaymentService.getEventTicketRevenue(
           widget.eventModel!.id,
         );
-        
+
         // Load payment records for this event
         final querySnapshot = await FirebaseFirestore.instance
             .collection(TicketPaymentModel.firebaseKey)
@@ -75,7 +76,10 @@ class _TicketRevenueScreenState extends State<TicketRevenueScreen> {
         // Load all payment records for this creator
         final querySnapshot = await FirebaseFirestore.instance
             .collection(TicketPaymentModel.firebaseKey)
-            .where('creatorUid', isEqualTo: CustomerController.logeInCustomer!.uid)
+            .where(
+              'creatorUid',
+              isEqualTo: CustomerController.logeInCustomer!.uid,
+            )
             .where('status', isEqualTo: 'completed')
             .orderBy('createdAt', descending: true)
             .get();
@@ -86,9 +90,9 @@ class _TicketRevenueScreenState extends State<TicketRevenueScreen> {
 
         // Calculate revenue per event
         for (var payment in paymentList) {
-          eventRevenue[payment.eventId] = 
+          eventRevenue[payment.eventId] =
               (eventRevenue[payment.eventId] ?? 0) + payment.amount;
-          eventTicketsSold[payment.eventId] = 
+          eventTicketsSold[payment.eventId] =
               (eventTicketsSold[payment.eventId] ?? 0) + 1;
         }
 
@@ -114,44 +118,49 @@ class _TicketRevenueScreenState extends State<TicketRevenueScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF667EEA),
-        elevation: 0,
         title: Text(
-          widget.eventModel != null 
-              ? 'Ticket Revenue' 
-              : 'All Ticket Revenue',
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'Roboto',
-          ),
+          widget.eventModel != null ? 'Ticket Revenue' : 'All Ticket Revenue',
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => Navigator.pop(context),
+          tooltip: 'Back',
         ),
       ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AttendUsLoadingState(label: 'Loading revenue...')
           : RefreshIndicator(
               onRefresh: _loadRevenue,
-              color: const Color(0xFF667EEA),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (widget.eventModel != null) _buildEventInfo(),
-                    _buildRevenueOverview(),
-                    const SizedBox(height: 24),
-                    if (widget.eventModel == null && eventRevenue.isNotEmpty) ...[
-                      _buildEventBreakdown(),
-                      const SizedBox(height: 24),
-                    ],
-                    _buildTransactionList(),
-                  ],
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1080),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AttendUsPageSection(
+                          title: widget.eventModel != null
+                              ? widget.eventModel!.title
+                              : 'Ticket revenue',
+                          subtitle:
+                              'Sales summary, paid ticket activity, and event-level revenue.',
+                          icon: Icons.payments_outlined,
+                          child: const SizedBox.shrink(),
+                        ),
+                        if (widget.eventModel != null) _buildEventInfo(),
+                        _buildRevenueOverview(),
+                        const SizedBox(height: 20),
+                        if (widget.eventModel == null &&
+                            eventRevenue.isNotEmpty) ...[
+                          _buildEventBreakdown(),
+                          const SizedBox(height: 20),
+                        ],
+                        _buildTransactionList(),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -188,9 +197,7 @@ class _TicketRevenueScreenState extends State<TicketRevenueScreen> {
                 height: 60,
                 color: const Color(0xFFF5F7FA),
                 child: const Center(
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                  ),
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               ),
               errorWidget: (context, url, error) => Container(
@@ -220,8 +227,9 @@ class _TicketRevenueScreenState extends State<TicketRevenueScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  DateFormat('EEEE, MMMM dd, yyyy')
-                      .format(widget.eventModel!.selectedDateTime),
+                  DateFormat(
+                    'EEEE, MMMM dd, yyyy',
+                  ).format(widget.eventModel!.selectedDateTime),
                   style: const TextStyle(
                     fontSize: 14,
                     color: Color(0xFF6B7280),
@@ -237,100 +245,39 @@ class _TicketRevenueScreenState extends State<TicketRevenueScreen> {
   }
 
   Widget _buildRevenueOverview() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF667EEA).withValues(alpha: 0.3),
-            spreadRadius: 0,
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Total Revenue',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white70,
-              fontFamily: 'Roboto',
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '\$${totalRevenue.toStringAsFixed(2)}',
-            style: const TextStyle(
-              fontSize: 36,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              fontFamily: 'Roboto',
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildStatItem(
-                icon: Icons.confirmation_number,
-                label: 'Tickets Sold',
-                value: totalTicketsSold.toString(),
-              ),
-              if (totalTicketsSold > 0)
-                _buildStatItem(
-                  icon: Icons.attach_money,
-                  label: 'Avg. Price',
-                  value: '\$${(totalRevenue / totalTicketsSold).toStringAsFixed(2)}',
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatItem({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    final average = totalTicketsSold > 0 ? totalRevenue / totalTicketsSold : 0;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 760;
+        return GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: isWide ? 3 : 1,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: isWide ? 2.2 : 3.8,
           children: [
-            Icon(icon, size: 16, color: Colors.white70),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.white70,
-                fontFamily: 'Roboto',
-              ),
+            AttendUsMetricTile(
+              label: 'Total revenue',
+              value: '\$${totalRevenue.toStringAsFixed(2)}',
+              icon: Icons.attach_money,
+              tone: AttendUsStatusTone.success,
+            ),
+            AttendUsMetricTile(
+              label: 'Tickets sold',
+              value: '$totalTicketsSold',
+              icon: Icons.confirmation_number_outlined,
+              tone: AttendUsStatusTone.info,
+            ),
+            AttendUsMetricTile(
+              label: 'Average ticket',
+              value: '\$${average.toStringAsFixed(2)}',
+              icon: Icons.trending_up,
+              tone: AttendUsStatusTone.warning,
             ),
           ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            fontFamily: 'Roboto',
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -373,8 +320,10 @@ class _TicketRevenueScreenState extends State<TicketRevenueScreen> {
             final revenue = entry.value;
             final ticketsSold = eventTicketsSold[eventId] ?? 0;
             final eventTitle = payments
-                .firstWhere((p) => p.eventId == eventId,
-                    orElse: () => payments.first)
+                .firstWhere(
+                  (p) => p.eventId == eventId,
+                  orElse: () => payments.first,
+                )
                 .eventTitle;
 
             return Container(
@@ -490,7 +439,9 @@ class _TicketRevenueScreenState extends State<TicketRevenueScreen> {
               ),
             )
           else
-            ...payments.take(10).map((payment) => _buildTransactionItem(payment)),
+            ...payments
+                .take(10)
+                .map((payment) => _buildTransactionItem(payment)),
         ],
       ),
     );
@@ -500,12 +451,7 @@ class _TicketRevenueScreenState extends State<TicketRevenueScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: Color(0xFFE5E7EB),
-            width: 1,
-          ),
-        ),
+        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,

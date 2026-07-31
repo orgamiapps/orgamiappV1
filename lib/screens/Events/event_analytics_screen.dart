@@ -17,6 +17,7 @@ import 'package:intl/intl.dart';
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 import 'package:attendus/Services/subscription_service.dart';
 import 'package:attendus/widgets/upgrade_prompt_dialog.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class EventAnalyticsScreen extends StatefulWidget {
   final String eventId;
@@ -48,7 +49,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    
+
     // Check Premium access before loading data
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkPremiumAccess();
@@ -57,7 +58,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
 
   void _checkPremiumAccess() {
     final subscriptionService = context.read<SubscriptionService>();
-    
+
     if (!subscriptionService.canAccessAnalytics()) {
       // Show upgrade dialog and navigate back
       UpgradePromptDialog.showAnalyticsUpgrade(context).then((_) {
@@ -338,88 +339,10 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
   Widget build(BuildContext context) {
     if (!_isAuthorized) {
       return AppScaffoldWrapper(
-        backgroundColor: AppThemeColor.backGroundColor,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(
-                    Dimensions.paddingSizeLarge * 2,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppThemeColor.lightBlueColor,
-                        AppThemeColor.lightBlueColor.withValues(alpha: 0.7),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(
-                      Dimensions.radiusExtraLarge,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppThemeColor.darkBlueColor.withValues(
-                          alpha: 0.1,
-                        ),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [
-                              AppThemeColor.darkBlueColor,
-                              AppThemeColor.dullBlueColor,
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(50),
-                        ),
-                        child: const Icon(
-                          Icons.security_rounded,
-                          color: AppThemeColor.pureWhiteColor,
-                          size: 32,
-                        ),
-                      ),
-                      const SizedBox(height: Dimensions.spaceSizedLarge),
-                      const CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          AppThemeColor.darkBlueColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: Dimensions.spaceSizedLarge * 2),
-                Text(
-                  'Verifying Access',
-                  style: TextStyle(
-                    fontSize: Dimensions.fontSizeOverLarge,
-                    fontWeight: FontWeight.bold,
-                    color: AppThemeColor.darkBlueColor,
-                  ),
-                ),
-                const SizedBox(height: Dimensions.spaceSizeSmall),
-                Text(
-                  'Checking authorization for event analytics...',
-                  style: TextStyle(
-                    fontSize: Dimensions.fontSizeLarge,
-                    color: AppThemeColor.dullFontColor,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
+          child: const AttendUsLoadingState(
+            label: 'Verifying analytics access...',
           ),
         ),
       );
@@ -3041,7 +2964,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
       await Share.shareXFiles(
         [XFile(file.path)],
         subject: 'Event Analytics - ${widget.eventId}',
-        text: 'Event analytics data exported from AttendUs app',
+        text: 'Event analytics data exported from Attendus app',
       );
       if (!mounted) return;
       ShowToast().showSnackBar('Data exported successfully', context);

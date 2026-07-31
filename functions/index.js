@@ -10,8 +10,297 @@
 const {setGlobalOptions} = require("firebase-functions");
 const {onDocumentCreated, onDocumentUpdated, onDocumentWritten} = require("firebase-functions/v2/firestore");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
-const {onCall} = require("firebase-functions/v2/https");
+const {onCall, HttpsError} = require("firebase-functions/v2/https");
+const {defineSecret} = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
+
+const GOOGLE_PLACES_API_KEY = defineSecret("GOOGLE_PLACES_API_KEY");
+const placesRateWindows = new Map();
+const PLACES_RATE_LIMIT = 60;
+const PLACES_RATE_WINDOW_MS = 60 * 1000;
+
+function requirePlacesCaller(req) {
+  const uid = req.auth?.uid;
+  const provider = req.auth?.token?.firebase?.sign_in_provider;
+  if (!uid || provider === "anonymous") {
+    throw new HttpsError(
+      "unauthenticated",
+      "A signed-in account is required to search for locations.",
+    );
+  }
+
+  const now = Date.now();
+  const current = placesRateWindows.get(uid);
+  if (!current || now - current.startedAt >= PLACES_RATE_WINDOW_MS) {
+    placesRateWindows.set(uid, {startedAt: now, count: 1});
+    return uid;
+  }
+  if (current.count >= PLACES_RATE_LIMIT) {
+    throw new HttpsError(
+      "resource-exhausted",
+      "Too many location searches. Please wait a moment and try again.",
+    );
+  }
+  current.count += 1;
+  return uid;
+}
+
+function placesKey() {
+  const value = GOOGLE_PLACES_API_KEY.value().trim();
+  if (!value) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Location search is not configured.",
+    );
+  }
+  return value;
+}
+
+async function googleMapsRequest(url, options = {}) {
+  let response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch (error) {
+    logger.error("Google Maps request failed", {error: String(error)});
+    throw new HttpsError(
+      "unavailable",
+      "The location service is temporarily unavailable.",
+    );
+  }
+
+  let body = {};
+  try {
+    body = await response.json();
+  } catch (_) {
+    // The status code below still provides a stable client-facing error.
+  }
+  if (!response.ok) {
+    logger.error("Google Maps API rejected a request", {
+      status: response.status,
+      message: body?.error?.message || body?.error_message || "Unknown error",
+    });
+    if (response.status === 429) {
+      throw new HttpsError(
+        "resource-exhausted",
+        "Location search quota was reached. Please try again shortly.",
+      );
+    }
+    if (response.status === 400) {
+      throw new HttpsError("invalid-argument", "Invalid location request.");
+    }
+    if (response.status === 403) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Location search is not available. Check Maps billing and API configuration.",
+      );
+    }
+    throw new HttpsError(
+      "unavailable",
+      "The location service could not complete the request.",
+    );
+  }
+  return body;
+}
+
+function validateSessionToken(value) {
+  const token = typeof value === "string" ? value.trim() : "";
+  if (token.length < 8 || token.length > 128) {
+    throw new HttpsError("invalid-argument", "A valid session token is required.");
+  }
+  return token;
+}
+
+/**
+ * Authenticated Google Places autocomplete proxy.
+ * Input: {query, sessionToken, useCase: "event"|"groupCity", locationBias?}
+ */
+exports.placesAutocomplete = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 15,
+    invoker: "public",
+    secrets: [GOOGLE_PLACES_API_KEY],
+  },
+  async (req) => {
+    requirePlacesCaller(req);
+    const query = typeof req.data?.query === "string" ? req.data.query.trim() : "";
+    const sessionToken = validateSessionToken(req.data?.sessionToken);
+    const useCase = req.data?.useCase;
+    if (useCase !== "event" && useCase !== "groupCity") {
+      throw new HttpsError(
+        "invalid-argument",
+        "A valid location search use case is required.",
+      );
+    }
+    if (query.length < 3 || query.length > 200) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Enter at least three characters to search.",
+      );
+    }
+
+    const requestBody = {
+      input: query,
+      sessionToken,
+      includeQueryPredictions: false,
+      languageCode: "en",
+    };
+    if (useCase === "groupCity") {
+      requestBody.includedPrimaryTypes = ["(cities)"];
+      requestBody.includedRegionCodes = ["us"];
+    } else {
+      const bias = req.data?.locationBias;
+      const lat = Number(bias?.latitude);
+      const lng = Number(bias?.longitude);
+      if (bias !== undefined && (!Number.isFinite(lat) || !Number.isFinite(lng) ||
+          lat < -90 || lat > 90 || lng < -180 || lng > 180)) {
+        throw new HttpsError("invalid-argument", "Invalid location bias.");
+      }
+      if (bias !== undefined) {
+        requestBody.locationBias = {
+          circle: {
+            center: {latitude: lat, longitude: lng},
+            radius: 50000,
+          },
+        };
+      }
+    }
+
+    const body = await googleMapsRequest(
+      "https://places.googleapis.com/v1/places:autocomplete",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": placesKey(),
+          "X-Goog-FieldMask": [
+            "suggestions.placePrediction.placeId",
+            "suggestions.placePrediction.text.text",
+            "suggestions.placePrediction.structuredFormat.mainText.text",
+            "suggestions.placePrediction.structuredFormat.secondaryText.text",
+          ].join(","),
+        },
+        body: JSON.stringify(requestBody),
+      },
+    );
+
+    const predictions = (body.suggestions || [])
+      .map((suggestion) => suggestion.placePrediction)
+      .filter((prediction) => prediction?.placeId)
+      .slice(0, 8)
+      .map((prediction) => ({
+        placeId: String(prediction.placeId),
+        description: String(prediction.text?.text || ""),
+        primaryText: String(prediction.structuredFormat?.mainText?.text || ""),
+        secondaryText: String(prediction.structuredFormat?.secondaryText?.text || ""),
+      }));
+    return {predictions};
+  },
+);
+
+/** Input: {placeId, sessionToken}. */
+exports.placeDetails = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 15,
+    invoker: "public",
+    secrets: [GOOGLE_PLACES_API_KEY],
+  },
+  async (req) => {
+    requirePlacesCaller(req);
+    const placeId = typeof req.data?.placeId === "string" ? req.data.placeId.trim() : "";
+    const sessionToken = validateSessionToken(req.data?.sessionToken);
+    if (!placeId || placeId.length > 256) {
+      throw new HttpsError("invalid-argument", "A valid place ID is required.");
+    }
+
+    const query = new URLSearchParams({sessionToken, languageCode: "en"});
+    const body = await googleMapsRequest(
+      `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?${query}`,
+      {
+        headers: {
+          "X-Goog-Api-Key": placesKey(),
+          "X-Goog-FieldMask": "id,displayName,formattedAddress,location,addressComponents",
+        },
+      },
+    );
+    const latitude = Number(body.location?.latitude);
+    const longitude = Number(body.location?.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      throw new HttpsError("not-found", "That place has no map location.");
+    }
+
+    let city = "";
+    let regionCode = "";
+    for (const component of body.addressComponents || []) {
+      const types = component.types || [];
+      if (!city && ["locality", "postal_town", "administrative_area_level_2"]
+        .some((type) => types.includes(type))) {
+        city = String(component.longText || component.shortText || "");
+      }
+      if (types.includes("administrative_area_level_1")) {
+        regionCode = String(component.shortText || component.longText || "");
+      }
+    }
+    return {
+      placeId: String(body.id || placeId),
+      displayName: String(body.displayName?.text || ""),
+      formattedAddress: String(body.formattedAddress || ""),
+      city,
+      regionCode,
+      latitude,
+      longitude,
+    };
+  },
+);
+
+/** Input: {latitude, longitude}. */
+exports.reverseGeocode = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 15,
+    invoker: "public",
+    secrets: [GOOGLE_PLACES_API_KEY],
+  },
+  async (req) => {
+    requirePlacesCaller(req);
+    const latitude = Number(req.data?.latitude);
+    const longitude = Number(req.data?.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+        latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+      throw new HttpsError("invalid-argument", "Valid coordinates are required.");
+    }
+    const query = new URLSearchParams({
+      latlng: `${latitude},${longitude}`,
+      key: placesKey(),
+    });
+    const body = await googleMapsRequest(
+      `https://maps.googleapis.com/maps/api/geocode/json?${query}`,
+    );
+    if (body.status !== "OK" || !body.results?.length) {
+      if (body.status === "ZERO_RESULTS") {
+        throw new HttpsError("not-found", "No address was found for that pin.");
+      }
+      logger.error("Reverse geocoding failed", {
+        status: body.status,
+        message: body.error_message,
+      });
+      throw new HttpsError(
+        "failed-precondition",
+        "Address lookup is not configured or unavailable.",
+      );
+    }
+    return {
+      placeId: String(body.results[0].place_id || ""),
+      formattedAddress: String(body.results[0].formatted_address || ""),
+      latitude,
+      longitude,
+    };
+  },
+);
 
 // Initialize Firebase Admin SDK
 const admin = require("firebase-admin");
@@ -197,7 +486,7 @@ exports.dispatchPendingPush = onDocumentCreated("pendingPushNotifications/{docId
   const data = snap.data();
   try {
     const token = data.fcmToken;
-    const title = data.title || "AttendUs";
+    const title = data.title || "Attendus";
     const body = data.body || "New notification";
     if (!token || typeof token !== 'string' || token.length < 10) {
       logger.warn("No valid fcmToken, removing pending push", { id: snap.id });
@@ -307,9 +596,9 @@ async function generateApplePassUrl(uid, userData) {
       passTypeIdentifier: 'pass.com.attendus.badge',
       serialNumber: uid,
       teamIdentifier: 'ATTENDUS',
-      organizationName: 'AttendUs',
-      description: 'AttendUs Member Badge',
-      logoText: 'AttendUs',
+      organizationName: 'Attendus',
+      description: 'Attendus Member Badge',
+      logoText: 'Attendus',
       foregroundColor: 'rgb(255, 255, 255)',
       backgroundColor: 'rgb(70, 144, 226)',
       generic: {
@@ -324,7 +613,7 @@ async function generateApplePassUrl(uid, userData) {
           {
             key: 'name',
             label: 'Name',
-            value: userData.userName || 'AttendUs Member'
+            value: userData.userName || 'Attendus Member'
           },
           {
             key: 'member-since',
@@ -407,7 +696,7 @@ const { GoogleAuth } = require('google-auth-library');
 async function generateGoogleSaveUrl(uid, userData) {
   try {
     const badgeLevel = userData.badgeLevel || 'Member';
-    const userName = userData.userName || 'AttendUs Member';
+    const userName = userData.userName || 'Attendus Member';
     const eventsCreated = userData.eventsCreated || 0;
     const eventsAttended = userData.eventsAttended || 0;
     const memberSince = userData.memberSince ? new Date(userData.memberSince.toDate()).getFullYear() : 2024;
@@ -596,7 +885,7 @@ async function createGoogleWalletObject(objectId, classId, userData) {
     });
 
     const badgeLevel = userData.badgeLevel || 'Member';
-    const userName = userData.userName || 'AttendUs Member';
+    const userName = userData.userName || 'Attendus Member';
     const eventsCreated = userData.eventsCreated || 0;
     const eventsAttended = userData.eventsAttended || 0;
     const memberSince = userData.memberSince ? new Date(userData.memberSince.toDate()).getFullYear() : 2024;
@@ -612,7 +901,7 @@ async function createGoogleWalletObject(objectId, classId, userData) {
       cardTitle: {
         defaultValue: {
           language: 'en-US',
-          value: 'ATTENDUS'
+          value: 'Attendus'
         }
       },
       header: {
@@ -660,7 +949,7 @@ async function createGoogleWalletObject(objectId, classId, userData) {
         uris: [
           {
             uri: 'https://attendus.app',
-            description: 'AttendUs App',
+            description: 'Attendus App',
             id: 'app_link'
           }
         ]
@@ -668,7 +957,7 @@ async function createGoogleWalletObject(objectId, classId, userData) {
       barcode: {
         type: 'QR_CODE',
         value: userData.badgeQrData || `attendus://user/${userData.uid || 'unknown'}`,
-        alternateText: `AttendUs Member: ${userName}`,
+        alternateText: `Attendus Member: ${userName}`,
         renderEncoding: 'UTF_8'
       },
       heroImage: {
@@ -678,7 +967,7 @@ async function createGoogleWalletObject(objectId, classId, userData) {
         contentDescription: {
           defaultValue: {
             language: 'en-US',
-            value: 'AttendUs Professional Badge'
+            value: 'Attendus Professional Badge'
           }
         }
       }

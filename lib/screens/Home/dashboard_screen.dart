@@ -1,14 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/screens/Home/home_hub_screen.dart';
-import 'package:attendus/screens/MyProfile/my_profile_screen.dart';
-import 'package:attendus/screens/Home/notifications_screen.dart';
-import 'package:attendus/screens/Messaging/messaging_screen.dart';
-import 'package:attendus/screens/Groups/groups_screen.dart';
-import 'package:attendus/screens/Home/account_screen.dart';
+import 'package:attendus/screens/MyProfile/my_profile_screen.dart'
+    deferred as profile;
+import 'package:attendus/screens/Home/notifications_screen.dart'
+    deferred as notifications;
+import 'package:attendus/screens/Messaging/messaging_screen.dart'
+    deferred as messaging;
+import 'package:attendus/screens/Messaging/new_message_screen.dart'
+    deferred as new_message;
+import 'package:attendus/screens/Groups/groups_screen.dart' deferred as groups;
+import 'package:attendus/screens/Home/account_screen.dart' deferred as account;
 import 'package:attendus/widgets/attendus_scaffold.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Services/navigation_state_service.dart';
 import 'package:attendus/Utils/route_names.dart';
+import 'package:attendus/widgets/deferred_screen_loader.dart';
 
 class DashboardScreen extends StatefulWidget {
   final int initialIndex;
@@ -69,7 +76,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _restoreTabIndexIfNeeded() async {
     if (widget.initialIndex != 0) {
-      Logger.debug('DashboardScreen: Using provided initialIndex: $_selectedIndex');
+      Logger.debug(
+        'DashboardScreen: Using provided initialIndex: $_selectedIndex',
+      );
       return;
     }
 
@@ -92,38 +101,84 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authUser = FirebaseAuth.instance.currentUser;
     return AttendUsScaffold(
       title: _getTitleForTab(_selectedIndex),
       subtitle: _getSubtitleForTab(_selectedIndex),
       selectedIndex: _selectedIndex,
       destinations: _destinations,
-      actions: [
-        IconButton(
-          tooltip: 'Notifications',
-          onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-            );
-          },
-          icon: const Icon(Icons.notifications_none),
-        ),
-      ],
+      actions: _actionsForTab(_selectedIndex),
+      onNotificationsPressed: _openNotifications,
+      onProfilePressed: () => _selectTab(RouteNames.accountTab),
+      profileName: authUser?.displayName ?? authUser?.email,
+      profileImageUrl: authUser?.photoURL,
       onDestinationSelected: (index) {
         final normalizedIndex = _normalizeIndex(index);
-        setState(() {
-          _selectedIndex = normalizedIndex;
-          _visitedScreens.add(normalizedIndex);
-        });
-        _saveTabChange(normalizedIndex);
+        _selectTab(normalizedIndex);
       },
       body: _bodyView(),
     );
   }
 
   int _normalizeIndex(int index) {
-    if (index >= _destinations.length) return _destinations.length - 1;
-    if (index < 0) return 0;
-    return index;
+    return RouteNames.normalizeDashboardTabIndex(index);
+  }
+
+  void _selectTab(int index) {
+    final normalizedIndex = _normalizeIndex(index);
+    if (_selectedIndex == normalizedIndex) return;
+    setState(() {
+      _selectedIndex = normalizedIndex;
+      _visitedScreens.add(normalizedIndex);
+    });
+    _saveTabChange(normalizedIndex);
+  }
+
+  Future<void> _openNotifications() async {
+    try {
+      await notifications.loadLibrary();
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => notifications.NotificationsScreen()),
+      );
+    } catch (error) {
+      _showDeferredRouteError('Notifications', _openNotifications);
+    }
+  }
+
+  Future<void> _openNewMessage() async {
+    try {
+      await new_message.loadLibrary();
+      if (!mounted) return;
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => new_message.NewMessageScreen()));
+    } catch (error) {
+      _showDeferredRouteError('New message', _openNewMessage);
+    }
+  }
+
+  void _showDeferredRouteError(String label, VoidCallback retry) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$label could not be loaded.'),
+        action: SnackBarAction(label: 'Retry', onPressed: retry),
+      ),
+    );
+  }
+
+  List<Widget> _actionsForTab(int index) {
+    if (index == RouteNames.messagesTab) {
+      return [
+        IconButton(
+          tooltip: 'New message',
+          onPressed: _openNewMessage,
+          icon: const Icon(Icons.add_comment_outlined),
+        ),
+      ];
+    }
+    return const [];
   }
 
   Widget _bodyView() {
@@ -145,13 +200,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 0:
         return const HomeHubScreen();
       case 1:
-        return const GroupsScreen();
+        return DeferredScreenLoader(
+          loadLibrary: groups.loadLibrary,
+          loadingLabel: 'Loading groups',
+          builder: () => groups.GroupsScreen(),
+        );
       case 2:
-        return const MessagingScreen();
+        return DeferredScreenLoader(
+          loadLibrary: messaging.loadLibrary,
+          loadingLabel: 'Loading messages',
+          builder: () => messaging.MessagingScreen(showShellHeader: false),
+        );
       case 3:
-        return const MyProfileScreen(showBackButton: false);
+        return DeferredScreenLoader(
+          loadLibrary: profile.loadLibrary,
+          loadingLabel: 'Loading profile',
+          builder: () => profile.MyProfileScreen(showBackButton: false),
+        );
       case 4:
-        return const AccountScreen();
+        return DeferredScreenLoader(
+          loadLibrary: account.loadLibrary,
+          loadingLabel: 'Loading account',
+          builder: () => account.AccountScreen(),
+        );
       default:
         return const SizedBox.shrink();
     }
@@ -200,7 +271,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 4:
         return 'Account';
       default:
-        return 'AttendUs';
+        return 'Attendus';
     }
   }
 

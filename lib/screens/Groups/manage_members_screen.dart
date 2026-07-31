@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/Utils/attendus_theme.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class ManageMembersScreen extends StatefulWidget {
   final String organizationId;
@@ -104,168 +106,143 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Manage Members',
-          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: Colors.black87),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(120),
-          child: Column(
-            children: [
-              // Search Bar
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search members...',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    isDense: true,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            const AttendUsTopBar(
+              title: 'Manage Members',
+              subtitle: 'Search members, review roles, and update access.',
+            ),
+            Expanded(
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: AttendUsTokens.pageMaxWidth,
+                  ),
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: _getMembersStream(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return const AttendUsEmptyState(
+                          icon: Icons.error_outline,
+                          title: 'Error loading members',
+                          message: 'Please try again later.',
+                        );
+                      }
+
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const AttendUsLoadingState(
+                          label: 'Loading members',
+                        );
+                      }
+
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                        return _buildEmptyState();
+                      }
+
+                      final members = snapshot.data!.docs;
+                      final filteredMembers = _filterMembers(members);
+
+                      return ListView(
+                        padding: AttendUsTokens.pagePadding,
+                        children: [
+                          _buildMemberControls(members.length),
+                          const SizedBox(height: 16),
+                          if (filteredMembers.isEmpty)
+                            _buildEmptyState(isFiltered: true)
+                          else
+                            ...filteredMembers.map((member) {
+                              final memberData =
+                                  member.data() as Map<String, dynamic>;
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: FutureBuilder<Map<String, dynamic>>(
+                                  future: _enrichMemberData(
+                                    member.id,
+                                    memberData,
+                                  ),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.connectionState ==
+                                        ConnectionState.waiting) {
+                                      return const AttendUsListTile(
+                                        leadingIcon: Icons.person_outline,
+                                        title: 'Loading...',
+                                        subtitle: 'Please wait',
+                                      );
+                                    }
+
+                                    final enrichedData =
+                                        snapshot.data ?? memberData;
+                                    return _buildMemberCard(
+                                      member.id,
+                                      enrichedData,
+                                    );
+                                  },
+                                ),
+                              );
+                            }),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
-              // Filter Chips
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildFilterChip('All Members', 'all'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Admins', 'admin'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Members', 'member'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Pending', 'pending'),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
-      ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: _getMembersStream(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 64,
-                      color: Colors.red.shade300,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Error loading members',
-                      style: TextStyle(fontSize: 18),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return _buildEmptyState();
-          }
-
-          final members = snapshot.data!.docs;
-          final filteredMembers = _filterMembers(members);
-
-          if (filteredMembers.isEmpty) {
-            return _buildEmptyState(isFiltered: true);
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: filteredMembers.length,
-            itemBuilder: (context, index) {
-              final member = filteredMembers[index];
-              final memberData = member.data() as Map<String, dynamic>;
-
-              return FutureBuilder<Map<String, dynamic>>(
-                future: _enrichMemberData(member.id, memberData),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 24,
-                              backgroundColor: const Color(
-                                0xFF667EEA,
-                              ).withValues(alpha: 0.1),
-                              child: const Icon(
-                                Icons.person,
-                                color: Color(0xFF667EEA),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Loading...',
-                                    style: TextStyle(fontSize: 16),
-                                  ),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    'Please wait',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-
-                  final enrichedData = snapshot.data ?? memberData;
-                  return _buildMemberCard(member.id, enrichedData);
-                },
-              );
-            },
-          );
-        },
       ),
     );
   }
 
+  Widget _buildMemberControls(int totalMembers) {
+    return AttendUsPageSection(
+      title: 'Members',
+      subtitle: '$totalMembers total members',
+      icon: Icons.people_outline,
+      framed: true,
+      child: Column(
+        children: [
+          AttendUsSearchField(
+            controller: _searchController,
+            hintText: 'Search members',
+          ),
+          const SizedBox(height: 12),
+          _buildFilterChips(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChips() {
+    final options = const [
+      ('All Members', 'all'),
+      ('Admins', 'admin'),
+      ('Members', 'member'),
+      ('Pending', 'pending'),
+    ];
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: options
+            .map(
+              (option) => Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: Text(option.$1),
+                  selected: _selectedFilter == option.$2,
+                  onSelected: (_) =>
+                      setState(() => _selectedFilter = option.$2),
+                ),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+
+  // ignore: unused_element
   Widget _buildFilterChip(String label, String value) {
     final isSelected = _selectedFilter == value;
     return FilterChip(
@@ -344,33 +321,12 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
   }
 
   Widget _buildEmptyState({bool isFiltered = false}) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isFiltered ? Icons.search_off : Icons.people_outline,
-              size: 80,
-              color: Colors.grey.shade300,
-            ),
-            const SizedBox(height: 24),
-            Text(
-              isFiltered ? 'No members found' : 'No members yet',
-              style: TextStyle(fontSize: 20, color: Colors.grey.shade700),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isFiltered
-                  ? 'Try adjusting your search or filters'
-                  : 'Members will appear here when they join the group',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade500),
-            ),
-          ],
-        ),
-      ),
+    return AttendUsEmptyState(
+      icon: isFiltered ? Icons.search_off : Icons.people_outline,
+      title: isFiltered ? 'No members found' : 'No members yet',
+      message: isFiltered
+          ? 'Try adjusting your search or filters.'
+          : 'Members will appear here when they join the group.',
     );
   }
 
@@ -387,6 +343,83 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
     final isCurrentUser = memberId == _currentUserId;
 
     // Permission logic for action visibility
+    final bool canCurrentUserManage =
+        !isCurrentUser &&
+        (_isCurrentUserOwner ||
+            _isCurrentUserEventCreator ||
+            (_isCurrentUserAdmin && !isAdmin));
+
+    IconData roleIcon;
+    String roleLabel;
+    AttendUsStatusTone roleTone;
+
+    if (isOwner) {
+      roleIcon = Icons.star;
+      roleLabel = 'Owner';
+      roleTone = AttendUsStatusTone.warning;
+    } else if (isAdmin) {
+      roleIcon = Icons.admin_panel_settings;
+      roleLabel = 'Admin';
+      roleTone = AttendUsStatusTone.info;
+    } else if (isPending) {
+      roleIcon = Icons.hourglass_empty;
+      roleLabel = 'Pending';
+      roleTone = AttendUsStatusTone.warning;
+    } else {
+      roleIcon = Icons.person;
+      roleLabel = 'Member';
+      roleTone = AttendUsStatusTone.success;
+    }
+
+    return AttendUsUserRow(
+      name: name,
+      subtitle: joinedAt != null ? 'Joined ${_formatDate(joinedAt)}' : null,
+      imageUrl: profilePictureUrl,
+      onTap: () => _openMemberProfile(memberId),
+      action: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AttendUsStatusBadge(label: roleLabel, tone: roleTone, icon: roleIcon),
+          if (isCurrentUser) ...[
+            const SizedBox(width: 6),
+            const AttendUsStatusBadge(
+              label: 'You',
+              tone: AttendUsStatusTone.neutral,
+            ),
+          ],
+          if (canCurrentUserManage) ...[
+            const SizedBox(width: 4),
+            Builder(
+              builder: (context) {
+                final actions = _buildMemberActions(data);
+                if (actions.isEmpty) return const SizedBox.shrink();
+                return PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) =>
+                      _handleMemberAction(value, memberId, data),
+                  itemBuilder: (context) => actions,
+                );
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ignore: unused_element
+  Widget _buildLegacyMemberCard(String memberId, Map<String, dynamic> data) {
+    final name = data['name']?.toString() ?? 'Unknown';
+    final role = data['role']?.toString() ?? 'member';
+    final status = data['status']?.toString() ?? 'approved';
+    final joinedAt = (data['joinedAt'] as Timestamp?)?.toDate();
+    final profilePictureUrl = data['profilePictureUrl']?.toString();
+
+    final isOwner = role == 'owner';
+    final isAdmin = role == 'admin' || isOwner;
+    final isPending = status == 'pending';
+    final isCurrentUser = memberId == _currentUserId;
+
     final bool canCurrentUserManage =
         !isCurrentUser &&
         (_isCurrentUserOwner ||

@@ -24,10 +24,13 @@ import 'package:attendus/Utils/platform_helper.dart';
 import 'package:attendus/Utils/emulator_config.dart';
 import 'package:attendus/Services/firebase_initializer.dart';
 import 'package:attendus/Services/navigation_state_service.dart';
+import 'package:attendus/Utils/app_constants.dart';
+import 'package:attendus/Utils/google_maps_bootstrap.dart';
+import 'package:attendus/widgets/app_startup_gate.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
   // Initialize global error handling with better crash reporting
   ErrorHandler.initialize();
@@ -45,20 +48,22 @@ void main() async {
   // Made non-blocking to prevent startup delay
   EmulatorConfig.configureForEmulator();
 
-  // Initialize Firebase BEFORE runApp to ensure it's ready when AuthGate loads
-  // This prevents race conditions and ANR issues
   final Stopwatch startupStopwatch = Stopwatch()..start();
-  Logger.info('Initializing Firebase before app startup...');
+  Logger.info('Starting Firebase initialization in parallel with first paint');
+  final firebaseInitialization = FirebaseInitializer.initializeOnce();
 
-  try {
-    await FirebaseInitializer.initializeOnce().timeout(
-      const Duration(seconds: 5),
-      onTimeout: () {
-        Logger.warning(
-          'Firebase initialization timed out after 5 seconds, continuing anyway',
-        );
-      },
-    );
+  // Stripe configuration is synchronous and does not need to wait for Firebase.
+  Stripe.publishableKey = 'pk_test_YOUR_PUBLISHABLE_KEY';
+
+  // Build the app after Firebase is ready
+  // Use lazy initialization for providers to improve startup time
+  // OPTIMIZATION: Create ThemeProvider synchronously to avoid async SharedPreferences call on startup
+  final themeProvider = ThemeProvider();
+
+  var firebaseServicesStarted = false;
+  void onFirebaseReady() {
+    if (firebaseServicesStarted) return;
+    firebaseServicesStarted = true;
 
     if (kDebugMode) {
       Logger.success('Firebase initialized successfully');
@@ -67,20 +72,9 @@ void main() async {
       );
     }
 
-    // Initialize Stripe after Firebase
-    Stripe.publishableKey = 'pk_test_YOUR_PUBLISHABLE_KEY';
-    if (kDebugMode) {
-      Logger.info('Stripe initialized');
-    }
-  } catch (e) {
-    Logger.warning('Firebase initialization failed, app will continue: $e');
-    // Continue even if Firebase fails - app will handle gracefully
+    unawaited(_initializeBackgroundServices());
+    _scheduleProviderInitialization();
   }
-
-  // Build the app after Firebase is ready
-  // Use lazy initialization for providers to improve startup time
-  // OPTIMIZATION: Create ThemeProvider synchronously to avoid async SharedPreferences call on startup
-  final themeProvider = ThemeProvider();
 
   final Widget appWidget = MultiProvider(
     providers: [
@@ -94,12 +88,20 @@ void main() async {
         lazy: true, // Lazy load - only initialize when first accessed
       ),
     ],
-    child: const MyApp(),
+    child: MyApp(
+      firebaseInitialization: firebaseInitialization,
+      onFirebaseRetry: FirebaseInitializer.retry,
+      onFirebaseReady: onFirebaseReady,
+    ),
   );
   runApp(appWidget);
 
   // Initialize background services and theme after first frame
   WidgetsBinding.instance.addPostFrameCallback((_) async {
+    // Google Maps can take up to 15 seconds to load on a slow or filtered
+    // network. It is optional at startup and must not delay the first frame.
+    unawaited(_initializeGoogleMaps());
+
     // OPTIMIZATION: Load theme preference asynchronously without blocking UI
     // The ThemeProvider is already initialized, just load the saved preference
     Future.microtask(() async {
@@ -116,49 +118,56 @@ void main() async {
       }
     });
 
-    // Initialize background services (non-blocking)
-    _initializeBackgroundServices();
-
-    // PERFORMANCE: Delay subscription service initialization to reduce startup time
-    // OPTIMIZATION: Reduced from 2s to 1.5s to improve user experience
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      try {
-        final context = appNavigatorKey.currentContext;
-        if (context != null) {
-          final subscriptionService = Provider.of<SubscriptionService>(
-            context,
-            listen: false,
-          );
-          subscriptionService.initialize().catchError((e) {
-            Logger.warning('Subscription service initialization failed: $e');
-          });
-
-          // PERFORMANCE: Initialize creation limit service with additional delay
-          // OPTIMIZATION: Reduced from 500ms to 300ms
-          Future.delayed(const Duration(milliseconds: 300), () {
-            final creationLimitService = Provider.of<CreationLimitService>(
-              context,
-              listen: false,
-            );
-            creationLimitService.initialize().catchError((e) {
-              Logger.warning(
-                'Creation limit service initialization failed: $e',
-              );
-            });
-          });
-        }
-      } catch (e) {
-        Logger.warning('Could not initialize services: $e');
-      }
-    });
-
     if (kDebugMode) {
-      Logger.success('Background services initialization started');
       Logger.info(
-        'T+${startupStopwatch.elapsed.inMilliseconds}ms: App fully rendered',
+        'T+${startupStopwatch.elapsed.inMilliseconds}ms: First frame scheduled',
       );
     }
   });
+}
+
+void _scheduleProviderInitialization() {
+  Future.delayed(const Duration(milliseconds: 1500), () {
+    try {
+      final context = appNavigatorKey.currentContext;
+      if (context == null) return;
+
+      final subscriptionService = Provider.of<SubscriptionService>(
+        context,
+        listen: false,
+      );
+      subscriptionService.initialize().catchError((e) {
+        Logger.warning('Subscription service initialization failed: $e');
+      });
+
+      Future.delayed(const Duration(milliseconds: 300), () {
+        final currentContext = appNavigatorKey.currentContext;
+        if (currentContext == null) return;
+
+        final creationLimitService = Provider.of<CreationLimitService>(
+          currentContext,
+          listen: false,
+        );
+        creationLimitService.initialize().catchError((e) {
+          Logger.warning('Creation limit service initialization failed: $e');
+        });
+      });
+    } catch (e) {
+      Logger.warning('Could not initialize services: $e');
+    }
+  });
+}
+
+Future<void> _initializeGoogleMaps() async {
+  try {
+    await GoogleMapsBootstrap.initialize(AppConstants.googleMapsWebApiKey);
+    if (!GoogleMapsBootstrap.isAvailable &&
+        GoogleMapsBootstrap.errorMessage != null) {
+      Logger.warning(GoogleMapsBootstrap.errorMessage!);
+    }
+  } catch (e) {
+    Logger.warning('Google Maps initialization failed: $e');
+  }
 }
 
 /// Initialize background services after app startup
@@ -276,10 +285,19 @@ Future<void> _initializeBackgroundServices() async {
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key, this.homeOverride});
+  const MyApp({
+    super.key,
+    this.homeOverride,
+    this.firebaseInitialization,
+    this.onFirebaseRetry,
+    this.onFirebaseReady,
+  });
 
   // Allows tests to inject a simple home to avoid heavy initialization in widgets
   final Widget? homeOverride;
+  final Future<void>? firebaseInitialization;
+  final StartupRetry? onFirebaseRetry;
+  final VoidCallback? onFirebaseReady;
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -287,14 +305,32 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   final NavigationStateService _navStateService = NavigationStateService();
+  late Future<void> _firebaseInitialization;
 
   @override
   void initState() {
     super.initState();
+    _firebaseInitialization =
+        widget.firebaseInitialization ??
+        (widget.homeOverride != null
+            ? Future<void>.value()
+            : FirebaseInitializer.initializeOnce());
     WidgetsBinding.instance.addObserver(this);
     // Initialize navigation state service
     _navStateService.initialize();
     Logger.debug('MyApp: Added lifecycle observer');
+  }
+
+  @override
+  void didUpdateWidget(covariant MyApp oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(
+      oldWidget.firebaseInitialization,
+      widget.firebaseInitialization,
+    )) {
+      _firebaseInitialization =
+          widget.firebaseInitialization ?? Future<void>.value();
+    }
   }
 
   @override
@@ -307,7 +343,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    
+
     if (kDebugMode) {
       Logger.debug('App lifecycle state changed to: $state');
     }
@@ -319,7 +355,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         break;
       case AppLifecycleState.resumed:
         // App is coming back to foreground
-        Logger.info('App resumed - navigation state will be restored on next launch');
+        Logger.info(
+          'App resumed - navigation state will be restored on next launch',
+        );
         break;
       case AppLifecycleState.inactive:
         // App is inactive (e.g., during phone call)
@@ -342,7 +380,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       builder: (context, themeProvider, child) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
-          title: 'AttendUs',
+          title: 'Attendus',
           theme: AttendUsTheme.light,
           darkTheme: AttendUsTheme.dark,
           themeMode: themeProvider.themeMode,
@@ -354,7 +392,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             GlobalCupertinoLocalizations.delegate,
           ],
           supportedLocales: const [Locale('en')],
-          home: widget.homeOverride ?? const AuthGate(),
+          home:
+              widget.homeOverride ??
+              AppStartupGate(
+                initialization: _firebaseInitialization,
+                onRetry: widget.onFirebaseRetry ?? FirebaseInitializer.retry,
+                onReady: widget.onFirebaseReady,
+                child: const AuthGate(),
+              ),
           // Add navigation observer for debugging and state tracking
           navigatorObservers: [_NavigationLogger()],
         );
@@ -374,7 +419,7 @@ class _NavigationLogger extends NavigatorObserver {
         'Navigation: Pushed ${route.settings.name ?? 'unnamed route'}',
       );
     }
-    
+
     // Save navigation state
     _saveRouteState(route);
   }
@@ -386,7 +431,7 @@ class _NavigationLogger extends NavigatorObserver {
         'Navigation: Popped ${route.settings.name ?? 'unnamed route'}',
       );
     }
-    
+
     // Save previous route state when popping
     if (previousRoute != null) {
       _saveRouteState(previousRoute);
@@ -409,7 +454,7 @@ class _NavigationLogger extends NavigatorObserver {
         'Navigation: Replaced ${oldRoute?.settings.name ?? 'unnamed'} with ${newRoute?.settings.name ?? 'unnamed'}',
       );
     }
-    
+
     // Save new route state
     if (newRoute != null) {
       _saveRouteState(newRoute);
@@ -423,7 +468,7 @@ class _NavigationLogger extends NavigatorObserver {
       if (route is! ModalRoute || route is PopupRoute) {
         return;
       }
-      
+
       _navStateService.trackRoute(route);
     } catch (e) {
       if (kDebugMode) {

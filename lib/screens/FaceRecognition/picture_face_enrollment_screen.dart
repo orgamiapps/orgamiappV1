@@ -512,10 +512,9 @@ class _PictureFaceEnrollmentScreenState
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
-        title: Text(
-          'Face Enrollment (Picture Mode)',
-          style: TextStyle(color: Colors.white),
-        ),
+        foregroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        title: const Text('Secure face enrollment'),
         actions: const [],
       ),
       body: Stack(

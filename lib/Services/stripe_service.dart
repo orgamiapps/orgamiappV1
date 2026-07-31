@@ -28,7 +28,7 @@ class StripeService {
       Stripe.publishableKey = publishableKey;
 
       // Configure merchant identifier for Apple Pay (iOS)
-      Stripe.merchantIdentifier = 'merchant.com.yourapp.orgami';
+      Stripe.merchantIdentifier = 'merchant.app.attendus';
 
       // Configure URL scheme for return URL (Android)
       Stripe.urlScheme = 'flutterstripe';
@@ -170,7 +170,7 @@ class StripeService {
       await Stripe.instance.initPaymentSheet(
         paymentSheetParameters: SetupPaymentSheetParameters(
           paymentIntentClientSecret: clientSecret,
-          merchantDisplayName: 'Orgami',
+          merchantDisplayName: 'Attendus',
           customerId: customerId,
           customerEphemeralKeySecret: customerEphemeralKeySecret,
           style: ThemeMode.system,

@@ -4,11 +4,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
+import 'package:intl/intl.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 import 'package:attendus/firebase/engagement_predictor.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
@@ -69,7 +70,7 @@ class _SearchScreenState extends State<SearchScreen>
   Widget build(BuildContext context) {
     return AppScaffoldWrapper(
       selectedBottomNavIndex: 0, // Home tab
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: _buildAppBar(),
       body: SafeArea(
         child: Column(
@@ -93,34 +94,17 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   PreferredSizeWidget _buildAppBar() {
+    final theme = Theme.of(context);
     return AppBar(
       elevation: 0,
-      backgroundColor: Colors.white,
-      surfaceTintColor: Colors.white,
-      leading: GestureDetector(
-        onTap: () => Navigator.pop(context),
-        child: Container(
-          margin: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(
-            Icons.arrow_back_ios_new,
-            color: Color(0xFF1E293B),
-            size: 20,
-          ),
-        ),
+      backgroundColor: theme.colorScheme.surface,
+      surfaceTintColor: Colors.transparent,
+      leading: IconButton(
+        tooltip: 'Back',
+        onPressed: () => Navigator.pop(context),
+        icon: const Icon(Icons.arrow_back),
       ),
-      title: const Text(
-        'Search',
-        style: TextStyle(
-          color: Color(0xFF1E293B),
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-          fontFamily: 'Roboto',
-        ),
-      ),
+      title: Text('Search', style: theme.textTheme.titleLarge),
       centerTitle: false,
     );
   }
@@ -129,138 +113,26 @@ class _SearchScreenState extends State<SearchScreen>
     final bool isAiActive =
         _tabController.index == 0 && _searchQuery.isNotEmpty;
 
-    return Container(
-      color: Colors.white,
-      padding: EdgeInsets.fromLTRB(
-        MediaQuery.of(context).size.width * 0.05, // 5% of screen width
-        8,
-        MediaQuery.of(context).size.width * 0.05, // 5% of screen width
-        16,
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: _searchController.text.isEmpty
-                    ? const Color(0xFFE2E8F0)
-                    : isAiActive
-                    ? const Color(0xFF6366F1)
-                    : const Color(0xFF667EEA),
-                width: 1.5,
-              ),
-              boxShadow: isAiActive
-                  ? [
-                      BoxShadow(
-                        color: const Color(0xFF6366F1).withValues(alpha: 0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
-                  : null,
-            ),
-            child: Theme(
-              data: Theme.of(context).copyWith(
-                textSelectionTheme: const TextSelectionThemeData(
-                  cursorColor: Colors.black,
-                  selectionColor: Color(0x33000000),
-                  selectionHandleColor: Colors.black,
-                ),
-              ),
-              child: TextField(
-                controller: _searchController,
-                cursorColor: Colors.black,
-                decoration: InputDecoration(
-                  contentPadding: const EdgeInsets.symmetric(
-                    vertical: 16,
-                    horizontal: 16,
-                  ),
-                  border: InputBorder.none,
-                  hintText: _tabController.index == 2
-                      ? 'Find users by name or username...'
-                      : _tabController.index == 0
-                      ? 'Search events by name, category, date, or near you...'
-                      : 'Find events by name, location, or category...',
-                  hintStyle: const TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 15,
-                    fontFamily: 'Roboto',
-                  ),
-                  prefixIcon: Icon(
-                    isAiActive ? Icons.auto_awesome_rounded : Icons.search,
-                    color: isAiActive
-                        ? const Color(0xFF6366F1)
-                        : const Color(0xFF64748B),
-                    size: 22,
-                  ),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(
-                            Icons.clear,
-                            color: Color(0xFF64748B),
-                            size: 20,
-                          ),
-                          onPressed: () => _searchController.clear(),
-                        )
-                      : null,
-                ),
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 15,
-                  fontFamily: 'Roboto',
-                ),
-              ),
-            ),
+          AttendUsSearchField(
+            controller: _searchController,
+            hintText: _tabController.index == 2
+                ? 'Find users by name or username'
+                : _tabController.index == 0
+                ? 'Search public events by name, category, date, or nearby'
+                : 'Search private group events',
           ),
           if (isAiActive)
-            Container(
-              margin: const EdgeInsets.only(top: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF6366F1).withValues(alpha: 0.1),
-                    const Color(0xFF8B5CF6).withValues(alpha: 0.1),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF667EEA),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF667EEA).withValues(alpha: 0.4),
-                          blurRadius: 4,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Text(
-                    'Smart Search Active',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF6366F1),
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(
-                    Icons.psychology_rounded,
-                    size: 14,
-                    color: Color(0xFF8B5CF6),
-                  ),
-                ],
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: AttendUsStatusBadge(
+                label: 'Smart search active',
+                tone: AttendUsStatusTone.info,
+                icon: Icons.auto_awesome_rounded,
               ),
             ),
         ],
@@ -269,32 +141,20 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   Widget _buildTabBar() {
-    return Container(
-      color: Colors.white,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
       child: TabBar(
         controller: _tabController,
-        indicator: BoxDecoration(
-          color: const Color(0xFF667EEA),
-          borderRadius: BorderRadius.circular(25),
-        ),
         indicatorSize: TabBarIndicatorSize.tab,
-        indicatorPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 8,
+        indicator: BoxDecoration(
+          color: Theme.of(context).colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(12),
         ),
         dividerColor: Colors.transparent,
-        labelColor: Colors.white,
-        unselectedLabelColor: const Color(0xFF64748B),
-        labelStyle: const TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 15,
-          fontFamily: 'Roboto',
-        ),
-        unselectedLabelStyle: const TextStyle(
-          fontWeight: FontWeight.w500,
-          fontSize: 15,
-          fontFamily: 'Roboto',
-        ),
+        labelColor: Theme.of(context).colorScheme.primary,
+        unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
+        labelStyle: Theme.of(context).textTheme.labelLarge,
+        unselectedLabelStyle: Theme.of(context).textTheme.labelLarge,
         tabs: const [
           Tab(text: 'Public'),
           Tab(text: 'Private'),
@@ -781,8 +641,8 @@ class _EventsListState extends State<EventsList>
 
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: SingleEventListViewItem(
-              eventModel: _filteredEvents[index],
+            child: _SearchEventCard(
+              event: _filteredEvents[index],
               onTap: () {
                 EngagementPredictor.trackInteraction(
                   _filteredEvents[index].id,
@@ -801,6 +661,12 @@ class _EventsListState extends State<EventsList>
                     debugPrint('Error tracking recommendation interaction: $e');
                   }
                 });
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        SingleEventScreen(eventModel: _filteredEvents[index]),
+                  ),
+                );
               },
             ),
           );
@@ -1177,8 +1043,8 @@ class _OrgEventsListState extends State<OrgEventsList>
           final event = _filteredEvents[index];
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: SingleEventListViewItem(
-              eventModel: event,
+            child: _SearchEventCard(
+              event: event,
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
@@ -1526,6 +1392,30 @@ class _UsersListState extends State<UsersList>
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SearchEventCard extends StatelessWidget {
+  final EventModel event;
+  final VoidCallback? onTap;
+
+  const _SearchEventCard({required this.event, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return AttendUsEventSummaryCard(
+      title: event.title.isEmpty ? 'Untitled event' : event.title,
+      subtitle: event.groupName.isEmpty ? event.description : event.groupName,
+      imageUrl: event.imageUrl,
+      dateLabel: DateFormat('MMM d, h:mm a').format(event.selectedDateTime),
+      locationLabel: event.location.isEmpty ? 'Location TBD' : event.location,
+      statusLabel: event.private
+          ? 'Private'
+          : event.ticketsEnabled
+          ? 'Tickets'
+          : 'Public',
+      onTap: onTap,
     );
   }
 }

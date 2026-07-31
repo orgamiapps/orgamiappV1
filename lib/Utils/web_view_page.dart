@@ -51,10 +51,12 @@ class _WebViewPageState extends State<WebViewPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(widget.title),
         actions: [
           IconButton(
+            tooltip: 'Reload page',
             icon: const Icon(Icons.refresh),
             onPressed: () {
               _controller.reload();
@@ -65,7 +67,13 @@ class _WebViewPageState extends State<WebViewPage> {
       body: Stack(
         children: [
           WebViewWidget(controller: _controller),
-          if (_isLoading) const Center(child: CircularProgressIndicator()),
+          if (_isLoading)
+            const Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              child: LinearProgressIndicator(minHeight: 3),
+            ),
         ],
       ),
     );

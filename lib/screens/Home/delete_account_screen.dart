@@ -5,6 +5,7 @@ import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/Services/auth_service.dart';
 import 'package:attendus/Utils/app_app_bar_view.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class DeleteAccountScreen extends StatefulWidget {
   const DeleteAccountScreen({super.key});
@@ -43,7 +44,9 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -53,77 +56,65 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
               subtitle: 'Permanently delete your account',
             ),
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Are you sure you want to delete your account?',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'This will permanently delete your account and associated data. '
-                      'This action cannot be undone.',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildWarningItem(
-                      context,
-                      icon: Icons.delete_forever,
-                      text:
-                          'Your profile, followers, and following will be removed.',
-                    ),
-                    const SizedBox(height: 8),
-                    _buildWarningItem(
-                      context,
-                      icon: Icons.chat_bubble_outline,
-                      text: 'Your messages and comments may be deleted.',
-                    ),
-                    const SizedBox(height: 8),
-                    _buildWarningItem(
-                      context,
-                      icon: Icons.event,
-                      text:
-                          'Tickets, attendance records, and related user data will be deleted.',
-                    ),
-                    const Spacer(),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _isDeleting
-                                ? null
-                                : () => Navigator.pop(context),
-                            child: const Text('Cancel'),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 760),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: AttendUsPageSection(
+                      title: 'Permanent account deletion',
+                      subtitle:
+                          'This action removes your Attendus account and associated account data. It cannot be undone.',
+                      icon: Icons.warning_amber_rounded,
+                      framed: true,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildWarningItem(
+                            context,
+                            icon: Icons.person_remove_outlined,
+                            text:
+                                'Your profile, followers, and following will be removed.',
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton.tonal(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: const Color(0xFFEF4444),
-                              foregroundColor: Colors.white,
-                            ),
-                            onPressed: _isDeleting ? null : _handleDelete,
-                            child: _isDeleting
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                : const Text('Delete Account'),
+                          const SizedBox(height: 10),
+                          _buildWarningItem(
+                            context,
+                            icon: Icons.chat_bubble_outline,
+                            text: 'Your messages and comments may be deleted.',
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 10),
+                          _buildWarningItem(
+                            context,
+                            icon: Icons.event_busy_outlined,
+                            text:
+                                'Tickets, attendance records, and related user data will be deleted.',
+                          ),
+                          const SizedBox(height: 24),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: AttendUsButton.secondary(
+                                  label: 'Cancel',
+                                  onPressed: _isDeleting
+                                      ? null
+                                      : () => Navigator.pop(context),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: AttendUsButton.destructive(
+                                  label: 'Delete Account',
+                                  icon: Icons.delete_forever_outlined,
+                                  loading: _isDeleting,
+                                  onPressed: _handleDelete,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -141,7 +132,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: const Color(0xFFEF4444)),
+        Icon(icon, color: Theme.of(context).colorScheme.error),
         const SizedBox(width: 12),
         Expanded(
           child: Text(text, style: Theme.of(context).textTheme.bodyMedium),

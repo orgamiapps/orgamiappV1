@@ -17,10 +17,8 @@ import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:carousel_slider/carousel_slider.dart';
-import 'package:shimmer/shimmer.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/Utils/toast.dart';
@@ -31,8 +29,9 @@ import 'package:attendus/Utils/theme_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:attendus/Utils/location_helper.dart';
 import 'package:attendus/Utils/logger.dart';
-import 'package:attendus/screens/Events/chose_sign_in_methods_screen.dart';
+import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:attendus/Utils/images.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -50,7 +49,13 @@ enum SearchType { events, users }
 
 class HomeScreen extends StatefulWidget {
   final bool showHeader;
-  const HomeScreen({super.key, this.showHeader = true});
+  final bool coordinateWithParentScroll;
+
+  const HomeScreen({
+    super.key,
+    this.showHeader = true,
+    this.coordinateWithParentScroll = false,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -87,7 +92,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       SortOption.none; // Default to none which will use our custom sorting
 
   // Scroll controller and animation
-  late ScrollController _scrollController;
+  ScrollController? _scrollController;
   bool _isScrollingDown = false;
   static const double _appBarHeight = 56.0;
   double _lastScrollOffset = 0.0;
@@ -227,8 +232,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
 
     // Initialize scroll controller
-    _scrollController = ScrollController();
-    _scrollController.addListener(_onScroll);
+    if (!widget.coordinateWithParentScroll) {
+      _scrollController = ScrollController();
+      _scrollController!.addListener(_onScroll);
+    }
 
     // Initialize animations with reduced durations for better performance
     _pulseController = AnimationController(
@@ -292,7 +299,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    _scrollController?.dispose();
     _pulseController.dispose();
     _fadeController.dispose();
     _searchAnimationController.dispose();
@@ -405,21 +412,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _onScroll() {
+    final controller = _scrollController;
+    if (controller == null) return;
+    _handleScrollOffset(controller.offset);
+  }
+
+  void _handleScrollOffset(double offset) {
     // Use a threshold to prevent excessive calls during small scroll changes
     const scrollThreshold = 10.0;
 
     // Only process significant scroll changes
-    if ((_scrollController.offset - _lastScrollOffset).abs() <
-        scrollThreshold) {
+    if ((offset - _lastScrollOffset).abs() < scrollThreshold) {
       return;
     }
 
-    _lastScrollOffset = _scrollController.offset;
+    _lastScrollOffset = offset;
 
-    if (_scrollController.offset > _appBarHeight && !_isScrollingDown) {
+    if (offset > _appBarHeight && !_isScrollingDown) {
       _isScrollingDown = true;
       _animateFabOpacity(0.3);
-    } else if (_scrollController.offset <= _appBarHeight && _isScrollingDown) {
+    } else if (offset <= _appBarHeight && _isScrollingDown) {
       _isScrollingDown = false;
       _animateFabOpacity(1.0);
     }
@@ -435,7 +447,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _onFabPressed() {
-    RouterClass.nextScreenNormal(context, const ChoseSignInMethodsScreen());
+    RouterClass.nextScreenNormal(context, const PremiumEventCreationWrapper());
   }
 
   Future<void> getCurrentLocation() async {
@@ -624,27 +636,38 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return RefreshIndicator(
       onRefresh: _onRefresh,
       color: const Color(0xFF667EEA),
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: CustomScrollView(
-          controller: _scrollController,
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
-          slivers: [
-            if (widget.showHeader)
-              // Header Section as Sliver
-              SliverToBoxAdapter(child: _headerView()),
-            // Filter Section as Sliver
-            SliverToBoxAdapter(child: _filterSection()),
-            // Events Content as Sliver
-            SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [_eventsView()],
-              ),
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (widget.coordinateWithParentScroll &&
+              notification.depth == 0 &&
+              notification.metrics.axis == Axis.vertical) {
+            _handleScrollOffset(notification.metrics.pixels);
+          }
+          return false;
+        },
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: CustomScrollView(
+            controller: _scrollController,
+            primary: widget.coordinateWithParentScroll ? true : null,
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
             ),
-          ],
+            slivers: [
+              if (widget.showHeader)
+                // Header Section as Sliver
+                SliverToBoxAdapter(child: _headerView()),
+              // Filter Section as Sliver
+              SliverToBoxAdapter(child: _filterSection()),
+              // Events Content as Sliver
+              SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [_eventsView()],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -823,140 +846,204 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _filterSection() {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    return Container(
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: themeProvider.isDarkMode
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.05),
-            spreadRadius: 0,
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Distance Slider
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.location_on,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Distance',
-                    style: TextStyle(
-                      color:
-                          Theme.of(context).textTheme.titleMedium?.color ??
-                          const Color(0xFF1A1A1A),
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                      fontFamily: 'Roboto',
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF667EEA).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      // Show Global when slider is at maximum
-                      _distanceSlider >= 0.999
-                          ? 'Global'
-                          : '${radiusInMiles.toStringAsFixed(0)} mi',
-                      style: const TextStyle(
-                        color: Color(0xFF667EEA),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              GestureDetector(
-                onTap: () {
-                  _showFilterSortModal();
-                },
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF667EEA).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Stack(
-                    children: [
-                      const Center(
-                        child: Icon(
-                          Icons.tune,
-                          color: Color(0xFF667EEA),
-                          size: 20,
-                        ),
-                      ),
-                      if (selectedCategories.isNotEmpty ||
-                          currentSortOption != SortOption.none)
-                        Positioned(
-                          top: 4,
-                          right: 4,
-                          child: Container(
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFFF6B6B),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                    ],
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 760;
+          return AttendUsPageSection(
+            title: 'Discover events',
+            subtitle: wide
+                ? 'Filter public events by category, distance, and sort order.'
+                : 'Use filters to refine public events near you.',
+            icon: Icons.travel_explore_outlined,
+            framed: true,
+            padding: const EdgeInsets.all(16),
+            actions: [
+              if (!wide)
+                IconButton(
+                  tooltip: 'Filters',
+                  onPressed: _showFilterSortModal,
+                  icon: Badge(
+                    isLabelVisible:
+                        selectedCategories.isNotEmpty ||
+                        currentSortOption != SortOption.none,
+                    child: const Icon(Icons.tune),
                   ),
                 ),
-              ),
             ],
-          ),
-          const SizedBox(height: 12),
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: const Color(0xFF667EEA),
-              inactiveTrackColor: const Color(0xFFE1E5E9),
-              thumbColor: const Color(0xFF667EEA),
-              overlayColor: const Color(0xFF667EEA).withValues(alpha: 0.2),
-              trackHeight: 4,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    AttendUsStatusBadge(
+                      label: _distanceSlider >= 0.999
+                          ? 'Global'
+                          : '${radiusInMiles.toStringAsFixed(0)} mi',
+                      tone: AttendUsStatusTone.info,
+                      icon: Icons.location_on_outlined,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Slider(
+                        min: 0.0,
+                        max: 1.0,
+                        value: _distanceSlider,
+                        onChanged: (value) {
+                          setState(() {
+                            _distanceSlider = value;
+                            radiusInMiles = _mapSliderToMiles(value);
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                if (currentLocation == null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Location access is optional. Global discovery remains available.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+                if (wide) ...[
+                  const SizedBox(height: 16),
+                  _buildInlineDiscoveryFilters(),
+                ],
+              ],
             ),
-            child: Slider(
-              min: 0.0,
-              max: 1.0,
-              value: _distanceSlider,
-              onChanged: (value) {
-                setState(() {
-                  _distanceSlider = value;
-                  radiusInMiles = _mapSliderToMiles(value);
-                });
-              },
-            ),
-          ),
-        ],
+          );
+        },
       ),
+    );
+  }
+
+  IconData _homeCategoryIcon(String category) {
+    switch (category) {
+      case 'Featured':
+        return Icons.star;
+      case 'Social & Networking':
+        return Icons.people;
+      case 'Entertainment':
+        return Icons.celebration;
+      case 'Sports & Fitness':
+        return Icons.fitness_center;
+      case 'Education & Learning':
+        return Icons.school;
+      case 'Arts & Culture':
+        return Icons.palette;
+      case 'Food & Dining':
+        return Icons.restaurant;
+      case 'Technology':
+        return Icons.computer;
+      case 'Community & Charity':
+        return Icons.volunteer_activism;
+      default:
+        return Icons.category;
+    }
+  }
+
+  String _homeSortOptionText(SortOption option) {
+    switch (option) {
+      case SortOption.none:
+        return 'Upcoming';
+      case SortOption.dateAddedAsc:
+        return 'Date Added (Oldest First)';
+      case SortOption.dateAddedDesc:
+        return 'Newest';
+      case SortOption.titleAsc:
+        return 'A-Z';
+      case SortOption.titleDesc:
+        return 'Title (Z-A)';
+      case SortOption.eventDateAsc:
+        return 'Upcoming';
+      case SortOption.eventDateDesc:
+        return 'Event Date (Latest First)';
+    }
+  }
+
+  IconData _homeSortOptionIcon(SortOption option) {
+    switch (option) {
+      case SortOption.none:
+        return Icons.sort;
+      case SortOption.dateAddedAsc:
+      case SortOption.dateAddedDesc:
+        return Icons.schedule;
+      case SortOption.titleAsc:
+      case SortOption.titleDesc:
+        return Icons.sort_by_alpha;
+      case SortOption.eventDateAsc:
+      case SortOption.eventDateDesc:
+        return Icons.event;
+    }
+  }
+
+  Widget _buildInlineDiscoveryFilters() {
+    final sortOptions = [
+      SortOption.none,
+      SortOption.dateAddedDesc,
+      SortOption.titleAsc,
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Categories', style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 8),
+        AttendUsFilterChipGroup<String>(
+          multiSelect: true,
+          selectedValues: selectedCategories.toSet(),
+          options: [
+            for (final category in _allCategories)
+              AttendUsFilterOption(
+                value: category,
+                label: category,
+                icon: _homeCategoryIcon(category),
+              ),
+          ],
+          onChanged: (values) {
+            setState(() => selectedCategories = values.toList());
+          },
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Text('Sort', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final option in sortOptions)
+                    ChoiceChip(
+                      label: Text(_homeSortOptionText(option)),
+                      avatar: Icon(_homeSortOptionIcon(option), size: 16),
+                      selected: currentSortOption == option,
+                      onSelected: (_) {
+                        setState(() => currentSortOption = option);
+                      },
+                    ),
+                  if (selectedCategories.isNotEmpty ||
+                      currentSortOption != SortOption.none)
+                    ActionChip(
+                      avatar: const Icon(Icons.clear, size: 16),
+                      label: const Text('Clear'),
+                      onPressed: () {
+                        setState(() {
+                          selectedCategories = [];
+                          currentSortOption = SortOption.none;
+                        });
+                      },
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -1243,174 +1330,44 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildSkeletonLoading() {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Featured skeleton
-          Shimmer.fromColors(
-            baseColor: const Color(0xFFE1E5E9),
-            highlightColor: Colors.white,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  height: 24,
-                  width: 150,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  height: 200,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          // Events skeleton
-          ...List.generate(
-            3,
-            (index) => Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Shimmer.fromColors(
-                baseColor: const Color(0xFFE1E5E9),
-                highlightColor: Colors.white,
-                child: Container(
-                  height: 280,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+    return const Padding(
+      padding: EdgeInsets.all(32),
+      child: SizedBox(
+        height: 280,
+        child: AttendUsLoadingState(label: 'Loading public events'),
       ),
     );
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(40),
-              ),
-              child: Icon(
-                Icons.event_busy,
-                size: 40,
-                color: const Color(0xFF667EEA),
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'No Events Yet',
-              style: TextStyle(
-                color: Color(0xFF1A1A1A),
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Roboto',
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Events will appear here once they are created.\nCheck back soon!',
-              style: TextStyle(
-                color: Color(0xFF6B7280),
-                fontSize: 16,
-                fontFamily: 'Roboto',
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+    return const Padding(
+      padding: EdgeInsets.all(32),
+      child: AttendUsEmptyState(
+        icon: Icons.event_busy_outlined,
+        title: 'No events yet',
+        message: 'Public events will appear here once organizers publish them.',
       ),
     );
   }
 
   Widget _buildEmptyStateWithFilters() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(40),
-              ),
-              child: Icon(
-                Icons.filter_alt_off,
-                size: 40,
-                color: const Color(0xFF667EEA),
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'No events match your filters',
-              style: TextStyle(
-                color: Color(0xFF1A1A1A),
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Roboto',
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Try adjusting your filters or distance settings',
-              style: TextStyle(
-                color: const Color(0xFF6B7280),
-                fontSize: 16,
-                fontFamily: 'Roboto',
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  selectedCategories = ['Featured'];
-                  radiusInMiles = 0;
-                  _distanceSlider = _mapMilesToSlider(0);
-                  currentSortOption = SortOption.none;
-                });
-              },
-              icon: const Icon(Icons.clear_all),
-              label: const Text('Clear Filters'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF667EEA),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ],
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: AttendUsEmptyState(
+        icon: Icons.filter_alt_off_outlined,
+        title: 'No matching events',
+        message: 'Adjust your categories, distance, or sort settings.',
+        action: AttendUsButton.secondary(
+          label: 'Clear filters',
+          icon: Icons.clear_all,
+          onPressed: () {
+            setState(() {
+              selectedCategories = [];
+              radiusInMiles = 0;
+              _distanceSlider = _mapMilesToSlider(0);
+              currentSortOption = SortOption.none;
+            });
+          },
         ),
       ),
     );
@@ -1422,20 +1379,65 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      child: Column(
-        children: events.map((event) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: _buildEventCard(event),
-          );
-        }).toList(),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      child: AttendUsPageSection(
+        title: 'Upcoming public events',
+        subtitle:
+            '${events.length} event${events.length == 1 ? '' : 's'} available',
+        icon: Icons.event_available_outlined,
+        padding: EdgeInsets.zero,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            if (width < 680) {
+              return Column(
+                children: [
+                  for (final event in events) ...[
+                    _buildEventCard(event),
+                    const SizedBox(height: 12),
+                  ],
+                ],
+              );
+            }
+
+            final count = width >= 1040 ? 3 : 2;
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: events.length,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: count,
+                crossAxisSpacing: 14,
+                mainAxisSpacing: 14,
+                mainAxisExtent: 320,
+              ),
+              itemBuilder: (context, index) => _buildEventCard(events[index]),
+            );
+          },
+        ),
       ),
     );
   }
 
   Widget _buildEventCard(EventModel event) {
-    return SingleEventListViewItem(eventModel: event);
+    return AttendUsEventSummaryCard(
+      title: event.title.isEmpty ? 'Untitled event' : event.title,
+      subtitle: event.groupName.isEmpty ? event.description : event.groupName,
+      imageUrl: event.imageUrl,
+      dateLabel: DateFormat('MMM d, h:mm a').format(event.selectedDateTime),
+      locationLabel: event.location.isEmpty ? 'Location TBD' : event.location,
+      statusLabel: event.ticketsEnabled
+          ? 'Tickets'
+          : event.private
+          ? 'Private'
+          : 'Public',
+      onTap: () {
+        RouterClass.nextScreenNormal(
+          context,
+          SingleEventScreen(eventModel: event),
+        );
+      },
+    );
   }
 
   // Search results methods

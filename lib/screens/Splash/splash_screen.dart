@@ -1,13 +1,13 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/Services/auth_service.dart';
-import 'package:attendus/controller/customer_controller.dart';
-import 'package:attendus/models/customer_model.dart';
-
+import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/Utils/images.dart';
 import 'package:attendus/Utils/router.dart';
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/models/customer_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -18,112 +18,66 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
-  late AnimationController _logoAnimationController;
-  late AnimationController _fadeAnimationController;
-  late AnimationController _loadingAnimationController;
-
-  late Animation<double> _logoScaleAnimation;
-  late Animation<double> _logoOpacityAnimation;
-  late Animation<double> _fadeAnimation;
-  // Removed unused `_loadingAnimation` to satisfy analyzer warnings
+  late final AnimationController _logoAnimationController;
+  late final AnimationController _fadeAnimationController;
+  late final Animation<double> _logoScaleAnimation;
+  late final Animation<double> _logoOpacityAnimation;
+  late final Animation<double> _fadeAnimation;
 
   bool _isLoading = false;
   bool _hasNavigated = false;
-  String _loadingText = "Initializing...";
+  String _loadingText = 'Preparing Attendus...';
   Timer? _timeoutTimer;
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
-    // Delay the loading sequence to ensure Firebase is initialized
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _startLoadingSequence();
     });
 
-    // Fail-safe: navigate if we haven't moved within 5 seconds (reduced from 8s)
     _timeoutTimer = Timer(const Duration(seconds: 5), () {
-      if (mounted && !_hasNavigated) {
-        debugPrint('⏰ Global timeout - forcing navigation to prevent hanging');
-        _navigateToSecondSplash();
-      }
+      if (mounted && !_hasNavigated) _navigateToSecondSplash();
     });
   }
 
   void _initializeAnimations() {
-    // Logo scale and opacity animation - simplified for better performance
     _logoAnimationController = AnimationController(
-      duration: const Duration(
-        milliseconds: 400,
-      ), // Further reduced for faster startup
+      duration: const Duration(milliseconds: 400),
       vsync: this,
     );
-
-    _logoScaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+    _logoScaleAnimation = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _logoAnimationController,
-        curve: Curves.easeOutCubic, // Simpler curve than elasticOut
+        curve: Curves.easeOutCubic,
+      ),
+    );
+    _logoOpacityAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(
+        parent: _logoAnimationController,
+        curve: const Interval(0, 0.6, curve: Curves.easeIn),
       ),
     );
 
-    _logoOpacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _logoAnimationController,
-        curve: const Interval(0.0, 0.6, curve: Curves.easeIn),
-      ),
-    );
-
-    // Fade animation for text
     _fadeAnimationController = AnimationController(
-      duration: const Duration(
-        milliseconds: 300,
-      ), // Further reduced for faster startup
+      duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _fadeAnimationController, curve: Curves.easeIn),
     );
-
-    // Loading animation
-    _loadingAnimationController = AnimationController(
-      duration: const Duration(
-        milliseconds: 600,
-      ), // Further reduced for faster startup
-      vsync: this,
-    );
-
-    // Using controller directly for the loading indicator; no separate animation needed
   }
 
-  void _startLoadingSequence() async {
-    try {
-      // Start all animations in parallel for faster startup
-      _logoAnimationController.forward();
-
-      // Start fade animation with minimal delay
-      Future.delayed(const Duration(milliseconds: 200), () {
-        if (mounted) _fadeAnimationController.forward();
-      });
-
-      // Start loading animation
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted) _loadingAnimationController.repeat();
-      });
-
-      // Firebase is already initialized in main.dart
-      // Start auth check immediately without redundant initialization
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        if (!mounted || _hasNavigated) return;
-        // Start auth check immediately
-        await _getUser();
-      });
-    } catch (e) {
-      debugPrint('❌ Error in loading sequence: $e');
-      if (mounted && !_hasNavigated) {
-        _navigateToSecondSplash();
-      }
-    }
+  void _startLoadingSequence() {
+    _logoAnimationController.forward();
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) _fadeAnimationController.forward();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || _hasNavigated) return;
+      await _getUser();
+    });
   }
 
   Future<void> _getUser() async {
@@ -131,115 +85,65 @@ class _SplashScreenState extends State<SplashScreen>
 
     setState(() {
       _isLoading = true;
-      _loadingText = "Checking authentication...";
+      _loadingText = 'Checking your session...';
     });
 
     try {
-      debugPrint('🔄 Checking Firebase Auth state directly...');
-
-      // Firebase is already initialized in main.dart - skip redundant check
-      // Direct Firebase Auth check - this is immediately available
       final firebaseUser = FirebaseAuth.instance.currentUser;
       if (firebaseUser != null) {
-        debugPrint('🔍 Firebase user found directly: ${firebaseUser.uid}');
-
-        // Set minimal customer model immediately for fast navigation
         CustomerController.logeInCustomer ??= CustomerModel(
           uid: firebaseUser.uid,
           name: firebaseUser.displayName ?? '',
           email: firebaseUser.email ?? '',
           createdAt: DateTime.now(),
         );
+        await _welcomeAndNavigateHome();
 
-        setState(() {
-          _loadingText = "Welcome back!";
-        });
-
-        // Very brief pause to show welcome message
-        await Future.delayed(const Duration(milliseconds: 100));
-
-        if (!mounted || _hasNavigated) return;
-        _navigateToHome();
-
-        // Initialize AuthService in background for full functionality
         Future.microtask(() async {
           try {
             await AuthService().initialize();
-            // Try to update current user profile from Firebase Auth if incomplete
             await AuthService().updateCurrentUserProfileFromAuth();
           } catch (e) {
             debugPrint('Background AuthService init failed: $e');
           }
         });
-
         return;
       }
 
-      debugPrint('🔄 No direct Firebase user, initializing AuthService...');
-
-      // Initialize AuthService with shorter timeout for faster startup
       await AuthService().initialize().timeout(
         const Duration(milliseconds: 800),
-        onTimeout: () {
-          debugPrint('⚠️ AuthService initialization timed out');
-          // Continue without auth service if it times out
-        },
+        onTimeout: () => debugPrint('AuthService initialization timed out'),
       );
 
-      debugPrint('✅ AuthService initialized');
-
       if (!mounted || _hasNavigated) return;
-
-      // Check if user is logged in through AuthService
       if (AuthService().isLoggedIn) {
-        debugPrint('🔍 User found via AuthService');
-
-        if (!mounted || _hasNavigated) return;
-        setState(() {
-          _loadingText = "Welcome back!";
-        });
-
-        debugPrint('✅ User session restored successfully');
-
-        // Very brief pause to show welcome message
-        await Future.delayed(const Duration(milliseconds: 100));
-
-        if (!mounted || _hasNavigated) return;
-        _navigateToHome();
-
-        // Try to update user profile from Firebase Auth in background
+        await _welcomeAndNavigateHome();
         Future.microtask(() async {
           try {
-            // Run aggressive profile update on app startup
-            bool success = await AuthService().aggressiveProfileUpdate();
+            final success = await AuthService().aggressiveProfileUpdate();
             if (!success) {
-              // Fallback to regular update
               await AuthService().updateCurrentUserProfileFromAuth();
             }
-            debugPrint('Background profile update completed');
           } catch (e) {
             debugPrint('Background profile update failed: $e');
           }
         });
       } else {
-        debugPrint('🔍 No user session found, navigating to second splash');
-        if (!mounted || _hasNavigated) return;
-
-        setState(() {
-          _loadingText = "Welcome to Attendus";
-        });
-
+        setState(() => _loadingText = 'Welcome to Attendus');
         await Future.delayed(const Duration(milliseconds: 100));
-        if (!mounted || _hasNavigated) return;
-        _navigateToSecondSplash();
+        if (mounted && !_hasNavigated) _navigateToSecondSplash();
       }
     } catch (e) {
-      debugPrint('❌ Error in _getUser: $e');
-      if (mounted && !_hasNavigated) {
-        // On any error, just navigate to second splash
-        _navigateToSecondSplash();
-      }
+      debugPrint('Error checking auth state: $e');
+      if (mounted && !_hasNavigated) _navigateToSecondSplash();
     }
+  }
+
+  Future<void> _welcomeAndNavigateHome() async {
+    if (!mounted || _hasNavigated) return;
+    setState(() => _loadingText = 'Welcome back');
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (mounted && !_hasNavigated) _navigateToHome();
   }
 
   void _navigateToHome() {
@@ -262,164 +166,103 @@ class _SplashScreenState extends State<SplashScreen>
     _timeoutTimer?.cancel();
     _logoAnimationController.dispose();
     _fadeAnimationController.dispose();
-    _loadingAnimationController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFF667EEA),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Top section with logo and app name
-              Expanded(
-                flex: 3,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Logo with animation
-                      AnimatedBuilder(
-                        animation: _logoAnimationController,
-                        builder: (context, child) {
-                          return Transform.scale(
-                            scale: _logoScaleAnimation.value,
-                            child: Opacity(
-                              opacity: _logoOpacityAnimation.value,
-                              child: Container(
-                                width: 120,
-                                height: 120,
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(24),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.1,
-                                      ),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, 10),
-                                    ),
-                                  ],
-                                ),
-                                padding: const EdgeInsets.all(20),
-                                child: Image.asset(
-                                  Images.inAppLogo,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    debugPrint('❌ Error loading logo: $error');
-                                    return const Icon(
-                                      Icons.event,
-                                      size: 60,
-                                      color: Color(0xFF667EEA),
-                                    );
-                                  },
-                                ),
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  AnimatedBuilder(
+                    animation: _logoAnimationController,
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _logoScaleAnimation.value,
+                        child: Opacity(
+                          opacity: _logoOpacityAnimation.value,
+                          child: Container(
+                            width: 116,
+                            height: 116,
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surface,
+                              borderRadius: BorderRadius.circular(
+                                AttendUsTokens.radiusLg,
+                              ),
+                              border: Border.all(
+                                color: theme.colorScheme.outlineVariant,
+                              ),
+                              boxShadow: AttendUsTokens.softShadow(
+                                dark: theme.brightness == Brightness.dark,
                               ),
                             ),
-                          );
-                        },
-                      ),
-
-                      const SizedBox(height: 32),
-
-                      // App name with fade animation
-                      AnimatedBuilder(
-                        animation: _fadeAnimationController,
-                        builder: (context, child) {
-                          return Opacity(
-                            opacity: _fadeAnimation.value,
-                            child: const Column(
-                              children: [
-                                Text(
-                                  'ATTENDUS',
-                                  style: TextStyle(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    letterSpacing: 2.0,
-                                  ),
-                                ),
-                                SizedBox(height: 8),
-                                Text(
-                                  'Discover Amazing Events',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.white70,
-                                    fontWeight: FontWeight.w300,
-                                  ),
-                                ),
-                              ],
+                            child: Image.asset(
+                              Images.inAppLogo,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(
+                                  Icons.event_available,
+                                  size: 52,
+                                  color: theme.colorScheme.primary,
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // Bottom section with loading indicator
-              Expanded(
-                flex: 1,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Loading text
-                    AnimatedBuilder(
-                      animation: _fadeAnimationController,
-                      builder: (context, child) {
-                        return Opacity(
-                          opacity: _fadeAnimation.value,
-                          child: Text(
-                            _loadingText,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Colors.white70,
-                              fontWeight: FontWeight.w400,
-                            ),
-                            textAlign: TextAlign.center,
                           ),
-                        );
-                      },
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Loading indicator
-                    if (_isLoading)
-                      AnimatedBuilder(
-                        animation: _loadingAnimationController,
-                        builder: (context, child) {
-                          return SizedBox(
-                            width: 40,
-                            height: 40,
-                            child: CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white.withValues(alpha: 0.8),
-                              ),
-                              strokeWidth: 3,
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 28),
+                  AnimatedBuilder(
+                    animation: _fadeAnimationController,
+                    builder: (context, child) {
+                      return Opacity(
+                        opacity: _fadeAnimation.value,
+                        child: Column(
+                          children: [
+                            Text(
+                              'Attendus',
+                              style: theme.textTheme.headlineMedium,
+                              textAlign: TextAlign.center,
                             ),
-                          );
-                        },
-                      ),
-                  ],
-                ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Discover events, manage attendance, and check in securely.',
+                              style: theme.textTheme.bodyMedium,
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 40),
+                  Text(
+                    _loadingText,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 18),
+                  if (_isLoading)
+                    const SizedBox.square(
+                      dimension: 34,
+                      child: CircularProgressIndicator(strokeWidth: 3),
+                    ),
+                ],
               ),
-
-              // Bottom padding
-              const SizedBox(height: 40),
-            ],
+            ),
           ),
         ),
       ),

@@ -23,6 +23,11 @@ class AttendUsScaffold extends StatelessWidget {
   final ValueChanged<int> onDestinationSelected;
   final List<Widget> actions;
   final Widget? floatingActionButton;
+  final VoidCallback? onNotificationsPressed;
+  final VoidCallback? onProfilePressed;
+  final String? profileName;
+  final String? profileImageUrl;
+  final int notificationCount;
 
   const AttendUsScaffold({
     super.key,
@@ -34,14 +39,44 @@ class AttendUsScaffold extends StatelessWidget {
     required this.onDestinationSelected,
     this.actions = const [],
     this.floatingActionButton,
+    this.onNotificationsPressed,
+    this.onProfilePressed,
+    this.profileName,
+    this.profileImageUrl,
+    this.notificationCount = 0,
   });
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final useRail = width >= 900;
+    final useSideNavigation = width >= 720;
+    final useExpandedSidebar = width >= 1100;
+    final shellActions = [
+      ...actions,
+      if (onNotificationsPressed != null)
+        _NotificationButton(
+          onPressed: onNotificationsPressed!,
+          count: notificationCount,
+        ),
+      if (onProfilePressed != null)
+        _ProfileButton(
+          name: profileName,
+          imageUrl: profileImageUrl,
+          onPressed: onProfilePressed!,
+          expanded: width >= 900,
+        ),
+    ];
+    final constrainedBody = Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: AttendUsTokens.pageMaxWidth,
+        ),
+        child: body,
+      ),
+    );
 
-    if (useRail) {
+    if (useSideNavigation) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         floatingActionButton: floatingActionButton,
@@ -52,6 +87,7 @@ class AttendUsScaffold extends StatelessWidget {
                 destinations: destinations,
                 selectedIndex: selectedIndex,
                 onDestinationSelected: onDestinationSelected,
+                expanded: useExpandedSidebar,
               ),
               Expanded(
                 child: Column(
@@ -59,19 +95,9 @@ class AttendUsScaffold extends StatelessWidget {
                     AttendUsTopBar(
                       title: title,
                       subtitle: subtitle,
-                      actions: actions,
+                      actions: shellActions,
                     ),
-                    Expanded(
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            maxWidth: AttendUsTokens.pageMaxWidth,
-                          ),
-                          child: body,
-                        ),
-                      ),
-                    ),
+                    Expanded(child: constrainedBody),
                   ],
                 ),
               ),
@@ -87,8 +113,12 @@ class AttendUsScaffold extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            AttendUsTopBar(title: title, subtitle: subtitle, actions: actions),
-            Expanded(child: body),
+            AttendUsTopBar(
+              title: title,
+              subtitle: subtitle,
+              actions: shellActions,
+            ),
+            Expanded(child: constrainedBody),
           ],
         ),
       ),
@@ -112,28 +142,35 @@ class _AttendUsSidebar extends StatelessWidget {
   final int selectedIndex;
   final List<AttendUsNavDestination> destinations;
   final ValueChanged<int> onDestinationSelected;
+  final bool expanded;
 
   const _AttendUsSidebar({
     required this.selectedIndex,
     required this.destinations,
     required this.onDestinationSelected,
+    required this.expanded,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      width: AttendUsTokens.sidebarWidth,
+      width: expanded ? AttendUsTokens.sidebarWidth : 88,
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        border: Border(right: BorderSide(color: theme.colorScheme.outlineVariant)),
+        border: Border(
+          right: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+            padding: EdgeInsets.fromLTRB(16, 20, expanded ? 20 : 16, 16),
             child: Row(
+              mainAxisAlignment: expanded
+                  ? MainAxisAlignment.start
+                  : MainAxisAlignment.center,
               children: [
                 Container(
                   width: 38,
@@ -147,8 +184,10 @@ class _AttendUsSidebar extends StatelessWidget {
                     color: theme.colorScheme.onPrimary,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Text('AttendUs', style: theme.textTheme.titleLarge),
+                if (expanded) ...[
+                  const SizedBox(width: 12),
+                  Text('Attendus', style: theme.textTheme.titleLarge),
+                ],
               ],
             ),
           ),
@@ -167,8 +206,9 @@ class _AttendUsSidebar extends StatelessWidget {
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(AttendUsTokens.radiusMd),
                   child: InkWell(
-                    borderRadius:
-                        BorderRadius.circular(AttendUsTokens.radiusMd),
+                    borderRadius: BorderRadius.circular(
+                      AttendUsTokens.radiusMd,
+                    ),
                     onTap: () => onDestinationSelected(index),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
@@ -176,6 +216,9 @@ class _AttendUsSidebar extends StatelessWidget {
                         vertical: 12,
                       ),
                       child: Row(
+                        mainAxisAlignment: expanded
+                            ? MainAxisAlignment.start
+                            : MainAxisAlignment.center,
                         children: [
                           Icon(
                             selected
@@ -185,15 +228,21 @@ class _AttendUsSidebar extends StatelessWidget {
                                 ? theme.colorScheme.primary
                                 : theme.colorScheme.onSurfaceVariant,
                           ),
-                          const SizedBox(width: 12),
-                          Text(
-                            destination.label,
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              color: selected
-                                  ? theme.colorScheme.primary
-                                  : theme.colorScheme.onSurfaceVariant,
+                          if (expanded) ...[
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                destination.label,
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  color: selected
+                                      ? theme.colorScheme.primary
+                                      : theme.colorScheme.onSurfaceVariant,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
@@ -202,14 +251,124 @@ class _AttendUsSidebar extends StatelessWidget {
               },
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              'Professional event operations for organizers and attendees.',
-              style: theme.textTheme.bodySmall,
+          if (expanded)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Professional event operations for organizers and attendees.',
+                style: theme.textTheme.bodySmall,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NotificationButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  final int count;
+
+  const _NotificationButton({required this.onPressed, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          tooltip: 'Notifications',
+          onPressed: onPressed,
+          icon: const Icon(Icons.notifications_none),
+        ),
+        if (count > 0)
+          Positioned(
+            right: 7,
+            top: 7,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.error,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: theme.colorScheme.surface,
+                  width: 1.5,
+                ),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                count > 99 ? '99+' : count.toString(),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onError,
+                  fontSize: 10,
+                  height: 1,
+                ),
+              ),
             ),
           ),
-        ],
+      ],
+    );
+  }
+}
+
+class _ProfileButton extends StatelessWidget {
+  final String? name;
+  final String? imageUrl;
+  final VoidCallback onPressed;
+  final bool expanded;
+
+  const _ProfileButton({
+    required this.name,
+    required this.imageUrl,
+    required this.onPressed,
+    required this.expanded,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final displayName = (name == null || name!.trim().isEmpty)
+        ? 'Account'
+        : name!.trim();
+    return Tooltip(
+      message: displayName,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AttendUsTokens.radiusMd),
+        onTap: onPressed,
+        child: Container(
+          height: 40,
+          padding: EdgeInsets.only(
+            left: 6,
+            right: expanded ? 10 : 6,
+            top: 4,
+            bottom: 4,
+          ),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(AttendUsTokens.radiusMd),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AttendUsAvatar(imageUrl: imageUrl, name: displayName, size: 30),
+              if (expanded) ...[
+                const SizedBox(width: 8),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 140),
+                  child: Text(
+                    displayName,
+                    style: theme.textTheme.labelLarge,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:attendus/firebase/organization_helper.dart';
 import 'package:attendus/Utils/router.dart';
-import 'package:attendus/screens/Events/chose_sign_in_methods_screen.dart';
+import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 
 class SelectGroupScreen extends StatefulWidget {
   const SelectGroupScreen({super.key});
@@ -35,7 +35,7 @@ class _SelectGroupScreenState extends State<SelectGroupScreen> {
   void _goToDateTime(String organizationId) {
     RouterClass.nextScreenNormal(
       context,
-      ChoseSignInMethodsScreen(
+      PremiumEventCreationWrapper(
         preselectedOrganizationId: organizationId,
         forceOrganizationEvent: true,
       ),

@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>AttendUs</string>
+	<string>Attendus</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIconFile</key>
@@ -50,15 +50,15 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>AttendUs needs camera access to scan QR codes for event check-ins, ticket verification, facial recognition sign-in, and activating NFC badges at events you attend.</string>
+	<string>Attendus needs camera access to scan QR codes for event check-ins, ticket verification, facial recognition sign-in, and activating NFC badges at events you attend.</string>
 	<key>NSFaceIDUsageDescription</key>
-	<string>AttendUs uses facial recognition to provide secure and convenient sign-in to events you attend. Your biometric data is processed locally and stored securely.</string>
+	<string>Attendus uses facial recognition to provide secure and convenient sign-in to events you attend. Your biometric data is processed locally and stored securely.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>AttendUs uses your location to help you discover nearby events, show event locations on the map, and provide location-based event recommendations.</string>
+	<string>Attendus uses your location to help you discover nearby events, show event locations on the map, and provide location-based event recommendations.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>AttendUs needs access to your photo library to let you upload profile pictures, event photos, and images for the events and groups you create.</string>
+	<string>Attendus needs access to your photo library to let you upload profile pictures, event photos, and images for the events and groups you create.</string>
 	<key>NFCReaderUsageDescription</key>
-	<string>AttendUs uses NFC to activate and verify your event tickets by tapping your badge or phone at event entrances for contactless check-in.</string>
+	<string>Attendus uses NFC to activate and verify your event tickets by tapping your badge or phone at event entrances for contactless check-in.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
@@ -70,16 +70,16 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.951311475019-vrmcjm9inlpdi66qupst3op5c81e74el</string>
+				<string>com.googleusercontent.apps.951311475019-qib9ha5vjl17rhveej77tisuj1gahos1</string>
 			</array>
 		</dict>
 	</array>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>AttendUs needs permission to save event tickets, QR codes, and event photos to your photo library for easy offline access and sharing.</string>
+	<string>Attendus needs permission to save event tickets, QR codes, and event photos to your photo library for easy offline access and sharing.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>GMSApiKey</key>
-	<string>AIzaSyAf1t5cToh1UoF7R52vTSJxMajw8CvmVUA</string>
+	<string>$(GOOGLE_MAPS_IOS_API_KEY)</string>
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<true/>
 </dict>

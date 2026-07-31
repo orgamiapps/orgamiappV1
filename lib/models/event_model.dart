@@ -6,6 +6,8 @@ class EventModel {
 
   String id, groupName, title, description, location, customerUid, imageUrl;
   String? locationName; // Optional display name for the venue/location
+  String locationType; // 'in_person' or 'online'
+  String? placeId;
 
   DateTime selectedDateTime, eventGenerateTime;
 
@@ -22,22 +24,20 @@ class EventModel {
   int issuedTickets;
   double? ticketPrice; // Price per ticket in USD
   bool ticketUpgradeEnabled; // Whether skip-the-line upgrades are available
-  double?
-  ticketUpgradePrice; // Price to upgrade to skip-the-line (total price, not additional)
+  double? ticketUpgradePrice; // Total skip-the-line upgrade price
   int eventDuration; // Duration in hours
   List<String> coHosts; // Array of user IDs who are co-hosts
   String? organizationId; // Optional organization context for the event
-  List<String>
-  accessList; // For private events outside org or additional invitees
+  List<String> accessList; // Private-event invitees outside the organization
 
   // Sign-in methods configuration
   // Legacy support: ['qr_code', 'manual_code', 'geofence', 'facial_recognition']
-  List<String> signInMethods; 
-  
+  List<String> signInMethods;
+
   // New security tier system
   // Options: 'most_secure', 'geofence_only', 'regular', 'all'
   String? signInSecurityTier;
-  
+
   String? manualCode; // Custom manual code for the event
 
   // Live Quiz configuration
@@ -65,6 +65,8 @@ class EventModel {
     required this.latitude,
     required this.longitude,
     this.locationName,
+    this.locationType = 'in_person',
+    this.placeId,
     this.categories = const [],
     this.isFeatured = false,
     this.featureEndDate,
@@ -100,6 +102,8 @@ class EventModel {
       description: data['description'],
       location: data['location'],
       locationName: data['locationName'],
+      locationType: data['locationType'] == 'online' ? 'online' : 'in_person',
+      placeId: data['placeId'],
       imageUrl: data['imageUrl'],
       customerUid: data['customerUid'],
       status: data['status'],
@@ -113,9 +117,9 @@ class EventModel {
                 DateTime.now(),
       private: data['private'],
       getLocation: data['getLocation'] ?? false,
-      latitude: data['latitude'] ?? 0.0,
-      longitude: data['longitude'] ?? 0.0,
-      radius: data['radius'] ?? 1.0,
+      latitude: (data['latitude'] as num?)?.toDouble() ?? 0.0,
+      longitude: (data['longitude'] as num?)?.toDouble() ?? 0.0,
+      radius: (data['radius'] as num?)?.toDouble() ?? 1.0,
       categories: (data.containsKey('categories') && data['categories'] != null)
           ? List<String>.from(data['categories'])
           : [],
@@ -214,17 +218,19 @@ class EventModel {
           break;
       }
     }
-    
+
     // Legacy support: check individual methods
     return signInMethods.contains(method);
   }
-  
+
   /// Get available sign-in methods based on security tier
   List<String> getAvailableSignInMethods() {
     if (signInSecurityTier != null) {
       switch (signInSecurityTier) {
         case 'most_secure':
-          return ['most_secure']; // Special indicator for geofence + facial combo
+          return [
+            'most_secure',
+          ]; // Special indicator for geofence + facial combo
         case 'geofence_only':
           return ['geofence'];
         case 'regular':
@@ -235,17 +241,17 @@ class EventModel {
           break;
       }
     }
-    
+
     // Legacy support
     return signInMethods;
   }
-  
+
   /// Check if the event requires geofence-based sign-in
   bool get requiresGeofence {
-    return signInSecurityTier == 'most_secure' || 
-           signInSecurityTier == 'geofence_only' ||
-           signInSecurityTier == 'all' ||
-           signInMethods.contains('geofence');
+    return signInSecurityTier == 'most_secure' ||
+        signInSecurityTier == 'geofence_only' ||
+        signInSecurityTier == 'all' ||
+        signInMethods.contains('geofence');
   }
 
   /// Get the manual code for the event (generates one if not set)
@@ -259,23 +265,38 @@ class EventModel {
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
+    final isOnline = locationType == 'online';
+    final normalizedSecurityTier =
+        isOnline &&
+            (signInSecurityTier == 'most_secure' ||
+                signInSecurityTier == 'geofence_only' ||
+                signInSecurityTier == 'all')
+        ? 'regular'
+        : signInSecurityTier;
+    final normalizedSignInMethods = isOnline
+        ? signInMethods.where((method) => method != 'geofence').toList()
+        : signInMethods;
 
     data['id'] = id;
     data['groupName'] = groupName;
     data['title'] = title;
     data['description'] = description;
     data['location'] = location;
-    if (locationName != null) data['locationName'] = locationName;
+    // Include nullable location metadata so Firestore update() clears stale
+    // physical-place fields when an event is changed to online.
+    data['locationName'] = isOnline ? null : locationName;
+    data['locationType'] = locationType;
+    data['placeId'] = isOnline || placeId?.isEmpty == true ? null : placeId;
     data['imageUrl'] = imageUrl;
     data['customerUid'] = customerUid;
     data['status'] = status;
     data['selectedDateTime'] = selectedDateTime;
     data['eventGenerateTime'] = eventGenerateTime;
     data['private'] = private;
-    data['getLocation'] = getLocation;
-    data['radius'] = radius;
-    data['longitude'] = longitude;
-    data['latitude'] = latitude;
+    data['getLocation'] = isOnline ? false : getLocation;
+    data['radius'] = isOnline ? 0.0 : radius;
+    data['longitude'] = isOnline ? 0.0 : longitude;
+    data['latitude'] = isOnline ? 0.0 : latitude;
     data['categories'] = categories;
     data['isFeatured'] = isFeatured;
     data['featureEndDate'] = featureEndDate;
@@ -284,14 +305,17 @@ class EventModel {
     data['issuedTickets'] = issuedTickets;
     if (ticketPrice != null) data['ticketPrice'] = ticketPrice;
     data['ticketUpgradeEnabled'] = ticketUpgradeEnabled;
-    if (ticketUpgradePrice != null)
+    if (ticketUpgradePrice != null) {
       data['ticketUpgradePrice'] = ticketUpgradePrice;
+    }
     data['eventDuration'] = eventDuration;
     data['coHosts'] = coHosts;
     if (organizationId != null) data['organizationId'] = organizationId;
     data['accessList'] = accessList;
-    data['signInMethods'] = signInMethods;
-    if (signInSecurityTier != null) data['signInSecurityTier'] = signInSecurityTier;
+    data['signInMethods'] = normalizedSignInMethods;
+    if (normalizedSecurityTier != null) {
+      data['signInSecurityTier'] = normalizedSecurityTier;
+    }
     if (manualCode != null) data['manualCode'] = manualCode;
     data['hasLiveQuiz'] = hasLiveQuiz;
     if (liveQuizId != null) data['liveQuizId'] = liveQuizId;

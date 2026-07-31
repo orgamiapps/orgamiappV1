@@ -126,7 +126,7 @@ class _ActionCard extends StatelessWidget {
     final Uri uri = Uri(
       scheme: 'mailto',
       path: HelpScreen.supportEmail,
-      queryParameters: {'subject': 'Support Request - Orgami'},
+      queryParameters: {'subject': 'Support Request - Attendus'},
     );
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       // No-op fallback if mail client unavailable
@@ -251,7 +251,7 @@ class _MetaInfo extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Mon–Sun, 9:00am–6:00pm (ET)',
+          'Mon-Sun, 9:00am-6:00pm (ET)',
           style: TextStyle(
             fontSize: 13,
             color: Theme.of(context).textTheme.bodyMedium?.color,

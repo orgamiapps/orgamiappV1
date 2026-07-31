@@ -1,15 +1,17 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:attendus/screens/Splash/splash_screen.dart';
-import 'package:attendus/screens/Home/dashboard_screen.dart';
+import 'package:attendus/screens/Splash/second_splash_screen.dart';
+import 'package:attendus/screens/Home/dashboard_screen.dart'
+    deferred as dashboard;
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/Services/auth_service.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Services/subscription_service.dart';
 import 'package:attendus/Services/navigation_state_service.dart';
-import 'package:attendus/Utils/route_builder.dart';
+import 'package:attendus/Utils/route_builder.dart' deferred as route_builder;
+import 'package:attendus/widgets/deferred_screen_loader.dart';
 import 'package:provider/provider.dart';
 
 /// AuthGate determines the initial screen based on Firebase Auth state
@@ -46,7 +48,7 @@ class _AuthGateState extends State<AuthGate> {
 
       // Firebase should already be initialized in main.dart
       // Skip redundant initialization to speed up startup
-      
+
       // First, check if Firebase Auth is immediately available
       final firebaseUser = FirebaseAuth.instance.currentUser;
       Logger.debug(
@@ -73,7 +75,7 @@ class _AuthGateState extends State<AuthGate> {
       ) {
         if (!mounted || authChecked) return;
         authChecked = true;
-        
+
         Logger.debug('🔍 AuthGate: Auth state changed: ${user?.uid ?? 'null'}');
 
         if (user != null) {
@@ -88,7 +90,7 @@ class _AuthGateState extends State<AuthGate> {
             _isChecking = false;
           });
         }
-        
+
         _authStateSubscription?.cancel();
       });
 
@@ -132,10 +134,14 @@ class _AuthGateState extends State<AuthGate> {
       if (shouldRestore) {
         Logger.info('AuthGate: Attempting to restore navigation state');
         final savedRoute = await _navStateService.restoreNavigationState();
-        
+
         if (savedRoute != null) {
-          restoredScreen = await RouteBuilder.buildRouteFromConfig(savedRoute);
-          Logger.success('AuthGate: Successfully restored route: ${savedRoute.routeName}');
+          await route_builder.loadLibrary();
+          restoredScreen =
+              await route_builder.RouteBuilder.buildRouteFromConfig(savedRoute);
+          Logger.success(
+            'AuthGate: Successfully restored route: ${savedRoute.routeName}',
+          );
         }
       } else {
         Logger.debug('AuthGate: No valid navigation state to restore');
@@ -143,6 +149,12 @@ class _AuthGateState extends State<AuthGate> {
     } catch (e) {
       Logger.warning('AuthGate: Failed to restore navigation state: $e');
     }
+
+    restoredScreen ??= DeferredScreenLoader(
+      loadLibrary: dashboard.loadLibrary,
+      loadingLabel: 'Loading dashboard',
+      builder: () => dashboard.DashboardScreen(),
+    );
 
     if (!mounted) return;
 
@@ -219,17 +231,11 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     if (_isLoggedIn) {
-      // Return restored widget if available, otherwise default to dashboard
-      if (_restoredWidget != null) {
-        Logger.debug('🔄 AuthGate: Returning restored screen');
-        return _restoredWidget!;
-      } else {
-        Logger.debug('🏠 AuthGate: Navigating to Dashboard (no restored state)');
-        return const DashboardScreen();
-      }
+      Logger.debug('AuthGate: Returning authenticated destination');
+      return _restoredWidget!;
     } else {
-      Logger.debug('🔍 AuthGate: Navigating to Splash');
-      return const SplashScreen();
+      Logger.debug('AuthGate: Navigating directly to onboarding');
+      return const SecondSplashScreen();
     }
   }
 }

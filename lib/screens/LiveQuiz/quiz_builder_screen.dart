@@ -1323,39 +1323,41 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF667EEA),
         title: Text(
           widget.existingQuestion != null ? 'Edit Question' : 'Add Question',
         ),
-        foregroundColor: Colors.white,
-        elevation: 0,
       ),
       body: SafeArea(
         bottom: true,
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            padding: EdgeInsets.only(
-              left: 24,
-              right: 24,
-              top: 24,
-              bottom: 24 + bottomPadding,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildQuestionTypeSelector(),
-                const SizedBox(height: 24),
-                _buildQuestionInput(),
-                const SizedBox(height: 24),
-                _buildAnswerSection(),
-                const SizedBox(height: 24),
-                _buildQuestionSettings(),
-                const SizedBox(height: 32),
-                _buildSaveButton(),
-              ],
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 900),
+            child: Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                padding: EdgeInsets.only(
+                  left: 24,
+                  right: 24,
+                  top: 24,
+                  bottom: 24 + bottomPadding,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildQuestionTypeSelector(),
+                    const SizedBox(height: 24),
+                    _buildQuestionInput(),
+                    const SizedBox(height: 24),
+                    _buildAnswerSection(),
+                    const SizedBox(height: 24),
+                    _buildQuestionSettings(),
+                    const SizedBox(height: 32),
+                    _buildSaveButton(),
+                  ],
+                ),
+              ),
             ),
           ),
         ),

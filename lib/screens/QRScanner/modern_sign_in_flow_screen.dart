@@ -70,7 +70,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -102,13 +102,17 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
   }
 
   Widget _buildModernHeader() {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: theme.colorScheme.shadow.withValues(alpha: 0.04),
             offset: const Offset(0, 2),
             blurRadius: 8,
           ),
@@ -122,36 +126,31 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
+                color: theme.colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.arrow_back_ios_new,
                 size: 18,
-                color: Color(0xFF1A1A1A),
+                color: theme.colorScheme.onSurface,
               ),
             ),
           ),
-          const Expanded(
+          Expanded(
             child: Column(
               children: [
                 Text(
                   'Event Sign-In',
-                  style: TextStyle(
+                  style: theme.textTheme.titleLarge?.copyWith(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF1A1A1A),
-                    fontFamily: 'Roboto',
-                    letterSpacing: -0.5,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
-                  'Quick & Secure',
-                  style: TextStyle(
+                  'Secure attendee check-in',
+                  style: theme.textTheme.bodySmall?.copyWith(
                     fontSize: 13,
-                    color: Color(0xFF667EEA),
-                    fontFamily: 'Roboto',
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -1416,9 +1415,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
         final result = await Navigator.push<bool>(
           context,
           MaterialPageRoute(
-            builder: (context) => PictureFaceScannerScreen(
-              eventModel: event,
-            ),
+            builder: (context) => PictureFaceScannerScreen(eventModel: event),
           ),
         );
 

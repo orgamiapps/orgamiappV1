@@ -3,13 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/models/message_model.dart';
-import 'package:provider/provider.dart';
 
 import 'package:attendus/firebase/firebase_messaging_helper.dart';
-import 'package:attendus/Utils/colors.dart';
-import 'package:attendus/Utils/dimensions.dart';
-import 'package:attendus/Utils/cached_image.dart';
-import 'package:attendus/Utils/theme_provider.dart';
 import 'package:attendus/screens/Messaging/chat_screen.dart';
 import 'package:attendus/screens/Messaging/new_message_screen.dart';
 import 'package:intl/intl.dart';
@@ -17,9 +12,12 @@ import 'package:attendus/models/customer_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class MessagingScreen extends StatefulWidget {
-  const MessagingScreen({super.key});
+  final bool showShellHeader;
+
+  const MessagingScreen({super.key, this.showShellHeader = true});
 
   @override
   State<MessagingScreen> createState() => _MessagingScreenState();
@@ -284,134 +282,56 @@ class _MessagingScreenState extends State<MessagingScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        iconTheme: const IconThemeData(color: Colors.black87),
-        actionsIconTheme: const IconThemeData(color: Colors.black87),
-        titleTextStyle: const TextStyle(
-          color: Colors.black87,
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-        ),
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.transparent,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
-        title: const Text('Messages'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_comment_rounded),
-            tooltip: 'New message',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const NewMessageScreen(),
+      appBar: widget.showShellHeader
+          ? AppBar(
+              systemOverlayStyle: SystemUiOverlayStyle.dark,
+              title: const Text('Messages'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.add_comment_rounded),
+                  tooltip: 'New message',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const NewMessageScreen(),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: const Divider(
-            height: 1,
-            thickness: 1,
-            color: Color(0xFFE5E7EB),
+              ],
+            )
+          : null,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 900),
+          child: Column(
+            children: [
+              _buildSearchBar(),
+              Expanded(child: _buildBody()),
+            ],
           ),
         ),
-      ),
-      body: Column(
-        children: [
-          _buildSearchBar(),
-          Expanded(child: _buildBody()),
-        ],
       ),
     );
   }
 
   Widget _buildBody() {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
-    final theme = Theme.of(context);
-
     if (_isLoading) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(
-              color: isDark ? const Color(0xFF2C5A96) : const Color(0xFF667EEA),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Loading messages...',
-              style: TextStyle(
-                color: theme.textTheme.bodyMedium?.color,
-                fontSize: 16,
-              ),
-            ),
-          ],
-        ),
-      );
+      return const AttendUsLoadingState(label: 'Loading conversations...');
     }
 
     if (_errorMessage != null) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: 80,
-              color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Oops!',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: isDark
-                    ? const Color(0xFF2C5A96)
-                    : const Color(0xFF667EEA),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _errorMessage!,
-              style: TextStyle(
-                fontSize: 16,
-                color: theme.textTheme.bodyMedium?.color,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _retryLoading,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isDark
-                    ? const Color(0xFF2C5A96)
-                    : const Color(0xFF667EEA),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-                ),
-              ),
-              child: const Text(
-                'Try Again',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
+        child: AttendUsEmptyState(
+          icon: Icons.cloud_off_outlined,
+          title: 'Messages unavailable',
+          message: _errorMessage!,
+          action: AttendUsButton.primary(
+            label: 'Try again',
+            icon: Icons.refresh,
+            onPressed: _retryLoading,
+          ),
         ),
       );
     }
@@ -424,155 +344,49 @@ class _MessagingScreenState extends State<MessagingScreen> {
   }
 
   Widget _buildEmptyState() {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
-    final theme = Theme.of(context);
     final isSearching = _searchController.text.isNotEmpty;
 
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            isSearching ? Icons.search_off : Icons.message_outlined,
-            size: 80,
-            color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            isSearching ? 'No conversations found' : 'No messages yet',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: isDark ? const Color(0xFF2C5A96) : const Color(0xFF667EEA),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            isSearching
-                ? 'Try adjusting your search terms or start a new conversation'
-                : 'Start a conversation with other users',
-            style: TextStyle(
-              fontSize: 16,
-              color: theme.textTheme.bodyMedium?.color,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          if (!isSearching)
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const NewMessageScreen(),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isDark
-                    ? const Color(0xFF2C5A96)
-                    : const Color(0xFF667EEA),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-                ),
+      child: AttendUsEmptyState(
+        icon: isSearching ? Icons.search_off : Icons.mark_chat_unread_outlined,
+        title: isSearching ? 'No conversations found' : 'No messages yet',
+        message: isSearching
+            ? 'Try a different name, username, or message keyword.'
+            : 'Start a direct message or create a group conversation.',
+        action: isSearching
+            ? null
+            : AttendUsButton.primary(
+                label: 'New message',
+                icon: Icons.add_comment_outlined,
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const NewMessageScreen(),
+                    ),
+                  );
+                },
               ),
-              child: const Text(
-                'Start Messaging',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }
 
   Widget _buildSearchBar() {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: TextField(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      child: AttendUsSearchField(
         controller: _searchController,
         onChanged: _onSearchChanged,
-        style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-        decoration: InputDecoration(
-          hintText: 'Search conversations...',
-          hintStyle: TextStyle(color: theme.textTheme.bodyMedium?.color),
-          prefixIcon: Icon(
-            Icons.search,
-            color: theme.textTheme.bodyMedium?.color,
-          ),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: Icon(
-                    Icons.clear,
-                    color: theme.textTheme.bodyMedium?.color,
-                  ),
-                  onPressed: () {
-                    _searchController.clear();
-                    _onSearchChanged('');
-                  },
-                )
-              : null,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-            borderSide: BorderSide(
-              color: isDark
-                  ? const Color(0xFF4A90E2)
-                  : AppThemeColor.lightBlueColor,
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-            borderSide: BorderSide(
-              color: isDark ? const Color(0xFF2C5A96) : const Color(0xFF667EEA),
-              width: 2,
-            ),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-            borderSide: BorderSide(
-              color: isDark
-                  ? const Color(0xFF4A90E2)
-                  : AppThemeColor.lightBlueColor,
-            ),
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 12,
-          ),
-        ),
+        hintText: 'Search conversations',
       ),
     );
   }
 
   Widget _buildConversationsList() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
       itemCount: _filteredConversations.length,
+      separatorBuilder: (_, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final conversation = _filteredConversations[index];
         final otherParticipantInfo = _getOtherParticipantInfo(conversation);
@@ -586,8 +400,6 @@ class _MessagingScreenState extends State<MessagingScreen> {
     ConversationModel conversation,
     Map<String, dynamic> otherParticipantInfo,
   ) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
     final theme = Theme.of(context);
 
     final bool isGroup = conversation.isGroup;
@@ -605,150 +417,63 @@ class _MessagingScreenState extends State<MessagingScreen> {
       subtitleUsername = otherParticipantInfo['username'];
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-        boxShadow: [
-          BoxShadow(
-            color: theme.shadowColor.withValues(alpha: isDark ? 0.3 : 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
+    final subtitleParts = <String>[
+      if (!isGroup && subtitleUsername != null && subtitleUsername.isNotEmpty)
+        '@$subtitleUsername',
+      _buildLastMessagePreview(conversation),
+      DateFormat('MMM d, h:mm a').format(conversation.lastMessageTime),
+    ];
+
+    return AttendUsListTile(
+      selected: hasUnread,
+      leading: isGroup
+          ? _buildGroupAvatar(conversation)
+          : AttendUsAvatar(imageUrl: profilePictureUrl, name: name, size: 48),
+      title: name,
+      subtitle: subtitleParts.join(' • '),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (hasUnread) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                conversation.unreadCount > 99
+                    ? '99+'
+                    : conversation.unreadCount.toString(),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
         ],
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: isGroup
-            ? _buildGroupAvatar(conversation)
-            : ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  color: isDark
-                      ? const Color(0xFF4A90E2)
-                      : AppThemeColor.lightBlueColor,
-                  child: profilePictureUrl != null
-                      ? SafeNetworkImage(
-                          imageUrl: profilePictureUrl,
-                          fit: BoxFit.cover,
-                          placeholder: Icon(
-                            Icons.person,
-                            color: isDark
-                                ? const Color(0xFF2C5A96)
-                                : const Color(0xFF667EEA),
-                          ),
-                          errorWidget: Icon(
-                            Icons.person,
-                            color: isDark
-                                ? const Color(0xFF2C5A96)
-                                : const Color(0xFF667EEA),
-                          ),
-                        )
-                      : Icon(
-                          Icons.person,
-                          color: isDark
-                              ? const Color(0xFF2C5A96)
-                              : const Color(0xFF667EEA),
-                        ),
-                ),
-              ),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                name,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: hasUnread ? FontWeight.w600 : FontWeight.w500,
-                  color: hasUnread
-                      ? (isDark
-                            ? const Color(0xFF2C5A96)
-                            : const Color(0xFF667EEA))
-                      : theme.textTheme.titleMedium?.color,
-                ),
-              ),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(
+              conversationId: conversation.id,
+              otherParticipantInfo: conversation.isGroup
+                  ? null
+                  : _convertToCustomerModel(otherParticipantInfo),
             ),
-            if (hasUnread)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF2C5A96)
-                      : const Color(0xFF667EEA),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  conversation.unreadCount.toString(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (!isGroup && subtitleUsername != null) ...[
-              Text(
-                '@$subtitleUsername',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: theme.textTheme.bodyMedium?.color,
-                ),
-              ),
-              const SizedBox(height: 4),
-            ],
-            Text(
-              _buildLastMessagePreview(conversation),
-              style: TextStyle(
-                fontSize: 14,
-                color: hasUnread
-                    ? (isDark
-                          ? const Color(0xFF2C5A96)
-                          : const Color(0xFF667EEA))
-                    : theme.textTheme.bodyMedium?.color,
-                fontWeight: hasUnread ? FontWeight.w500 : FontWeight.normal,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              DateFormat('MMM d, h:mm a').format(conversation.lastMessageTime),
-              style: TextStyle(
-                fontSize: 12,
-                color: theme.textTheme.bodyMedium?.color,
-              ),
-            ),
-          ],
-        ),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ChatScreen(
-                conversationId: conversation.id,
-                otherParticipantInfo: conversation.isGroup
-                    ? null
-                    : _convertToCustomerModel(otherParticipantInfo),
-              ),
-            ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
   // Build stacked avatars for a group (show up to 3)
   Widget _buildGroupAvatar(ConversationModel conversation) {
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    final isDark = themeProvider.isDarkMode;
     final List<String> memberIds = conversation.participantIds;
     final currentUserId = _auth.currentUser?.uid;
     final others = memberIds
@@ -756,35 +481,43 @@ class _MessagingScreenState extends State<MessagingScreen> {
         .take(3)
         .toList();
 
-    List<Widget> circles = [];
-    for (int i = 0; i < others.length; i++) {
-      final uid = others[i];
-      final info = conversation.participantInfo[uid] ?? {};
-      final url = info['profilePictureUrl'];
-      circles.add(
-        Positioned(
-          left: i * 18.0,
-          child: CircleAvatar(
-            radius: 16,
-            backgroundColor: isDark
-                ? const Color(0xFF4A90E2)
-                : AppThemeColor.lightBlueColor,
-            child: url != null
-                ? ClipOval(
-                    child: SafeNetworkImage(
-                      imageUrl: url,
-                      fit: BoxFit.cover,
-                      placeholder: const Icon(Icons.person, size: 14),
-                      errorWidget: const Icon(Icons.person, size: 14),
-                    ),
-                  )
-                : const Icon(Icons.person, size: 14),
-          ),
-        ),
+    if (others.isEmpty) {
+      return AttendUsAvatar(
+        name: conversation.groupName ?? 'Group',
+        fallbackIcon: Icons.groups_outlined,
+        size: 48,
+        tone: AttendUsStatusTone.success,
       );
     }
 
-    return SizedBox(width: 56, height: 32, child: Stack(children: circles));
+    return SizedBox(
+      width: 60,
+      height: 42,
+      child: Stack(
+        children: [
+          for (var i = 0; i < others.length; i++)
+            Positioned(
+              left: i * 16.0,
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.surface,
+                    width: 2,
+                  ),
+                ),
+                child: AttendUsAvatar(
+                  imageUrl: conversation
+                      .participantInfo[others[i]]?['profilePictureUrl'],
+                  name: conversation.participantInfo[others[i]]?['name'],
+                  size: 38,
+                  tone: AttendUsStatusTone.success,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   String _buildLastMessagePreview(ConversationModel conversation) {

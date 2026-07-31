@@ -1494,7 +1494,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                     size: 18,
                   ),
                   label: Text(
-                    'Upgrade to VIP • \$${widget.eventModel.ticketUpgradePrice!.toStringAsFixed(2)}',
+                    'Upgrade to VIP � \$${widget.eventModel.ticketUpgradePrice!.toStringAsFixed(2)}',
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -1562,14 +1562,14 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
 
       final tempDir = await getTemporaryDirectory();
       final file = File(
-        '${tempDir.path}/orgami_ticket_${ticket.ticketCode}.png',
+        '${tempDir.path}/attendus_ticket_${ticket.ticketCode}.png',
       );
       await file.writeAsBytes(bytes);
 
       await Share.shareXFiles(
         [XFile(file.path)],
         text:
-            'AttendUs Ticket • ${ticket.eventTitle} • Code: ${ticket.ticketCode}',
+            'Attendus Ticket • ${ticket.eventTitle} • Code: ${ticket.ticketCode}',
       );
     } catch (e) {
       debugPrint('Error sharing ticket: $e');
@@ -1662,7 +1662,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                       const SizedBox(width: 6),
                       Text(
                         DateFormat(
-                          'EEE, MMM dd • h:mm a',
+                          'EEE, MMM dd � h:mm a',
                         ).format(ticket.eventDateTime),
                         style: const TextStyle(
                           fontSize: 14,
@@ -1741,7 +1741,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                   const Divider(height: 20),
                   const Center(
                     child: Text(
-                      'Powered by AttendUs',
+                      'Powered by Attendus',
                       style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
                     ),
                   ),
@@ -1976,7 +1976,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                       Icons.calendar_month_rounded,
                       'Date & Time',
                       DateFormat(
-                        'EEE, MMM dd, yyyy • h:mm a',
+                        'EEE, MMM dd, yyyy � h:mm a',
                       ).format(ticket.eventDateTime),
                     ),
                     const SizedBox(height: 14),
@@ -2088,7 +2088,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                             const SizedBox(height: 12),
                             if (ticket.usedDateTime != null)
                               Text(
-                                'Used on ${DateFormat('MMM dd, yyyy • h:mm a').format(ticket.usedDateTime!)}',
+                                'Used on ${DateFormat('MMM dd, yyyy � h:mm a').format(ticket.usedDateTime!)}',
                                 style: const TextStyle(
                                   fontSize: 13,
                                   color: Color(0xFF6B7280),
@@ -2122,7 +2122,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
                           ),
                           icon: const Icon(Icons.flash_on, color: Colors.white),
                           label: Text(
-                            'Upgrade to VIP • \$${widget.eventModel.ticketUpgradePrice!.toStringAsFixed(2)}',
+                            'Upgrade to VIP � \$${widget.eventModel.ticketUpgradePrice!.toStringAsFixed(2)}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -2299,7 +2299,7 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
             customerUid: ticket.customerUid,
             customerName: ticket.customerName,
             customerEmail:
-                'noreply@orgami.app', // Fallback if email not fetched here
+                'noreply@attendus.app', // Fallback if email not fetched here
             eventTitle: ticket.eventTitle,
           );
 

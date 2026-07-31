@@ -1,27 +1,46 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import 'package:attendus/screens/Home/home_screen.dart' as legacy;
 import 'package:attendus/screens/Home/search_screen.dart';
 import 'package:attendus/screens/QRScanner/qr_scanner_flow_screen.dart';
 import 'package:attendus/firebase/organization_helper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/Utils/router.dart';
-import 'package:attendus/Utils/images.dart';
-import 'package:attendus/Utils/theme_provider.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/Utils/logger.dart';
-import 'package:attendus/screens/Events/Widget/single_event_list_view_item.dart';
 import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:attendus/screens/Home/calendar_screen.dart';
 import 'package:attendus/Utils/firebase_retry_helper.dart';
 import 'package:attendus/screens/Events/global_events_map_screen.dart';
 import 'package:attendus/Services/guest_mode_service.dart';
 import 'package:attendus/screens/Authentication/create_account/create_account_screen.dart';
+import 'package:attendus/Utils/attendus_theme.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class HomeHubScreen extends StatefulWidget {
-  const HomeHubScreen({super.key});
+  final bool? _guestModeOverride;
+  final Widget? _publicContentOverride;
+  final Widget? _privateContentOverride;
+  final bool _loadDiscoveryData;
+
+  const HomeHubScreen({super.key})
+    : _guestModeOverride = null,
+      _publicContentOverride = null,
+      _privateContentOverride = null,
+      _loadDiscoveryData = true;
+
+  @visibleForTesting
+  const HomeHubScreen.test({
+    super.key,
+    required bool isGuestMode,
+    required Widget publicContent,
+    Widget? privateContent,
+  }) : _guestModeOverride = isGuestMode,
+       _publicContentOverride = publicContent,
+       _privateContentOverride = privateContent,
+       _loadDiscoveryData = false;
 
   @override
   State<HomeHubScreen> createState() => _HomeHubScreenState();
@@ -34,6 +53,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   List<Map<String, String>> _myOrgs = [];
   List<Map<String, dynamic>> _discoverOrgs = [];
   String? _selectedCategoryLower;
+  String? _discoverError;
   // Removed unused _categoryOptions (old UI)
 
   @override
@@ -42,11 +62,13 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
     Logger.debug('🏠 HomeHubScreen: initState started');
     // PERFORMANCE FIX: Defer data loading to after first frame to prevent blocking
     // This prevents the heavy Firestore query from blocking app startup
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _loadOrgs();
-      }
-    });
+    if (widget._loadDiscoveryData) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _loadOrgs();
+        }
+      });
+    }
     Logger.debug('🏠 HomeHubScreen: initState finished');
   }
 
@@ -60,6 +82,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
         setState(() {
           _myOrgs = [];
           _searching = true; // Show loading indicator
+          _discoverError = null;
         });
       }
 
@@ -160,14 +183,20 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
       }).toList();
 
       if (mounted) {
-        setState(() => _discoverOrgs = list);
+        setState(() {
+          _discoverOrgs = list;
+          _discoverError = null;
+        });
         Logger.debug('🏠 HomeHubScreen: State updated with discovered orgs');
       }
     } catch (e) {
       Logger.error('❌ ERROR: Error discovering organizations');
       Logger.error('Error details: $e');
       if (mounted) {
-        setState(() => _discoverOrgs = []);
+        setState(() {
+          _discoverOrgs = [];
+          _discoverError = FirebaseRetryHelper.getUserFriendlyErrorMessage(e);
+        });
       }
       // Show user-friendly error message
       final errorMessage = FirebaseRetryHelper.getUserFriendlyErrorMessage(e);
@@ -182,313 +211,309 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isGuestMode = GuestModeService().isGuestMode;
+    final isGuestMode = _isGuestMode;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       floatingActionButton: _tabIndex == 1 ? _buildCreateFab() : null,
       body: SafeArea(
-        child: Column(
-          children: [
-            _buildSimpleHeader(),
-            if (isGuestMode) _buildGuestBanner(),
-            const SizedBox(height: 12),
-            // Hide Private tab in guest mode
-            if (!isGuestMode) _buildSegmentedTabs(),
-            if (!isGuestMode) const SizedBox(height: 12),
-            Expanded(
-              child: AnimatedSwitcher(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: AttendUsTokens.pageMaxWidth,
+            ),
+            child: NestedScrollView(
+              headerSliverBuilder: (context, innerBoxIsScrolled) => [
+                SliverToBoxAdapter(
+                  child: _buildDiscoveryHeader(isGuestMode: isGuestMode),
+                ),
+                if (isGuestMode) SliverToBoxAdapter(child: _buildGuestBanner()),
+                if (!isGuestMode)
+                  SliverToBoxAdapter(child: _buildSegmentedTabs()),
+              ],
+              body: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 250),
                 child: (_tabIndex == 0 || isGuestMode)
-                    ? const legacy.HomeScreen(showHeader: false)
-                    : _buildOrgsTab(),
+                    ? (widget._publicContentOverride ??
+                          const legacy.HomeScreen(
+                            key: ValueKey('public-events'),
+                            showHeader: false,
+                            coordinateWithParentScroll: true,
+                          ))
+                    : KeyedSubtree(
+                        key: const ValueKey('private-groups'),
+                        child:
+                            widget._privateContentOverride ?? _buildOrgsTab(),
+                      ),
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildCreateFab() {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isGuestMode = GuestModeService().isGuestMode;
+    final isGuestMode = _isGuestMode;
+    final theme = Theme.of(context);
 
-    return Container(
-      width: 56,
-      height: 56,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: themeProvider.getGradientColors(context),
-        ),
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-            spreadRadius: 2,
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(28),
-          onTap: () {
-            if (isGuestMode) {
-              _showGuestRestrictionDialog(GuestFeature.createEvent);
-            } else {
-              RouterClass.nextScreenNormal(
-                context,
-                const PremiumEventCreationWrapper(),
-              );
-            }
-          },
-          child: Icon(
-            Icons.add,
-            color: Theme.of(context).colorScheme.onPrimary,
-            size: 28,
-          ),
-        ),
-      ),
+    return FloatingActionButton.extended(
+      onPressed: () {
+        if (isGuestMode) {
+          _showGuestRestrictionDialog(GuestFeature.createEvent);
+        } else {
+          RouterClass.nextScreenNormal(
+            context,
+            const PremiumEventCreationWrapper(),
+          );
+        }
+      },
+      backgroundColor: theme.colorScheme.primary,
+      foregroundColor: theme.colorScheme.onPrimary,
+      icon: const Icon(Icons.add),
+      label: const Text('Create event'),
     );
   }
 
-  Widget _buildSimpleHeader() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            Image.asset(Images.inAppLogo, width: 32, height: 32),
-            const SizedBox(width: 12),
-            _quickAction(
-              icon: Icons.public,
-              label: 'Map',
-              onTap: () {
-                RouterClass.nextScreenNormal(
-                  context,
-                  const GlobalEventsMapScreen(),
-                );
-              },
-              emphasized: true,
-            ),
-            _quickAction(
-              icon: Icons.fact_check,
-              label: 'Check in',
-              onTap: () {
-                RouterClass.nextScreenNormal(
-                  context,
-                  const QRScannerFlowScreen(),
-                );
-              },
-            ),
-            _quickAction(
-              icon: Icons.event,
-              label: 'Calendar',
-              onTap: () {
-                RouterClass.nextScreenNormal(context, const CalendarScreen());
-              },
-            ),
-            _quickAction(
-              icon: Icons.search,
-              label: 'Search',
-              onTap: () {
-                RouterClass.nextScreenNormal(context, const SearchScreen());
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _quickAction({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    bool emphasized = false,
-  }) {
+  Widget _buildDiscoveryHeader({required bool isGuestMode}) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ActionChip(
-        avatar: Icon(
-          icon,
-          size: 18,
-          color: emphasized
-              ? theme.colorScheme.onPrimary
-              : theme.colorScheme.primary,
-        ),
-        label: Text(label),
-        labelStyle: TextStyle(
-          color: emphasized
-              ? theme.colorScheme.onPrimary
-              : theme.colorScheme.onSurface,
-          fontWeight: FontWeight.w700,
-        ),
-        backgroundColor: emphasized
-            ? theme.colorScheme.primary
-            : theme.colorScheme.surfaceContainerHighest,
-        side: BorderSide(
-          color: emphasized
-              ? theme.colorScheme.primary
-              : theme.colorScheme.outlineVariant,
-        ),
-        onPressed: onTap,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 840;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (wide)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 3, child: _buildSearchLauncher()),
+                    const SizedBox(width: 16),
+                    Expanded(flex: 4, child: _buildQuickActionGrid(wide: true)),
+                  ],
+                )
+              else ...[
+                _buildSearchLauncher(),
+                const SizedBox(height: 12),
+                _buildQuickActionGrid(wide: false),
+              ],
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  AttendUsStatusBadge(
+                    label: isGuestMode ? 'Guest discovery' : 'Signed in',
+                    tone: isGuestMode
+                        ? AttendUsStatusTone.warning
+                        : AttendUsStatusTone.success,
+                    icon: isGuestMode
+                        ? Icons.visibility_outlined
+                        : Icons.verified_user_outlined,
+                  ),
+                  AttendUsStatusBadge(
+                    label: _tabIndex == 0 || isGuestMode
+                        ? 'Public events'
+                        : 'Private groups',
+                    tone: AttendUsStatusTone.info,
+                    icon: _tabIndex == 0 || isGuestMode
+                        ? Icons.public
+                        : Icons.apartment_outlined,
+                  ),
+                  if (_discoverError != null)
+                    AttendUsStatusBadge(
+                      label: 'Discovery limited',
+                      tone: AttendUsStatusTone.danger,
+                      icon: Icons.cloud_off_outlined,
+                    ),
+                ],
+              ),
+              if (_discoverError != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  _discoverError!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildSegmentedTabs() {
-    final Color primary = const Color(0xFF667EEA);
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+  Widget _buildSearchLauncher() {
+    final theme = Theme.of(context);
+    return AttendUsCard(
+      padding: const EdgeInsets.all(16),
+      onTap: () => RouterClass.nextScreenNormal(context, const SearchScreen()),
       child: Row(
         children: [
-          _segButton('Public', 0, primary, Icons.public),
-          _segButton('Private', 1, primary, Icons.diversity_3),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(AttendUsTokens.radiusMd),
+            ),
+            child: Icon(Icons.search, color: theme.colorScheme.primary),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Search Attendus', style: theme.textTheme.titleMedium),
+                const SizedBox(height: 2),
+                Text(
+                  'Find events, groups, locations, and people',
+                  style: theme.textTheme.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.arrow_forward, color: theme.colorScheme.onSurfaceVariant),
         ],
       ),
     );
   }
 
-  Widget _segButton(String label, int idx, Color primary, IconData icon) {
-    final selected = _tabIndex == idx;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _tabIndex = idx),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: selected
-                ? primary.withValues(alpha: 0.1)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+  Widget _buildQuickActionGrid({required bool wide}) {
+    final actions = [
+      _DiscoveryQuickAction(
+        icon: Icons.public,
+        title: 'Map',
+        subtitle: 'Global view',
+        tone: AttendUsStatusTone.info,
+        onTap: () {
+          RouterClass.nextScreenNormal(context, const GlobalEventsMapScreen());
+        },
+      ),
+      _DiscoveryQuickAction(
+        icon: Icons.fact_check_outlined,
+        title: 'Check in',
+        subtitle: 'Scan QR',
+        tone: AttendUsStatusTone.success,
+        onTap: () {
+          RouterClass.nextScreenNormal(context, const QRScannerFlowScreen());
+        },
+      ),
+      _DiscoveryQuickAction(
+        icon: Icons.calendar_month_outlined,
+        title: 'Calendar',
+        subtitle: 'Agenda',
+        tone: AttendUsStatusTone.warning,
+        onTap: () {
+          RouterClass.nextScreenNormal(context, const CalendarScreen());
+        },
+      ),
+      _DiscoveryQuickAction(
+        icon: Icons.add_circle_outline,
+        title: 'Create',
+        subtitle: 'Organizer',
+        tone: AttendUsStatusTone.neutral,
+        onTap: () {
+          if (_isGuestMode) {
+            _showGuestRestrictionDialog(GuestFeature.createEvent);
+          } else {
+            RouterClass.nextScreenNormal(
+              context,
+              const PremiumEventCreationWrapper(),
+            );
+          }
+        },
+      ),
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: actions.length,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: wide ? 4 : 2,
+        mainAxisExtent: 86,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+      ),
+      itemBuilder: (context, index) => actions[index],
+    );
+  }
+
+  bool get _isGuestMode =>
+      widget._guestModeOverride ?? GuestModeService().isGuestMode;
+
+  Widget _buildSegmentedTabs() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      child: AttendUsFilterChipGroup<int>(
+        multiSelect: false,
+        selectedValues: {_tabIndex},
+        options: const [
+          AttendUsFilterOption(
+            value: 0,
+            label: 'Public events',
+            icon: Icons.public,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 18,
-                color: selected ? primary : const Color(0xFF6B7280),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  color: selected ? primary : const Color(0xFF6B7280),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+          AttendUsFilterOption(
+            value: 1,
+            label: 'Private groups',
+            icon: Icons.apartment_outlined,
           ),
-        ),
+        ],
+        onChanged: (values) {
+          if (values.isEmpty) return;
+          setState(() => _tabIndex = values.first);
+        },
       ),
     );
   }
 
   Widget _buildOrgsTab() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          AttendUsPageSection(
+            title: 'Private group events',
+            subtitle: _discoverOrgs.isEmpty
+                ? 'Upcoming events from organizations you belong to.'
+                : '${_discoverOrgs.length} public groups available for discovery.',
+            icon: Icons.apartment_outlined,
+            framed: true,
+            padding: const EdgeInsets.all(16),
+            child: const SizedBox.shrink(),
+          ),
+          const SizedBox(height: 12),
           if (_searching) const LinearProgressIndicator(minHeight: 2),
-          if (_discoverOrgs.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 8, bottom: 4),
-              child: Text(
-                'Groups: ${_discoverOrgs.length}',
-                style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-              ),
-            ),
           Expanded(child: _orgEventsList()),
         ],
       ),
     );
   }
 
-  // Empty state matching the Public tab's "No Events Yet" design
   Widget _buildNoEventsYet() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(40),
-              ),
-              child: const Icon(
-                Icons.event_busy,
-                size: 40,
-                color: Color(0xFF667EEA),
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'No Events Yet',
-              style: TextStyle(
-                color: Color(0xFF1A1A1A),
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Roboto',
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Events will appear here once they are created.\nCheck back soon!',
-              style: TextStyle(
-                color: Color(0xFF6B7280),
-                fontSize: 16,
-                fontFamily: 'Roboto',
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+    return AttendUsEmptyState(
+      icon: Icons.event_busy_outlined,
+      title: 'No events yet',
+      message:
+          'Private group events will appear here after your organizations publish them.',
     );
   }
 
   Widget _orgEventsList() {
     if (_myOrgs.isEmpty) {
-      return Center(
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: _cardDeco(),
-          child: const Text('Join an organization to see its events here'),
-        ),
+      return AttendUsEmptyState(
+        icon: Icons.apartment_outlined,
+        title: 'Join a group',
+        message: 'Join an organization to see its private events here.',
       );
     }
 
@@ -514,34 +539,43 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
       ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const AttendUsLoadingState(label: 'Loading group events');
+        }
+        if (snapshot.hasError) {
+          return AttendUsEmptyState(
+            icon: Icons.cloud_off_outlined,
+            title: 'Events unavailable',
+            message: 'Attendus could not load private group events right now.',
+            action: AttendUsButton.secondary(
+              label: 'Retry',
+              icon: Icons.refresh,
+              onPressed: () => setState(() {}),
+            ),
+          );
         }
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return _buildNoEventsYet();
         }
 
-        // Merge docs, filter to upcoming/active events, then sort by selectedDateTime
-        // Calculate cutoff time: show events that haven't ended more than 3 hours ago
         final DateTime now = DateTime.now();
         final DateTime cutoffTime = now.subtract(const Duration(hours: 3));
-        
+
         final docs =
             snapshot.data!.expand((qs) => qs.docs).where((d) {
               final data = d.data();
-              final startTime = (data['selectedDateTime'] as Timestamp?)?.toDate();
-              
-              // If no start time, exclude the event
+              final startTime = (data['selectedDateTime'] as Timestamp?)
+                  ?.toDate();
+
               if (startTime == null) {
                 return false;
               }
-              
-              // Get event duration (default to 2 hours if not specified)
-              final eventDuration = (data['eventDuration'] as num?)?.toInt() ?? 2;
-              
-              // Calculate event end time: start time + duration
-              final eventEndTime = startTime.add(Duration(hours: eventDuration));
-              
-              // Include event if it hasn't ended more than 3 hours ago
+
+              final eventDuration =
+                  (data['eventDuration'] as num?)?.toInt() ?? 2;
+              final eventEndTime = startTime.add(
+                Duration(hours: eventDuration),
+              );
+
               return eventEndTime.isAfter(cutoffTime);
             }).toList()..sort((a, b) {
               final ad =
@@ -557,13 +591,17 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
           return _buildNoEventsYet();
         }
 
-        return ListView.separated(
-          itemCount: docs.length,
-          separatorBuilder: (_, index) => const SizedBox(height: 12),
-          itemBuilder: (context, i) {
-            final data = docs[i].data();
-            final model = _eventFromMap(docs[i].id, data);
-            return _eventTile(model);
+        final events = docs
+            .map((doc) => _eventFromMap(doc.id, doc.data()))
+            .toList(growable: false);
+
+        return _PrivateEventsGrid(
+          events: events,
+          onOpenEvent: (model) {
+            RouterClass.nextScreenNormal(
+              context,
+              SingleEventScreen(eventModel: model),
+            );
           },
         );
       },
@@ -615,122 +653,39 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
     );
   }
 
-  Widget _eventTile(EventModel model) {
-    return SingleEventListViewItem(
-      eventModel: model,
-      onTap: () {
-        RouterClass.nextScreenNormal(
-          context,
-          SingleEventScreen(eventModel: model),
-        );
-      },
-    );
-  }
-
-  BoxDecoration _cardDeco() => BoxDecoration(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(16),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.black.withValues(alpha: 0.06),
-        blurRadius: 16,
-        offset: const Offset(0, 8),
-      ),
-    ],
-  );
-
-  // Removed unused _pill helper
-
   /// Build guest mode banner with account creation CTA
   Widget _buildGuestBanner() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF667EEA).withValues(alpha: 0.3),
-            offset: const Offset(0, 4),
-            blurRadius: 12,
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      child: AttendUsCard(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            AttendUsStatusBadge(
+              label: 'Guest',
+              tone: AttendUsStatusTone.warning,
+              icon: Icons.visibility_outlined,
             ),
-            child: const Icon(
-              Icons.explore_outlined,
-              color: Colors.white,
-              size: 24,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Create an account to create events, join groups, and access private attendance tools.',
+                style: theme.textTheme.bodyMedium,
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Browsing as Guest',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Create an account for full access',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 13,
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
+            const SizedBox(width: 12),
+            AttendUsButton.primary(
+              label: 'Sign up',
+              onPressed: () {
                 RouterClass.nextScreenNormal(
                   context,
                   const CreateAccountScreen(),
                 );
               },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'Sign Up',
-                  style: TextStyle(
-                    color: Color(0xFF667EEA),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -742,9 +697,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
             Container(
@@ -851,9 +804,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.grey[600],
-            ),
+            style: TextButton.styleFrom(foregroundColor: Colors.grey[600]),
             child: const Text('Maybe Later'),
           ),
           ElevatedButton(
@@ -882,6 +833,118 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DiscoveryQuickAction extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final AttendUsStatusTone tone;
+  final VoidCallback onTap;
+
+  const _DiscoveryQuickAction({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.tone,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AttendUsCard(
+      padding: const EdgeInsets.all(12),
+      onTap: onTap,
+      child: Row(
+        children: [
+          AttendUsStatusBadge(label: '', icon: icon, tone: tone),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrivateEventsGrid extends StatelessWidget {
+  final List<EventModel> events;
+  final ValueChanged<EventModel> onOpenEvent;
+
+  const _PrivateEventsGrid({required this.events, required this.onOpenEvent});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        if (width < 680) {
+          return ListView.separated(
+            itemCount: events.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            itemBuilder: (context, index) => _EventSummary(
+              event: events[index],
+              onTap: () => onOpenEvent(events[index]),
+            ),
+          );
+        }
+
+        final crossAxisCount = width >= 1040 ? 3 : 2;
+        return GridView.builder(
+          itemCount: events.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
+            mainAxisExtent: 320,
+          ),
+          itemBuilder: (context, index) => _EventSummary(
+            event: events[index],
+            onTap: () => onOpenEvent(events[index]),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _EventSummary extends StatelessWidget {
+  final EventModel event;
+  final VoidCallback onTap;
+
+  const _EventSummary({required this.event, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return AttendUsEventSummaryCard(
+      title: event.title.isEmpty ? 'Untitled event' : event.title,
+      subtitle: event.groupName.isEmpty ? event.description : event.groupName,
+      imageUrl: event.imageUrl,
+      dateLabel: DateFormat('MMM d, h:mm a').format(event.selectedDateTime),
+      locationLabel: event.location.isEmpty ? 'Location TBD' : event.location,
+      statusLabel: event.private ? 'Private' : 'Public',
+      onTap: onTap,
     );
   }
 }

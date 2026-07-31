@@ -50,12 +50,13 @@ class RouteBuilder {
   static Future<Widget> buildRouteFromConfig(RouteConfig config) async {
     try {
       Logger.info('Building route from config: ${config.routeName}');
-      
+
       switch (config.routeName) {
         // Dashboard and main tabs
         case RouteNames.dashboard:
-          final tabIndex = config.parameters['initialIndex'] as int? ?? 
-                          config.tabIndex ?? 0;
+          final tabIndex = RouteNames.normalizeDashboardTabIndex(
+            config.parameters['initialIndex'] as int? ?? config.tabIndex ?? 0,
+          );
           return DashboardScreen(initialIndex: tabIndex);
 
         // Event screens
@@ -147,16 +148,18 @@ class RouteBuilder {
 
   /// Get fallback screen based on tab index or default to home
   static Widget _getFallbackScreen(RouteConfig config) {
-    final tabIndex = config.tabIndex ?? 
-                     RouteNames.getDashboardTabForRoute(config.routeName) ?? 
-                     0;
+    final tabIndex = RouteNames.normalizeDashboardTabIndex(
+      config.tabIndex ??
+          RouteNames.getDashboardTabForRoute(config.routeName) ??
+          0,
+    );
     return DashboardScreen(initialIndex: tabIndex);
   }
 
   // Event screen builders
   static Future<Widget> _buildSingleEventScreen(RouteConfig config) async {
     final eventId = config.parameters['eventId'] as String?;
-    
+
     if (eventId != null) {
       try {
         // Fetch event from Firestore
@@ -164,7 +167,7 @@ class RouteBuilder {
             .collection(EventModel.firebaseKey)
             .doc(eventId)
             .get();
-        
+
         if (doc.exists) {
           final event = EventModel.fromJson(doc);
           return SingleEventScreen(eventModel: event);
@@ -173,27 +176,29 @@ class RouteBuilder {
         Logger.error('Error fetching event $eventId: $e');
       }
     }
-    
+
     return _getFallbackScreen(config);
   }
 
   static Future<Widget> _buildCreateEventScreen(RouteConfig config) async {
     // CreateEventScreen requires selectedLocation and radius, which we can't restore
     // Return to appropriate tab instead
-    Logger.warning('CreateEventScreen cannot be restored, returning to Groups tab');
+    Logger.warning(
+      'CreateEventScreen cannot be restored, returning to Groups tab',
+    );
     return _getFallbackScreen(config);
   }
 
   static Future<Widget> _buildEditEventScreen(RouteConfig config) async {
     final eventId = config.parameters['eventId'] as String?;
-    
+
     if (eventId != null) {
       try {
         final doc = await FirebaseFirestore.instance
             .collection(EventModel.firebaseKey)
             .doc(eventId)
             .get();
-        
+
         if (doc.exists) {
           final event = EventModel.fromJson(doc);
           return EditEventScreen(eventModel: event);
@@ -202,13 +207,13 @@ class RouteBuilder {
         Logger.error('Error fetching event for edit $eventId: $e');
       }
     }
-    
+
     return _getFallbackScreen(config);
   }
 
   static Future<Widget> _buildTicketManagementScreen(RouteConfig config) async {
     final eventId = config.parameters['eventId'] as String?;
-    
+
     if (eventId != null) {
       try {
         // Fetch event from Firestore
@@ -216,7 +221,7 @@ class RouteBuilder {
             .collection(EventModel.firebaseKey)
             .doc(eventId)
             .get();
-        
+
         if (doc.exists) {
           final event = EventModel.fromJson(doc);
           return TicketManagementScreen(eventModel: event);
@@ -225,38 +230,38 @@ class RouteBuilder {
         Logger.error('Error fetching event for ticket management $eventId: $e');
       }
     }
-    
+
     return _getFallbackScreen(config);
   }
 
   static Future<Widget> _buildEventAnalyticsScreen(RouteConfig config) async {
     final eventId = config.parameters['eventId'] as String?;
-    
+
     if (eventId != null) {
       return EventAnalyticsScreen(eventId: eventId);
     }
-    
+
     return _getFallbackScreen(config);
   }
 
   // Group screen builders
   static Future<Widget> _buildGroupProfileScreen(RouteConfig config) async {
     final organizationId = config.parameters['organizationId'] as String?;
-    
+
     if (organizationId != null) {
       return GroupProfileScreenV2(organizationId: organizationId);
     }
-    
+
     return _getFallbackScreen(config);
   }
 
   static Future<Widget> _buildGroupAnalyticsScreen(RouteConfig config) async {
     final organizationId = config.parameters['organizationId'] as String?;
-    
+
     if (organizationId != null) {
       return GroupAnalyticsDashboardScreen(organizationId: organizationId);
     }
-    
+
     return _getFallbackScreen(config);
   }
 
@@ -264,54 +269,56 @@ class RouteBuilder {
     return const ManageGroupsScreen();
   }
 
-  static Future<Widget> _buildGroupAdminSettingsScreen(RouteConfig config) async {
+  static Future<Widget> _buildGroupAdminSettingsScreen(
+    RouteConfig config,
+  ) async {
     final organizationId = config.parameters['organizationId'] as String?;
-    
+
     if (organizationId != null) {
       return GroupAdminSettingsScreen(organizationId: organizationId);
     }
-    
+
     return _getFallbackScreen(config);
   }
 
   static Future<Widget> _buildManageMembersScreen(RouteConfig config) async {
     final organizationId = config.parameters['organizationId'] as String?;
-    
+
     if (organizationId != null) {
       return ManageMembersScreen(organizationId: organizationId);
     }
-    
+
     return _getFallbackScreen(config);
   }
 
   static Future<Widget> _buildManageFeedPostsScreen(RouteConfig config) async {
     final organizationId = config.parameters['organizationId'] as String?;
-    
+
     if (organizationId != null) {
       return ManageFeedPostsScreen(organizationId: organizationId);
     }
-    
+
     return _getFallbackScreen(config);
   }
 
   static Future<Widget> _buildPendingEventsScreen(RouteConfig config) async {
     final organizationId = config.parameters['organizationId'] as String?;
-    
+
     if (organizationId != null) {
       return PendingEventsScreen(organizationId: organizationId);
     }
-    
+
     return _getFallbackScreen(config);
   }
 
   // Messaging screen builders
   static Future<Widget> _buildChatScreen(RouteConfig config) async {
     final conversationId = config.parameters['conversationId'] as String?;
-    
+
     if (conversationId != null) {
       return ChatScreen(conversationId: conversationId);
     }
-    
+
     return _getFallbackScreen(config);
   }
 
@@ -322,7 +329,7 @@ class RouteBuilder {
   // Profile screen builders
   static Future<Widget> _buildUserProfileScreen(RouteConfig config) async {
     final userId = config.parameters['userId'] as String?;
-    
+
     if (userId != null) {
       try {
         // Fetch user from Firestore
@@ -330,7 +337,7 @@ class RouteBuilder {
             .collection('Customers')
             .doc(userId)
             .get();
-        
+
         if (doc.exists) {
           final user = CustomerModel.fromFirestore(doc);
           return UserProfileScreen(user: user);
@@ -339,7 +346,7 @@ class RouteBuilder {
         Logger.error('Error fetching user profile $userId: $e');
       }
     }
-    
+
     return _getFallbackScreen(config);
   }
 
@@ -350,27 +357,27 @@ class RouteBuilder {
   // Quiz screen builders
   static Future<Widget> _buildQuizBuilderScreen(RouteConfig config) async {
     final eventId = config.parameters['eventId'] as String?;
-    
+
     if (eventId != null) {
       return QuizBuilderScreen(eventId: eventId);
     }
-    
+
     return _getFallbackScreen(config);
   }
 
   static Future<Widget> _buildQuizHostScreen(RouteConfig config) async {
     final quizId = config.parameters['quizId'] as String?;
-    
+
     if (quizId != null) {
       return QuizHostScreen(quizId: quizId);
     }
-    
+
     return _getFallbackScreen(config);
   }
 
   static Future<Widget> _buildQuizParticipantScreen(RouteConfig config) async {
     final quizId = config.parameters['quizId'] as String?;
-    
+
     if (quizId != null) {
       final isAnonymous = config.parameters['isAnonymous'] as bool? ?? false;
       final displayName = config.parameters['displayName'] as String?;
@@ -380,7 +387,7 @@ class RouteBuilder {
         displayName: displayName,
       );
     }
-    
+
     return _getFallbackScreen(config);
   }
 
@@ -398,8 +405,9 @@ class RouteBuilder {
     return const SearchScreen();
   }
 
-  static Future<Widget> _buildAnalyticsDashboardScreen(RouteConfig config) async {
+  static Future<Widget> _buildAnalyticsDashboardScreen(
+    RouteConfig config,
+  ) async {
     return const AnalyticsDashboardScreen();
   }
 }
-

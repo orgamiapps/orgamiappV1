@@ -5,7 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:geocoding/geocoding.dart';
+import 'package:attendus/Services/places_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
@@ -23,9 +23,10 @@ import 'package:attendus/firebase/organization_helper.dart'; // ignore: unused_i
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/firebase/firebase_messaging_helper.dart';
 import 'package:attendus/screens/Events/location_picker_screen.dart';
+import 'package:attendus/screens/Events/Widget/sign_in_security_tier_selector.dart';
 import 'package:attendus/Services/creation_limit_service.dart';
 import 'package:attendus/widgets/limit_reached_dialog.dart';
-import 'package:attendus/Utils/app_app_bar_view.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class CreateEventScreen extends StatefulWidget {
   final DateTime? selectedDateTime;
@@ -43,8 +44,8 @@ class CreateEventScreen extends StatefulWidget {
     super.key,
     this.selectedDateTime,
     this.eventDurationHours,
-    required this.selectedLocation,
-    required this.radios,
+    this.selectedLocation = const LatLng(0, 0),
+    this.radios = 10,
     this.selectedSignInMethods,
     this.selectedSignInTier = 'regular',
     this.manualCode,
@@ -77,6 +78,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
     'Community & Charity',
   ];
   final List<String> _selectedCategories = [];
+  final List<EventQuestionModel> _questions = [];
+  bool _advancedOptionsExpanded = false;
 
   final TextEditingController groupNameEdtController = TextEditingController();
   final TextEditingController titleEdtController = TextEditingController();
@@ -94,7 +97,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   List<Map<String, String>> _userOrganizations = const [];
 
   // Sign-in security tier
-  String _selectedSignInTier = 'regular'; // 'most_secure', 'geofence_only', 'regular', or 'all'
+  String _selectedSignInTier =
+      'regular'; // 'most_secure', 'geofence_only', 'regular', or 'all'
   late List<String> _selectedSignInMethods; // Legacy support
   String? _manualCode;
 
@@ -151,9 +155,13 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   }
 
   // Location selection state
+  final PlacesService _placesService = PlacesService();
   LatLng? _selectedLocationInternal;
   double? _selectedRadius;
   String? _resolvedAddress;
+  String _locationType = 'in_person';
+  String? _selectedPlaceId;
+  String? _selectedPlaceName;
   bool _isResolvingAddress = false;
 
   Future<void> _pickLocation() async {
@@ -162,6 +170,9 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         builder: (_) => LocationPickerScreen(
           initialLocation: _selectedLocationInternal,
           initialRadius: _selectedRadius,
+          initialPlaceId: _selectedPlaceId,
+          initialDisplayName: _selectedPlaceName,
+          initialAddress: _resolvedAddress,
         ),
       ),
     );
@@ -169,36 +180,50 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       setState(() {
         _selectedLocationInternal = picked.location;
         _selectedRadius = picked.radius;
+        _selectedPlaceId = picked.placeId;
+        _selectedPlaceName = picked.displayName;
+        _resolvedAddress = picked.formattedAddress;
+        locationEdtController.text = picked.formattedAddress;
+        locationNameEdtController.text = picked.displayName.isNotEmpty
+            ? picked.displayName
+            : picked.formattedAddress;
       });
-      await _reverseGeocodeSelectedLocation();
     }
+  }
+
+  void _setLocationType(String value) {
+    if (_locationType == value) return;
+    setState(() {
+      _locationType = value;
+      if (value == 'online') {
+        _selectedLocationInternal = null;
+        _selectedRadius = null;
+        _selectedPlaceId = null;
+        _selectedPlaceName = null;
+        _resolvedAddress = null;
+        locationEdtController.clear();
+        locationNameEdtController.clear();
+        _selectedSignInTier = 'regular';
+        _selectedSignInMethods = _methodsForSecurityTier('regular');
+      } else {
+        locationNameEdtController.clear();
+      }
+    });
   }
 
   Future<void> _reverseGeocodeSelectedLocation() async {
     if (_selectedLocationInternal == null) return;
     setState(() => _isResolvingAddress = true);
     try {
-      final placemarks = await placemarkFromCoordinates(
-        _selectedLocationInternal!.latitude,
-        _selectedLocationInternal!.longitude,
+      final details = await _placesService.reverseGeocode(
+        _selectedLocationInternal!,
       );
-      if (placemarks.isNotEmpty) {
-        final p = placemarks.first;
-        final parts = <String>[
-          if ((p.street ?? '').isNotEmpty) p.street!,
-          if ((p.locality ?? '').isNotEmpty) p.locality!,
-          if ((p.administrativeArea ?? '').isNotEmpty) p.administrativeArea!,
-          if ((p.postalCode ?? '').isNotEmpty) p.postalCode!,
-          if ((p.country ?? '').isNotEmpty) p.country!,
-        ];
-        final addr = parts.isNotEmpty
-            ? parts.join(', ')
-            : '${_selectedLocationInternal!.latitude.toStringAsFixed(6)}, ${_selectedLocationInternal!.longitude.toStringAsFixed(6)}';
-        setState(() {
-          _resolvedAddress = addr;
-          locationEdtController.text = addr;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _selectedPlaceId = details.placeId;
+        _resolvedAddress = details.formattedAddress;
+        locationEdtController.text = details.formattedAddress;
+      });
     } catch (_) {
       // Fallback to coordinates text
       final lat = _selectedLocationInternal!.latitude.toStringAsFixed(6);
@@ -280,12 +305,33 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   void _handleSubmit() async {
     if (_formKey.currentState!.validate()) {
       final bool hasLocation =
+          _locationType == 'in_person' &&
           _selectedLocationInternal != null &&
           !(_selectedLocationInternal!.latitude == 0 &&
               _selectedLocationInternal!.longitude == 0);
       final bool hasLocationName = locationNameEdtController.text
           .trim()
           .isNotEmpty;
+      if (_locationType == 'in_person' && !hasLocation) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Select a venue, address, or map pin for this event'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      if (_locationType == 'online' && !hasLocationName) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Enter the online event location or meeting link'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
       // If geofence sign-in is selected, require a map location
       if (_selectedSignInMethods.contains('geofence') ||
           _selectedSignInTier == 'most_secure' ||
@@ -296,20 +342,6 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             const SnackBar(
               content: Text(
                 'Please pick the event location to enable geofence sign-in',
-              ),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return;
-        }
-      } else {
-        // Otherwise require either a location name or a selected map location
-        if (!hasLocation && !hasLocationName) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Please enter a location name or select a location',
               ),
               backgroundColor: Colors.red,
             ),
@@ -422,7 +454,17 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
               // If member creation is disabled and user is not admin, show error
               if (!allowMemberCreation && !isAdmin) {
-                throw Exception('Only admins can create events in this group');
+                _btnCtlr.reset();
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Only group admins can create events for this group',
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
               }
 
               // If approval is required and user is not admin, set pending status
@@ -438,35 +480,35 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         }
 
         final bool hasLocation =
+            _locationType == 'in_person' &&
             _selectedLocationInternal != null &&
             !(_selectedLocationInternal!.latitude == 0 &&
                 _selectedLocationInternal!.longitude == 0);
 
         // Ensure 'location' has a meaningful value: prefer resolved address,
         // otherwise fall back to manual location name (if provided)
-        final String computedLocation =
-            locationEdtController.text.trim().isNotEmpty
-            ? locationEdtController.text.trim()
-            : (locationNameEdtController.text.trim().isNotEmpty
-                  ? locationNameEdtController.text.trim()
-                  : '');
+        final String computedLocation = _locationType == 'online'
+            ? locationNameEdtController.text.trim()
+            : locationEdtController.text.trim();
 
         // Get current user info for author fields
         final currentUser = FirebaseAuth.instance.currentUser!;
         final currentUserData = CustomerController.logeInCustomer;
-        final authorName = currentUserData?.name ?? 
-                          currentUserData?.username ?? 
-                          groupNameEdtController.text;
-        
+        final authorName =
+            currentUserData?.name ??
+            currentUserData?.username ??
+            groupNameEdtController.text;
+
         // Determine author role if this is an organization event
         String authorRole = 'member';
-        if (_selectedOrganizationId != null && _selectedOrganizationId!.isNotEmpty) {
+        if (_selectedOrganizationId != null &&
+            _selectedOrganizationId!.isNotEmpty) {
           try {
             final orgDoc = await FirebaseFirestore.instance
                 .collection('Organizations')
                 .doc(_selectedOrganizationId!)
                 .get();
-            
+
             if (orgDoc.exists) {
               final orgData = orgDoc.data()!;
               if (orgData['createdBy'] == currentUser.uid) {
@@ -478,7 +520,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                     .collection('Members')
                     .doc(currentUser.uid)
                     .get();
-                
+
                 if (memberDoc.exists) {
                   authorRole = memberDoc.data()?['role'] ?? 'member';
                 }
@@ -495,32 +537,32 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           title: titleEdtController.text,
           description: descriptionEdtController.text,
           location: computedLocation,
-          locationName: locationNameEdtController.text.isNotEmpty
+          locationName: hasLocation && locationNameEdtController.text.isNotEmpty
               ? locationNameEdtController.text
               : null,
+          locationType: _locationType,
+          placeId: hasLocation ? _selectedPlaceId : null,
           customerUid: currentUser.uid,
           imageUrl: thumbnailUrlCtlr.text,
           selectedDateTime: _startDateTime,
           eventGenerateTime: DateTime.now(),
           status: eventStatus,
           getLocation: hasLocation,
-          radius: _selectedRadius ?? widget.radios,
+          radius: hasLocation ? (_selectedRadius ?? widget.radios) : 0,
           longitude: hasLocation ? _selectedLocationInternal!.longitude : 0.0,
           latitude: hasLocation ? _selectedLocationInternal!.latitude : 0.0,
           private: privateEvent,
           categories: _selectedCategories,
           eventDuration: _durationHours,
           organizationId: _selectedOrganizationId,
-          accessList: privateEvent
-              ? [currentUser.uid]
-              : const [],
+          accessList: privateEvent ? [currentUser.uid] : const [],
           signInMethods: _selectedSignInMethods,
           signInSecurityTier: _selectedSignInTier, // Add security tier
           manualCode: _manualCode,
         );
 
         Map<String, dynamic> data = newEvent.toJson();
-        
+
         // Add author info and engagement fields for unified post display
         data['authorId'] = currentUser.uid;
         data['authorName'] = authorName;
@@ -560,8 +602,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         }
 
         // Save questions if provided
-        if (widget.questions != null && widget.questions!.isNotEmpty) {
-          for (EventQuestionModel question in widget.questions!) {
+        if (_questions.isNotEmpty) {
+          for (EventQuestionModel question in _questions) {
             // Generate a new ID for each question
             String questionId = FirebaseFirestore.instance
                 .collection(EventQuestionModel.firebaseKey)
@@ -620,8 +662,11 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
     // Initialize sign-in tier and methods
     _selectedSignInTier = widget.selectedSignInTier ?? 'regular';
+    final List<String>? suppliedMethods = widget.selectedSignInMethods;
     _selectedSignInMethods =
-        widget.selectedSignInMethods ?? ['qr_code', 'manual_code'];
+        suppliedMethods != null && suppliedMethods.isNotEmpty
+        ? List<String>.from(suppliedMethods)
+        : _methodsForSecurityTier(_selectedSignInTier);
     _manualCode = widget.manualCode;
 
     // Load user's organizations (lightweight)
@@ -662,15 +707,29 @@ class _CreateEventScreenState extends State<CreateEventScreen>
     // Listen to scroll events to hide/show header
     _scrollController.addListener(_onScroll);
 
-    // Prefill inline date/time from incoming values when available
+    // Start with a complete, sensible schedule so most users only need to
+    // confirm it. Calendar launches still preserve their supplied time.
+    final DateTime start;
     if (widget.selectedDateTime != null) {
-      final dt = widget.selectedDateTime!;
-      _selectedDate = DateTime(dt.year, dt.month, dt.day);
-      _startTime = TimeOfDay(hour: dt.hour, minute: dt.minute);
-      final int duration = widget.eventDurationHours ?? 1;
-      final DateTime end = dt.add(Duration(hours: duration));
-      _endTime = TimeOfDay(hour: end.hour, minute: end.minute);
+      start = widget.selectedDateTime!;
+    } else {
+      final DateTime now = DateTime.now();
+      final int minutesToAdd = 30 - (now.minute % 30);
+      start = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        now.hour,
+        now.minute,
+      ).add(Duration(minutes: minutesToAdd));
     }
+    _selectedDate = DateTime(start.year, start.month, start.day);
+    _startTime = TimeOfDay(hour: start.hour, minute: start.minute);
+    final DateTime end = start.add(
+      Duration(hours: widget.eventDurationHours ?? 1),
+    );
+    _endTime = TimeOfDay(hour: end.hour, minute: end.minute);
+    _questions.addAll(widget.questions ?? const []);
 
     // Initialize location from incoming value and resolve address
     _selectedLocationInternal = widget.selectedLocation;
@@ -732,6 +791,12 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
   @override
   void dispose() {
+    groupNameEdtController.dispose();
+    titleEdtController.dispose();
+    locationEdtController.dispose();
+    locationNameEdtController.dispose();
+    thumbnailUrlCtlr.dispose();
+    descriptionEdtController.dispose();
     _fadeController.dispose();
     _slideController.dispose();
     _scrollController.dispose();
@@ -768,28 +833,29 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       position: _slideAnimation,
       child: SingleChildScrollView(
         controller: _scrollController,
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Group selector
-              _buildOrganizationSelector(),
-              const SizedBox(height: 24),
-              // Private/Public Toggle (depends on org context)
-              _buildVisibilityToggle(),
-              const SizedBox(height: 24),
-              // Categories Section
-              _buildCategoriesSection(),
-              const SizedBox(height: 24),
-              // Form Fields
-              _buildFormFields(),
-              const SizedBox(height: 100), // Space for button
-            ],
+        padding: const EdgeInsets.all(20),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: Form(key: _formKey, child: _buildCreateFormSections()),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildCreateFormSections() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildOrganizationSelector(),
+        const SizedBox(height: 16),
+        _buildFormFields(),
+        const SizedBox(height: 16),
+        _buildAdvancedOptions(),
+        const SizedBox(height: 100),
+      ],
     );
   }
 
@@ -872,20 +938,36 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
   Widget _buildDateField() {
     final String text = _selectedDate == null
-        ? 'Select Date'
-        : DateFormat('M/d/yyyy').format(_selectedDate!);
+        ? 'Choose date'
+        : DateFormat('EEE, MMM d, y').format(_selectedDate!);
     return _pickerButton(
       icon: Icons.calendar_today,
-      label: text,
+      title: 'Date',
+      value: text,
+      isSelected: _selectedDate != null,
       onTap: () async {
+        final DateTime today = DateUtils.dateOnly(DateTime.now());
+        final DateTime lastDate = DateTime(today.year + 5, 12, 31);
+        final DateTime selectedDate = _selectedDate ?? today;
+        final DateTime initialDate = selectedDate.isBefore(today)
+            ? today
+            : selectedDate.isAfter(lastDate)
+            ? lastDate
+            : selectedDate;
         final DateTime? picked = await showDatePicker(
           context: context,
-          initialDate: _selectedDate ?? DateTime.now(),
-          firstDate: DateTime.now(),
-          lastDate: DateTime(2026),
+          initialDate: initialDate,
+          firstDate: today,
+          lastDate: lastDate,
+          initialEntryMode: DatePickerEntryMode.calendarOnly,
+          helpText: 'Choose event date',
+          cancelText: 'Cancel',
+          confirmText: 'Select',
+          builder: _buildPickerTheme,
         );
         if (!mounted) return;
         if (picked != null) {
+          HapticFeedback.selectionClick();
           setState(() => _selectedDate = picked);
         }
       },
@@ -894,22 +976,31 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
   Widget _buildStartTimeField() {
     final String text = _startTime == null
-        ? 'Start'
+        ? 'Choose time'
         : DateFormat(
             'h:mm a',
           ).format(DateTime(0, 1, 1, _startTime!.hour, _startTime!.minute));
     return _pickerButton(
       icon: Icons.schedule,
-      label: text,
+      title: 'Starts',
+      value: text,
+      isSelected: _startTime != null,
       onTap: () async {
         final TimeOfDay? picked = await showTimePicker(
           context: context,
-          initialTime: _startTime ?? TimeOfDay.now(),
+          initialTime: _startTime ?? _nextQuarterHour(),
+          initialEntryMode: TimePickerEntryMode.dialOnly,
+          helpText: 'Choose start time',
+          cancelText: 'Cancel',
+          confirmText: 'Select',
+          builder: _buildPickerTheme,
         );
         if (!mounted) return;
         if (picked != null) {
+          HapticFeedback.selectionClick();
           setState(() {
             _startTime = picked;
+            _endTime ??= _addToTime(picked, const Duration(hours: 1));
           });
         }
       },
@@ -918,37 +1009,95 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
   Widget _buildEndTimeField() {
     final String text = _endTime == null
-        ? 'End'
+        ? 'Choose time'
         : DateFormat(
             'h:mm a',
           ).format(DateTime(0, 1, 1, _endTime!.hour, _endTime!.minute));
     return _pickerButton(
       icon: Icons.schedule,
-      label: text,
+      title: 'Ends',
+      value: text,
+      isSelected: _endTime != null,
       onTap: () async {
         final TimeOfDay initialEnd =
             _endTime ??
             (_startTime != null
-                ? TimeOfDay(
-                    hour: (_startTime!.hour + 1) % 24,
-                    minute: _startTime!.minute,
-                  )
-                : TimeOfDay.now());
+                ? _addToTime(_startTime!, const Duration(hours: 1))
+                : _addToTime(_nextQuarterHour(), const Duration(hours: 1)));
         final TimeOfDay? picked = await showTimePicker(
           context: context,
           initialTime: initialEnd,
+          initialEntryMode: TimePickerEntryMode.dialOnly,
+          helpText: 'Choose end time',
+          cancelText: 'Cancel',
+          confirmText: 'Select',
+          builder: _buildPickerTheme,
         );
         if (!mounted) return;
         if (picked != null) {
+          HapticFeedback.selectionClick();
           setState(() => _endTime = picked);
         }
       },
     );
   }
 
+  Widget _buildPickerTheme(BuildContext context, Widget? child) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme scheme = theme.colorScheme;
+    return Theme(
+      data: theme.copyWith(
+        datePickerTheme: DatePickerThemeData(
+          backgroundColor: scheme.surface,
+          surfaceTintColor: Colors.transparent,
+          headerBackgroundColor: scheme.primary,
+          headerForegroundColor: scheme.onPrimary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+        ),
+        timePickerTheme: TimePickerThemeData(
+          backgroundColor: scheme.surface,
+          dialBackgroundColor: scheme.primaryContainer.withValues(alpha: 0.5),
+          dialHandColor: scheme.primary,
+          hourMinuteColor: scheme.primaryContainer,
+          hourMinuteTextColor: scheme.onPrimaryContainer,
+          dayPeriodColor: scheme.surfaceContainerHighest,
+          dayPeriodTextColor: scheme.onSurface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+        ),
+        dialogTheme: DialogThemeData(
+          backgroundColor: scheme.surface,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+        ),
+      ),
+      child: child!,
+    );
+  }
+
+  TimeOfDay _nextQuarterHour() {
+    final DateTime now = DateTime.now();
+    final int minutesToAdd = 15 - (now.minute % 15);
+    final DateTime rounded = now.add(Duration(minutes: minutesToAdd));
+    return TimeOfDay(hour: rounded.hour, minute: rounded.minute);
+  }
+
+  TimeOfDay _addToTime(TimeOfDay time, Duration duration) {
+    final int minutes =
+        (time.hour * 60 + time.minute + duration.inMinutes) % (24 * 60);
+    return TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60);
+  }
+
   Widget _pickerButton({
     required IconData icon,
-    required String label,
+    required String title,
+    required String value,
+    required bool isSelected,
     required VoidCallback onTap,
   }) {
     return Material(
@@ -957,7 +1106,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: Container(
-          height: 48,
+          constraints: const BoxConstraints(minHeight: 60),
           decoration: BoxDecoration(
             color: const Color(0xFFF9FAFB),
             borderRadius: BorderRadius.circular(10),
@@ -973,12 +1122,36 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                   children: [
                     Icon(icon, size: 18, color: const Color(0xFF667EEA)),
                     const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        label,
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                        softWrap: false,
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              color: Color(0xFF6B7280),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            value,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            softWrap: false,
+                            style: TextStyle(
+                              color: isSelected
+                                  ? const Color(0xFF111827)
+                                  : const Color(0xFF6B7280),
+                              fontSize: 14,
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -1235,11 +1408,9 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             children: [
               const Icon(Icons.apartment, color: Color(0xFF667EEA), size: 20),
               const SizedBox(width: 8),
-              Text(
-                widget.forceOrganizationEvent
-                    ? 'Group (required)'
-                    : 'Group (optional)',
-                style: const TextStyle(
+              const Text(
+                'Hosting as',
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF1A1A1A),
@@ -1249,9 +1420,21 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           ),
           const SizedBox(height: 12),
           if (_userOrganizations.isEmpty)
-            const Text(
-              'You are not in any group yet',
-              style: TextStyle(color: Color(0xFF6B7280)),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+              title: Text(
+                widget.forceOrganizationEvent
+                    ? 'Loading group...'
+                    : (groupNameEdtController.text.isEmpty
+                          ? 'Personal event'
+                          : groupNameEdtController.text),
+              ),
+              subtitle: Text(
+                widget.forceOrganizationEvent
+                    ? 'This event must be hosted by the selected group'
+                    : 'Personal event - Public by default',
+              ),
             )
           else
             DropdownButtonFormField<String>(
@@ -1262,10 +1445,11 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                 fillColor: Color(0xFFF9FAFB),
               ),
               items: [
-                const DropdownMenuItem<String>(
-                  value: null,
-                  child: Text('None'),
-                ),
+                if (!widget.forceOrganizationEvent)
+                  const DropdownMenuItem<String>(
+                    value: null,
+                    child: Text('Personal event'),
+                  ),
                 ..._userOrganizations.map(
                   (org) => DropdownMenuItem<String>(
                     value: org['id'],
@@ -1273,20 +1457,23 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                   ),
                 ),
               ],
-              onChanged: (value) {
-                setState(() {
-                  _selectedOrganizationId = value;
-                  // If selecting a group, default to private
-                  // If selecting "None", default to public
-                  if (_selectedOrganizationId != null &&
-                      _selectedOrganizationId!.isNotEmpty) {
-                    privateEvent = true; // Group events are private by default
-                  } else {
-                    privateEvent =
-                        false; // No group events are public by default
-                  }
-                });
-              },
+              onChanged: widget.forceOrganizationEvent
+                  ? null
+                  : (value) {
+                      setState(() {
+                        _selectedOrganizationId = value;
+                        // If selecting a group, default to private
+                        // If selecting "None", default to public
+                        if (_selectedOrganizationId != null &&
+                            _selectedOrganizationId!.isNotEmpty) {
+                          privateEvent =
+                              true; // Group events are private by default
+                        } else {
+                          privateEvent =
+                              false; // No group events are public by default
+                        }
+                      });
+                    },
             ),
           // Add informational text when a group is selected
           if (_selectedOrganizationId != null &&
@@ -1305,6 +1492,232 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         ],
       ),
     );
+  }
+
+  Widget _buildAdvancedOptions() {
+    final bool needsMapPin =
+        _locationType == 'in_person' && _selectedSignInTier == 'most_secure' ||
+        (_locationType == 'in_person' &&
+            (_selectedSignInTier == 'geofence_only' ||
+                _selectedSignInTier == 'all'));
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE5E7EB)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        initiallyExpanded: _advancedOptionsExpanded,
+        onExpansionChanged: (expanded) {
+          setState(() => _advancedOptionsExpanded = expanded);
+        },
+        tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        leading: const Icon(Icons.tune, color: Color(0xFF667EEA)),
+        title: const Text(
+          'More options',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        subtitle: const Text(
+          'Description, image, categories, visibility, and check-in settings',
+        ),
+        children: [
+          const Divider(),
+          const SizedBox(height: 12),
+          _buildTextField(
+            controller: descriptionEdtController,
+            label: 'Description (optional)',
+            hint: 'Help attendees know what to expect',
+            icon: Icons.description_outlined,
+            maxLines: 4,
+            validator: (_) => null,
+          ),
+          const SizedBox(height: 20),
+          _buildImageField(),
+          const SizedBox(height: 20),
+          _buildCategoriesSection(),
+          const SizedBox(height: 20),
+          _buildVisibilityToggle(),
+          const SizedBox(height: 20),
+          SignInSecurityTierSelector(
+            selectedTier: _selectedSignInTier,
+            onTierChanged: _updateSecurityTier,
+          ),
+          if (needsMapPin) ...[
+            const SizedBox(height: 20),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'A precise map pin is required for the selected security mode.',
+                style: TextStyle(
+                  color: Color(0xFFB45309),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 20),
+          _buildQuestionsSection(),
+        ],
+      ),
+    );
+  }
+
+  List<String> _methodsForSecurityTier(String tier) {
+    switch (tier) {
+      case 'most_secure':
+        return ['geofence', 'facial_recognition'];
+      case 'geofence_only':
+        return ['geofence'];
+      case 'all':
+        return ['geofence', 'facial_recognition', 'qr_code', 'manual_code'];
+      case 'regular':
+      default:
+        return ['qr_code', 'manual_code'];
+    }
+  }
+
+  void _updateSecurityTier(String tier) {
+    if (_locationType == 'online' &&
+        (tier == 'most_secure' || tier == 'geofence_only' || tier == 'all')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Geofence sign-in is unavailable for online events'),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _selectedSignInTier = tier;
+      _selectedSignInMethods = _methodsForSecurityTier(tier);
+    });
+  }
+
+  Widget _buildQuestionsSection() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Attendee questions',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Optional prompts shown during sign-in',
+                      style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _showAddQuestionDialog,
+                icon: const Icon(Icons.add),
+                label: const Text('Add'),
+              ),
+            ],
+          ),
+          if (_questions.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            for (var index = 0; index < _questions.length; index++)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.help_outline),
+                title: Text(_questions[index].questionTitle),
+                subtitle: Text(
+                  _questions[index].required ? 'Required' : 'Optional',
+                ),
+                trailing: IconButton(
+                  tooltip: 'Remove question',
+                  onPressed: () {
+                    setState(() => _questions.removeAt(index));
+                  },
+                  icon: const Icon(Icons.close),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showAddQuestionDialog() async {
+    final TextEditingController controller = TextEditingController();
+    bool isRequired = false;
+    final EventQuestionModel? question = await showDialog<EventQuestionModel>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Add attendee question'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: controller,
+                    autofocus: true,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: const InputDecoration(
+                      labelText: 'Question',
+                      hintText: 'e.g., Do you have dietary restrictions?',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Required answer'),
+                    value: isRequired,
+                    onChanged: (value) {
+                      setDialogState(() => isRequired = value);
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final String text = controller.text.trim();
+                    if (text.isEmpty) return;
+                    Navigator.pop(
+                      dialogContext,
+                      EventQuestionModel(
+                        id: '',
+                        questionTitle: text,
+                        required: isRequired,
+                      ),
+                    );
+                  },
+                  child: const Text('Add question'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    controller.dispose();
+    if (question != null && mounted) {
+      setState(() => _questions.add(question));
+    }
   }
 
   Widget _buildFormFields() {
@@ -1354,61 +1767,41 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             ],
           ),
           const SizedBox(height: 20),
-          // Organizer Field (auto-filled, read-only)
-          _buildTextField(
-            controller: groupNameEdtController,
-            label: 'Organizer',
-            hint: 'Auto-filled from your profile',
-            icon: Icons.person,
-            enableCapitalization: false,
-            validator: (_) => null,
-            readOnly: true,
-          ),
-          const SizedBox(height: 16),
-          // Title Field
           _buildTextField(
             controller: titleEdtController,
-            label: 'Title',
-            hint: 'Type here...',
+            label: 'Event title',
+            hint: 'What is your event called?',
             icon: Icons.title,
             enableCapitalization: true,
             validator: (value) {
-              if (value!.isEmpty) {
-                return 'Enter Title first!';
+              if (value == null || value.trim().isEmpty) {
+                return 'Enter an event title';
               }
               return null;
             },
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           _buildInlineDateTimePicker(),
           const SizedBox(height: 16),
-          // Image Field
-          _buildImageField(),
-          const SizedBox(height: 16),
-          // Location Name (optional)
-          _buildTextField(
-            controller: locationNameEdtController,
-            label: 'Location Name (Optional)',
-            hint: 'e.g., Madison Square Garden',
-            icon: Icons.place_outlined,
-            enableCapitalization: true,
-            validator: (_) => null,
-          ),
-          const SizedBox(height: 16),
-          // Location Picker
-          _buildLocationSelector(),
-          const SizedBox(height: 16),
-          // Description Field
-          _buildTextField(
-            controller: descriptionEdtController,
-            label: 'Description',
-            hint: 'Type here...',
-            icon: Icons.description,
-            maxLines: 4,
-            validator: (value) {
-              return null;
-            },
-          ),
+          _buildLocationTypeSelector(),
+          const SizedBox(height: 12),
+          if (_locationType == 'in_person')
+            _buildLocationSelector()
+          else
+            _buildTextField(
+              controller: locationNameEdtController,
+              label: 'Online location or meeting link',
+              hint: 'Zoom, Teams, or a meeting URL',
+              icon: Icons.videocam_outlined,
+              enableCapitalization: false,
+              validator: (value) {
+                if (_locationType == 'online' &&
+                    (value == null || value.trim().isEmpty)) {
+                  return 'Enter the online event location or meeting link';
+                }
+                return null;
+              },
+            ),
         ],
       ),
     );
@@ -1431,7 +1824,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Location (Optional)',
+            'Event location',
             style: TextStyle(
               color: Color(0xFF1A1A1A),
               fontWeight: FontWeight.w600,
@@ -1524,6 +1917,26 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildLocationTypeSelector() {
+    return SegmentedButton<String>(
+      segments: const [
+        ButtonSegment<String>(
+          value: 'in_person',
+          icon: Icon(Icons.place_outlined),
+          label: Text('In person'),
+        ),
+        ButtonSegment<String>(
+          value: 'online',
+          icon: Icon(Icons.videocam_outlined),
+          label: Text('Online'),
+        ),
+      ],
+      selected: {_locationType},
+      onSelectionChanged: (selection) => _setLocationType(selection.first),
+      showSelectedIcon: false,
     );
   }
 
@@ -1840,14 +2253,50 @@ class _CreateEventScreenState extends State<CreateEventScreen>
     );
   }
 
+  bool get _hasDraftChanges =>
+      titleEdtController.text.trim().isNotEmpty ||
+      locationNameEdtController.text.trim().isNotEmpty ||
+      descriptionEdtController.text.trim().isNotEmpty ||
+      _selectedImagePath != null ||
+      _selectedCategories.isNotEmpty ||
+      _questions.isNotEmpty;
+
+  Future<void> _confirmClose() async {
+    if (!_hasDraftChanges) {
+      Navigator.maybePop(context);
+      return;
+    }
+    final bool discard =
+        await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Discard this event?'),
+            content: const Text('Your event details have not been saved.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Keep editing'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Discard'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (discard && mounted) {
+      Navigator.maybePop(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
-            // Modern header with animation for hide/show
             AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
@@ -1855,28 +2304,30 @@ class _CreateEventScreenState extends State<CreateEventScreen>
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 300),
                 opacity: _showHeader ? 1.0 : 0.0,
-                child: AppAppBarView.modernHeader(
-                  context: context,
-                  title: 'Create Event',
-                  subtitle: 'Step 3 of 3',
+                child: AttendUsTopBar(
+                  title: 'Create event',
+                  subtitle:
+                      'Add the essentials now; customize more only if needed',
+                  actions: [
+                    IconButton(
+                      tooltip: 'Close',
+                      onPressed: _confirmClose,
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
                 ),
               ),
             ),
-            // Content
             Expanded(child: _contentView()),
-            // Continue Button (Fixed at bottom)
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    spreadRadius: 0,
-                    blurRadius: 20,
-                    offset: const Offset(0, -4),
+                color: Theme.of(context).colorScheme.surface,
+                border: Border(
+                  top: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant,
                   ),
-                ],
+                ),
               ),
               child: SizedBox(
                 width: double.infinity,
@@ -1889,7 +2340,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                   color: const Color(0xFF667EEA),
                   elevation: 0,
                   child: const Text(
-                    'Add New Event',
+                    'Create event',
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,

@@ -1,5 +1,12 @@
 /// Route name constants for navigation state restoration
 class RouteNames {
+  static const int homeTab = 0;
+  static const int groupsTab = 1;
+  static const int messagesTab = 2;
+  static const int profileTab = 3;
+  static const int accountTab = 4;
+  static const int legacyNotificationsTab = 5;
+
   // Dashboard and main tabs
   static const String dashboard = 'dashboard';
   static const String homeHub = 'home_hub';
@@ -62,12 +69,7 @@ class RouteNames {
   /// Check if a route should be persisted for restoration
   static bool shouldPersistRoute(String routeName) {
     // Don't persist auth, splash, or login screens
-    const excludedRoutes = [
-      splash,
-      secondSplash,
-      login,
-      authGate,
-    ];
+    const excludedRoutes = [splash, secondSplash, login, authGate];
     return !excludedRoutes.contains(routeName);
   }
 
@@ -104,5 +106,17 @@ class RouteNames {
       default:
         return null;
     }
+  }
+
+  /// Normalize historical dashboard tab indexes to the current 5-tab shell.
+  ///
+  /// Older code used index 5 for notifications/account-adjacent screens. The
+  /// modern shell keeps notifications in the top bar, so that legacy index now
+  /// lands on Account.
+  static int normalizeDashboardTabIndex(int index) {
+    if (index < homeTab) return homeTab;
+    if (index >= legacyNotificationsTab) return accountTab;
+    if (index > accountTab) return accountTab;
+    return index;
   }
 }

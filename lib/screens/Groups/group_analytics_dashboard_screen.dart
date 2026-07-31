@@ -12,6 +12,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xlsio;
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class GroupAnalyticsDashboardScreen extends StatefulWidget {
   final String organizationId;
@@ -413,49 +414,10 @@ class _GroupAnalyticsDashboardScreenState
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: AppThemeColor.backGroundColor,
-        appBar: AppBar(
-          title: const Text(
-            'Group Analytics',
-            style: TextStyle(
-              color: Colors.black87,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black87,
-          iconTheme: const IconThemeData(color: Colors.black87),
-          elevation: 0,
-          surfaceTintColor: Colors.transparent,
-        ),
+        appBar: AppBar(title: const Text('Group Analytics')),
         body: SafeArea(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
-                  decoration: BoxDecoration(
-                    color: AppThemeColor.lightBlueColor,
-                    borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-                  ),
-                  child: const CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AppThemeColor.darkBlueColor,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: Dimensions.spaceSizedLarge),
-                Text(
-                  'Loading group analytics...',
-                  style: TextStyle(
-                    fontSize: Dimensions.fontSizeLarge,
-                    color: AppThemeColor.darkBlueColor,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
+          child: const AttendUsLoadingState(
+            label: 'Loading group analytics...',
           ),
         ),
       );

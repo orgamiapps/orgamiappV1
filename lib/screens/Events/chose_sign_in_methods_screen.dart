@@ -3,7 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:attendus/screens/Events/add_questions_prompt_screen.dart';
 import 'package:attendus/screens/Events/Widget/sign_in_security_tier_selector.dart';
 import 'package:attendus/Utils/router.dart';
-import 'package:attendus/Utils/app_app_bar_view.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class ChoseSignInMethodsScreen extends StatefulWidget {
   final DateTime? selectedDateTime;
@@ -27,7 +27,8 @@ class ChoseSignInMethodsScreen extends StatefulWidget {
 class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
     with TickerProviderStateMixin {
   // New security tier system
-  String _selectedSignInTier = ''; // no default selected; 'most_secure', 'geofence_only', 'regular', or 'all'
+  String _selectedSignInTier =
+      ''; // no default selected; 'most_secure', 'geofence_only', 'regular', or 'all'
 
   // Legacy method list for backward compatibility
   List<String> _selectedSignInMethods = [];
@@ -108,168 +109,98 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
       position: _slideAnimation,
       child: SingleChildScrollView(
         controller: _scrollController,
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 16),
-            // Subtitle
-            Text(
-              'Choose how attendees can sign in to your event',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 16,
-                fontFamily: 'Roboto',
-                height: 1.4,
+        padding: const EdgeInsets.all(20),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 920),
+            child: AttendUsPageSection(
+              title: 'Access & sign-in security',
+              subtitle:
+                  'Choose how attendees verify attendance. You can still adjust these settings later.',
+              icon: Icons.verified_user_outlined,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SignInSecurityTierSelector(
+                    selectedTier: _selectedSignInTier,
+                    onTierChanged: (tier) {
+                      setState(() {
+                        _selectedSignInTier = tier;
+
+                        switch (tier) {
+                          case 'most_secure':
+                            _selectedSignInMethods = [
+                              'geofence',
+                              'facial_recognition',
+                            ];
+                            break;
+                          case 'geofence_only':
+                            _selectedSignInMethods = ['geofence'];
+                            break;
+                          case 'regular':
+                            _selectedSignInMethods = ['qr_code', 'manual_code'];
+                            break;
+                          case 'all':
+                            _selectedSignInMethods = [
+                              'geofence',
+                              'facial_recognition',
+                              'qr_code',
+                              'manual_code',
+                            ];
+                            break;
+                        }
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInfoCard(),
+                  const SizedBox(height: 100),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
-            // New Sign-In Security Tier Selector
-            SignInSecurityTierSelector(
-              selectedTier: _selectedSignInTier,
-              onTierChanged: (tier) {
-                setState(() {
-                  _selectedSignInTier = tier;
-
-                  // Update legacy methods list based on tier
-                  switch (tier) {
-                    case 'most_secure':
-                      _selectedSignInMethods = [
-                        'geofence',
-                        'facial_recognition',
-                      ];
-                      break;
-                    case 'geofence_only':
-                      _selectedSignInMethods = ['geofence'];
-                      break;
-                    case 'regular':
-                      _selectedSignInMethods = ['qr_code', 'manual_code'];
-                      break;
-                    case 'all':
-                      _selectedSignInMethods = [
-                        'geofence',
-                        'facial_recognition',
-                        'qr_code',
-                        'manual_code',
-                      ];
-                      break;
-                  }
-                });
-              },
-            ),
-            const SizedBox(height: 24),
-            // Info Card
-            _buildInfoCard(),
-            const SizedBox(height: 100), // Space for button
-          ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildInfoCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF667EEA).withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFF667EEA).withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.info_outline,
-                color: const Color(0xFF667EEA),
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'What happens next?',
-                style: TextStyle(
-                  color: Color(0xFF1A1A1A),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  fontFamily: 'Roboto',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'You can now proceed to add questions and then fill out your event details, including picking the event\'s location.',
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 14,
-              fontFamily: 'Roboto',
-              height: 1.4,
-            ),
-          ),
-        ],
+    return AttendUsActionTile(
+      icon: Icons.info_outline,
+      title: 'What happens next?',
+      subtitle:
+          'Add optional sign-in prompts, then complete event basics, schedule, location, and review.',
+      tone: AttendUsStatusTone.info,
+    );
+  }
+
+  void _continueToQuestions() {
+    RouterClass.nextScreenNormal(
+      context,
+      AddQuestionsPromptScreen(
+        selectedDateTime: widget.selectedDateTime,
+        eventDurationHours: widget.eventDurationHours,
+        selectedLocation: const LatLng(0, 0),
+        radios: 10.0,
+        selectedSignInMethods: _selectedSignInMethods,
+        selectedSignInTier: _selectedSignInTier.isEmpty
+            ? null
+            : _selectedSignInTier,
+        manualCode: _manualCode,
+        preselectedOrganizationId: widget.preselectedOrganizationId,
+        forceOrganizationEvent: widget.forceOrganizationEvent,
       ),
     );
   }
 
   Widget _buildContinueButton() {
-    return Container(
+    return SizedBox(
       width: double.infinity,
-      height: 56,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF667EEA).withValues(alpha: 0.3),
-            spreadRadius: 0,
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () {
-            // Proceed directly to questions prompt. Location will be picked on Event Details.
-            // Pass the security tier info to the next screen
-            RouterClass.nextScreenNormal(
-              context,
-              AddQuestionsPromptScreen(
-                selectedDateTime: widget.selectedDateTime,
-                eventDurationHours: widget.eventDurationHours,
-                selectedLocation: const LatLng(0, 0), // Placeholder
-                radios: 10.0, // Default radius
-                selectedSignInMethods: _selectedSignInMethods,
-                selectedSignInTier: _selectedSignInTier.isEmpty ? null : _selectedSignInTier, // Pass null if none selected
-                manualCode: _manualCode,
-                preselectedOrganizationId: widget.preselectedOrganizationId,
-                forceOrganizationEvent: widget.forceOrganizationEvent,
-              ),
-            );
-          },
-          child: const Center(
-            child: Text(
-              'Continue',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                fontFamily: 'Roboto',
-              ),
-            ),
-          ),
-        ),
+      child: AttendUsButton.primary(
+        label: 'Continue',
+        icon: Icons.arrow_forward,
+        onPressed: _continueToQuestions,
       ),
     );
   }
@@ -277,11 +208,10 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
-            // Modern header with animation for hide/show
             AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
@@ -289,28 +219,29 @@ class _ChoseSignInMethodsScreenState extends State<ChoseSignInMethodsScreen>
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 300),
                 opacity: _showHeader ? 1.0 : 0.0,
-                child: AppAppBarView.modernHeader(
-                  context: context,
-                  title: 'Create Event',
-                  subtitle: 'Step 1 of 3',
+                child: AttendUsTopBar(
+                  title: 'Create event',
+                  subtitle: 'Step 1: access and sign-in security',
+                  actions: [
+                    IconButton(
+                      tooltip: 'Back',
+                      onPressed: () => Navigator.maybePop(context),
+                      icon: const Icon(Icons.arrow_back),
+                    ),
+                  ],
                 ),
               ),
             ),
-            // Content
             Expanded(child: _contentView()),
-            // Continue Button (Fixed at bottom)
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    spreadRadius: 0,
-                    blurRadius: 20,
-                    offset: const Offset(0, -4),
+                color: Theme.of(context).colorScheme.surface,
+                border: Border(
+                  top: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant,
                   ),
-                ],
+                ),
               ),
               child: _buildContinueButton(),
             ),

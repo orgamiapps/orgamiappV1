@@ -428,7 +428,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
                   controller: controller,
                   textInputAction: TextInputAction.done,
                   decoration: const InputDecoration(
-                    hintText: 'Add a name (optional) 🛸✨',
+                    hintText: 'Add a name (optional) ???',
                     border: OutlineInputBorder(),
                   ),
                   onSubmitted: (v) => Navigator.pop(context, controller.text),
@@ -1676,7 +1676,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
   }
 
   void _inviteFriends() {
-    Share.share('Join me on AttendUs to chat and collaborate!');
+    Share.share('Join me on Attendus to chat and collaborate!');
   }
 
   void _discoverPeople() {
@@ -1686,7 +1686,9 @@ class _NewMessageScreenState extends State<NewMessageScreen>
         MaterialPageRoute(builder: (_) => const GroupsScreen()),
       );
     } catch (_) {
-      ShowToast().showNormalToast(msg: 'Discover coming soon');
+      ShowToast().showNormalToast(
+        msg: 'Unable to open Discover. Please try again.',
+      );
     }
   }
 }

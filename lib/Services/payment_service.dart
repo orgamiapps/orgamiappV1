@@ -62,15 +62,15 @@ class PaymentService {
       await Stripe.instance.initPaymentSheet(
         paymentSheetParameters: SetupPaymentSheetParameters(
           paymentIntentClientSecret: clientSecret,
-          merchantDisplayName: 'Orgami',
+          merchantDisplayName: 'Attendus',
           style: ThemeMode.system,
           googlePay: const PaymentSheetGooglePay(
             merchantCountryCode: 'US',
-            testEnv: true, // Set to false for production
+            testEnv: false,
           ),
           applePay: const PaymentSheetApplePay(merchantCountryCode: 'US'),
           customFlow: false,
-          returnURL: 'orgami://stripe-redirect',
+          returnURL: 'attendus://callback',
           allowsDelayedPaymentMethods: false,
         ),
       );

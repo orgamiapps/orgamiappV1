@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/Utils/toast.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:geocoding/geocoding.dart';
+import 'package:attendus/Utils/geocoding_compat.dart';
 
 class GeofenceSetupScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -161,7 +162,7 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: FadeTransition(opacity: _fadeAnimation, child: _bodyView()),
       ),
@@ -516,174 +517,75 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
   }
 
   Widget _buildDistanceSlider() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            spreadRadius: 0,
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.radar,
-                  color: Color(0xFF667EEA),
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 16),
-              const Expanded(
-                child: Text(
-                  'Detection Distance',
-                  style: TextStyle(
-                    color: Color(0xFF1A1A1A),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '${radius.toInt()} feet',
-            style: const TextStyle(
-              color: Color(0xFF667EEA),
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              fontFamily: 'Roboto',
-            ),
-          ),
-          const SizedBox(height: 8),
-          Slider(
-            value: radius,
-            min: 5.0,
-            max: 100.0,
-            divisions: 19,
-            activeColor: const Color(0xFF667EEA),
-            inactiveColor: Colors.grey[300],
-            onChanged: (value) {
-              setState(() {
-                radius = value;
-                if (selectedLocation != null) {
-                  _addMarker(selectedLocation!);
-                }
-              });
-            },
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '5 ft',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12,
-                  fontFamily: 'Roboto',
-                ),
-              ),
-              Text(
-                '100 ft',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12,
-                  fontFamily: 'Roboto',
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+    final theme = Theme.of(context);
+    return AttendUsMapControlPanel(
+      title: 'Detection Distance',
+      subtitle: '${radius.toInt()} feet from the selected event location',
+      icon: Icons.radar,
+      controls: [
+        Slider(
+          value: radius,
+          min: 5.0,
+          max: 100.0,
+          divisions: 19,
+          onChanged: (value) {
+            setState(() {
+              radius = value;
+              if (selectedLocation != null) {
+                _addMarker(selectedLocation!);
+              }
+            });
+          },
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('5 ft', style: theme.textTheme.bodySmall),
+            Text('100 ft', style: theme.textTheme.bodySmall),
+          ],
+        ),
+      ],
     );
   }
 
   Widget _buildContinueButton() {
-    return Container(
+    return SizedBox(
       width: double.infinity,
-      height: 56,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF667EEA).withValues(alpha: 0.3),
-            spreadRadius: 0,
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () async {
-            if (selectedLocation == null) {
-              ShowToast().showNormalToast(
-                msg: 'Please select a location on the map',
-              );
-              return;
-            }
+      child: AttendUsButton.primary(
+        label: 'Save Settings',
+        icon: Icons.save_outlined,
+        onPressed: () async {
+          if (selectedLocation == null) {
+            ShowToast().showNormalToast(
+              msg: 'Please select a location on the map',
+            );
+            return;
+          }
 
-            try {
-              // Update the event with geofence settings
-              await FirebaseFirestore.instance
-                  .collection(EventModel.firebaseKey)
-                  .doc(widget.eventModel.id)
-                  .update({
-                    'latitude': selectedLocation!.latitude,
-                    'longitude': selectedLocation!.longitude,
-                    'radius': radius,
-                    'getLocation': true,
-                  });
+          try {
+            // Update the event with geofence settings
+            await FirebaseFirestore.instance
+                .collection(EventModel.firebaseKey)
+                .doc(widget.eventModel.id)
+                .update({
+                  'latitude': selectedLocation!.latitude,
+                  'longitude': selectedLocation!.longitude,
+                  'radius': radius,
+                  'getLocation': true,
+                });
 
-              ShowToast().showNormalToast(
-                msg: 'Geofence settings updated successfully!',
-              );
-              if (!mounted) return;
-              Navigator.pop(context);
-            } catch (e) {
-              if (!mounted) return;
-              ShowToast().showNormalToast(
-                msg: 'Failed to update geofence settings: $e',
-              );
-            }
-          },
-          child: const Center(
-            child: Text(
-              'Save Settings',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                fontFamily: 'Roboto',
-              ),
-            ),
-          ),
-        ),
+            ShowToast().showNormalToast(
+              msg: 'Geofence settings updated successfully!',
+            );
+            if (!mounted) return;
+            Navigator.pop(context);
+          } catch (e) {
+            if (!mounted) return;
+            ShowToast().showNormalToast(
+              msg: 'Failed to update geofence settings: $e',
+            );
+          }
+        },
       ),
     );
   }

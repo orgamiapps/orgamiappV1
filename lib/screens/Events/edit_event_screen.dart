@@ -4,7 +4,6 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:geocoding/geocoding.dart';
 
 import 'package:image_picker/image_picker.dart';
 
@@ -18,6 +17,8 @@ import 'package:attendus/Utils/toast.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 import 'package:attendus/screens/Events/Widget/sign_in_security_tier_selector.dart';
 import 'package:attendus/screens/Events/location_picker_screen.dart';
+import 'package:attendus/Utils/attendus_theme.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 import 'dart:io';
 
 class EditEventScreen extends StatefulWidget {
@@ -39,7 +40,7 @@ class _EditEventScreenState extends State<EditEventScreen>
   bool privateEvent = false;
   final List<String> _allCategories = [
     'Social & Networking',
-    'Entertainment', 
+    'Entertainment',
     'Sports & Fitness',
     'Education & Learning',
     'Arts & Culture',
@@ -60,7 +61,8 @@ class _EditEventScreenState extends State<EditEventScreen>
   String? _currentImageUrl;
 
   // Sign-in security tier
-  String _selectedSignInTier = 'regular'; // 'most_secure', 'geofence_only', 'regular', or 'all'
+  String _selectedSignInTier =
+      'regular'; // 'most_secure', 'geofence_only', 'regular', or 'all'
   List<String> _selectedSignInMethods = ['qr_code', 'manual_code'];
   String? _manualCode;
 
@@ -68,7 +70,9 @@ class _EditEventScreenState extends State<EditEventScreen>
   LatLng? _selectedLocationInternal;
   double? _selectedRadius;
   String? _resolvedAddress;
-  bool _isResolvingAddress = false;
+  String _locationType = 'in_person';
+  String? _selectedPlaceId;
+  String? _selectedPlaceName;
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -140,17 +144,34 @@ class _EditEventScreenState extends State<EditEventScreen>
     _selectedSignInTier = event.signInSecurityTier ?? 'regular';
     _selectedSignInMethods = List.from(event.signInMethods);
     _manualCode = event.manualCode;
+    _locationType = event.locationType;
+    _selectedPlaceId = event.placeId;
+    _selectedPlaceName = event.locationName;
+    _resolvedAddress = event.location;
 
     // Initialize location and radius
-    _selectedLocationInternal = LatLng(event.latitude, event.longitude);
+    _selectedLocationInternal =
+        event.locationType == 'in_person' &&
+            !(event.latitude == 0 && event.longitude == 0)
+        ? LatLng(event.latitude, event.longitude)
+        : const LatLng(0, 0);
     _selectedRadius = event.radius;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _reverseGeocodeSelectedLocation();
-    });
+    if (_locationType == 'online') {
+      _selectedSignInTier = 'regular';
+      _selectedSignInMethods = const ['qr_code', 'manual_code'];
+      _selectedPlaceId = null;
+      _selectedPlaceName = null;
+      _selectedRadius = null;
+    }
   }
 
   @override
   void dispose() {
+    groupNameEdtController.dispose();
+    titleEdtController.dispose();
+    locationEdtController.dispose();
+    thumbnailUrlCtlr.dispose();
+    descriptionEdtController.dispose();
     _fadeController.dispose();
     _slideController.dispose();
     super.dispose();
@@ -189,6 +210,9 @@ class _EditEventScreenState extends State<EditEventScreen>
         builder: (_) => LocationPickerScreen(
           initialLocation: _selectedLocationInternal,
           initialRadius: _selectedRadius,
+          initialPlaceId: _selectedPlaceId,
+          initialDisplayName: _selectedPlaceName,
+          initialAddress: _resolvedAddress,
         ),
       ),
     );
@@ -196,56 +220,42 @@ class _EditEventScreenState extends State<EditEventScreen>
       setState(() {
         _selectedLocationInternal = picked.location;
         _selectedRadius = picked.radius;
+        _selectedPlaceId = picked.placeId;
+        _selectedPlaceName = picked.displayName;
+        _resolvedAddress = picked.formattedAddress;
+        locationEdtController.text = picked.formattedAddress;
         _hasChanges = true;
       });
-      await _reverseGeocodeSelectedLocation();
     }
   }
 
-  Future<void> _reverseGeocodeSelectedLocation() async {
-    if (_selectedLocationInternal == null) return;
-    setState(() => _isResolvingAddress = true);
-    try {
-      final placemarks = await placemarkFromCoordinates(
-        _selectedLocationInternal!.latitude,
-        _selectedLocationInternal!.longitude,
-      );
-      if (placemarks.isNotEmpty) {
-        final p = placemarks.first;
-        final parts = <String>[
-          if ((p.street ?? '').isNotEmpty) p.street!,
-          if ((p.locality ?? '').isNotEmpty) p.locality!,
-          if ((p.administrativeArea ?? '').isNotEmpty) p.administrativeArea!,
-          if ((p.postalCode ?? '').isNotEmpty) p.postalCode!,
-          if ((p.country ?? '').isNotEmpty) p.country!,
-        ];
-        final addr = parts.isNotEmpty
-            ? parts.join(', ')
-            : '${_selectedLocationInternal!.latitude.toStringAsFixed(6)}, ${_selectedLocationInternal!.longitude.toStringAsFixed(6)}';
-        setState(() {
-          _resolvedAddress = addr;
-          locationEdtController.text = addr;
-        });
+  void _setLocationType(String value) {
+    if (_locationType == value) return;
+    setState(() {
+      _locationType = value;
+      _hasChanges = true;
+      _selectedLocationInternal = value == 'online' ? const LatLng(0, 0) : null;
+      _selectedRadius = value == 'in_person' ? 100 : null;
+      _selectedPlaceId = null;
+      _selectedPlaceName = null;
+      _resolvedAddress = null;
+      locationEdtController.clear();
+      if (value == 'online') {
+        _selectedSignInTier = 'regular';
+        _selectedSignInMethods = const ['qr_code', 'manual_code'];
       }
-    } catch (_) {
-      final lat = _selectedLocationInternal!.latitude.toStringAsFixed(6);
-      final lng = _selectedLocationInternal!.longitude.toStringAsFixed(6);
-      setState(() {
-        _resolvedAddress = 'Coordinates: $lat, $lng';
-        locationEdtController.text = _resolvedAddress!;
-      });
-    } finally {
-      if (mounted) setState(() => _isResolvingAddress = false);
-    }
+    });
   }
 
   Future<String?> _uploadToFirebaseHosting() async {
     debugPrint('🔍 DEBUG: _uploadToFirebaseHosting called');
     debugPrint('🔍 DEBUG: _selectedImagePath: $_selectedImagePath');
     debugPrint('🔍 DEBUG: _currentImageUrl: $_currentImageUrl');
-    
+
     if (_selectedImagePath == null) {
-      debugPrint('🔍 DEBUG: No new image selected, returning current URL: $_currentImageUrl');
+      debugPrint(
+        '🔍 DEBUG: No new image selected, returning current URL: $_currentImageUrl',
+      );
       return _currentImageUrl;
     }
 
@@ -253,7 +263,9 @@ class _EditEventScreenState extends State<EditEventScreen>
       debugPrint('🔍 DEBUG: Starting image upload...');
       String? imageUrl;
       Uint8List imageData = await XFile(_selectedImagePath!).readAsBytes();
-      debugPrint('🔍 DEBUG: Image data loaded, size: ${imageData.length} bytes');
+      debugPrint(
+        '🔍 DEBUG: Image data loaded, size: ${imageData.length} bytes',
+      );
 
       // Generate unique filename with timestamp
       final String fileName =
@@ -289,7 +301,9 @@ class _EditEventScreenState extends State<EditEventScreen>
       debugPrint('❌ ERROR: Error uploading image: $e');
       debugPrint('❌ ERROR: Stack trace: ${StackTrace.current}');
       // Return current image URL as fallback instead of null
-      debugPrint('🔍 DEBUG: Falling back to current image URL: $_currentImageUrl');
+      debugPrint(
+        '🔍 DEBUG: Falling back to current image URL: $_currentImageUrl',
+      );
       return _currentImageUrl;
     }
   }
@@ -301,7 +315,12 @@ class _EditEventScreenState extends State<EditEventScreen>
       _btnCtlr.start();
 
       try {
-        if (_selectedLocationInternal == null) {
+        final hasPhysicalLocation =
+            _locationType == 'in_person' &&
+            _selectedLocationInternal != null &&
+            !(_selectedLocationInternal!.latitude == 0 &&
+                _selectedLocationInternal!.longitude == 0);
+        if (_locationType == 'in_person' && !hasPhysicalLocation) {
           debugPrint('❌ ERROR: Location not selected');
           _btnCtlr.reset();
           if (!mounted) return;
@@ -313,8 +332,24 @@ class _EditEventScreenState extends State<EditEventScreen>
           );
           return;
         }
-        debugPrint('🔍 DEBUG: Location validated: ${_selectedLocationInternal!.latitude}, ${_selectedLocationInternal!.longitude}');
-        
+        if (_locationType == 'online' &&
+            locationEdtController.text.trim().isEmpty) {
+          _btnCtlr.reset();
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Enter the online event location or meeting link'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+        debugPrint(
+          hasPhysicalLocation
+              ? 'Location validated: ${_selectedLocationInternal!.latitude}, ${_selectedLocationInternal!.longitude}'
+              : 'Online event location validated',
+        );
+
         debugPrint('🔍 DEBUG: Starting image upload...');
         String? imageUrl = await _uploadToFirebaseHosting();
         debugPrint('🔍 DEBUG: Image upload result: $imageUrl');
@@ -327,30 +362,48 @@ class _EditEventScreenState extends State<EditEventScreen>
           title: titleEdtController.text.trim(),
           description: descriptionEdtController.text.trim(),
           location: locationEdtController.text.trim(),
+          locationName: hasPhysicalLocation ? _selectedPlaceName : null,
+          locationType: _locationType,
+          placeId: hasPhysicalLocation ? _selectedPlaceId : null,
           groupName: groupNameEdtController.text.trim(),
           imageUrl: imageUrl ?? '', // Use empty string if no image
           selectedDateTime: widget.eventModel.selectedDateTime,
           customerUid: widget.eventModel.customerUid,
           categories: _selectedCategories,
           private: privateEvent,
-          getLocation: widget.eventModel.getLocation,
-          radius: _selectedRadius ?? widget.eventModel.radius,
+          getLocation: hasPhysicalLocation,
+          radius: hasPhysicalLocation
+              ? (_selectedRadius ?? widget.eventModel.radius)
+              : 0,
           ticketsEnabled: widget.eventModel.ticketsEnabled,
           maxTickets: widget.eventModel.maxTickets,
           issuedTickets: widget.eventModel.issuedTickets,
           isFeatured: widget.eventModel.isFeatured,
           status: widget.eventModel.status,
           eventGenerateTime: widget.eventModel.eventGenerateTime,
-          latitude: _selectedLocationInternal!.latitude,
-          longitude: _selectedLocationInternal!.longitude,
+          latitude: hasPhysicalLocation
+              ? _selectedLocationInternal!.latitude
+              : 0,
+          longitude: hasPhysicalLocation
+              ? _selectedLocationInternal!.longitude
+              : 0,
+          eventDuration: widget.eventModel.eventDuration,
+          coHosts: widget.eventModel.coHosts,
+          ticketPrice: widget.eventModel.ticketPrice,
+          ticketUpgradeEnabled: widget.eventModel.ticketUpgradeEnabled,
+          ticketUpgradePrice: widget.eventModel.ticketUpgradePrice,
           organizationId: widget.eventModel.organizationId,
           accessList: widget.eventModel.accessList,
           signInMethods: _selectedSignInMethods,
           signInSecurityTier: _selectedSignInTier, // Add security tier
           manualCode: _manualCode,
+          hasLiveQuiz: widget.eventModel.hasLiveQuiz,
+          liveQuizId: widget.eventModel.liveQuizId,
         );
 
-        debugPrint('🔍 DEBUG: Updating Firestore document: ${widget.eventModel.id}');
+        debugPrint(
+          '🔍 DEBUG: Updating Firestore document: ${widget.eventModel.id}',
+        );
         // Update in Firestore
         await FirebaseFirestore.instance
             .collection(EventModel.firebaseKey)
@@ -372,8 +425,7 @@ class _EditEventScreenState extends State<EditEventScreen>
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) =>
-                  SingleEventScreen(eventModel: updatedEvent),
+              builder: (context) => SingleEventScreen(eventModel: updatedEvent),
             ),
           );
         });
@@ -396,17 +448,21 @@ class _EditEventScreenState extends State<EditEventScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnimation,
           child: SlideTransition(
             position: _slideAnimation,
-            child: SingleChildScrollView(
-              child: Form(
-                key: _formKey,
-                child: Column(children: [_buildHeader(), _buildFormContent()]),
-              ),
+            child: Column(
+              children: [
+                _buildHeader(),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Form(key: _formKey, child: _buildFormContent()),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -417,173 +473,142 @@ class _EditEventScreenState extends State<EditEventScreen>
   }
 
   Widget _buildFloatingUpdateButton() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      width: double.infinity,
-      height: 56,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-        ),
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF667EEA).withValues(alpha: 0.35),
-            spreadRadius: 0,
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-          BoxShadow(
-            color: const Color(0xFF764BA2).withValues(alpha: 0.2),
-            spreadRadius: 0,
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(28),
-          onTap: () {
-            debugPrint('🔍 DEBUG: Floating button tapped');
-            _handleSubmit();
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (_btnCtlr.currentState == ButtonState.loading)
-                  const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                else
-                  const Icon(
-                    Icons.check_circle_outline,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                const SizedBox(width: 10),
-                const Text(
-                  'Update Event',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
-                    fontFamily: 'Roboto',
-                    letterSpacing: 0.5,
-                  ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: FloatingActionButton.extended(
+        onPressed: _handleSubmit,
+        icon: _btnCtlr.currentState == ButtonState.loading
+            ? const SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
                 ),
-              ],
-            ),
-          ),
-        ),
+              )
+            : const Icon(Icons.check_circle_outline),
+        label: const Text('Update event'),
       ),
     );
   }
 
   Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+    return AttendUsTopBar(
+      title: 'Edit event',
+      subtitle: widget.eventModel.title,
+      actions: [
+        IconButton(
+          tooltip: 'Back',
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back),
         ),
-      ),
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    Icons.arrow_back_ios_new,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              const Expanded(
-                child: Text(
-                  'Edit Event',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Update your event details',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontFamily: 'Roboto',
-              height: 1.4,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+      ],
     );
   }
 
   Widget _buildFormContent() {
     return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          // Event Image
-          _buildImageSection(),
-          const SizedBox(height: 24),
+      padding: const EdgeInsets.all(20),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 980;
+          final form = Column(
+            children: [
+              _buildImageSection(),
+              const SizedBox(height: 16),
+              _buildEventDetailsSection(),
+              const SizedBox(height: 16),
+              _buildCategoriesSection(),
+              const SizedBox(height: 16),
+              _buildSignInMethodsSection(),
+              const SizedBox(height: 16),
+              _buildPrivacySection(),
+              const SizedBox(height: 24),
+              _buildSubmitButton(),
+              const SizedBox(height: 12),
+              _buildDeleteButton(),
+              const SizedBox(height: 120),
+            ],
+          );
 
-          // Event Details
-          _buildEventDetailsSection(),
-          const SizedBox(height: 24),
-
-          // Categories
-          _buildCategoriesSection(),
-          const SizedBox(height: 24),
-
-          // Sign-In Methods
-          _buildSignInMethodsSection(),
-          const SizedBox(height: 24),
-
-          // Privacy Settings
-          _buildPrivacySection(),
-          const SizedBox(height: 32),
-
-          // Submit Button
-          _buildSubmitButton(),
-          const SizedBox(height: 16),
-
-          // Delete Event Button
-          _buildDeleteButton(),
-        ],
+          return Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: AttendUsTokens.pageMaxWidth,
+              ),
+              child: wide
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(width: 300, child: _buildEditOverview()),
+                        const SizedBox(width: 20),
+                        Expanded(child: form),
+                      ],
+                    )
+                  : Column(
+                      children: [
+                        _buildEditOverview(compact: true),
+                        const SizedBox(height: 16),
+                        form,
+                      ],
+                    ),
+            ),
+          );
+        },
       ),
+    );
+  }
+
+  Widget _buildEditOverview({bool compact = false}) {
+    return AttendUsPageSection(
+      title: 'Event setup',
+      subtitle: _hasChanges
+          ? 'Unsaved changes are ready to publish.'
+          : 'Review and adjust event operations.',
+      icon: Icons.tune_outlined,
+      framed: true,
+      padding: const EdgeInsets.all(16),
+      child: compact
+          ? Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: const [
+                AttendUsStatusBadge(
+                  label: 'Basics',
+                  icon: Icons.edit_note,
+                  tone: AttendUsStatusTone.info,
+                ),
+                AttendUsStatusBadge(
+                  label: 'Location',
+                  icon: Icons.place_outlined,
+                  tone: AttendUsStatusTone.info,
+                ),
+                AttendUsStatusBadge(
+                  label: 'Security',
+                  icon: Icons.verified_user_outlined,
+                  tone: AttendUsStatusTone.info,
+                ),
+              ],
+            )
+          : Column(
+              children: [
+                AttendUsMetricTile(
+                  label: 'RSVPs',
+                  value: '${widget.eventModel.issuedTickets}',
+                  icon: Icons.confirmation_number_outlined,
+                  tone: AttendUsStatusTone.info,
+                ),
+                const SizedBox(height: 10),
+                AttendUsListTile(
+                  leadingIcon: widget.eventModel.private
+                      ? Icons.lock_outline
+                      : Icons.public,
+                  title: widget.eventModel.private ? 'Private' : 'Public',
+                  subtitle: 'Visibility',
+                  dense: true,
+                ),
+              ],
+            ),
     );
   }
 
@@ -816,8 +841,42 @@ class _EditEventScreenState extends State<EditEventScreen>
           ),
           const SizedBox(height: 16),
 
-          // Location selector
-          _buildLocationSelector(),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment<String>(
+                value: 'in_person',
+                icon: Icon(Icons.place_outlined),
+                label: Text('In person'),
+              ),
+              ButtonSegment<String>(
+                value: 'online',
+                icon: Icon(Icons.videocam_outlined),
+                label: Text('Online'),
+              ),
+            ],
+            selected: {_locationType},
+            onSelectionChanged: (selection) {
+              _setLocationType(selection.first);
+            },
+            showSelectedIcon: false,
+          ),
+          const SizedBox(height: 12),
+          if (_locationType == 'in_person')
+            _buildLocationSelector()
+          else
+            AppTextFields.textField2(
+              controller: locationEdtController,
+              hintText: 'Zoom, Teams, or a meeting URL',
+              titleText: 'Online location or meeting link',
+              width: double.infinity,
+              validator: (value) {
+                if (_locationType == 'online' &&
+                    (value == null || value.trim().isEmpty)) {
+                  return 'Please enter the online event location';
+                }
+                return null;
+              },
+            ),
           const SizedBox(height: 16),
 
           // Description
@@ -913,25 +972,6 @@ class _EditEventScreenState extends State<EditEventScreen>
                             color: Color(0xFF6B7280),
                             fontSize: 14,
                           ),
-                        ),
-                      ],
-                      if (_isResolvingAddress) ...[
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Color(0xFF667EEA),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Text('Resolving address...'),
-                          ],
                         ),
                       ],
                     ],
@@ -1039,7 +1079,8 @@ class _EditEventScreenState extends State<EditEventScreen>
                       color: isSelected
                           ? Colors.white
                           : const Color(0xFF667EEA),
-                      fontSize: 13, // Slightly smaller font for longer category names
+                      fontSize:
+                          13, // Slightly smaller font for longer category names
                       fontWeight: FontWeight.w600,
                       fontFamily: 'Roboto',
                     ),
@@ -1059,10 +1100,23 @@ class _EditEventScreenState extends State<EditEventScreen>
     return SignInSecurityTierSelector(
       selectedTier: _selectedSignInTier,
       onTierChanged: (tier) {
+        if (_locationType == 'online' &&
+            (tier == 'most_secure' ||
+                tier == 'geofence_only' ||
+                tier == 'all')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Geofence sign-in is unavailable for online events',
+              ),
+            ),
+          );
+          return;
+        }
         setState(() {
           _selectedSignInTier = tier;
           _hasChanges = true;
-          
+
           // Update legacy methods list based on tier
           switch (tier) {
             case 'most_secure':

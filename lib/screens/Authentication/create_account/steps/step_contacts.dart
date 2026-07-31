@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/screens/Authentication/create_account/suggested_contacts_screen.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class StepContacts extends StatelessWidget {
   const StepContacts({super.key, required this.onFinish});
@@ -9,23 +9,24 @@ class StepContacts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return AttendUsPageSection(
+      title: 'Find people you know',
+      subtitle:
+          'Contact sync is optional. You can skip this now and manage contacts later from Settings.',
+      icon: Icons.contacts_outlined,
+      framed: false,
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Sync your contacts',
-            style: TextStyle(
-              color: AppThemeColor.darkBlueColor,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
+          const AttendUsActionTile(
+            icon: Icons.people_alt_outlined,
+            title: 'Connect with attendees and organizers',
+            subtitle:
+                'Attendus can help suggest contacts after you grant permission.',
+            tone: AttendUsStatusTone.info,
           ),
-          const SizedBox(height: 8),
-          const Text(
-              'Find people you know by allowing access to your contacts. You can change this later in Settings.'),
-          const Spacer(),
+          const SizedBox(height: 24),
           Row(
             children: [
               Expanded(
@@ -36,24 +37,15 @@ class StepContacts extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppThemeColor.darkBlueColor,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                    elevation: 0,
-                  ),
+                child: AttendUsButton.primary(
+                  label: 'Sync contacts',
+                  icon: Icons.sync,
                   onPressed: () {
-                    // After sync, navigate to suggestions list
                     RouterClass.nextScreenNormal(
                       context,
                       const SuggestedContactsScreen(),
                     );
                   },
-                  child: const Text(
-                    'Sync Contacts',
-                    style: TextStyle(color: Colors.white),
-                  ),
                 ),
               ),
             ],
@@ -63,5 +55,3 @@ class StepContacts extends StatelessWidget {
     );
   }
 }
-
-

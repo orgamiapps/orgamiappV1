@@ -5,19 +5,19 @@ importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
 
 firebase.initializeApp({
-  apiKey: "AIzaSyAgxBhWgtmRA_cc-JcuMP8fXl7NjZIthOI",
+  apiKey: "AIzaSyA-PFyqhP5aEVE6XwGku3jMe91G3efMaVw",
   authDomain: "orgami-66nxok.firebaseapp.com",
   projectId: "orgami-66nxok",
   storageBucket: "orgami-66nxok.appspot.com",
   messagingSenderId: "951311475019",
-  appId: "1:951311475019:web:d65cfc2cbe6e987c89c8ce"
+  appId: "1:951311475019:web:65b1de24d2f3a8d289c8ce"
 });
 
 const messaging = firebase.messaging();
 
 // Handle background messages
 messaging.onBackgroundMessage(function(payload) {
-  const title = (payload.notification && payload.notification.title) || 'AttendUs';
+  const title = (payload.notification && payload.notification.title) || 'Attendus';
   const body = (payload.notification && payload.notification.body) || '';
   const data = payload.data || {};
   self.registration.showNotification(title, {

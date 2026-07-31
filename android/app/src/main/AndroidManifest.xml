@@ -98,12 +98,12 @@
             android:value="2" />
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyAf1t5cToh1UoF7R52vTSJxMajw8CvmVUA" />
+            android:value="${GOOGLE_MAPS_ANDROID_API_KEY}" />
         
         <!-- Firebase Messaging -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="orgami_channel" />
+            android:value="attendus_channel" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@mipmap/ic_launcher" />

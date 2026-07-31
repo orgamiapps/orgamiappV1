@@ -44,8 +44,8 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyAgxBhWgtmRA_cc-JcuMP8fXl7NjZIthOI',
-    appId: '1:951311475019:web:d65cfc2cbe6e987c89c8ce',
+    apiKey: 'AIzaSyA-PFyqhP5aEVE6XwGku3jMe91G3efMaVw',
+    appId: '1:951311475019:web:65b1de24d2f3a8d289c8ce',
     messagingSenderId: '951311475019',
     projectId: 'orgami-66nxok',
     authDomain: 'orgami-66nxok.firebaseapp.com',
@@ -62,7 +62,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyCD0XNVuDDTljnD9R7n8TCr_9Ze21PA0VU',
-    appId: '1:951311475019:ios:5adde68ce6b5846289c8ce',
+    appId: '1:951311475019:ios:4b42c42f9ee9f67289c8ce',
     messagingSenderId: '951311475019',
     projectId: 'orgami-66nxok',
     storageBucket: 'orgami-66nxok.appspot.com',
@@ -77,5 +77,4 @@ class DefaultFirebaseOptions {
     authDomain: 'orgami-66nxok.firebaseapp.com',
     storageBucket: 'orgami-66nxok.appspot.com',
   );
-
 }

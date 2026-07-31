@@ -12,6 +12,7 @@ import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/screens/LiveQuiz/widgets/live_leaderboard_widget.dart';
 import 'package:attendus/screens/LiveQuiz/widgets/quiz_waiting_lobby.dart';
 import 'package:attendus/screens/LiveQuiz/quiz_builder_screen.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class QuizParticipantScreen extends StatefulWidget {
   final String quizId;
@@ -142,7 +143,9 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
     try {
       final userId = FirebaseAuth.instance.currentUser?.uid;
 
-      Logger.info('Checking for existing participant: userId=$userId, isAnonymous=${widget.isAnonymous}');
+      Logger.info(
+        'Checking for existing participant: userId=$userId, isAnonymous=${widget.isAnonymous}',
+      );
 
       // Only search for authenticated users (anonymous users can't be tracked across sessions)
       if (userId != null && !widget.isAnonymous) {
@@ -159,13 +162,17 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
           final participant = QuizParticipantModel.fromFirestore(
             participantsSnapshot.docs.first,
           );
-          Logger.info('Found existing participant for userId=$userId: ${participant.id}');
+          Logger.info(
+            'Found existing participant for userId=$userId: ${participant.id}',
+          );
           return participant;
         } else {
           Logger.info('No existing participant found for userId=$userId');
         }
       } else {
-        Logger.info('Skipping existing participant check (userId=$userId, isAnonymous=${widget.isAnonymous})');
+        Logger.info(
+          'Skipping existing participant check (userId=$userId, isAnonymous=${widget.isAnonymous})',
+        );
       }
 
       return null;
@@ -544,7 +551,7 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: _isJoining
             ? _buildJoiningScreen()
@@ -552,11 +559,16 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
                 opacity: _fadeAnimation,
                 child: SlideTransition(
                   position: _slideAnimation,
-                  child: Column(
-                    children: [
-                      _buildHeader(),
-                      Expanded(child: _buildContent()),
-                    ],
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 960),
+                      child: Column(
+                        children: [
+                          _buildHeader(),
+                          Expanded(child: _buildContent()),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -635,67 +647,7 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
       );
     }
 
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              SizedBox(
-                width: 80,
-                height: 80,
-                child: CircularProgressIndicator(
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                    Color(0xFF667EEA),
-                  ),
-                  strokeWidth: 3,
-                ),
-              ),
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: const Icon(
-                  Icons.quiz,
-                  color: Color(0xFF667EEA),
-                  size: 30,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 32),
-          const Text(
-            'Joining Live Quiz...',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1A1A1A),
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 48),
-            child: Text(
-              'Connecting you to the live quiz.\nThis should only take a moment.',
-              style: TextStyle(fontSize: 15, color: Colors.grey, height: 1.5),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          const SizedBox(height: 32),
-          const SizedBox(
-            width: 200,
-            child: LinearProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
-              backgroundColor: Color(0xFFE5E7EB),
-            ),
-          ),
-        ],
-      ),
-    );
+    return const AttendUsLoadingState(label: 'Joining live quiz...');
   }
 
   Widget _buildHeader() {
@@ -976,8 +928,9 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
     if (_quiz?.isDraft == true) {
       // Check if current user is the quiz creator
       final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-      final isCreator = currentUserId != null && currentUserId == _quiz?.creatorId;
-      
+      final isCreator =
+          currentUserId != null && currentUserId == _quiz?.creatorId;
+
       return QuizWaitingLobby(
         quizId: widget.quizId,
         currentParticipantId: _participantId,
@@ -986,7 +939,7 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
         onManageQuiz: isCreator ? _navigateToQuizBuilder : null,
       );
     }
-    
+
     // For other waiting states (like paused), show simple waiting screen
     return Center(
       child: Padding(

@@ -6,13 +6,14 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:attendus/Utils/app_constants.dart';
-import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:provider/provider.dart';
 import 'package:attendus/screens/Authentication/create_account/create_account_view_model.dart';
 import 'package:attendus/firebase/firebase_google_auth_helper.dart';
 import 'package:attendus/Services/auth_service.dart';
+import 'package:attendus/widgets/attendus_auth_layout.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class StepBasicInfo extends StatefulWidget {
@@ -305,42 +306,33 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
         },
       ),
       if (_placeSuggestions.isNotEmpty)
-        Container(
+        AttendUsCard(
+          padding: EdgeInsets.zero,
           margin: const EdgeInsets.only(top: 8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 20,
-                offset: const Offset(0, 6),
-              ),
-            ],
-            border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
-          ),
-          constraints: const BoxConstraints(maxHeight: 220),
-          child: ListView.builder(
-            itemCount: _placeSuggestions.length,
-            shrinkWrap: true,
-            itemBuilder: (context, index) {
-              final suggestion = _placeSuggestions[index];
-              final description = suggestion['description'] as String? ?? '';
-              return ListTile(
-                leading: const Icon(
-                  Icons.location_on_outlined,
-                  color: Color(0xFF667EEA),
-                ),
-                title: Text(description),
-                onTap: () {
-                  setState(() {
-                    _locationController.text = description;
-                    _locationSelectedFromSuggestions = true;
-                    _placeSuggestions = [];
-                  });
-                },
-              );
-            },
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 220),
+            child: ListView.builder(
+              itemCount: _placeSuggestions.length,
+              shrinkWrap: true,
+              itemBuilder: (context, index) {
+                final suggestion = _placeSuggestions[index];
+                final description = suggestion['description'] as String? ?? '';
+                return ListTile(
+                  leading: Icon(
+                    Icons.location_on_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  title: Text(description),
+                  onTap: () {
+                    setState(() {
+                      _locationController.text = description;
+                      _locationSelectedFromSuggestions = true;
+                      _placeSuggestions = [];
+                    });
+                  },
+                );
+              },
+            ),
           ),
         ),
     ],
@@ -349,20 +341,10 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
   Widget _nextButton() {
     return SizedBox(
       width: double.infinity,
-      height: 56,
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppThemeColor.darkBlueColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          elevation: 0,
-        ),
+      child: AttendUsButton.primary(
+        label: 'Continue',
+        icon: Icons.arrow_forward,
         onPressed: _validateAndNext,
-        child: const Text(
-          'Next',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-        ),
       ),
     );
   }
@@ -378,14 +360,7 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'OR',
-            style: TextStyle(
-              color: Colors.grey.withValues(alpha: 0.6),
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+          child: Text('OR', style: Theme.of(context).textTheme.labelMedium),
         ),
         Expanded(
           child: Divider(
@@ -400,16 +375,13 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
   Widget _buildGoogleSignInButton(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 50,
-      child: OutlinedButton.icon(
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(
-            color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+      child: AttendUsSocialButton(
+        icon: const FaIcon(
+          FontAwesomeIcons.google,
+          size: 18,
+          color: Color(0xFF4285F4),
         ),
+        label: 'Continue with Google',
         onPressed: () async {
           widget.onSocialSignIn(true);
           try {
@@ -429,26 +401,17 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
               }
             } else {
               if (!FirebaseGoogleAuthHelper.lastGoogleCancelled) {
-                ShowToast().showNormalToast(msg: 'Google sign-in failed');
+                ShowToast().showNormalToast(
+                  msg:
+                      FirebaseGoogleAuthHelper.lastGoogleErrorMessage ??
+                      'Google sign-in failed.',
+                );
               }
             }
           } finally {
             if (mounted) widget.onSocialSignIn(false);
           }
         },
-        icon: const FaIcon(
-          FontAwesomeIcons.google,
-          size: 18,
-          color: Color(0xFF4285F4),
-        ),
-        label: const Text(
-          'Continue with Google',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
-        ),
       ),
     );
   }
@@ -456,16 +419,9 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
   Widget _buildAppleSignInButton(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 50,
-      child: OutlinedButton.icon(
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(
-            color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
+      child: AttendUsSocialButton(
+        icon: const Icon(Icons.apple, size: 20, color: Colors.black),
+        label: 'Continue with Apple',
         onPressed: () async {
           widget.onSocialSignIn(true);
           try {
@@ -485,22 +441,17 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
               }
             } else {
               if (!FirebaseGoogleAuthHelper.lastAppleCancelled) {
-                ShowToast().showNormalToast(msg: 'Apple sign-in failed');
+                ShowToast().showNormalToast(
+                  msg:
+                      FirebaseGoogleAuthHelper.lastAppleErrorMessage ??
+                      'Apple sign-in failed.',
+                );
               }
             }
           } finally {
             if (mounted) widget.onSocialSignIn(false);
           }
         },
-        icon: const Icon(Icons.apple, size: 20, color: Colors.black),
-        label: const Text(
-          'Continue with Apple',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
-        ),
       ),
     );
   }
@@ -516,48 +467,16 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
     TextCapitalization capitalization = TextCapitalization.none,
     ValueChanged<String>? onChanged,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: AppThemeColor.darkBlueColor,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboard,
-          inputFormatters: inputFormatters,
-          textCapitalization: capitalization,
-          decoration: InputDecoration(
-            hintText: hint,
-            filled: true,
-            fillColor: Colors.grey.withValues(alpha: 0.04),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(
-                color: AppThemeColor.darkBlueColor,
-                width: 2,
-              ),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 18,
-            ),
-            prefixIcon: Icon(icon, color: AppThemeColor.lightGrayColor),
-          ),
-          validator: validator,
-          onChanged: onChanged,
-        ),
-      ],
+    return AttendUsFormTextField(
+      controller: controller,
+      keyboardType: keyboard,
+      inputFormatters: inputFormatters,
+      textCapitalization: capitalization,
+      labelText: label,
+      hintText: hint ?? label,
+      prefixIcon: icon,
+      validator: validator,
+      onChanged: onChanged,
     );
   }
 }

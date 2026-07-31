@@ -17,6 +17,8 @@ import 'package:attendus/screens/Home/account_details_screen_v2.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:attendus/Utils/attendus_theme.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -67,7 +69,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   List<String> selectedCategories = [];
   final List<String> _allCategories = [
     'Social & Networking',
-    'Entertainment', 
+    'Entertainment',
     'Sports & Fitness',
     'Education & Learning',
     'Arts & Culture',
@@ -289,13 +291,17 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           } else if (tabIndex == 3) {
             savedEvents.addAll(newEvents);
           }
-          
+
           // Only log totals if significant or if there are issues
           if (newEvents.length > 5) {
-            final totalCount = tabIndex == 1 ? createdEvents.length : 
-                              tabIndex == 2 ? attendedEvents.length : 
-                              savedEvents.length;
-            debugPrint("✅ Tab $tabIndex: Added ${newEvents.length} events (Total: $totalCount)");
+            final totalCount = tabIndex == 1
+                ? createdEvents.length
+                : tabIndex == 2
+                ? attendedEvents.length
+                : savedEvents.length;
+            debugPrint(
+              "✅ Tab $tabIndex: Added ${newEvents.length} events (Total: $totalCount)",
+            );
           }
           // For created events, we get all on first fetch. For others, check if we need more.
           _hasMore[tabIndex] = (tabIndex != 1) && (newEvents.length >= 50);
@@ -340,7 +346,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     setState(() {
       selectedTab = newIndex;
     });
-    
+
     // Load tab data on-demand to prevent Firebase overload
     final events = newIndex == 1
         ? createdEvents
@@ -355,20 +361,21 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     }
   }
 
-  
-
   @override
   Widget build(BuildContext context) {
     final user = CustomerController.logeInCustomer;
 
     // Reduced build logging to prevent main thread blocking
     // Only log during initial load or significant state changes
-    if (isLoading && createdEvents.isEmpty && attendedEvents.isEmpty && savedEvents.isEmpty) {
+    if (isLoading &&
+        createdEvents.isEmpty &&
+        attendedEvents.isEmpty &&
+        savedEvents.isEmpty) {
       debugPrint('🏗️ MY_PROFILE_SCREEN: Initial loading state');
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: isLoading
             ? _buildLoadingState()
@@ -503,22 +510,23 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   Widget _buildProfileContent(CustomerModel? user) {
     return RefreshIndicator(
       onRefresh: () => _loadProfileData(isRefresh: true),
-      color: const Color(0xFF667EEA),
-      child: CustomScrollView(
-        slivers: [
-          // Back Button and Profile Header
-          SliverToBoxAdapter(child: _buildProfileHeader(user)),
-          // Badge Section
-          SliverToBoxAdapter(child: _buildBadgeSection()),
-          // Discoverability Section
-          SliverToBoxAdapter(child: _buildDiscoverabilitySection()),
-          // My Tickets Section
-          SliverToBoxAdapter(child: _buildMyTicketsSection()),
-          // Tab Bar
-          SliverToBoxAdapter(child: _buildTabBar()),
-          // Tab Content
-          SliverToBoxAdapter(child: _buildTabContent()),
-        ],
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: AttendUsTokens.pageMaxWidth,
+          ),
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(child: _buildProfileHeader(user)),
+              SliverToBoxAdapter(child: _buildBadgeSection()),
+              SliverToBoxAdapter(child: _buildDiscoverabilitySection()),
+              SliverToBoxAdapter(child: _buildMyTicketsSection()),
+              SliverToBoxAdapter(child: _buildTabBar()),
+              SliverToBoxAdapter(child: _buildTabContent()),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -800,25 +808,13 @@ class _MyProfileScreenState extends State<MyProfileScreen>
 
   Widget _buildBadgeSection() {
     if (_isBadgeLoading) {
-      return Container(
-        margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              spreadRadius: 0,
-              blurRadius: 20,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: const Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
-          ),
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(24, 0, 24, 24),
+        child: AttendUsPageSection(
+          title: 'Professional Badge',
+          icon: Icons.military_tech,
+          framed: true,
+          child: AttendUsLoadingState(label: 'Loading badge'),
         ),
       );
     }
@@ -827,182 +823,104 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       return const SizedBox(); // Don't show anything if badge failed to load
     }
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            spreadRadius: 0,
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _isBadgeExpanded = !_isBadgeExpanded;
-                  });
-                },
-                behavior: HitTestBehavior.opaque,
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.military_tech,
-                      color: const Color(0xFF667EEA),
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'My Badge',
-                      style: TextStyle(
-                        color: Color(0xFF1A1A1A),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                        fontFamily: 'Roboto',
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(
-                      _isBadgeExpanded ? Icons.expand_less : Icons.expand_more,
-                      color: const Color(0xFF667EEA),
-                      size: 18,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          AnimatedCrossFade(
-            firstChild: Column(
-              children: [
-                const SizedBox(height: 16),
-                Center(
-                  child: GestureDetector(
-                    onTap: () => _showBadgeWalletModal(context),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final availableWidth = constraints.maxWidth;
-                        final double badgeWidth = availableWidth.clamp(
-                          260.0,
-                          360.0,
-                        );
-                        final double badgeHeight = badgeWidth * (180 / 280);
-                        return ProfessionalBadgeWidget(
-                          badge: _userBadge!,
-                          width: badgeWidth,
-                          height: badgeHeight,
-                          showActions: false,
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ],
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      child: AttendUsPageSection(
+        title: 'Professional Badge',
+        subtitle: 'Your scannable Attendus identity badge.',
+        icon: Icons.military_tech,
+        framed: true,
+        actions: [
+          IconButton(
+            tooltip: _isBadgeExpanded ? 'Collapse badge' : 'Expand badge',
+            icon: Icon(
+              _isBadgeExpanded ? Icons.expand_less : Icons.expand_more,
             ),
-            secondChild: const SizedBox.shrink(),
-            crossFadeState: _isBadgeExpanded
-                ? CrossFadeState.showFirst
-                : CrossFadeState.showSecond,
-            duration: const Duration(milliseconds: 200),
+            onPressed: () =>
+                setState(() => _isBadgeExpanded = !_isBadgeExpanded),
           ),
         ],
+        child: AnimatedCrossFade(
+          firstChild: Center(
+            child: GestureDetector(
+              onTap: () => _showBadgeWalletModal(context),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final availableWidth = constraints.maxWidth;
+                  final double badgeWidth = availableWidth.clamp(260.0, 360.0);
+                  final double badgeHeight = badgeWidth * (180 / 280);
+                  return ProfessionalBadgeWidget(
+                    badge: _userBadge!,
+                    width: badgeWidth,
+                    height: badgeHeight,
+                    showActions: false,
+                  );
+                },
+              ),
+            ),
+          ),
+          secondChild: const AttendUsListTile(
+            leadingIcon: Icons.badge_outlined,
+            title: 'Badge ready',
+            subtitle: 'Tap expand to view your badge.',
+          ),
+          crossFadeState: _isBadgeExpanded
+              ? CrossFadeState.showFirst
+              : CrossFadeState.showSecond,
+          duration: const Duration(milliseconds: 200),
+        ),
       ),
     );
   }
 
   Widget _buildDiscoverabilitySection() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            spreadRadius: 0,
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.visibility, color: const Color(0xFF667EEA), size: 18),
-              const SizedBox(width: 8),
-              const Text(
-                'Privacy Settings',
-                style: TextStyle(
-                  color: Color(0xFF1A1A1A),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                  fontFamily: 'Roboto',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Profile Discoverability',
-                      style: TextStyle(
-                        color: Color(0xFF1A1A1A),
-                        fontWeight: FontWeight.w500,
-                        fontSize: 14,
-                        fontFamily: 'Roboto',
-                      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      child: AttendUsPageSection(
+        title: 'Privacy',
+        subtitle: 'Control how people discover your profile.',
+        icon: Icons.visibility_outlined,
+        framed: true,
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Profile Discoverability',
+                    style: TextStyle(
+                      color: Color(0xFF1A1A1A),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                      fontFamily: 'Roboto',
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      isDiscoverable
-                          ? 'Your profile can be found in user searches'
-                          : 'Your profile is hidden from user searches',
-                      style: TextStyle(
-                        color: const Color(0xFF6B7280),
-                        fontSize: 12,
-                        fontFamily: 'Roboto',
-                      ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    isDiscoverable
+                        ? 'Your profile can be found in user searches'
+                        : 'Your profile is hidden from user searches',
+                    style: TextStyle(
+                      color: const Color(0xFF6B7280),
+                      fontSize: 12,
+                      fontFamily: 'Roboto',
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              Switch(
-                value: isDiscoverable,
-                onChanged: (value) {
-                  setState(() {
-                    isDiscoverable = value;
-                  });
-                  _updateDiscoverability(value);
-                },
-                activeThumbColor: const Color(0xFF667EEA),
-                activeTrackColor: const Color(
-                  0xFF667EEA,
-                ).withValues(alpha: 0.3),
-                inactiveThumbColor: const Color(0xFF9CA3AF),
-                inactiveTrackColor: const Color(0xFFE1E5E9),
-              ),
-            ],
-          ),
-        ],
+            ),
+            Switch(
+              value: isDiscoverable,
+              onChanged: (value) {
+                setState(() {
+                  isDiscoverable = value;
+                });
+                _updateDiscoverability(value);
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1031,99 +949,24 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   }
 
   Widget _buildMyTicketsSection() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            spreadRadius: 0,
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // My Tickets button
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF9800).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: const Color(0xFFFF9800).withValues(alpha: 0.3),
-              ),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const MyTicketsScreen(),
-                    ),
-                  );
-                },
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFF9800).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.confirmation_number,
-                        color: Color(0xFFFF9800),
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'My Tickets',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF1A1A1A),
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
-                          SizedBox(height: 2),
-                          Text(
-                            'View and manage your event tickets',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF6B7280),
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(
-                      Icons.arrow_forward_ios,
-                      color: Color(0xFFFF9800),
-                      size: 16,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      child: AttendUsPageSection(
+        title: 'Tickets',
+        subtitle: 'View QR passes and event admission history.',
+        icon: Icons.confirmation_number_outlined,
+        framed: true,
+        child: AttendUsActionTile(
+          icon: Icons.wallet_outlined,
+          title: 'My Tickets',
+          subtitle: 'View and manage your event tickets',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const MyTicketsScreen()),
+            );
+          },
+        ),
       ),
     );
   }
@@ -1330,7 +1173,9 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           .toList();
       // Category filter applied - only log if significant change
       if (events.length - filteredEvents.length > 5) {
-        debugPrint('🔍 Category filter reduced events: ${events.length} → ${filteredEvents.length}');
+        debugPrint(
+          '🔍 Category filter reduced events: ${events.length} → ${filteredEvents.length}',
+        );
       }
     }
 
@@ -1452,7 +1297,6 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   }
 
   Widget _buildEmptyState(String message, FaIconData icon) {
-
     return Container(
       padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(

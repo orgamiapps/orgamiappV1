@@ -2,13 +2,17 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/firebase/firebase_storage_helper.dart';
 import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class StepProfilePhoto extends StatefulWidget {
-  const StepProfilePhoto({super.key, required this.onSkip, required this.onNext});
+  const StepProfilePhoto({
+    super.key,
+    required this.onSkip,
+    required this.onNext,
+  });
   final VoidCallback onSkip;
   final VoidCallback onNext;
 
@@ -49,7 +53,10 @@ class _StepProfilePhotoState extends State<StepProfilePhoto> {
       });
 
       final userId = CustomerController.logeInCustomer!.uid;
-      final url = await FirebaseStorageHelper.uploadProfilePicture(userId, _image!);
+      final url = await FirebaseStorageHelper.uploadProfilePicture(
+        userId,
+        _image!,
+      );
       if (url != null) {
         // Save to Firestore
         await FirebaseFirestore.instance
@@ -79,56 +86,35 @@ class _StepProfilePhotoState extends State<StepProfilePhoto> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Padding(
+        AttendUsPageSection(
+          title: 'Add a profile photo',
+          subtitle:
+              'A clear photo helps attendees and organizers recognize you. You can change it later.',
+          icon: Icons.account_circle_outlined,
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 8),
-              Text(
-                'Set profile picture',
-                style: TextStyle(
-                  color: AppThemeColor.darkBlueColor,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Add a clear photo of yourself so friends can recognize you. '
-                'You can change this anytime from your profile.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppThemeColor.dullFontColor,
-                  fontSize: 14,
-                ),
-              ),
               const SizedBox(height: 24),
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [
-                      AppThemeColor.lightBlueColor.withValues(alpha: 0.2),
-                      Colors.white,
-                    ],
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
                 ),
                 child: CircleAvatar(
                   radius: 72,
-                  backgroundColor:
-                      AppThemeColor.lightBlueColor.withValues(alpha: 0.15),
+                  backgroundColor: Theme.of(context).colorScheme.surface,
                   backgroundImage: _image != null ? FileImage(_image!) : null,
                   child: _image == null
-                      ? Icon(Icons.person, size: 72, color: AppThemeColor.darkBlueColor)
+                      ? Icon(
+                          Icons.person,
+                          size: 72,
+                          color: Theme.of(context).colorScheme.primary,
+                        )
                       : null,
                 ),
               ),
@@ -154,7 +140,7 @@ class _StepProfilePhotoState extends State<StepProfilePhoto> {
                 const SizedBox(height: 12),
                 Text(
                   _error!,
-                  style: const TextStyle(color: Colors.red),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -169,18 +155,12 @@ class _StepProfilePhotoState extends State<StepProfilePhoto> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppThemeColor.darkBlueColor,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16)),
-                        elevation: 0,
-                      ),
-                      onPressed: _isUploading ? null : _uploadIfNeededAndContinue,
-                      child: const Text(
-                        'Next',
-                        style: TextStyle(color: Colors.white),
-                      ),
+                    child: AttendUsButton.primary(
+                      label: 'Next',
+                      icon: Icons.arrow_forward,
+                      onPressed: _isUploading
+                          ? null
+                          : _uploadIfNeededAndContinue,
                     ),
                   ),
                 ],
@@ -197,5 +177,3 @@ class _StepProfilePhotoState extends State<StepProfilePhoto> {
     );
   }
 }
-
-

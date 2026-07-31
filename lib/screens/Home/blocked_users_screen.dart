@@ -6,6 +6,7 @@ import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/Utils/app_app_bar_view.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class BlockedUsersScreen extends StatefulWidget {
   const BlockedUsersScreen({super.key});
@@ -87,7 +88,7 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
   @override
   Widget build(BuildContext context) {
     return AppScaffoldWrapper(
-      selectedBottomNavIndex: 5, // Account tab
+      selectedBottomNavIndex: 4, // Account tab
       body: SafeArea(
         child: Column(
           children: [
@@ -102,38 +103,43 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
               ),
             ),
             Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _blocked.isEmpty
-                  ? const Center(child: Text('No blocked users'))
-                  : ListView.separated(
-                      itemBuilder: (context, i) {
-                        final u = _blocked[i];
-                        return ListTile(
-                          leading: CircleAvatar(
-                            backgroundImage:
-                                (u.profilePictureUrl != null &&
-                                    u.profilePictureUrl!.isNotEmpty)
-                                ? NetworkImage(u.profilePictureUrl!)
-                                : null,
-                            child:
-                                (u.profilePictureUrl == null ||
-                                    u.profilePictureUrl!.isEmpty)
-                                ? Text(
-                                    u.name.isNotEmpty ? u.name[0].toUpperCase() : '?',
-                                  )
-                                : null,
-                          ),
-                          title: Text(u.name),
-                          trailing: TextButton(
-                            onPressed: () => _unblock(u.uid),
-                            child: const Text('Unblock'),
-                          ),
-                        );
-                      },
-                      separatorBuilder: (_, index) => const Divider(height: 0),
-                      itemCount: _blocked.length,
-                    ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 860),
+                  child: _loading
+                      ? const AttendUsLoadingState(
+                          label: 'Loading blocked users...',
+                        )
+                      : _blocked.isEmpty
+                      ? const AttendUsEmptyState(
+                          icon: Icons.block_outlined,
+                          title: 'No blocked users',
+                          message:
+                              'People you block will appear here so you can review or unblock them later.',
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.all(20),
+                          itemBuilder: (context, i) {
+                            final u = _blocked[i];
+                            return AttendUsListTile(
+                              leading: AttendUsAvatar(
+                                name: u.name,
+                                imageUrl: u.profilePictureUrl,
+                              ),
+                              title: u.name,
+                              subtitle: 'Blocked account',
+                              trailing: TextButton(
+                                onPressed: () => _unblock(u.uid),
+                                child: const Text('Unblock'),
+                              ),
+                            );
+                          },
+                          separatorBuilder: (_, index) =>
+                              const SizedBox(height: 10),
+                          itemCount: _blocked.length,
+                        ),
+                ),
+              ),
             ),
           ],
         ),
@@ -149,23 +155,28 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
       useSafeArea: true,
       showDragHandle: true,
       builder: (ctx) {
-        return _BlockUserSearchSheet(
-          initiallyBlockedUserIds: blockedIds,
-          onUserBlocked: (CustomerModel user) {
-            if (!mounted) return;
-            setState(() {
-              // Avoid duplicates
-              if (_blocked.indexWhere((e) => e.uid == user.uid) == -1) {
-                _blocked.add(
-                  _BlockedUser(
-                    uid: user.uid,
-                    name: user.name,
-                    profilePictureUrl: user.profilePictureUrl,
-                  ),
-                );
-              }
-            });
-          },
+        return AttendUsBottomSheet(
+          title: 'Block users',
+          subtitle:
+              'Search for an account to block. Blocked users can be unblocked from this page.',
+          child: _BlockUserSearchSheet(
+            initiallyBlockedUserIds: blockedIds,
+            onUserBlocked: (CustomerModel user) {
+              if (!mounted) return;
+              setState(() {
+                // Avoid duplicates
+                if (_blocked.indexWhere((e) => e.uid == user.uid) == -1) {
+                  _blocked.add(
+                    _BlockedUser(
+                      uid: user.uid,
+                      name: user.name,
+                      profilePictureUrl: user.profilePictureUrl,
+                    ),
+                  );
+                }
+              });
+            },
+          ),
         );
       },
     );
@@ -275,98 +286,63 @@ class _BlockUserSearchSheetState extends State<_BlockUserSearchSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final viewInsets = MediaQuery.of(context).viewInsets.bottom;
-    return Padding(
-      padding: EdgeInsets.only(bottom: viewInsets),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Block users',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: TextField(
-              controller: _searchController,
-              decoration: const InputDecoration(
-                hintText: 'Search users by name or @username',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ),
-          if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else
-            Flexible(
-              child: _results.isEmpty
-                  ? const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Center(child: Text('No users found')),
-                    )
-                  : ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: _results.length,
-                      separatorBuilder: (context, _) =>
-                          const Divider(height: 0),
-                      itemBuilder: (context, index) {
-                        final user = _results[index];
-                        final isBlocked = _blockedIds.contains(user.uid);
-                        return ListTile(
-                          leading: CircleAvatar(
-                            backgroundImage:
-                                (user.profilePictureUrl != null &&
-                                    user.profilePictureUrl!.isNotEmpty)
-                                ? NetworkImage(user.profilePictureUrl!)
-                                : null,
-                            child:
-                                (user.profilePictureUrl == null ||
-                                    user.profilePictureUrl!.isEmpty)
-                                ? Text(
-                                    user.name.isNotEmpty
-                                        ? user.name[0].toUpperCase()
-                                        : '?',
-                                  )
-                                : null,
-                          ),
-                          title: Text(user.name),
-                          subtitle:
-                              user.username != null && user.username!.isNotEmpty
-                              ? Text('@${user.username}')
-                              : null,
-                          trailing: isBlocked
-                              ? const Text(
-                                  'Blocked',
-                                  style: TextStyle(fontWeight: FontWeight.w600),
-                                )
-                              : TextButton(
-                                  onPressed: () => _blockUser(user),
-                                  child: const Text('Block'),
-                                ),
-                        );
-                      },
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AttendUsSearchField(
+          controller: _searchController,
+          hintText: 'Search users by name or @username',
+        ),
+        const SizedBox(height: 12),
+        if (_isLoading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: AttendUsLoadingState(label: 'Searching users...'),
+          )
+        else
+          Flexible(
+            child: _results.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: AttendUsEmptyState(
+                      icon: Icons.person_search_outlined,
+                      title: 'No users found',
+                      message: 'Try a different name or username.',
                     ),
-            ),
-          const SizedBox(height: 16),
-        ],
-      ),
+                  )
+                : ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: _results.length,
+                    separatorBuilder: (context, _) =>
+                        const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final user = _results[index];
+                      final isBlocked = _blockedIds.contains(user.uid);
+                      return AttendUsListTile(
+                        leading: AttendUsAvatar(
+                          name: user.name,
+                          imageUrl: user.profilePictureUrl,
+                        ),
+                        title: user.name,
+                        subtitle:
+                            user.username != null && user.username!.isNotEmpty
+                            ? '@${user.username}'
+                            : 'Attendus member',
+                        trailing: isBlocked
+                            ? const AttendUsStatusBadge(
+                                label: 'Blocked',
+                                tone: AttendUsStatusTone.warning,
+                              )
+                            : TextButton(
+                                onPressed: () => _blockUser(user),
+                                child: const Text('Block'),
+                              ),
+                      );
+                    },
+                  ),
+          ),
+        const SizedBox(height: 16),
+      ],
     );
   }
 }

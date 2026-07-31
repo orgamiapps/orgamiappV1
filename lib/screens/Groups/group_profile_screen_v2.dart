@@ -12,6 +12,8 @@ import 'package:attendus/screens/Groups/enhanced_feed_tab.dart';
 import 'package:attendus/screens/Groups/group_admin_settings_screen.dart';
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/Utils/attendus_theme.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class GroupProfileScreenV2 extends StatefulWidget {
   final String organizationId;
@@ -148,7 +150,7 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
     final data = doc.data();
     final name = (data?['name'] ?? '').toString();
     final description = (data?['description'] ?? '').toString();
-    await Share.share('Check out $name on Orgami!\n$description');
+    await Share.share('Check out $name on Attendus!\n$description');
   }
 
   Widget _buildDefaultBanner(BuildContext context) {
@@ -227,282 +229,74 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
         final logoUrl = data?['logoUrl']?.toString();
 
         return Scaffold(
-          body: NestedScrollView(
-            headerSliverBuilder: (context, innerBoxIsScrolled) => [
-              SliverAppBar(
-                pinned: false,
-                floating: true,
-                snap: true,
-                expandedHeight: 260,
-                elevation: 0,
-                surfaceTintColor: Colors.transparent,
-                backgroundColor: const Color(0xFF667EEA),
-                leading: IconButton(
-                  icon: const Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    color: Colors.white,
-                  ),
-                  onPressed: () => Navigator.of(context).maybePop(),
-                ),
-                actions: [
-                  IconButton(
-                    icon: const Icon(
-                      Icons.ios_share_rounded,
-                      color: Colors.white,
-                    ),
-                    onPressed: _share,
-                  ),
-                ],
-                flexibleSpace: FlexibleSpaceBar(
-                  collapseMode: CollapseMode.pin,
-                  background: Stack(
-                    children: [
-                      // Default banner or custom banner
-                      Container(
-                        decoration: BoxDecoration(
-                          image: bannerUrl != null
-                              ? DecorationImage(
-                                  image: NetworkImage(bannerUrl),
-                                  fit: BoxFit.cover,
-                                  colorFilter: ColorFilter.mode(
-                                    Colors.black.withValues(alpha: 0.3),
-                                    BlendMode.darken,
-                                  ),
-                                )
-                              : null,
-                        ),
-                        child: bannerUrl == null
-                            ? _buildDefaultBanner(context)
-                            : null,
-                      ),
-                      // Gradient overlay for better text visibility
-                      Positioned(
-                        bottom: 48, // Start from tab bar height
-                        left: 0,
-                        right: 0,
-                        height:
-                            140, // Compact gradient coverage while maintaining readability
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.transparent,
-                                Colors.black.withValues(alpha: 0.2),
-                                Colors.black.withValues(alpha: 0.4),
-                              ],
-                              stops: const [0.0, 0.6, 1.0],
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Group info overlay
-                      Positioned(
-                        bottom: 96, // Added cushion below group profile info
-                        left: 0,
-                        right: 0,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              CircleAvatar(
-                                radius:
-                                    22, // Slightly reduced to avoid clipping
-                                backgroundColor: Colors.white,
-                                backgroundImage: logoUrl != null
-                                    ? NetworkImage(logoUrl)
-                                    : null,
-                                child: logoUrl == null
-                                    ? const Icon(
-                                        Icons.apartment,
-                                        size: 20, // Proportionally reduced
-                                        color: Color(0xFF667EEA),
-                                      )
-                                    : null,
-                              ),
-                              const SizedBox(width: 12), // Reduced from 16
-                              Expanded(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      name.isEmpty ? 'Group' : name,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 18, // Further reduced
-                                        fontWeight: FontWeight.w700,
-                                        shadows: [
-                                          Shadow(
-                                            offset: Offset(0, 1),
-                                            blurRadius: 3,
-                                            color: Colors.black26,
-                                          ),
-                                        ],
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(
-                                      height: 1,
-                                    ), // Minimal spacing
-                                    Text(
-                                      category,
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 12, // Further reduced
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (!_isMember && !_checkingMembership) ...[
-                                const SizedBox(width: 8),
-                                FilledButton(
-                                  onPressed: _hasRequestedJoin
-                                      ? null
-                                      : _requestToJoin,
-                                  style: FilledButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 6,
-                                    ),
-                                    backgroundColor: _hasRequestedJoin
-                                        ? Colors.grey.shade400
-                                        : Colors.white,
-                                    foregroundColor: _hasRequestedJoin
-                                        ? Colors.white
-                                        : const Color(0xFF667EEA),
-                                    disabledBackgroundColor:
-                                        Colors.grey.shade400,
-                                    disabledForegroundColor: Colors.white,
-                                  ),
-                                  child: Text(
-                                    _hasRequestedJoin ? 'Requested' : 'Join',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ] else if (_isMember && !_checkingMembership) ...[
-                                const SizedBox(width: 8), // Reduced from 12
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, // Further reduced
-                                    vertical: 3, // Further reduced
-                                  ),
-                                  decoration: BoxDecoration(
-                                    gradient:
-                                        _memberRole == 'Owner' ||
-                                            _memberRole == 'Admin'
-                                        ? LinearGradient(
-                                            colors: [
-                                              Colors.amber.shade400,
-                                              Colors.orange.shade400,
-                                            ],
-                                            begin: Alignment.topLeft,
-                                            end: Alignment.bottomRight,
-                                          )
-                                        : null,
-                                    color:
-                                        _memberRole == 'Owner' ||
-                                            _memberRole == 'Admin'
-                                        ? null
-                                        : Colors.white.withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.3,
-                                      ),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        _memberRole == 'Owner'
-                                            ? Icons.star
-                                            : _memberRole == 'Admin'
-                                            ? Icons.shield
-                                            : Icons.check_circle,
-                                        size: 12, // Further reduced
-                                        color: Colors.white,
-                                      ),
-                                      const SizedBox(
-                                        width: 3,
-                                      ), // Reduced spacing
-                                      Text(
-                                        _memberRole.isEmpty
-                                            ? 'Member'
-                                            : _memberRole,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 11, // Further reduced
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(
-                    48,
-                  ), // Tab height (46) + indicator weight (2)
-                  child: Container(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    child: TabBar(
-                      controller: _tabController,
-                      isScrollable: false,
-                      tabAlignment: TabAlignment.fill,
-                      labelColor: const Color(0xFF667EEA),
-                      unselectedLabelColor: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
-                      indicatorColor: const Color(0xFF667EEA),
-                      indicatorWeight: 2,
-                      labelStyle: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                      unselectedLabelStyle: const TextStyle(
-                        fontWeight: FontWeight.w500,
-                        fontSize: 14,
-                      ),
-                      padding: EdgeInsets.zero,
-                      indicatorPadding: EdgeInsets.zero,
-                      tabs: const [
-                        Tab(text: 'Feed', height: 46),
-                        Tab(text: 'Members', height: 46),
-                        Tab(text: 'About', height: 46),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-            body: TabBarView(
-              controller: _tabController,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          body: SafeArea(
+            child: Column(
               children: [
-                EnhancedFeedTab(
-                  organizationId: widget.organizationId,
-                  onScrollChange: _handleScrollChange,
+                AttendUsTopBar(
+                  title: name.isEmpty ? 'Group' : name,
+                  subtitle: '$category community',
+                  actions: [
+                    IconButton(
+                      tooltip: 'Share group',
+                      icon: const Icon(Icons.ios_share_rounded),
+                      onPressed: _share,
+                    ),
+                    IconButton(
+                      tooltip: 'Back',
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                      onPressed: () => Navigator.of(context).maybePop(),
+                    ),
+                  ],
                 ),
-                _MembersTab(organizationId: widget.organizationId),
-                _AboutTab(
-                  organizationId: widget.organizationId,
-                  onScrollChange: _handleScrollChange,
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxWidth: AttendUsTokens.pageMaxWidth,
+                      ),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isWide = constraints.maxWidth >= 1000;
+                          final main = Column(
+                            children: [
+                              _buildModernHeader(
+                                context: context,
+                                name: name,
+                                category: category,
+                                bannerUrl: bannerUrl,
+                                logoUrl: logoUrl,
+                              ),
+                              _buildTabs(context),
+                              Expanded(child: _buildTabView()),
+                            ],
+                          );
+
+                          if (!isWide) return main;
+
+                          return Padding(
+                            padding: AttendUsTokens.pagePadding,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(child: main),
+                                const SizedBox(width: 18),
+                                SizedBox(
+                                  width: 320,
+                                  child: _buildSummaryPanel(
+                                    name: name,
+                                    category: category,
+                                    logoUrl: logoUrl,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -513,6 +307,229 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildModernHeader({
+    required BuildContext context,
+    required String name,
+    required String category,
+    required String? bannerUrl,
+    required String? logoUrl,
+  }) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+      child: AttendUsCard(
+        padding: EdgeInsets.zero,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: 180,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (bannerUrl != null && bannerUrl.isNotEmpty)
+                    Image.network(
+                      bannerUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => _buildDefaultBanner(context),
+                    )
+                  else
+                    _buildDefaultBanner(context),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.48),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 20,
+                    right: 20,
+                    bottom: 18,
+                    child: Row(
+                      children: [
+                        AttendUsAvatar(
+                          imageUrl: logoUrl,
+                          name: name,
+                          fallbackIcon: Icons.groups_outlined,
+                          size: 64,
+                          tone: AttendUsStatusTone.success,
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                name.isEmpty ? 'Group' : name,
+                                style: theme.textTheme.headlineSmall?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  AttendUsStatusBadge(
+                                    label: category,
+                                    tone: AttendUsStatusTone.info,
+                                  ),
+                                  if (_isMember && !_checkingMembership)
+                                    AttendUsStatusBadge(
+                                      label: _memberRole.isEmpty
+                                          ? 'Member'
+                                          : _memberRole,
+                                      tone:
+                                          _memberRole == 'Owner' ||
+                                              _memberRole == 'Admin'
+                                          ? AttendUsStatusTone.warning
+                                          : AttendUsStatusTone.success,
+                                      icon: _memberRole == 'Owner'
+                                          ? Icons.star
+                                          : Icons.verified_user_outlined,
+                                    ),
+                                  if (!_isMember &&
+                                      !_checkingMembership &&
+                                      _hasRequestedJoin)
+                                    const AttendUsStatusBadge(
+                                      label: 'Requested',
+                                      tone: AttendUsStatusTone.warning,
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (!_isMember && !_checkingMembership)
+                          AttendUsButton.primary(
+                            label: _hasRequestedJoin ? 'Requested' : 'Join',
+                            icon: _hasRequestedJoin
+                                ? Icons.hourglass_empty
+                                : Icons.person_add_alt_1,
+                            onPressed: _hasRequestedJoin
+                                ? null
+                                : _requestToJoin,
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabs(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: AttendUsCard(
+        padding: EdgeInsets.zero,
+        child: TabBar(
+          controller: _tabController,
+          labelColor: theme.colorScheme.primary,
+          unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
+          indicatorColor: theme.colorScheme.primary,
+          indicatorWeight: 2,
+          tabs: const [
+            Tab(text: 'Feed', icon: Icon(Icons.dynamic_feed_outlined)),
+            Tab(text: 'Members', icon: Icon(Icons.people_outline)),
+            Tab(text: 'About', icon: Icon(Icons.info_outline)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabView() {
+    return TabBarView(
+      controller: _tabController,
+      children: [
+        EnhancedFeedTab(
+          organizationId: widget.organizationId,
+          onScrollChange: _handleScrollChange,
+        ),
+        _MembersTab(organizationId: widget.organizationId),
+        _AboutTab(
+          organizationId: widget.organizationId,
+          onScrollChange: _handleScrollChange,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSummaryPanel({
+    required String name,
+    required String category,
+    required String? logoUrl,
+  }) {
+    return Column(
+      children: [
+        AttendUsPageSection(
+          title: 'Summary',
+          subtitle: 'Community status and quick actions.',
+          icon: Icons.analytics_outlined,
+          framed: true,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AttendUsListTile(
+                leading: AttendUsAvatar(
+                  imageUrl: logoUrl,
+                  name: name,
+                  fallbackIcon: Icons.groups_outlined,
+                ),
+                title: name.isEmpty ? 'Group' : name,
+                subtitle: category,
+              ),
+              const SizedBox(height: 10),
+              AttendUsListTile(
+                leadingIcon: Icons.verified_user_outlined,
+                title: 'Your access',
+                subtitle: _checkingMembership
+                    ? 'Checking membership'
+                    : _isMember
+                    ? (_memberRole.isEmpty ? 'Member' : _memberRole)
+                    : (_hasRequestedJoin ? 'Request pending' : 'Not joined'),
+                dense: true,
+              ),
+              const SizedBox(height: 10),
+              AttendUsActionTile(
+                icon: Icons.admin_panel_settings_outlined,
+                title: 'Admin tools',
+                subtitle: 'Members, requests, feed moderation, events',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => GroupAdminSettingsScreen(
+                        organizationId: widget.organizationId,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1712,117 +1729,34 @@ class _MembersTabState extends State<_MembersTab> {
                     'Loading...';
                 final profileImageUrl = userData?['profileImageUrl'];
 
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.06),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    leading: CircleAvatar(
-                      radius: 24,
-                      backgroundColor: const Color(0xFF667EEA),
-                      backgroundImage: profileImageUrl != null
-                          ? NetworkImage(profileImageUrl)
-                          : null,
-                      child: profileImageUrl == null
-                          ? Text(
-                              userName.isNotEmpty
-                                  ? userName[0].toUpperCase()
-                                  : 'U',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            )
-                          : null,
-                    ),
-                    title: Text(
-                      userName,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1A1A1A),
-                      ),
-                    ),
+                final normalizedRole = role.toLowerCase();
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: AttendUsUserRow(
+                    name: userName,
                     subtitle: joinedAt != null
-                        ? Text(
-                            'Joined ${_formatJoinDate(joinedAt)}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade500,
-                            ),
-                          )
+                        ? 'Joined ${_formatJoinDate(joinedAt)}'
                         : null,
-                    trailing: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: role == 'admin' || role == 'owner'
-                            ? LinearGradient(
-                                colors: [
-                                  Colors.amber.shade400,
-                                  Colors.orange.shade400,
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              )
-                            : null,
-                        color: role == 'admin' || role == 'owner'
-                            ? null
-                            : const Color(0xFF667EEA).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            role == 'owner'
-                                ? Icons.star
-                                : role == 'admin'
-                                ? Icons.shield
-                                : Icons.person,
-                            size: 14,
-                            color: role == 'admin' || role == 'owner'
-                                ? Colors.white
-                                : const Color(0xFF667EEA),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            role == 'admin'
-                                ? 'Admin'
-                                : role == 'owner'
-                                ? 'Owner'
-                                : 'Member',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: role == 'admin' || role == 'owner'
-                                  ? Colors.white
-                                  : const Color(0xFF667EEA),
-                            ),
-                          ),
-                        ],
-                      ),
+                    imageUrl: profileImageUrl,
+                    action: AttendUsStatusBadge(
+                      label: normalizedRole == 'admin'
+                          ? 'Admin'
+                          : normalizedRole == 'owner'
+                          ? 'Owner'
+                          : 'Member',
+                      tone:
+                          normalizedRole == 'admin' || normalizedRole == 'owner'
+                          ? AttendUsStatusTone.warning
+                          : AttendUsStatusTone.success,
+                      icon: normalizedRole == 'owner'
+                          ? Icons.star
+                          : normalizedRole == 'admin'
+                          ? Icons.shield
+                          : Icons.person_outline,
                     ),
                     onTap: userSnapshot.hasData && userData != null
-                        ? () {
-                            _navigateToUserProfile(context, userId, userData);
-                          }
+                        ? () =>
+                              _navigateToUserProfile(context, userId, userData)
                         : null,
                   ),
                 );

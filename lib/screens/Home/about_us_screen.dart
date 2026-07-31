@@ -52,7 +52,7 @@ class _Intro extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Your all‑in‑one events platform',
+          'Your all-in-one events platform',
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w700,
@@ -62,8 +62,8 @@ class _Intro extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Discover, promote, and manage events—from signups to on‑site check‑in—'
-          'with real‑time insights that help you grow your community.',
+          'Discover, promote, and manage events from signups to on-site check-in '
+          'with real-time insights that help you grow your community.',
           style: TextStyle(
             fontSize: 15,
             height: 1.35,
@@ -101,7 +101,7 @@ class _FeatureGrid extends StatelessWidget {
       _Feature(
         icon: Icons.qr_code_scanner,
         title: 'Track attendance',
-        description: 'Fast check‑in with QR/NFC and live capacity tracking.',
+        description: 'Fast check-in with QR/NFC and live capacity tracking.',
       ),
       _Feature(
         icon: Icons.insights,
@@ -117,7 +117,7 @@ class _FeatureGrid extends StatelessWidget {
       _Feature(
         icon: Icons.lock_outline,
         title: 'Secure & seamless',
-        description: 'Reliable auth, payments, and data protection built‑in.',
+        description: 'Reliable auth, payments, and data protection built-in.',
       ),
       _Feature(
         icon: Icons.devices,
@@ -224,7 +224,7 @@ class _FooterNote extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      'Orgami helps organizers deliver great experiences and attendees find the right events—'
+      'Attendus helps organizers deliver great experiences and attendees find the right events - '
       'all in one place.',
       textAlign: TextAlign.left,
       style: TextStyle(

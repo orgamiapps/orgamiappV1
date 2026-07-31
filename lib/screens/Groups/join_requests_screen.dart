@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/firebase/organization_helper.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class JoinRequestsScreen extends StatefulWidget {
   final String organizationId;
@@ -246,340 +247,379 @@ class _JoinRequestsScreenState extends State<JoinRequestsScreen> {
     final filtered = _filteredRequests();
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Join Requests${counts['pending'] != null && counts['pending']! > 0 ? ' (${counts['pending']})' : ''}',
-        ),
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _requests.isEmpty
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.inbox_outlined, size: 72, color: Colors.grey),
-                    SizedBox(height: 12),
-                    Text(
-                      'No join requests',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'When users request to join your group, they will appear here.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Search by name or @username',
-                      prefixIcon: const Icon(Icons.search),
-                      isDense: true,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onChanged: (value) => setState(() => _searchQuery = value),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: Wrap(
-                    spacing: 8,
-                    children: [
-                      ChoiceChip(
-                        label: Text('Pending (${counts['pending']})'),
-                        selected: _statusFilter == 'pending',
-                        onSelected: (_) =>
-                            setState(() => _statusFilter = 'pending'),
-                      ),
-                      ChoiceChip(
-                        label: Text('Declined (${counts['declined']})'),
-                        selected: _statusFilter == 'declined',
-                        onSelected: (_) =>
-                            setState(() => _statusFilter = 'declined'),
-                      ),
-                      ChoiceChip(
-                        label: Text('All (${counts['all']})'),
-                        selected: _statusFilter == 'all',
-                        onSelected: (_) =>
-                            setState(() => _statusFilter = 'all'),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 0),
-                Expanded(
-                  child: RefreshIndicator(
-                    onRefresh: _refreshUsers,
-                    child: filtered.isEmpty
-                        ? ListView(
-                            children: const [
-                              SizedBox(height: 120),
-                              Center(
-                                child: Text('No requests match your filters'),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            AttendUsTopBar(
+              title: 'Join Requests',
+              subtitle: counts['pending'] != null && counts['pending']! > 0
+                  ? '${counts['pending']} pending requests'
+                  : 'Review membership requests',
+            ),
+            Expanded(
+              child: _loading
+                  ? const AttendUsLoadingState(label: 'Loading join requests')
+                  : _requests.isEmpty
+                  ? const AttendUsEmptyState(
+                      icon: Icons.inbox_outlined,
+                      title: 'No join requests',
+                      message:
+                          'When users request to join your group, they will appear here.',
+                    )
+                  : Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                          child: TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              hintText: 'Search by name or @username',
+                              prefixIcon: const Icon(Icons.search),
+                              isDense: true,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onChanged: (value) =>
+                                setState(() => _searchQuery = value),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                          child: Wrap(
+                            spacing: 8,
+                            children: [
+                              ChoiceChip(
+                                label: Text('Pending (${counts['pending']})'),
+                                selected: _statusFilter == 'pending',
+                                onSelected: (_) =>
+                                    setState(() => _statusFilter = 'pending'),
+                              ),
+                              ChoiceChip(
+                                label: Text('Declined (${counts['declined']})'),
+                                selected: _statusFilter == 'declined',
+                                onSelected: (_) =>
+                                    setState(() => _statusFilter = 'declined'),
+                              ),
+                              ChoiceChip(
+                                label: Text('All (${counts['all']})'),
+                                selected: _statusFilter == 'all',
+                                onSelected: (_) =>
+                                    setState(() => _statusFilter = 'all'),
                               ),
                             ],
-                          )
-                        : ListView.separated(
-                            itemCount: filtered.length,
-                            separatorBuilder: (context, index) =>
-                                const Divider(height: 0),
-                            itemBuilder: (context, i) {
-                              final r = filtered[i];
-                              final userId = (r['userId'] ?? '').toString();
-                              final status = (r['status'] ?? 'pending')
-                                  .toString();
-                              final createdAt = r['createdAt'];
-                              final user = _userById[userId];
-                              final title = user?.name ?? userId;
-                              final username =
-                                  (user?.username != null &&
-                                      user!.username!.isNotEmpty)
-                                  ? '@${user.username}'
-                                  : null;
-                              final time = _relativeTime(createdAt);
-                              final bool isPending = status == 'pending';
-                              final bool isBusy = _processing.contains(userId);
-
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
-                                ),
-                                child: LayoutBuilder(
-                                  builder: (context, constraints) {
-                                    final double width = constraints.maxWidth;
-                                    final bool showLabels = width >= 360;
-                                    return Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        CircleAvatar(
-                                          radius: 22,
-                                          backgroundImage:
-                                              user?.profilePictureUrl != null
-                                              ? NetworkImage(
-                                                  user!.profilePictureUrl!,
-                                                )
-                                              : null,
-                                          child: user?.profilePictureUrl == null
-                                              ? const Icon(Icons.person)
-                                              : null,
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
-                                                children: [
-                                                  Expanded(
-                                                    child: Text(
-                                                      title,
-                                                      maxLines: 1,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      style: const TextStyle(
-                                                        fontSize: 16,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  Container(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          horizontal: 8,
-                                                          vertical: 2,
-                                                        ),
-                                                    decoration: BoxDecoration(
-                                                      color: isPending
-                                                          ? const Color(
-                                                              0xFFFF9800,
-                                                            ).withValues(
-                                                              alpha: 0.12,
-                                                            )
-                                                          : const Color(
-                                                              0xFF9E9E9E,
-                                                            ).withValues(
-                                                              alpha: 0.12,
-                                                            ),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            999,
-                                                          ),
-                                                    ),
-                                                    child: Text(
-                                                      status,
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        color: isPending
-                                                            ? Colors
-                                                                  .orange
-                                                                  .shade700
-                                                            : Colors
-                                                                  .grey
-                                                                  .shade700,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Row(
-                                                children: [
-                                                  if (username != null)
-                                                    Flexible(
-                                                      child: Text(
-                                                        username,
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                        style: const TextStyle(
-                                                          color: Colors.grey,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  if (username != null &&
-                                                      time.isNotEmpty)
-                                                    const Padding(
-                                                      padding:
-                                                          EdgeInsets.symmetric(
-                                                            horizontal: 6,
-                                                          ),
-                                                      child: Text(
-                                                        '·',
-                                                        style: TextStyle(
-                                                          color: Colors.grey,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  if (time.isNotEmpty)
-                                                    Flexible(
-                                                      child: Text(
-                                                        time,
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
-                                                        style: const TextStyle(
-                                                          color: Colors.grey,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 8),
-                                              Row(
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment.end,
-                                                children: [
-                                                  if (isPending) ...[
-                                                    if (showLabels)
-                                                      OutlinedButton.icon(
-                                                        onPressed: isBusy
-                                                            ? null
-                                                            : () => _decline(
-                                                                userId,
-                                                              ),
-                                                        icon: const Icon(
-                                                          Icons.close,
-                                                          size: 18,
-                                                        ),
-                                                        label: const Text(
-                                                          'Deny',
-                                                        ),
-                                                        style: OutlinedButton.styleFrom(
-                                                          padding:
-                                                              const EdgeInsets.symmetric(
-                                                                horizontal: 10,
-                                                                vertical: 8,
-                                                              ),
-                                                          minimumSize:
-                                                              const Size(0, 36),
-                                                        ),
-                                                      )
-                                                    else
-                                                      IconButton(
-                                                        tooltip: 'Deny',
-                                                        onPressed: isBusy
-                                                            ? null
-                                                            : () => _decline(
-                                                                userId,
-                                                              ),
-                                                        icon: const Icon(
-                                                          Icons.close,
-                                                        ),
-                                                      ),
-                                                    const SizedBox(width: 8),
-                                                    if (showLabels)
-                                                      FilledButton.icon(
-                                                        onPressed: isBusy
-                                                            ? null
-                                                            : () => _approve(
-                                                                userId,
-                                                              ),
-                                                        icon: const Icon(
-                                                          Icons.check,
-                                                          size: 18,
-                                                        ),
-                                                        label: const Text(
-                                                          'Approve',
-                                                        ),
-                                                        style: FilledButton.styleFrom(
-                                                          padding:
-                                                              const EdgeInsets.symmetric(
-                                                                horizontal: 12,
-                                                                vertical: 10,
-                                                              ),
-                                                          minimumSize:
-                                                              const Size(0, 36),
-                                                        ),
-                                                      )
-                                                    else
-                                                      IconButton(
-                                                        tooltip: 'Approve',
-                                                        onPressed: isBusy
-                                                            ? null
-                                                            : () => _approve(
-                                                                userId,
-                                                              ),
-                                                        icon: const Icon(
-                                                          Icons.check,
-                                                        ),
-                                                      ),
-                                                  ],
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                ),
-                              );
-                            },
                           ),
-                  ),
-                ),
-              ],
+                        ),
+                        const Divider(height: 0),
+                        Expanded(
+                          child: RefreshIndicator(
+                            onRefresh: _refreshUsers,
+                            child: filtered.isEmpty
+                                ? ListView(
+                                    children: const [
+                                      SizedBox(height: 120),
+                                      Center(
+                                        child: Text(
+                                          'No requests match your filters',
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : ListView.separated(
+                                    itemCount: filtered.length,
+                                    separatorBuilder: (context, index) =>
+                                        const Divider(height: 0),
+                                    itemBuilder: (context, i) {
+                                      final r = filtered[i];
+                                      final userId = (r['userId'] ?? '')
+                                          .toString();
+                                      final status = (r['status'] ?? 'pending')
+                                          .toString();
+                                      final createdAt = r['createdAt'];
+                                      final user = _userById[userId];
+                                      final title = user?.name ?? userId;
+                                      final username =
+                                          (user?.username != null &&
+                                              user!.username!.isNotEmpty)
+                                          ? '@${user.username}'
+                                          : null;
+                                      final time = _relativeTime(createdAt);
+                                      final bool isPending =
+                                          status == 'pending';
+                                      final bool isBusy = _processing.contains(
+                                        userId,
+                                      );
+
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 10,
+                                        ),
+                                        child: LayoutBuilder(
+                                          builder: (context, constraints) {
+                                            final double width =
+                                                constraints.maxWidth;
+                                            final bool showLabels =
+                                                width >= 360;
+                                            return Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                CircleAvatar(
+                                                  radius: 22,
+                                                  backgroundImage:
+                                                      user?.profilePictureUrl !=
+                                                          null
+                                                      ? NetworkImage(
+                                                          user!
+                                                              .profilePictureUrl!,
+                                                        )
+                                                      : null,
+                                                  child:
+                                                      user?.profilePictureUrl ==
+                                                          null
+                                                      ? const Icon(Icons.person)
+                                                      : null,
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Row(
+                                                        children: [
+                                                          Expanded(
+                                                            child: Text(
+                                                              title,
+                                                              maxLines: 1,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                              style: const TextStyle(
+                                                                fontSize: 16,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                            width: 8,
+                                                          ),
+                                                          Container(
+                                                            padding:
+                                                                const EdgeInsets.symmetric(
+                                                                  horizontal: 8,
+                                                                  vertical: 2,
+                                                                ),
+                                                            decoration: BoxDecoration(
+                                                              color: isPending
+                                                                  ? const Color(
+                                                                      0xFFFF9800,
+                                                                    ).withValues(
+                                                                      alpha:
+                                                                          0.12,
+                                                                    )
+                                                                  : const Color(
+                                                                      0xFF9E9E9E,
+                                                                    ).withValues(
+                                                                      alpha:
+                                                                          0.12,
+                                                                    ),
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    999,
+                                                                  ),
+                                                            ),
+                                                            child: Text(
+                                                              status,
+                                                              style: TextStyle(
+                                                                fontSize: 12,
+                                                                color: isPending
+                                                                    ? Colors
+                                                                          .orange
+                                                                          .shade700
+                                                                    : Colors
+                                                                          .grey
+                                                                          .shade700,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      const SizedBox(height: 4),
+                                                      Row(
+                                                        children: [
+                                                          if (username != null)
+                                                            Flexible(
+                                                              child: Text(
+                                                                username,
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                style: const TextStyle(
+                                                                  color: Colors
+                                                                      .grey,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          if (username !=
+                                                                  null &&
+                                                              time.isNotEmpty)
+                                                            const Padding(
+                                                              padding:
+                                                                  EdgeInsets.symmetric(
+                                                                    horizontal:
+                                                                        6,
+                                                                  ),
+                                                              child: Text(
+                                                                '·',
+                                                                style: TextStyle(
+                                                                  color: Colors
+                                                                      .grey,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          if (time.isNotEmpty)
+                                                            Flexible(
+                                                              child: Text(
+                                                                time,
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                style: const TextStyle(
+                                                                  color: Colors
+                                                                      .grey,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                        ],
+                                                      ),
+                                                      const SizedBox(height: 8),
+                                                      Row(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .end,
+                                                        children: [
+                                                          if (isPending) ...[
+                                                            if (showLabels)
+                                                              OutlinedButton.icon(
+                                                                onPressed:
+                                                                    isBusy
+                                                                    ? null
+                                                                    : () => _decline(
+                                                                        userId,
+                                                                      ),
+                                                                icon: const Icon(
+                                                                  Icons.close,
+                                                                  size: 18,
+                                                                ),
+                                                                label:
+                                                                    const Text(
+                                                                      'Deny',
+                                                                    ),
+                                                                style: OutlinedButton.styleFrom(
+                                                                  padding:
+                                                                      const EdgeInsets.symmetric(
+                                                                        horizontal:
+                                                                            10,
+                                                                        vertical:
+                                                                            8,
+                                                                      ),
+                                                                  minimumSize:
+                                                                      const Size(
+                                                                        0,
+                                                                        36,
+                                                                      ),
+                                                                ),
+                                                              )
+                                                            else
+                                                              IconButton(
+                                                                tooltip: 'Deny',
+                                                                onPressed:
+                                                                    isBusy
+                                                                    ? null
+                                                                    : () => _decline(
+                                                                        userId,
+                                                                      ),
+                                                                icon: const Icon(
+                                                                  Icons.close,
+                                                                ),
+                                                              ),
+                                                            const SizedBox(
+                                                              width: 8,
+                                                            ),
+                                                            if (showLabels)
+                                                              FilledButton.icon(
+                                                                onPressed:
+                                                                    isBusy
+                                                                    ? null
+                                                                    : () => _approve(
+                                                                        userId,
+                                                                      ),
+                                                                icon: const Icon(
+                                                                  Icons.check,
+                                                                  size: 18,
+                                                                ),
+                                                                label:
+                                                                    const Text(
+                                                                      'Approve',
+                                                                    ),
+                                                                style: FilledButton.styleFrom(
+                                                                  padding:
+                                                                      const EdgeInsets.symmetric(
+                                                                        horizontal:
+                                                                            12,
+                                                                        vertical:
+                                                                            10,
+                                                                      ),
+                                                                  minimumSize:
+                                                                      const Size(
+                                                                        0,
+                                                                        36,
+                                                                      ),
+                                                                ),
+                                                              )
+                                                            else
+                                                              IconButton(
+                                                                tooltip:
+                                                                    'Approve',
+                                                                onPressed:
+                                                                    isBusy
+                                                                    ? null
+                                                                    : () => _approve(
+                                                                        userId,
+                                                                      ),
+                                                                icon: const Icon(
+                                                                  Icons.check,
+                                                                ),
+                                                              ),
+                                                          ],
+                                                        ],
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            );
+                                          },
+                                        ),
+                                      );
+                                    },
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
             ),
+          ],
+        ),
+      ),
     );
   }
 }

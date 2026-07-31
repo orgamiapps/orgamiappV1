@@ -13,23 +13,31 @@ class SubscriptionService extends ChangeNotifier {
   factory SubscriptionService() => _instance;
   SubscriptionService._internal();
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  FirebaseFirestore get _firestore => FirebaseFirestore.instance;
+  FirebaseAuth get _auth => FirebaseAuth.instance;
   final StripeService _stripeService = StripeService();
 
   SubscriptionModel? _currentSubscription;
   bool _isLoading = false;
 
   // Pricing constants (in cents)
-  static const List<int> basicPrices = [500, 2500, 4000]; // Monthly, 6-month, Annual
-  static const List<int> premiumPrices = [2000, 10000, 17500]; // Monthly, 6-month, Annual
+  static const List<int> basicPrices = [
+    500,
+    2500,
+    4000,
+  ]; // Monthly, 6-month, Annual
+  static const List<int> premiumPrices = [
+    2000,
+    10000,
+    17500,
+  ]; // Monthly, 6-month, Annual
   static const List<String> billingPeriods = ['month', '6months', 'year'];
   static const List<int> billingDays = [30, 180, 365];
 
   SubscriptionModel? get currentSubscription => _currentSubscription;
   bool get isLoading => _isLoading;
   bool get hasPremium => _currentSubscription?.isActive ?? false;
-  
+
   /// Get current subscription tier
   SubscriptionTier get currentTier {
     if (_currentSubscription == null || !_currentSubscription!.isActive) {
@@ -144,7 +152,7 @@ class SubscriptionService extends ChangeNotifier {
           .get();
 
       final oldSubscription = _currentSubscription;
-      
+
       if (doc.exists) {
         _currentSubscription = SubscriptionModel.fromFirestore(doc);
         Logger.info(
@@ -154,7 +162,7 @@ class SubscriptionService extends ChangeNotifier {
         _currentSubscription = null;
         Logger.info('No subscription found for user');
       }
-      
+
       // Notify listeners if subscription state changed
       if (oldSubscription?.isActive != _currentSubscription?.isActive) {
         // CRITICAL FIX: Defer notifyListeners to prevent setState during build
@@ -189,10 +197,12 @@ class SubscriptionService extends ChangeNotifier {
 
       // Determine subscription parameters based on plan
       final selectedPlanId = planId ?? 'basic_monthly';
-      final subscriptionTier = tier ?? SubscriptionTier.fromString(
-        selectedPlanId.contains('basic') ? 'basic' : 'premium'
-      );
-      
+      final subscriptionTier =
+          tier ??
+          SubscriptionTier.fromString(
+            selectedPlanId.contains('basic') ? 'basic' : 'premium',
+          );
+
       int billingDays;
       int priceAmount;
       String interval;
@@ -234,9 +244,7 @@ class SubscriptionService extends ChangeNotifier {
         createdAt: now,
         updatedAt: now,
         isTrial: withTrial,
-        trialEndsAt: withTrial
-            ? now.add(const Duration(days: 30))
-            : null,
+        trialEndsAt: withTrial ? now.add(const Duration(days: 30)) : null,
         tier: subscriptionTier.value,
         eventsCreatedThisMonth: 0,
         currentMonthStart: now,
@@ -390,7 +398,7 @@ class SubscriptionService extends ChangeNotifier {
     try {
       final oldHasPremium = hasPremium;
       await _loadUserSubscription();
-      
+
       // Force notify listeners if premium status changed
       if (oldHasPremium != hasPremium) {
         Logger.info(
@@ -703,7 +711,7 @@ class SubscriptionService extends ChangeNotifier {
       final isBasic = scheduledPlanId.contains('basic');
       final prices = isBasic ? basicPrices : premiumPrices;
       final tier = isBasic ? 'basic' : 'premium';
-      
+
       int billingDays;
       int priceAmount;
       String interval;
@@ -734,8 +742,9 @@ class SubscriptionService extends ChangeNotifier {
         'priceAmount': priceAmount,
         'interval': interval,
         'currentPeriodStart': Timestamp.fromDate(scheduledStartDate),
-        'currentPeriodEnd':
-            Timestamp.fromDate(scheduledStartDate.add(Duration(days: billingDays))),
+        'currentPeriodEnd': Timestamp.fromDate(
+          scheduledStartDate.add(Duration(days: billingDays)),
+        ),
         'scheduledPlanId': null,
         'scheduledPlanStartDate': null,
         'updatedAt': Timestamp.now(),
@@ -774,7 +783,8 @@ class SubscriptionService extends ChangeNotifier {
 
       // Update local state
       _currentSubscription = _currentSubscription!.copyWith(
-        eventsCreatedThisMonth: _currentSubscription!.eventsCreatedThisMonth + 1,
+        eventsCreatedThisMonth:
+            _currentSubscription!.eventsCreatedThisMonth + 1,
         updatedAt: DateTime.now(),
       );
 
@@ -868,7 +878,9 @@ class SubscriptionService extends ChangeNotifier {
         'priceAmount': priceAmount,
         'interval': interval,
         'currentPeriodStart': Timestamp.fromDate(now),
-        'currentPeriodEnd': Timestamp.fromDate(now.add(Duration(days: billingDays))),
+        'currentPeriodEnd': Timestamp.fromDate(
+          now.add(Duration(days: billingDays)),
+        ),
         'updatedAt': Timestamp.now(),
       });
 

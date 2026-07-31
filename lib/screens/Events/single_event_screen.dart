@@ -14,7 +14,7 @@ import 'package:attendus/Services/auth_service.dart';
 import 'package:attendus/widgets/upgrade_prompt_dialog.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:geocoding/geocoding.dart';
+import 'package:attendus/Utils/geocoding_compat.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/Utils/location_helper.dart';
@@ -69,6 +69,8 @@ import 'package:attendus/screens/FaceRecognition/picture_face_enrollment_screen.
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 import 'package:attendus/screens/Events/Widget/delete_event_dialogue.dart';
 import 'package:attendus/services/event_flyer_generator.dart';
+import 'package:attendus/Utils/attendus_theme.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 import 'dart:io';
 
 class SingleEventScreen extends StatefulWidget {
@@ -124,6 +126,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   late AnimationController _glowController;
+  // ignore: unused_field
   late Animation<double> _glowAnimation;
 
   double radians(double degrees) {
@@ -153,6 +156,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
   // Modern color palette
   static const Color _primaryBlue = Color(0xFF667EEA);
+  // ignore: unused_field
   static const Color _primaryPurple = Color(0xFF764BA2);
   static const Color _accentBlue = Color(0xFF4338CA);
 
@@ -395,10 +399,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       value,
     ) {
       Logger.debug('Exist value is $value');
-      
+
       // Add mounted check before setState
       if (!mounted) return;
-      
+
       setState(() {
         signedIn = value;
       });
@@ -2175,8 +2179,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                 borderRadius: BorderRadius.circular(16),
                                 onTap: () => showDialog(
                                   context: context,
-                                  builder: (context) =>
-                                      DeleteEventDialoge(singleEvent: eventModel),
+                                  builder: (context) => DeleteEventDialoge(
+                                    singleEvent: eventModel,
+                                  ),
                                 ),
                                 child: const Center(
                                   child: Row(
@@ -2843,14 +2848,14 @@ Join us at: $eventUrl
       Logger.debug('Facial recognition already in progress, skipping');
       return;
     }
-    
+
     try {
       _isFacialRecognitionInProgress = true;
-      
+
       // Ensure user data is loaded
       final authService = AuthService();
       final userDataLoaded = await authService.ensureUserDataLoaded();
-      
+
       if (!userDataLoaded || CustomerController.logeInCustomer == null) {
         ShowToast().showNormalToast(
           msg: 'Please log in to use facial recognition.',
@@ -2909,14 +2914,14 @@ Join us at: $eventUrl
       Logger.debug('Facial recognition already in progress, skipping');
       return;
     }
-    
+
     try {
       _isFacialRecognitionInProgress = true;
-      
+
       // Ensure user data is loaded
       final authService = AuthService();
       final userDataLoaded = await authService.ensureUserDataLoaded();
-      
+
       if (!userDataLoaded || CustomerController.logeInCustomer == null) {
         ShowToast().showNormalToast(
           msg: 'Please log in to use facial recognition.',
@@ -3201,9 +3206,7 @@ Join us at: $eventUrl
       // User completed the full flow (enrollment → scanner → sign-in)
       // Refresh attendance to show they're signed in
       getAttendance();
-      ShowToast().showNormalToast(
-        msg: 'Successfully signed in!',
-      );
+      ShowToast().showNormalToast(msg: 'Successfully signed in!');
     }
   }
 
@@ -3633,7 +3636,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
   Widget build(BuildContext context) {
     return AppScaffoldWrapper(
       selectedBottomNavIndex: 1, // Groups tab
-      backgroundColor: _backgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       floatingActionButton:
           eventModel.hasManagementPermissions(
             FirebaseAuth.instance.currentUser!.uid,
@@ -3647,70 +3650,10 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
   }
 
   Widget _buildFloatingActionButton() {
-    return AnimatedBuilder(
-      animation: _pulseAnimation,
-      builder: (context, child) {
-        return GestureDetector(
-          onTap: () => _showEventManagementModal(),
-          child: Container(
-            margin: EdgeInsets.only(
-              bottom: MediaQuery.of(context).padding.bottom + 24,
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [_primaryBlue, _primaryPurple],
-              ),
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: [
-                BoxShadow(
-                  color: _primaryBlue.withValues(alpha: 0.4),
-                  spreadRadius: 0,
-                  blurRadius: 15,
-                  offset: const Offset(0, 6),
-                ),
-                BoxShadow(
-                  color: _primaryPurple.withValues(alpha: 0.3),
-                  spreadRadius: 0,
-                  blurRadius: 25,
-                  offset: const Offset(0, 12),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(
-                    Icons.dashboard_outlined,
-                    size: 18,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Manage Event',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontFamily: 'Roboto',
-                    fontSize: 16,
-                    letterSpacing: 0.2,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+    return FloatingActionButton.extended(
+      onPressed: _showEventManagementModal,
+      icon: const Icon(Icons.dashboard_outlined),
+      label: const Text('Manage event'),
     );
   }
 
@@ -3731,113 +3674,78 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
   }
 
   Widget _headerView() {
-    return AnimatedBuilder(
-      animation: _glowAnimation,
-      builder: (context, child) {
-        return Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(bottom: BorderSide(color: _borderColor, width: 1)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-            child: Column(
+    final theme = Theme.of(context);
+    final isManager = eventModel.hasManagementPermissions(
+      FirebaseAuth.instance.currentUser!.uid,
+    );
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        child: Column(
+          children: [
+            Row(
               children: [
-                // Back button, title, and action buttons
-                Row(
-                  children: [
-                    _buildModernButton(
-                      icon: Icons.arrow_back_ios_new,
-                      onTap: () => Navigator.pop(context),
-                      tooltip: 'Back',
-                    ),
-                    const SizedBox(width: 20),
-                    const Expanded(child: SizedBox()),
-                    if (eventModel.hasManagementPermissions(
-                      FirebaseAuth.instance.currentUser!.uid,
-                    ))
-                      Row(
-                        children: [
-                          _buildCalendarAddButton(
-                            onTap: () => _addToCalendar(),
-                            tooltip: 'Add to Calendar',
-                          ),
-                          const SizedBox(width: 16),
-                          _buildModernButton(
-                            icon: _isFavorited
-                                ? Icons.bookmark
-                                : Icons.bookmark_border,
-                            onTap: _isLoadingFavorite ? null : _toggleFavorite,
-                            tooltip: _isFavorited
-                                ? 'Remove from Saved'
-                                : 'Add to Saved',
-                            isLoading: _isLoadingFavorite,
-                            isActive: _isFavorited,
-                          ),
-                          const SizedBox(width: 16),
-                          _buildModernButton(
-                            icon: CupertinoIcons.share,
-                            onTap: () => _shareEventDetails(),
-                            tooltip: 'Share Event',
-                          ),
-                        ],
-                      )
-                    else
-                      // QR Scanner, Calendar, Favorite, and Share buttons for non-creators
-                      Row(
-                        children: [
-                          _buildModernButton(
-                            icon: Icons.fact_check,
-                            onTap: () => _handleSignIn(),
-                            tooltip: 'Sign In',
-                          ),
-                          const SizedBox(width: 16),
-                          _buildCalendarAddButton(
-                            onTap: () => _addToCalendar(),
-                            tooltip: 'Add to Calendar',
-                          ),
-                          const SizedBox(width: 16),
-                          _buildModernButton(
-                            icon: _isFavorited
-                                ? Icons.bookmark
-                                : Icons.bookmark_border,
-                            onTap: _isLoadingFavorite ? null : _toggleFavorite,
-                            tooltip: _isFavorited
-                                ? 'Remove from Saved'
-                                : 'Add to Saved',
-                            isLoading: _isLoadingFavorite,
-                            isActive: _isFavorited,
-                          ),
-                          const SizedBox(width: 16),
-                          _buildModernButton(
-                            icon: CupertinoIcons.share,
-                            onTap: () => _shareEventDetails(),
-                            tooltip: 'Share Event',
-                          ),
-                        ],
-                      ),
-                  ],
+                IconButton(
+                  tooltip: 'Back',
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back),
                 ),
-                if (eventModel.status.toLowerCase() == 'cancelled') ...[
-                  const SizedBox(height: 10),
-                  _buildCanceledBanner(),
-                ],
+                Expanded(
+                  child: Text(
+                    eventModel.title,
+                    style: theme.textTheme.titleMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (!isManager)
+                  IconButton(
+                    tooltip: 'Check in',
+                    onPressed: _handleSignIn,
+                    icon: const Icon(Icons.fact_check_outlined),
+                  ),
+                IconButton(
+                  tooltip: 'Add to calendar',
+                  onPressed: _addToCalendar,
+                  icon: const Icon(Icons.calendar_today_outlined),
+                ),
+                IconButton(
+                  tooltip: _isFavorited ? 'Remove from saved' : 'Save event',
+                  onPressed: _isLoadingFavorite ? null : _toggleFavorite,
+                  icon: _isLoadingFavorite
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(
+                          _isFavorited ? Icons.bookmark : Icons.bookmark_border,
+                        ),
+                ),
+                IconButton(
+                  tooltip: 'Share event',
+                  onPressed: _shareEventDetails,
+                  icon: const Icon(CupertinoIcons.share),
+                ),
               ],
             ),
-          ),
-        );
-      },
+            if (eventModel.status.toLowerCase() == 'cancelled') ...[
+              const SizedBox(height: 8),
+              _buildCanceledBanner(),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
+  // ignore: unused_element
   Widget _buildModernButton({
     required IconData icon,
     required VoidCallback? onTap,
@@ -3901,6 +3809,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     );
   }
 
+  // ignore: unused_element
   Widget _buildCalendarAddButton({
     required VoidCallback? onTap,
     required String tooltip,
@@ -3973,61 +3882,176 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
   Widget _contentView() {
     return SlideTransition(
       position: _slideAnimation,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-        physics: const BouncingScrollPhysics(),
-        child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool wide = constraints.maxWidth >= 980;
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+            physics: const BouncingScrollPhysics(),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: AttendUsTokens.pageMaxWidth,
+                ),
+                child: wide
+                    ? _buildWideEventLayout()
+                    : _buildNarrowEventLayout(),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildNarrowEventLayout() {
+    return Column(
+      children: [
+        _buildEventHeroStack(),
+        const SizedBox(height: 18),
+        _buildPrimaryActionSection(),
+        const SizedBox(height: 18),
+        _buildModernEventDetailsCard(),
+        const SizedBox(height: 18),
+        if (eventModel.categories.isNotEmpty) ...[
+          _buildModernCategoriesCard(),
+          const SizedBox(height: 18),
+        ],
+        _buildSecondaryEventSections(),
+      ],
+    );
+  }
+
+  Widget _buildWideEventLayout() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 5,
+          child: Column(
+            children: [
+              _buildEventHeroStack(),
+              const SizedBox(height: 18),
+              _buildPrimaryActionSection(),
+              if (eventModel.categories.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                _buildModernCategoriesCard(),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(width: 20),
+        Expanded(
+          flex: 7,
+          child: Column(
+            children: [
+              _buildModernEventDetailsCard(),
+              const SizedBox(height: 18),
+              _buildSecondaryEventSections(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEventHeroStack() {
+    return Column(
+      children: [
+        _buildEventImage(),
+        if (eventModel.imageUrl.isNotEmpty) const SizedBox(height: 14),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
-            // Event Image (only shown if image URL exists)
-            _buildEventImage(),
-            // Only add spacing if there's an image
-            if (eventModel.imageUrl.isNotEmpty) const SizedBox(height: 24),
-
-            // Live Quiz Card (prominently displayed under event image)
-            if (eventModel.hasLiveQuiz && _liveQuiz != null)
-              _buildLiveQuizCard(),
-            if (eventModel.hasLiveQuiz && _liveQuiz != null)
-              const SizedBox(height: 24),
-
-            // RSVP Button
-            _buildRsvpButton(),
-            const SizedBox(height: 24),
-
-            // Featured Badge
-            if (eventModel.isFeatured) _buildFeaturedBadge(),
-            if (eventModel.isFeatured) const SizedBox(height: 24),
-
-            // Event Details Card
-            _buildEventDetailsCard(),
-            const SizedBox(height: 24),
-
-            // Categories
-            if (eventModel.categories.isNotEmpty) _buildCategoriesCard(),
-            if (eventModel.categories.isNotEmpty) const SizedBox(height: 24),
-
-            // Tabbed Content Section (only for non-creators)
-            if (!eventModel.hasManagementPermissions(
-              FirebaseAuth.instance.currentUser!.uid,
-            ))
-              _buildTabbedContentSection(),
-
-            // RSVPs horizontal list (above attendees)
-            PreRegisteredHorizontalList(eventModel: eventModel),
-            const SizedBox(height: 8),
-
-            // Attendees List (for everyone) - Now as dropdown
-            _buildAttendeesDropdown(),
-            const SizedBox(height: 24),
-
-            // Comments Section (for everyone)
-            CommentsSection(eventModel: eventModel),
-            const SizedBox(height: 24),
-
-            // Dwell tracking UI hidden in public view; functionality remains available elsewhere
-            const SizedBox(height: 140), // Increased space for bottom buttons
+            AttendUsStatusBadge(
+              label: eventModel.private ? 'Private' : 'Public',
+              tone: eventModel.private
+                  ? AttendUsStatusTone.warning
+                  : AttendUsStatusTone.success,
+              icon: eventModel.private ? Icons.lock_outline : Icons.public,
+            ),
+            if (eventModel.isFeatured)
+              const AttendUsStatusBadge(
+                label: 'Featured',
+                tone: AttendUsStatusTone.warning,
+                icon: Icons.star,
+              ),
+            if (eventModel.ticketsEnabled)
+              const AttendUsStatusBadge(
+                label: 'Tickets',
+                tone: AttendUsStatusTone.info,
+                icon: Icons.confirmation_number_outlined,
+              ),
+            if (eventModel.hasLiveQuiz)
+              const AttendUsStatusBadge(
+                label: 'Live quiz',
+                tone: AttendUsStatusTone.info,
+                icon: Icons.quiz_outlined,
+              ),
           ],
         ),
+      ],
+    );
+  }
+
+  Widget _buildPrimaryActionSection() {
+    return AttendUsPageSection(
+      title:
+          eventModel.hasManagementPermissions(
+            FirebaseAuth.instance.currentUser!.uid,
+          )
+          ? 'Organizer actions'
+          : 'Attend this event',
+      subtitle:
+          eventModel.hasManagementPermissions(
+            FirebaseAuth.instance.currentUser!.uid,
+          )
+          ? 'Manage check-in, tickets, quiz, analytics, and event settings.'
+          : 'RSVP, get a ticket, or check in when the event is ready.',
+      icon: Icons.bolt_outlined,
+      framed: true,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (eventModel.hasLiveQuiz && _liveQuiz != null) ...[
+            _buildLiveQuizCard(),
+            const SizedBox(height: 14),
+          ],
+          _buildRsvpButton(),
+          if (!eventModel.hasManagementPermissions(
+            FirebaseAuth.instance.currentUser!.uid,
+          )) ...[
+            const SizedBox(height: 14),
+            _buildTabbedContentSection(),
+          ],
+          if (eventModel.hasManagementPermissions(
+            FirebaseAuth.instance.currentUser!.uid,
+          )) ...[
+            const SizedBox(height: 14),
+            AttendUsButton.primary(
+              label: 'Open event tools',
+              icon: Icons.dashboard_outlined,
+              onPressed: _showEventManagementModal,
+            ),
+          ],
+        ],
       ),
+    );
+  }
+
+  Widget _buildSecondaryEventSections() {
+    return Column(
+      children: [
+        PreRegisteredHorizontalList(eventModel: eventModel),
+        const SizedBox(height: 12),
+        _buildAttendeesDropdown(),
+        const SizedBox(height: 18),
+        CommentsSection(eventModel: eventModel),
+        const SizedBox(height: 120),
+      ],
     );
   }
 
@@ -4056,6 +4080,115 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernEventDetailsCard() {
+    final theme = Theme.of(context);
+    final hostName = _creatorUsername ?? _creatorName;
+    return AttendUsPageSection(
+      title: 'Event details',
+      subtitle: 'Schedule, location, host, access, and description.',
+      icon: Icons.event_note_outlined,
+      framed: true,
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(eventModel.title, style: theme.textTheme.headlineMedium),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              AttendUsStatusBadge(
+                label: eventModel.private ? 'Private' : 'Public',
+                tone: eventModel.private
+                    ? AttendUsStatusTone.warning
+                    : AttendUsStatusTone.success,
+                icon: eventModel.private ? Icons.lock_outline : Icons.public,
+              ),
+              if (hostName != null && hostName.isNotEmpty)
+                ActionChip(
+                  avatar: const Icon(Icons.person_outline, size: 16),
+                  label: Text('Hosted by @$hostName'),
+                  onPressed: _creatorUser == null
+                      ? null
+                      : () {
+                          RouterClass.nextScreenNormal(
+                            context,
+                            UserProfileScreen(
+                              user: _creatorUser!,
+                              isOwnProfile:
+                                  CustomerController.logeInCustomer?.uid ==
+                                  _creatorUser!.uid,
+                            ),
+                          );
+                        },
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          AttendUsListTile(
+            leadingIcon: Icons.calendar_month_rounded,
+            title: DateFormat(
+              'EEEE, MMMM d, yyyy',
+            ).format(eventModel.selectedDateTime),
+            subtitle: 'Date',
+            dense: true,
+          ),
+          const SizedBox(height: 10),
+          AttendUsListTile(
+            leadingIcon: Icons.access_time_rounded,
+            title:
+                '${DateFormat('h:mm a').format(eventModel.selectedDateTime)} - ${DateFormat('h:mm a').format(eventModel.eventEndTime)}',
+            subtitle: 'Time',
+            dense: true,
+          ),
+          const SizedBox(height: 10),
+          _buildLocationItem(),
+          if (eventModel.ticketsEnabled) ...[
+            const SizedBox(height: 10),
+            _buildTicketQuantityItem(),
+          ],
+          const SizedBox(height: 16),
+          AttendUsPageSection(
+            title: 'Description',
+            icon: Icons.description_outlined,
+            padding: EdgeInsets.zero,
+            child: Text(
+              eventModel.description.isEmpty
+                  ? 'No description provided.'
+                  : eventModel.description,
+              style: theme.textTheme.bodyLarge,
+            ),
+          ),
+          if (!eventModel.hasManagementPermissions(
+            FirebaseAuth.instance.currentUser!.uid,
+          )) ...[
+            const SizedBox(height: 16),
+            _buildFeedbackButton(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernCategoriesCard() {
+    return AttendUsPageSection(
+      title: 'Categories',
+      subtitle: 'How this event appears in discovery.',
+      icon: Icons.category_outlined,
+      framed: true,
+      padding: const EdgeInsets.all(18),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final category in eventModel.categories)
+            AttendUsStatusBadge(label: category, tone: AttendUsStatusTone.info),
         ],
       ),
     );
@@ -4255,6 +4388,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     );
   }
 
+  // ignore: unused_element
   Widget _buildFeaturedBadge() {
     return AnimatedBuilder(
       animation: _pulseAnimation,
@@ -4329,6 +4463,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     );
   }
 
+  // ignore: unused_element
   Widget _buildEventDetailsCard() {
     return AnimatedBuilder(
       animation: _fadeAnimation,
@@ -4945,6 +5080,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     );
   }
 
+  // ignore: unused_element
   Widget _buildCategoriesCard() {
     return Container(
       width: double.infinity,

@@ -16,6 +16,7 @@ class LimitReachedDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final isEvent = type.toLowerCase() == 'event';
     final typeName = isEvent ? 'Events' : 'Groups';
     final icon = isEvent ? Icons.event_rounded : Icons.group_rounded;
@@ -27,11 +28,11 @@ class LimitReachedDialog extends StatelessWidget {
       child: Container(
         constraints: const BoxConstraints(maxWidth: 400),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: theme.colorScheme.shadow.withValues(alpha: 0.12),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -43,9 +44,12 @@ class LimitReachedDialog extends StatelessWidget {
             // Header with gradient
             Container(
               padding: const EdgeInsets.all(24),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                  colors: [
+                    theme.colorScheme.primary,
+                    theme.colorScheme.primary.withValues(alpha: 0.82),
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -96,17 +100,18 @@ class LimitReachedDialog extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
+                      color: theme.colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                      border: Border.all(
+                        color: theme.colorScheme.outlineVariant,
+                      ),
                     ),
                     child: Column(
                       children: [
                         Text(
                           'Free Plan Limit',
-                          style: TextStyle(
+                          style: theme.textTheme.bodySmall?.copyWith(
                             fontSize: 13,
-                            color: Colors.grey[600],
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -116,19 +121,17 @@ class LimitReachedDialog extends StatelessWidget {
                           children: [
                             Text(
                               '$limit',
-                              style: const TextStyle(
+                              style: theme.textTheme.headlineMedium?.copyWith(
                                 fontSize: 32,
                                 fontWeight: FontWeight.w800,
-                                color: Color(0xFF111827),
                               ),
                             ),
                             const SizedBox(width: 8),
                             Text(
                               typeName,
-                              style: TextStyle(
+                              style: theme.textTheme.titleSmall?.copyWith(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.grey[700],
                               ),
                             ),
                           ],
@@ -137,12 +140,11 @@ class LimitReachedDialog extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  const Text(
+                  Text(
                     'Upgrade to Premium for:',
-                    style: TextStyle(
+                    style: theme.textTheme.titleSmall?.copyWith(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF111827),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -191,8 +193,8 @@ class LimitReachedDialog extends StatelessWidget {
                         );
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6366F1),
-                        foregroundColor: Colors.white,
+                        backgroundColor: theme.colorScheme.primary,
+                        foregroundColor: theme.colorScheme.onPrimary,
                         elevation: 0,
                         shadowColor: Colors.transparent,
                         shape: RoundedRectangleBorder(
@@ -223,14 +225,14 @@ class LimitReachedDialog extends StatelessWidget {
                     child: TextButton(
                       onPressed: () => Navigator.pop(context),
                       style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFF6B7280),
+                        foregroundColor: theme.colorScheme.onSurfaceVariant,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Maybe Later',
-                        style: TextStyle(
+                        style: theme.textTheme.labelLarge?.copyWith(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
                         ),

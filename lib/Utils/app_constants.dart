@@ -1,14 +1,14 @@
 import 'package:intl/intl.dart';
 
 class AppConstants {
-  static const appName = 'Orgami';
+  static const appName = 'Attendus';
   static const appVersion = '1.0.0';
 
-  static const privacyPolicyUrl = 'https://myorgami.com/privacy-policy';
-  static const termsConditionsUrl = 'https://myorgami.com/terms-conditions/';
+  static const privacyPolicyUrl = 'https://attendus.app/privacy';
+  static const termsConditionsUrl = 'https://attendus.app/terms';
 
-  static const companyEmail = 'orgami@myorgami.com';
-  static const supportUrl = 'https://myorgami.com/support';
+  static const companyEmail = 'support@attendus.app';
+  static const supportUrl = 'https://attendus.app/support';
   static const cloudFunctionsRegion = 'us-central1';
 
   static DateFormat dateFormat = DateFormat("dd MMM yyyy, hh:mm a");
@@ -21,18 +21,48 @@ class AppConstants {
   static const String googlePlacesApiKey =
       'AIzaSyAf1t5cToh1UoF7R52vTSJxMajw8CvmVUA';
 
-  // Firebase Dynamic Links configuration
-  // Update these if your domain/package names differ
-  static const String dynamicLinksDomain = 'https://orgamiapp.page.link';
+  // Browser-exposed keys are expected to be HTTP-referrer restricted. Supply
+  // this with --dart-define=GOOGLE_MAPS_WEB_API_KEY=... for web builds.
+  static const String googleMapsWebApiKey = String.fromEnvironment(
+    'GOOGLE_MAPS_WEB_API_KEY',
+    defaultValue: '',
+  );
+
+  // Public web/deep-link configuration.
+  static const String publicWebDomain = 'https://attendus.app';
+  static const String dynamicLinksDomain = 'https://attendus.app';
   static const String androidPackageName = 'com.stormdeve.orgami';
   static const String iosBundleId = 'com.stormdeve.orgami';
+  static const String stripeReturnUrl = 'attendus://callback';
+  static const String stripeMerchantDisplayName = 'Attendus';
+  static const String applePayMerchantIdentifier = 'merchant.app.attendus';
 
   // Feature flags
-  // Toggle to re-enable Apple Sign-In when Apple Developer setup is complete.
-  static const bool enableAppleSignIn = true;
+  // Apple Sign-In is hidden until the Apple Developer Service ID, callback URL,
+  // and Firebase provider settings are configured for AttendUs.
+  static const bool enableAppleSignIn = false;
+
+  // Web App Check is intentionally opt-in until a real reCAPTCHA v3 key is
+  // configured in Firebase Console for attendus.app.
+  static const bool enableWebAppCheck = bool.fromEnvironment(
+    'ATTENDUS_ENABLE_WEB_APP_CHECK',
+    defaultValue: false,
+  );
+  static const String appCheckWebRecaptchaSiteKey = String.fromEnvironment(
+    'ATTENDUS_RECAPTCHA_V3_SITE_KEY',
+    defaultValue: '',
+  );
+  static const String appleServiceId = String.fromEnvironment(
+    'ATTENDUS_APPLE_SERVICE_ID',
+    defaultValue: '',
+  );
+  static const String appleRedirectUrl = String.fromEnvironment(
+    'ATTENDUS_APPLE_REDIRECT_URL',
+    defaultValue: '',
+  );
 
   static Uri buildInviteUri(String eventId) {
-    return Uri.parse('https://orgami.app/invite?eventId=$eventId');
+    return Uri.parse('$publicWebDomain/invite?eventId=$eventId');
   }
 
   static String getMilesSliderLabel(double value) {

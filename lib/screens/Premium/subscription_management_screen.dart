@@ -5,6 +5,7 @@ import 'package:attendus/models/subscription_model.dart';
 import 'package:attendus/Utils/app_app_bar_view.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:intl/intl.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class SubscriptionManagementScreen extends StatefulWidget {
   const SubscriptionManagementScreen({super.key});
@@ -140,7 +141,7 @@ class _SubscriptionManagementScreenState
     return Consumer<SubscriptionService>(
       builder: (context, subscriptionService, child) {
         if (subscriptionService.isLoading || _isLoading) {
-          return const Center(child: CircularProgressIndicator());
+          return const AttendUsLoadingState(label: 'Loading subscription...');
         }
 
         final subscription = subscriptionService.currentSubscription;
@@ -148,25 +149,30 @@ class _SubscriptionManagementScreenState
           return _buildNoSubscription();
         }
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildHeaderCard(subscription, subscriptionService),
-              const SizedBox(height: 20),
-              _buildPlanOptionsCard(subscription),
-              const SizedBox(height: 20),
-              _buildPlanSummaryCard(subscription, subscriptionService),
-              const SizedBox(height: 20),
-              _buildBenefitsCard(),
-              const SizedBox(height: 20),
-              _buildManageCard(subscription, subscriptionService),
-              const SizedBox(height: 20),
-              _buildBillingHistoryPlaceholder(),
-              const SizedBox(height: 24),
-              _buildSupportSection(),
-            ],
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1080),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildHeaderCard(subscription, subscriptionService),
+                  const SizedBox(height: 20),
+                  _buildPlanOptionsCard(subscription),
+                  const SizedBox(height: 20),
+                  _buildPlanSummaryCard(subscription, subscriptionService),
+                  const SizedBox(height: 20),
+                  _buildBenefitsCard(),
+                  const SizedBox(height: 20),
+                  _buildManageCard(subscription, subscriptionService),
+                  const SizedBox(height: 20),
+                  _buildBillingHistoryPlaceholder(),
+                  const SizedBox(height: 24),
+                  _buildSupportSection(),
+                ],
+              ),
+            ),
           ),
         );
       },

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:attendus/models/quiz_participant_model.dart';
 import 'package:attendus/Services/live_quiz_service.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 /// A modern, elegant waiting lobby widget for participants joining before quiz starts
 class QuizWaitingLobby extends StatefulWidget {
@@ -10,7 +11,7 @@ class QuizWaitingLobby extends StatefulWidget {
   final String quizTitle;
   final bool isHost;
   final VoidCallback? onManageQuiz;
-  
+
   const QuizWaitingLobby({
     super.key,
     required this.quizId,
@@ -29,12 +30,12 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
   final _liveQuizService = LiveQuizService();
   List<QuizParticipantModel> _participants = [];
   StreamSubscription<List<QuizParticipantModel>>? _participantsSubscription;
-  
+
   // Animations
   late AnimationController _pulseController;
   late AnimationController _fadeController;
   late AnimationController _slideController;
-  
+
   late Animation<double> _pulseAnimation;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -66,9 +67,10 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
 
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.15),
@@ -83,10 +85,10 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
     _participantsSubscription = _liveQuizService
         .getParticipantsStream(widget.quizId)
         .listen((participants) {
-      if (mounted) {
-        setState(() => _participants = participants);
-      }
-    });
+          if (mounted) {
+            setState(() => _participants = participants);
+          }
+        });
   }
 
   @override
@@ -150,10 +152,7 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF667EEA),
-                  Color(0xFF764BA2),
-                ],
+                colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
               ),
               borderRadius: BorderRadius.circular(70),
               boxShadow: [
@@ -255,10 +254,7 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF667EEA),
-            Color(0xFF764BA2),
-          ],
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
@@ -344,10 +340,7 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF667EEA),
-                  Color(0xFF764BA2),
-                ],
+                colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
               ),
               borderRadius: BorderRadius.circular(28),
               boxShadow: [
@@ -402,9 +395,7 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: Colors.grey.withValues(alpha: 0.15),
-          ),
+          border: Border.all(color: Colors.grey.withValues(alpha: 0.15)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.04),
@@ -449,9 +440,7 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.grey.withValues(alpha: 0.15),
-        ),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.15)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -510,7 +499,7 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
         final index = entry.key;
         final participant = entry.value;
         final isCurrentUser = participant.id == widget.currentParticipantId;
-        
+
         return TweenAnimationBuilder<double>(
           duration: Duration(milliseconds: 300 + (index * 50)),
           tween: Tween(begin: 0.0, end: 1.0),
@@ -529,7 +518,10 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
     );
   }
 
-  Widget _buildParticipantChip(QuizParticipantModel participant, bool isCurrentUser) {
+  Widget _buildParticipantChip(
+    QuizParticipantModel participant,
+    bool isCurrentUser,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
@@ -579,7 +571,9 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
                   : LinearGradient(
                       colors: [
                         _getAvatarColor(participant.displayName),
-                        _getAvatarColor(participant.displayName).withValues(alpha: 0.8),
+                        _getAvatarColor(
+                          participant.displayName,
+                        ).withValues(alpha: 0.8),
                       ],
                     ),
               shape: BoxShape.circle,
@@ -624,11 +618,7 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
                 color: Colors.white.withValues(alpha: 0.25),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(
-                Icons.star,
-                color: Colors.white,
-                size: 12,
-              ),
+              child: const Icon(Icons.star, color: Colors.white, size: 12),
             ),
           ],
         ],
@@ -637,52 +627,12 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
   }
 
   Widget _buildInstructions() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFF10B981).withValues(alpha: 0.08),
-            const Color(0xFF059669).withValues(alpha: 0.04),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0xFF10B981).withValues(alpha: 0.2),
-        ),
-      ),
+    return AttendUsQuizPanel(
+      title: 'What to Expect',
+      icon: Icons.lightbulb_outline,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.lightbulb_outline,
-                  color: Colors.white,
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'What to Expect',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1A1A1A),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
           _buildInstructionItem(
             Icons.play_circle_outline,
             'The quiz will start soon',
@@ -705,7 +655,11 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
     );
   }
 
-  Widget _buildInstructionItem(IconData icon, String title, String description) {
+  Widget _buildInstructionItem(
+    IconData icon,
+    String title,
+    String description,
+  ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -715,11 +669,7 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
             color: const Color(0xFF10B981).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(
-            icon,
-            color: const Color(0xFF10B981),
-            size: 18,
-          ),
+          child: Icon(icon, color: const Color(0xFF10B981), size: 18),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -753,7 +703,7 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
   String _getInitials(String name) {
     final trimmedName = name.trim();
     if (trimmedName.isEmpty) return '?';
-    
+
     final words = trimmedName.split(' ').where((w) => w.isNotEmpty).toList();
     if (words.isEmpty) return '?';
     if (words.length == 1) {
@@ -773,9 +723,8 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
       const Color(0xFFEC4899),
       const Color(0xFF84CC16),
     ];
-    
+
     final hash = name.hashCode.abs();
     return colors[hash % colors.length];
   }
 }
-

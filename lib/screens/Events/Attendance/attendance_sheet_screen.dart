@@ -389,72 +389,42 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppThemeColor.lightBlueColor,
-      body: SafeArea(child: _bodyView()),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1180),
+            child: _bodyView(),
+          ),
+        ),
+      ),
     );
   }
 
   Widget _modernTabBar() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: BoxDecoration(
-        color: AppThemeColor.pureWhiteColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            spreadRadius: 0,
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          _modernTabView(
-            label: 'Attendees (${attendanceList.length})',
-            index: 1,
-          ),
-          _modernTabView(
-            label: "RSVP's (${registerAttendanceList.length})",
-            index: 2,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _modernTabView({required String label, required int index}) {
-    bool selectedOne = selectedTab == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            selectedTab = index;
-          });
-        },
-        child: Container(
-          margin: const EdgeInsets.all(4),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: selectedOne
-                ? AppThemeColor.darkBlueColor
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: selectedOne
-                    ? AppThemeColor.pureWhiteColor
-                    : AppThemeColor.dullFontColor,
-                fontSize: Dimensions.fontSizeDefault,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Roboto',
-              ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: SizedBox(
+        width: double.infinity,
+        child: SegmentedButton<int>(
+          segments: [
+            ButtonSegment<int>(
+              value: 1,
+              icon: const Icon(Icons.how_to_reg_outlined),
+              label: Text('Checked in (${attendanceList.length})'),
             ),
-          ),
+            ButtonSegment<int>(
+              value: 2,
+              icon: const Icon(Icons.event_available_outlined),
+              label: Text("RSVPs (${registerAttendanceList.length})"),
+            ),
+          ],
+          selected: {selectedTab},
+          onSelectionChanged: (values) {
+            setState(() {
+              selectedTab = values.first;
+            });
+          },
         ),
       ),
     );

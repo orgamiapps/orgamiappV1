@@ -9,7 +9,7 @@ class TermsConditionsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -249,7 +249,7 @@ class TermsConditionsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            content,
+            _cleanLegalText(content),
             style: const TextStyle(
               fontSize: 15,
               color: Colors.black87,
@@ -279,5 +279,12 @@ class TermsConditionsScreen extends StatelessWidget {
       'December',
     ];
     return '${months[now.month - 1]} ${now.day}, ${now.year}';
+  }
+
+  String _cleanLegalText(String value) {
+    return value
+        .replaceAll('â€¢', '-')
+        .replaceAll('â€“', '-')
+        .replaceAll('â€”', '-');
   }
 }

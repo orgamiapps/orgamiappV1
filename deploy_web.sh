@@ -31,7 +31,8 @@ echo "📦 Cleaning previous build..."
 flutter clean
 
 echo "🔨 Building Flutter web app for production..."
-flutter build web --release
+flutter build web --release --pwa-strategy=none --no-wasm-dry-run
+dart run tools/check_web_bundle_size.dart
 
 echo "🌐 Deploying to Firebase Hosting..."
 firebase deploy --only hosting

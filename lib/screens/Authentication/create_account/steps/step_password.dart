@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:attendus/Utils/colors.dart';
 import 'package:provider/provider.dart';
 import 'package:attendus/screens/Authentication/create_account/create_account_view_model.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class StepPassword extends StatefulWidget {
   const StepPassword({super.key, required this.onNext});
@@ -91,45 +91,20 @@ class _StepPasswordState extends State<StepPassword> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: AppThemeColor.darkBlueColor,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
+        AttendUsFormTextField(
           controller: controller,
+          labelText: label,
+          hintText: label,
+          prefixIcon: Icons.lock_outline,
           obscureText: obscure,
-          decoration: InputDecoration(
-            hintText: label,
-            filled: true,
-            fillColor: Colors.grey.withValues(alpha: 0.04),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
+          suffixIcon: IconButton(
+            tooltip: obscure ? 'Show password' : 'Hide password',
+            icon: Icon(
+              obscure
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(
-                color: AppThemeColor.darkBlueColor,
-                width: 2,
-              ),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 18,
-            ),
-            prefixIcon: Icon(
-              Icons.lock_outline,
-              color: AppThemeColor.lightGrayColor,
-            ),
-            suffixIcon: IconButton(
-              icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
-              onPressed: toggle,
-            ),
+            onPressed: toggle,
           ),
           validator: validator,
         ),
@@ -142,32 +117,11 @@ class _StepPasswordState extends State<StepPassword> {
       builder: (context, vm, child) {
         return SizedBox(
           width: double.infinity,
-          height: 56,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppThemeColor.darkBlueColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              elevation: 0,
-            ),
+          child: AttendUsButton.primary(
+            label: 'Create account',
+            icon: Icons.person_add_alt_1_outlined,
             onPressed: vm.isCreating ? null : _next,
-            child: vm.isCreating
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : const Text(
-                    'Create Account',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+            loading: vm.isCreating,
           ),
         );
       },

@@ -3,6 +3,7 @@ import 'package:attendus/firebase/firebase_messaging_helper.dart';
 import 'package:attendus/models/notification_model.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -96,7 +97,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           title: const Text('Enable Notifications'),
           content: const Text(
             'To receive notifications, you need to enable them in your device settings. '
-            'Go to Settings > Notifications > AttendUs and turn on Allow Notifications.',
+            'Go to Settings > Notifications > Attendus and turn on Allow Notifications.',
           ),
           actions: [
             TextButton(
@@ -112,70 +113,70 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.5,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF1A1A1A)),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => Navigator.pop(context),
+          tooltip: 'Back',
         ),
-        title: const Text(
-          'Notifications',
-          style: TextStyle(
-            color: Color(0xFF1A1A1A),
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        centerTitle: true,
+        title: const Text('Notification settings'),
       ),
       body: _settings == null
-          ? const Center(child: CircularProgressIndicator())
+          ? const AttendUsLoadingState(label: 'Loading preferences...')
           : FadeTransition(
               opacity: _fadeAnimation,
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    // Permission Banner (only if no permission)
-                    if (_permissionChecked && !_hasPermission)
-                      _buildPermissionBanner(),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 900),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        AttendUsPageSection(
+                          title: 'Notification controls',
+                          subtitle:
+                              'Choose how Attendus alerts you about events, messages, groups, and account activity.',
+                          icon: Icons.tune_outlined,
+                          child: const SizedBox.shrink(),
+                        ),
+                        if (_permissionChecked && !_hasPermission)
+                          _buildPermissionBanner(),
 
-                    // Master Toggle Section
-                    _buildMasterToggle(),
+                        _buildMasterToggle(),
 
-                    const SizedBox(height: 8),
+                        const SizedBox(height: 8),
 
-                    // Events Section
-                    _buildSectionHeader('Events', Icons.event_note_rounded),
-                    _buildEventsSection(),
+                        _buildSectionHeader('Events', Icons.event_note_rounded),
+                        _buildEventsSection(),
 
-                    const SizedBox(height: 8),
+                        const SizedBox(height: 8),
 
-                    // Communication Section
-                    _buildSectionHeader(
-                      'Communication',
-                      Icons.chat_bubble_outline_rounded,
+                        _buildSectionHeader(
+                          'Communication',
+                          Icons.chat_bubble_outline_rounded,
+                        ),
+                        _buildCommunicationSection(),
+
+                        const SizedBox(height: 8),
+
+                        _buildSectionHeader(
+                          'Activity',
+                          Icons.notifications_active_outlined,
+                        ),
+                        _buildActivitySection(),
+
+                        const SizedBox(height: 8),
+
+                        _buildSectionHeader(
+                          'Preferences',
+                          Icons.settings_outlined,
+                        ),
+                        _buildPreferencesSection(),
+
+                        const SizedBox(height: 24),
+                      ],
                     ),
-                    _buildCommunicationSection(),
-
-                    const SizedBox(height: 8),
-
-                    // Activity Section
-                    _buildSectionHeader(
-                      'Activity',
-                      Icons.notifications_active_outlined,
-                    ),
-                    _buildActivitySection(),
-
-                    const SizedBox(height: 8),
-
-                    // Preferences Section
-                    _buildSectionHeader('Preferences', Icons.settings_outlined),
-                    _buildPreferencesSection(),
-
-                    const SizedBox(height: 24),
-                  ],
+                  ),
                 ),
               ),
             ),

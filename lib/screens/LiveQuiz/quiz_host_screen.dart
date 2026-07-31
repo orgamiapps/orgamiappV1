@@ -9,6 +9,7 @@ import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/screens/LiveQuiz/widgets/live_leaderboard_widget.dart';
 import 'package:attendus/screens/LiveQuiz/widgets/quiz_waiting_lobby.dart';
 import 'package:attendus/screens/LiveQuiz/quiz_builder_screen.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class QuizHostScreen extends StatefulWidget {
   final String quizId;
@@ -317,7 +318,7 @@ class _QuizHostScreenState extends State<QuizHostScreen>
     if (option == null) return; // User cancelled
 
     HapticFeedback.mediumImpact();
-    
+
     // Show loading indicator
     if (!mounted) return;
     showDialog(
@@ -394,10 +395,7 @@ class _QuizHostScreenState extends State<QuizHostScreen>
             ),
             const SizedBox(width: 12),
             const Expanded(
-              child: Text(
-                'Restart Quiz',
-                style: TextStyle(fontSize: 20),
-              ),
+              child: Text('Restart Quiz', style: TextStyle(fontSize: 20)),
             ),
           ],
         ),
@@ -510,38 +508,27 @@ class _QuizHostScreenState extends State<QuizHostScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: _isLoading
-            ? const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Color(0xFF667EEA),
-                      ),
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'Loading quiz...',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              )
+            ? const AttendUsLoadingState(label: 'Loading quiz...')
             : _hasError
             ? _buildErrorState()
             : FadeTransition(
                 opacity: _fadeAnimation,
                 child: SlideTransition(
                   position: _slideAnimation,
-                  child: Column(
-                    children: [
-                      _buildHeader(),
-                      _buildControlPanel(),
-                      Expanded(child: _buildTabView()),
-                    ],
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1280),
+                      child: Column(
+                        children: [
+                          _buildHeader(),
+                          _buildControlPanel(),
+                          Expanded(child: _buildTabView()),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -1169,7 +1156,7 @@ class _QuizHostScreenState extends State<QuizHostScreen>
         ),
       );
     }
-    
+
     return Padding(
       padding: const EdgeInsets.all(24),
       child: AnimatedSwitcher(

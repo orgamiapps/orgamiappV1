@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 /// Modern, professional sign-in security tier selector for event creation
 /// Provides four tiers: Most Secure, Geofence Only, Regular, and All methods
 class SignInSecurityTierSelector extends StatefulWidget {
-  final String selectedTier; // 'most_secure', 'geofence_only', 'regular', or 'all'
+  final String
+  selectedTier; // 'most_secure', 'geofence_only', 'regular', or 'all'
   final Function(String) onTierChanged;
   final bool isEditing;
 
@@ -19,8 +21,8 @@ class SignInSecurityTierSelector extends StatefulWidget {
       _SignInSecurityTierSelectorState();
 }
 
-class _SignInSecurityTierSelectorState
-    extends State<SignInSecurityTierSelector> with TickerProviderStateMixin {
+class _SignInSecurityTierSelectorState extends State<SignInSecurityTierSelector>
+    with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -100,8 +102,8 @@ class _SignInSecurityTierSelectorState
     );
     _slideAnimation =
         Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
-    );
+          CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+        );
     _animationController.forward();
   }
 
@@ -122,21 +124,8 @@ class _SignInSecurityTierSelectorState
       opacity: _fadeAnimation,
       child: SlideTransition(
         position: _slideAnimation,
-        child: Container(
-          width: double.infinity,
+        child: AttendUsCard(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                spreadRadius: 0,
-                blurRadius: 20,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -249,8 +238,7 @@ class _SignInSecurityTierSelectorState
               boxShadow: isSelected
                   ? [
                       BoxShadow(
-                        color:
-                            tier['gradient'][0].withValues(alpha: 0.2),
+                        color: tier['gradient'][0].withValues(alpha: 0.2),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -308,19 +296,16 @@ class _SignInSecurityTierSelectorState
                         boxShadow: isSelected
                             ? [
                                 BoxShadow(
-                                  color: tier['gradient'][0]
-                                      .withValues(alpha: 0.4),
+                                  color: tier['gradient'][0].withValues(
+                                    alpha: 0.4,
+                                  ),
                                   blurRadius: 8,
                                   offset: const Offset(0, 4),
                                 ),
                               ]
                             : [],
                       ),
-                      child: Icon(
-                        tier['icon'],
-                        color: Colors.white,
-                        size: 24,
-                      ),
+                      child: Icon(tier['icon'], color: Colors.white, size: 24),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -371,9 +356,9 @@ class _SignInSecurityTierSelectorState
                               ? tier['gradient'][0]
                               : Colors.grey.withValues(alpha: 0.4),
                           width: 2,
-                            ),
-                          ),
-                          child: isSelected
+                        ),
+                      ),
+                      child: isSelected
                           ? const Icon(
                               Icons.check,
                               color: Colors.white,
@@ -469,11 +454,7 @@ class _SignInSecurityTierSelectorState
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.info_outline,
-            color: const Color(0xFF667EEA),
-            size: 18,
-          ),
+          Icon(Icons.info_outline, color: const Color(0xFF667EEA), size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -506,4 +487,3 @@ class _SignInSecurityTierSelectorState
     );
   }
 }
-

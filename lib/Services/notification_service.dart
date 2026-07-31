@@ -23,20 +23,21 @@ class NotificationService {
           );
 
       await _notifications.initialize(
-        initializationSettings,
+        settings: initializationSettings,
         onDidReceiveNotificationResponse: onNotificationTapped,
       );
 
       // Create Android notification channel (Android 8+)
       const AndroidNotificationChannel channel = AndroidNotificationChannel(
-        'orgami_channel',
-        'Orgami Notifications',
-        description: 'Notifications for Orgami app',
+        'attendus_channel',
+        'Attendus Notifications',
+        description: 'Notifications for Attendus events and updates',
         importance: Importance.high,
       );
       await _notifications
           .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
+            AndroidFlutterLocalNotificationsPlugin
+          >()
           ?.createNotificationChannel(channel);
     } catch (e) {
       if (kDebugMode) {
@@ -54,9 +55,9 @@ class NotificationService {
     try {
       const AndroidNotificationDetails androidPlatformChannelSpecifics =
           AndroidNotificationDetails(
-            'orgami_channel',
-            'Orgami Notifications',
-            channelDescription: 'Notifications for Orgami app',
+            'attendus_channel',
+            'Attendus Notifications',
+            channelDescription: 'Notifications for Attendus events and updates',
             importance: Importance.max,
             priority: Priority.high,
           );
@@ -72,10 +73,10 @@ class NotificationService {
       );
 
       await _notifications.show(
-        0,
-        title,
-        body,
-        platformChannelSpecifics,
+        id: 0,
+        title: title,
+        body: body,
+        notificationDetails: platformChannelSpecifics,
         payload: payload,
       );
     } catch (e) {

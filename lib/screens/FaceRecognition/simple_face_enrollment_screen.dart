@@ -83,7 +83,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   bool _useManualCapture = false;
-  
+
   // Navigation state for smooth transitions
   bool _isNavigating = false;
 
@@ -504,14 +504,14 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
           _logWithTimestamp('Error stopping stream: $e');
         }
       }
-      
+
       if (mounted) {
         setState(() {
           _isNavigating = true;
           _isCameraInitialized = false;
         });
       }
-      
+
       // Short delay to show the "Preparing scanner..." message
       await Future.delayed(Duration(milliseconds: 500));
 
@@ -520,22 +520,24 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => FaceRecognitionScannerScreen(
-              eventModel: widget.eventModel,
-              guestUserId: widget.guestUserId,
-              guestUserName: widget.guestUserName,
-            ),
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                FaceRecognitionScannerScreen(
+                  eventModel: widget.eventModel,
+                  guestUserId: widget.guestUserId,
+                  guestUserName: widget.guestUserName,
+                ),
             transitionDuration: Duration(milliseconds: 400),
             reverseTransitionDuration: Duration(milliseconds: 300),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(
-                opacity: CurvedAnimation(
-                  parent: animation,
-                  curve: Curves.easeInOut,
-                ),
-                child: child,
-              );
-            },
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(
+                    opacity: CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeInOut,
+                    ),
+                    child: child,
+                  );
+                },
           ),
         ).then((_) {
           // Dispose camera after navigation starts
@@ -575,8 +577,6 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
       _statusMessage = message;
     });
   }
-
-  
 
   void _logWithTimestamp(String message) {
     final timestamp = DateTime.now().toIso8601String();
@@ -621,19 +621,25 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
 
     // Only dispose if not already disposed (prevents double disposal during navigation)
     if (_cameraController != null && _isCameraInitialized) {
-      _cameraController!.dispose().then((_) {
-        _logWithTimestamp('Camera controller disposed');
-      }).catchError((e) {
-        _logWithTimestamp('Error disposing camera: $e');
-      });
+      _cameraController!
+          .dispose()
+          .then((_) {
+            _logWithTimestamp('Camera controller disposed');
+          })
+          .catchError((e) {
+            _logWithTimestamp('Error disposing camera: $e');
+          });
     }
-    
+
     // Close face detector
-    _faceDetector?.close().then((_) {
-      _logWithTimestamp('Face detector closed');
-    }).catchError((e) {
-      _logWithTimestamp('Error closing face detector: $e');
-    });
+    _faceDetector
+        ?.close()
+        .then((_) {
+          _logWithTimestamp('Face detector closed');
+        })
+        .catchError((e) {
+          _logWithTimestamp('Error closing face detector: $e');
+        });
 
     super.dispose();
   }
@@ -680,11 +686,12 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
         title: Text(
           widget.simulationMode
-              ? 'Face Enrollment (Simulation)'
-              : 'Face Enrollment',
-          style: TextStyle(color: Colors.white),
+              ? 'Secure face enrollment simulation'
+              : 'Secure face enrollment',
         ),
         actions: const [],
       ),
@@ -694,14 +701,13 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
           if (!_isNavigating) _buildCameraView(),
 
           // Face Guide Overlay
-          if (!_isNavigating && (_currentState == EnrollmentState.CAPTURING ||
-              _currentState == EnrollmentState.READY))
+          if (!_isNavigating &&
+              (_currentState == EnrollmentState.CAPTURING ||
+                  _currentState == EnrollmentState.READY))
             _buildFaceGuide(),
 
           // Status Panel
           if (!_isNavigating) _buildStatusPanel(),
-
-          
 
           // Progress Indicator
           if (!_isNavigating) _buildProgressIndicator(),
@@ -710,8 +716,9 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
           if (!_isNavigating && _useManualCapture) _buildManualCaptureButton(),
 
           // Error Dialog
-          if (!_isNavigating && _currentState == EnrollmentState.ERROR) _buildErrorDialog(),
-          
+          if (!_isNavigating && _currentState == EnrollmentState.ERROR)
+            _buildErrorDialog(),
+
           // Loading overlay during navigation
           if (_isNavigating)
             Container(
@@ -736,10 +743,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
                     SizedBox(height: 12),
                     Text(
                       'This will only take a moment',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(color: Colors.white70, fontSize: 14),
                     ),
                   ],
                 ),
@@ -861,8 +865,6 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
       ),
     );
   }
-
-  
 
   Widget _buildProgressIndicator() {
     return Positioned(

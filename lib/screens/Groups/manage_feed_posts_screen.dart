@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/screens/Groups/group_profile_screen_v2.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 enum _ModerationSource { feed, event }
 
@@ -153,7 +154,9 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
                   (watchEvents &&
                       (eventsSnapshot.connectionState ==
                           ConnectionState.waiting))) {
-                return const Center(child: CircularProgressIndicator());
+                return const AttendUsLoadingState(
+                  label: 'Loading moderation queue',
+                );
               }
 
               final List<QueryDocumentSnapshot> feedDocs =

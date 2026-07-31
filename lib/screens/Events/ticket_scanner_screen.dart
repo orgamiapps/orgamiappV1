@@ -121,7 +121,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
         });
 
         if (result.isSuccess && result.ticketId != null) {
-          // NFC functionality is temporarily disabled, this branch won't execute
+          // NFC badge support is excluded from the launch build; QR remains supported.
           setState(() {
             // scannedTicket = result.ticket; // Property doesn't exist in stub
           });
@@ -640,35 +640,39 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       resizeToAvoidBottomInset: true,
       body: SafeArea(
-        child: Column(
-          children: [
-            AppAppBarView.modernHeader(
-              context: context,
-              title: 'Ticket Scanner',
-              subtitle: 'Scan and validate event tickets',
-            ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(20),
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                children: [
-                  _buildEventInfo(),
-                  const SizedBox(height: 24),
-                  _buildScannerSection(),
-                  const SizedBox(height: 24),
-                  if (scannedTicket != null) _buildTicketInfo(),
-                  // Add extra space equal to keyboard inset to avoid overflow
-                  SizedBox(
-                    height: MediaQuery.of(context).viewInsets.bottom + 12,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 980),
+            child: Column(
+              children: [
+                AppAppBarView.modernHeader(
+                  context: context,
+                  title: 'Ticket Scanner',
+                  subtitle: 'Scan and validate event tickets',
+                ),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.all(20),
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    children: [
+                      _buildEventInfo(),
+                      const SizedBox(height: 24),
+                      _buildScannerSection(),
+                      const SizedBox(height: 24),
+                      if (scannedTicket != null) _buildTicketInfo(),
+                      SizedBox(
+                        height: MediaQuery.of(context).viewInsets.bottom + 12,
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

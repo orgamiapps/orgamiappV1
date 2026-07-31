@@ -300,7 +300,7 @@ class _ProfessionalBadgeWidgetState extends State<ProfessionalBadgeWidget>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'ATTENDUS',
+                'Attendus',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,

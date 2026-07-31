@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'dart:convert';
+import 'package:attendus/Services/places_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:http/http.dart' as http;
-import 'package:attendus/Utils/app_constants.dart';
 import 'package:attendus/models/organization_model.dart';
 // Removed current location helper import since feature is not used here
 
@@ -25,13 +23,16 @@ class GroupLocationSettingsScreen extends StatefulWidget {
 class _GroupLocationSettingsScreenState
     extends State<GroupLocationSettingsScreen> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final PlacesService _placesService = PlacesService();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
 
   bool _isLoading = false;
   bool _isSaving = false;
   Timer? _debounce;
-  List<Map<String, dynamic>> _suggestions = [];
+  List<PlaceSuggestion> _suggestions = [];
+  String? _searchError;
+  int _searchRequest = 0;
   String? _selectedLocationAddress;
   double? _selectedLatitude;
   double? _selectedLongitude;
@@ -40,7 +41,7 @@ class _GroupLocationSettingsScreenState
   @override
   void initState() {
     super.initState();
-    _placesSessionToken = DateTime.now().millisecondsSinceEpoch.toString();
+    _placesSessionToken = _placesService.createSessionToken();
     _initializeCurrentLocation();
   }
 
@@ -66,155 +67,73 @@ class _GroupLocationSettingsScreenState
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), () {
       final query = value.trim();
-      if (query.length < 2) {
-        setState(() => _suggestions = []);
+      if (query.length < 3) {
+        setState(() {
+          _suggestions = [];
+          _searchError = null;
+        });
         return;
       }
       _fetchLocationSuggestions(query);
     });
   }
 
-  /// Build a "City, ST" string from Google address components
-  String _cityStateFromComponents(List<dynamic>? components) {
-    if (components == null) return '';
-    String? city;
-    String? state;
-
-    for (final component in components) {
-      try {
-        final types = (component['types'] as List?)?.cast<String>() ?? const [];
-        if (types.contains('administrative_area_level_1')) {
-          state = component['short_name'] as String?;
-        }
-        if (types.contains('locality')) {
-          city = component['long_name'] as String?;
-        }
-        // Fallbacks for places where locality may be absent
-        if (city == null &&
-            (types.contains('postal_town') ||
-                types.contains('administrative_area_level_2') ||
-                types.contains('sublocality') ||
-                types.contains('neighborhood'))) {
-          city = component['long_name'] as String?;
-        }
-      } catch (_) {
-        // Ignore malformed component entries
-      }
-    }
-
-    if ((city ?? '').isNotEmpty && (state ?? '').isNotEmpty) {
-      return '${city!}, ${state!}';
-    }
-    return '';
-  }
-
   Future<void> _fetchLocationSuggestions(String input) async {
-    if (_isLoading) return;
-
-    setState(() => _isLoading = true);
+    final request = ++_searchRequest;
+    setState(() {
+      _isLoading = true;
+      _searchError = null;
+    });
 
     try {
-      final uri = Uri.https(
-        'maps.googleapis.com',
-        '/maps/api/place/autocomplete/json',
-        {
-          'input': input,
-          'key': AppConstants.googlePlacesApiKey,
-          'sessiontoken': _placesSessionToken,
-          'types': '(cities)',
-          'components': 'country:us',
-          'language': 'en',
-        },
+      final predictions = await _placesService.autocomplete(
+        query: input,
+        sessionToken: _placesSessionToken,
+        citiesOnly: true,
       );
-
-      final response = await http.get(uri);
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['status'] == 'OK') {
-          final List predictions = data['predictions'] ?? [];
-          setState(() {
-            _suggestions = predictions.cast<Map<String, dynamic>>();
-          });
-        } else {
-          setState(() => _suggestions = []);
-        }
-      }
-    } catch (e) {
-      debugPrint('Error fetching location suggestions: $e');
-      setState(() => _suggestions = []);
+      if (!mounted || request != _searchRequest) return;
+      setState(() => _suggestions = predictions);
+    } on PlacesServiceException catch (error) {
+      if (!mounted || request != _searchRequest) return;
+      setState(() {
+        _suggestions = [];
+        _searchError = error.message;
+      });
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted && request == _searchRequest) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
-  Future<void> _selectLocation(Map<String, dynamic> suggestion) async {
-    final placeId = suggestion['place_id'] as String?;
-    if (placeId == null) return;
-
+  Future<void> _selectLocation(PlaceSuggestion suggestion) async {
     setState(() => _isLoading = true);
 
     try {
-      final detailsUri =
-          Uri.https('maps.googleapis.com', '/maps/api/place/details/json', {
-            'place_id': placeId,
-            'fields': 'geometry,name,formatted_address,address_components',
-            'key': AppConstants.googlePlacesApiKey,
-            'sessiontoken': _placesSessionToken,
-          });
-
-      final response = await http.get(detailsUri);
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['status'] == 'OK') {
-          final result = data['result'];
-          final geometry = result['geometry'];
-          final location = geometry?['location'];
-          final components = (result['address_components'] as List?)
-              ?.cast<dynamic>();
-
-          if (location != null) {
-            // Prefer "City, ST" formatting for display and storage
-            String displayAddress = _cityStateFromComponents(components).trim();
-            if (displayAddress.isEmpty) {
-              // Fallback to Google's formatted address or suggestion description
-              displayAddress =
-                  (result['formatted_address'] as String?) ??
-                  (suggestion['description'] as String? ?? '');
-              // Strip trailing ", USA" if present
-              if (displayAddress.endsWith(', USA')) {
-                displayAddress = displayAddress.substring(
-                  0,
-                  displayAddress.length - 5,
-                );
-              }
-            }
-            final lat = (location['lat'] as num).toDouble();
-            final lng = (location['lng'] as num).toDouble();
-
-            setState(() {
-              _searchController.text = displayAddress;
-              _selectedLocationAddress = displayAddress;
-              _selectedLatitude = lat;
-              _selectedLongitude = lng;
-              _suggestions = [];
-            });
-
-            _searchFocusNode.unfocus();
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Error getting place details: $e');
+      final details = await _placesService.details(
+        placeId: suggestion.placeId,
+        sessionToken: _placesSessionToken,
+      );
+      if (!mounted) return;
+      final displayAddress = details.cityAndRegion;
+      setState(() {
+        _searchController.text = displayAddress;
+        _selectedLocationAddress = displayAddress;
+        _selectedLatitude = details.location.latitude;
+        _selectedLongitude = details.location.longitude;
+        _suggestions = [];
+        _searchError = null;
+      });
+      _searchFocusNode.unfocus();
+    } on PlacesServiceException catch (error) {
       if (mounted) {
+        setState(() => _searchError = error.message);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error getting location details: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(error.message), backgroundColor: Colors.red),
         );
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -335,22 +254,13 @@ class _GroupLocationSettingsScreenState
         _selectedLongitude != null;
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text(
-          'Location Settings',
-          style: TextStyle(
-            color: Colors.black87,
-            fontWeight: FontWeight.w600,
-            fontSize: 20,
-          ),
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
+        title: const Text('Group location'),
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
@@ -486,9 +396,11 @@ class _GroupLocationSettingsScreenState
                                     color: Colors.grey[500],
                                   ),
                                   onPressed: () {
+                                    ++_searchRequest;
                                     setState(() {
                                       _searchController.clear();
                                       _suggestions = [];
+                                      _searchError = null;
                                     });
                                   },
                                 )
@@ -518,6 +430,28 @@ class _GroupLocationSettingsScreenState
                       ),
 
                       const SizedBox(height: 4),
+                      if (_searchError != null) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Icon(Icons.error_outline, color: Colors.red),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _searchError!,
+                                style: const TextStyle(color: Colors.red),
+                              ),
+                            ),
+                            if (_searchController.text.trim().length >= 3)
+                              TextButton(
+                                onPressed: () => _fetchLocationSuggestions(
+                                  _searchController.text.trim(),
+                                ),
+                                child: const Text('Retry'),
+                              ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -559,16 +493,9 @@ class _GroupLocationSettingsScreenState
                               Divider(height: 1, color: Colors.grey[200]),
                           itemBuilder: (context, index) {
                             final suggestion = _suggestions[index];
-                            final description =
-                                suggestion['description'] as String? ?? '';
-                            final mainText =
-                                suggestion['structured_formatting']?['main_text']
-                                    as String? ??
-                                '';
-                            final secondaryText =
-                                suggestion['structured_formatting']?['secondary_text']
-                                    as String? ??
-                                '';
+                            final description = suggestion.description;
+                            final mainText = suggestion.primaryText;
+                            final secondaryText = suggestion.secondaryText;
 
                             return ListTile(
                               contentPadding: const EdgeInsets.symmetric(

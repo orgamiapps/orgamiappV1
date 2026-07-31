@@ -18,42 +18,215 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="AttendUs - Event attendance management app.">
+  <meta name="description" content="Attendus - Event attendance management app.">
+
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://maps.googleapis.com" crossorigin>
+  <link rel="preload" href="main.dart.js" as="script">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="AttendUs">
+  <meta name="apple-mobile-web-app-title" content="Attendus">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>AttendUs</title>
+  <title>Attendus</title>
   <link rel="manifest" href="manifest.json">
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
-  <script>
-    // Initialize Firebase for web (used by FCM on web)
-    const firebaseConfig = {
-      apiKey: 'AIzaSyAgxBhWgtmRA_cc-JcuMP8fXl7NjZIthOI',
-      appId: '1:951311475019:web:d65cfc2cbe6e987c89c8ce',
-      messagingSenderId: '951311475019',
-      projectId: 'orgami-66nxok',
-      authDomain: 'orgami-66nxok.firebaseapp.com',
-      storageBucket: 'orgami-66nxok.appspot.com',
-    };
-    if (typeof firebase !== 'undefined' && firebase.apps?.length === 0) {
-      firebase.initializeApp(firebaseConfig);
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      background: #f7f9fc;
+      color: #17324d;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function () {
-        navigator.serviceWorker.register('firebase-messaging-sw.js');
-      });
+
+    #attendus-loading {
+      position: fixed;
+      inset: 0;
+      z-index: 2147483647;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(180deg, #f7fbff 0%, #eef6fc 100%);
+      transition: opacity 160ms ease;
     }
-  </script>
+
+    #attendus-loading.attendus-loading--leaving {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .attendus-loading__content {
+      width: min(84vw, 320px);
+      text-align: center;
+    }
+
+    .attendus-loading__logo {
+      width: 88px;
+      height: 88px;
+      border-radius: 22px;
+      box-shadow: 0 14px 36px rgba(28, 96, 145, 0.18);
+    }
+
+    .attendus-loading__title {
+      margin: 18px 0 6px;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.6px;
+    }
+
+    .attendus-loading__status {
+      min-height: 22px;
+      margin: 0;
+      color: #557086;
+      font-size: 15px;
+    }
+
+    .attendus-loading__bar {
+      height: 3px;
+      margin: 22px auto 0;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(11, 126, 194, 0.14);
+    }
+
+    .attendus-loading__bar::after {
+      content: "";
+      display: block;
+      width: 45%;
+      height: 100%;
+      border-radius: inherit;
+      background: #0b7ec2;
+      animation: attendus-loading 1s ease-in-out infinite;
+    }
+
+    .attendus-loading__retry {
+      display: none;
+      margin: 20px auto 0;
+      padding: 10px 18px;
+      border: 0;
+      border-radius: 999px;
+      background: #0b7ec2;
+      color: white;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    #attendus-loading.attendus-loading--error .attendus-loading__bar {
+      display: none;
+    }
+
+    #attendus-loading.attendus-loading--error .attendus-loading__retry {
+      display: block;
+    }
+
+    @keyframes attendus-loading {
+      0% { transform: translateX(-110%); }
+      50% { transform: translateX(65%); }
+      100% { transform: translateX(225%); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #attendus-loading { transition: none; }
+      .attendus-loading__bar::after { animation: none; width: 100%; }
+    }
+  </style>
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+  <div id="attendus-loading" role="status" aria-live="polite">
+    <div class="attendus-loading__content">
+      <img
+        class="attendus-loading__logo"
+        src="icons/Icon-192.png"
+        alt="Attendus"
+        width="88"
+        height="88"
+      >
+      <h1 class="attendus-loading__title">Attendus</h1>
+      <p id="attendus-loading-status" class="attendus-loading__status">
+        Getting things ready&hellip;
+      </p>
+      <div class="attendus-loading__bar" aria-hidden="true"></div>
+      <button
+        class="attendus-loading__retry"
+        type="button"
+        onclick="window.location.reload()"
+      >
+        Try again
+      </button>
+    </div>
+  </div>
+  <script>
+    window.attendusBootStartedAt = performance.now();
+    window.attendusShowStartupError = function (error) {
+      console.error('Attendus startup failed:', error);
+      const loading = document.getElementById('attendus-loading');
+      const status = document.getElementById('attendus-loading-status');
+      if (loading) loading.classList.add('attendus-loading--error');
+      if (status) {
+        status.textContent = 'We could not start Attendus. Check your connection and try again.';
+      }
+    };
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('firebase-messaging-sw.js').catch(function (error) {
+          console.warn('Firebase Messaging worker registration was skipped:', error);
+        });
+      });
+    }
+
+    // Remove Flutter's deprecated app-cache worker before bootstrapping. The
+    // cleanup is capped so Safari storage APIs can never hold up startup.
+    (async function bootstrapAttendus() {
+      const cleanup = (async function cleanupLegacyFlutterCache() {
+        try {
+          if ('serviceWorker' in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(
+              registrations
+                .filter((registration) => {
+                  const worker = registration.active ||
+                      registration.waiting ||
+                      registration.installing;
+                  return worker?.scriptURL.includes('flutter_service_worker.js');
+                })
+                .map((registration) => registration.unregister()),
+            );
+          }
+
+          if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            await Promise.all(
+              cacheNames
+                .filter((cacheName) => cacheName.startsWith('flutter-'))
+                .map((cacheName) => caches.delete(cacheName)),
+            );
+          }
+        } catch (error) {
+          console.warn('Legacy Flutter cache cleanup was skipped:', error);
+        }
+      })();
+
+      try {
+        await Promise.race([
+          cleanup,
+          new Promise((resolve) => window.setTimeout(resolve, 250)),
+        ]);
+      } finally {
+        const bootstrap = document.createElement('script');
+        bootstrap.src = 'flutter_bootstrap.js';
+        bootstrap.async = true;
+        bootstrap.onerror = window.attendusShowStartupError;
+        document.body.appendChild(bootstrap);
+      }
+    })();
+  </script>
 </body>
 </html>

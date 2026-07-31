@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-// NFC functionality temporarily disabled due to plugin registration issues
+// NFC badge check-in is not included in this release
 // import 'package:nfc_manager/nfc_manager.dart';
 // import 'package:nfc_manager/nfc_manager_android.dart';
 // import 'package:ndef_record/ndef_record.dart';
@@ -24,7 +24,7 @@ class NFCBadgeService {
   /// Temporarily disabled due to plugin registration issues
   Future<bool> isNFCAvailable() async {
     try {
-      debugPrint('NFC functionality temporarily disabled');
+      debugPrint('NFC badge check-in is not included in this release');
       return false; // Always return false until plugin issues are resolved
     } catch (e) {
       debugPrint('Error checking NFC availability: $e');
@@ -42,16 +42,20 @@ class NFCBadgeService {
     Duration timeout = const Duration(seconds: 30),
   }) async {
     try {
-      // NFC functionality temporarily disabled
-      onStatusUpdate('NFC functionality is temporarily disabled. Please use QR codes instead.');
-      return NFCBadgeReadResult.error('NFC functionality temporarily disabled due to plugin issues. Please use QR code scanning instead.');
+      // NFC badge check-in is not included in this release
+      onStatusUpdate(
+        'NFC badge check-in is not included in this release. Please use QR codes instead.',
+      );
+      return NFCBadgeReadResult.error(
+        'NFC badge check-in is not included in this release due to plugin issues. Please use QR code scanning instead.',
+      );
     } catch (e) {
       debugPrint('Error in NFC service: $e');
-      return NFCBadgeReadResult.error('NFC functionality disabled: $e');
+      return NFCBadgeReadResult.error('NFC badge check-in unavailable: $e');
     }
   }
 
-  /// Stop NFC session - temporarily disabled
+  /// Stop NFC session when available.
   Future<void> stopNFCSession() async {
     try {
       debugPrint('NFC stop session requested but NFC is disabled');
@@ -60,9 +64,11 @@ class NFCBadgeService {
     }
   }
 
-  /// Write badge to NFC - temporarily disabled
+  /// Write badge to NFC when available.
   Future<NFCBadgeWriteResult> writeBadgeToNFC() async {
-    return NFCBadgeWriteResult.error('NFC functionality temporarily disabled');
+    return NFCBadgeWriteResult.error(
+      'NFC badge check-in is not included in this release',
+    );
   }
 }
 
@@ -92,10 +98,7 @@ class NFCBadgeReadResult {
   }
 
   factory NFCBadgeReadResult.error(String error) {
-    return NFCBadgeReadResult._(
-      isSuccess: false,
-      error: error,
-    );
+    return NFCBadgeReadResult._(isSuccess: false, error: error);
   }
 }
 
@@ -103,19 +106,13 @@ class NFCBadgeWriteResult {
   final bool isSuccess;
   final String? error;
 
-  NFCBadgeWriteResult._({
-    required this.isSuccess,
-    this.error,
-  });
+  NFCBadgeWriteResult._({required this.isSuccess, this.error});
 
   factory NFCBadgeWriteResult.success() {
     return NFCBadgeWriteResult._(isSuccess: true);
   }
 
   factory NFCBadgeWriteResult.error(String error) {
-    return NFCBadgeWriteResult._(
-      isSuccess: false,
-      error: error,
-    );
+    return NFCBadgeWriteResult._(isSuccess: false, error: error);
   }
 }

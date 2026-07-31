@@ -12,6 +12,7 @@ import 'package:attendus/screens/Groups/group_profile_screen_v2.dart';
 import 'package:attendus/screens/Events/event_feedback_management_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -138,34 +139,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final entries = _buildNotificationEntries();
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        titleTextStyle: const TextStyle(
-          color: Colors.black87,
-          fontSize: 22,
-          fontWeight: FontWeight.w600,
-        ),
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.transparent,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.notifications_outlined,
-              size: 24,
-              color: Colors.black87,
-            ),
+            const Icon(Icons.notifications_outlined, size: 24),
             const SizedBox(width: 8),
             const Text('Notifications'),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings, color: Colors.black87),
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Notification settings',
             onPressed: () {
               Navigator.push(
                 context,
@@ -176,133 +165,187 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             },
           ),
         ],
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
-        ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AttendUsLoadingState(label: 'Loading notifications...')
           : RefreshIndicator(
               onRefresh: _loadInitial,
-              child: CustomScrollView(
-                controller: _scrollController,
-                slivers: [
-                  // Removed header with 'Recent' text
-                  if (_items.isEmpty)
-                    SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: _buildEmptyState(),
-                    ),
-                  if (_items.isNotEmpty)
-                    SliverList(
-                      delegate: SliverChildBuilderDelegate((context, index) {
-                        if (index >= _items.length) {
-                          return const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 24),
-                            child: Center(child: CircularProgressIndicator()),
-                          );
-                        }
-                        return _buildNotificationTile(_items[index]);
-                      }, childCount: _items.length + (_hasMore ? 1 : 0)),
-                    ),
-                ],
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 900),
+                  child: CustomScrollView(
+                    controller: _scrollController,
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: AttendUsPageSection(
+                          title: 'Activity center',
+                          subtitle:
+                              'Messages, event updates, tickets, and group activity.',
+                          icon: Icons.notifications_active_outlined,
+                          actions: [
+                            TextButton.icon(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const NotificationSettingsScreen(),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.tune_outlined),
+                              label: const Text('Settings'),
+                            ),
+                          ],
+                          child: const SizedBox.shrink(),
+                        ),
+                      ),
+                      if (_items.isEmpty)
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: _buildEmptyState(),
+                        ),
+                      if (_items.isNotEmpty)
+                        SliverList(
+                          delegate: SliverChildBuilderDelegate((
+                            context,
+                            index,
+                          ) {
+                            if (index >= entries.length) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 24),
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              );
+                            }
+                            final entry = entries[index];
+                            if (entry is String) {
+                              return _buildGroupHeader(entry);
+                            }
+                            return _buildNotificationTile(
+                              entry as NotificationModel,
+                            );
+                          }, childCount: entries.length + (_hasMore ? 1 : 0)),
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ),
     );
   }
 
   Widget _buildEmptyState() {
-    return SizedBox(
-      height: 300,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.notifications_none_outlined,
-                size: 64,
-                color: Colors.grey[400],
-              ),
+    return AttendUsEmptyState(
+      icon: Icons.notifications_none_outlined,
+      title: 'All caught up',
+      message:
+          'New messages, event updates, tickets, and group activity will appear here.',
+      action: AttendUsButton.secondary(
+        label: 'Notification settings',
+        icon: Icons.tune_outlined,
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const NotificationSettingsScreen(),
             ),
-            const SizedBox(height: 24),
-            Text(
-              'All caught up!',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[700],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'You\'re up to date with all your notifications',
-              style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            const NotificationSettingsScreen(),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF667EEA).withAlpha(25),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: const Color(0xFF667EEA).withAlpha(76),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(
-                          Icons.settings_outlined,
-                          size: 16,
-                          color: Color(0xFF667EEA),
-                        ),
-                        SizedBox(width: 8),
-                        Text(
-                          'Manage notifications',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF667EEA),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
   Widget _buildNotificationTile(NotificationModel notification) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+      child: AttendUsListTile(
+        selected: !notification.isRead,
+        leading: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: _getNotificationColor(
+                  notification.type,
+                ).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                _getNotificationIcon(notification.type),
+                color: _getNotificationColor(notification.type),
+                size: 22,
+              ),
+            ),
+            if (!notification.isRead)
+              Positioned(
+                right: -1,
+                top: -1,
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: theme.colorScheme.surface),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        title: notification.title,
+        subtitle:
+            '${notification.body} • ${DateFormat('MMM d, h:mm a').format(notification.createdAt)}',
+        trailing: PopupMenuButton<String>(
+          icon: const Icon(Icons.more_horiz),
+          tooltip: 'Notification actions',
+          onSelected: (value) {
+            if (value == 'mark_read') {
+              _messagingHelper.markNotificationAsRead(notification.id);
+            } else if (value == 'delete') {
+              _messagingHelper.deleteNotification(notification.id);
+            }
+          },
+          itemBuilder: (context) => [
+            if (!notification.isRead)
+              const PopupMenuItem(
+                value: 'mark_read',
+                child: Row(
+                  children: [
+                    Icon(Icons.check, size: 18),
+                    SizedBox(width: 8),
+                    Text('Mark as read'),
+                  ],
+                ),
+              ),
+            const PopupMenuItem(
+              value: 'delete',
+              child: Row(
+                children: [
+                  Icon(Icons.delete_outline, size: 18),
+                  SizedBox(width: 8),
+                  Text('Delete'),
+                ],
+              ),
+            ),
+          ],
+        ),
+        onTap: () {
+          if (!notification.isRead) {
+            _messagingHelper.markNotificationAsRead(notification.id);
+          }
+          _handleNotificationTap(notification);
+        },
+      ),
+    );
+  }
+
+  // ignore: unused_element
+  Widget _buildNotificationTileLegacy(NotificationModel notification) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12, left: 16, right: 16),
       decoration: BoxDecoration(
@@ -469,6 +512,38 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
+  Widget _buildGroupHeader(String label) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      child: Text(label, style: Theme.of(context).textTheme.titleSmall),
+    );
+  }
+
+  List<Object> _buildNotificationEntries() {
+    final entries = <Object>[];
+    String? currentGroup;
+    for (final notification in _items) {
+      final group = _notificationGroupLabel(notification);
+      if (group != currentGroup) {
+        entries.add(group);
+        currentGroup = group;
+      }
+      entries.add(notification);
+    }
+    return entries;
+  }
+
+  String _notificationGroupLabel(NotificationModel notification) {
+    if (!notification.isRead) return 'Unread';
+    final now = DateTime.now();
+    final created = notification.createdAt;
+    final today = DateTime(now.year, now.month, now.day);
+    final createdDay = DateTime(created.year, created.month, created.day);
+    if (createdDay == today) return 'Today';
+    if (today.difference(createdDay).inDays <= 7) return 'This week';
+    return 'Earlier';
+  }
+
   Color _getNotificationColor(String type) {
     switch (type) {
       case 'event_reminder':
@@ -478,9 +553,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'geofence_checkin':
         return Colors.teal;
       case 'new_event':
-    return const Color(0xFF667EEA);
+        return const Color(0xFF667EEA);
       case 'group_event':
-    return const Color(0xFF667EEA);
+        return const Color(0xFF667EEA);
       case 'ticket_update':
         return Colors.blue;
       case 'message_mention':

@@ -10,6 +10,7 @@ import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/widgets/month_year_picker.dart';
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 import 'dart:async';
 
 class CalendarScreen extends StatefulWidget {
@@ -329,7 +330,7 @@ class _CalendarScreenState extends State<CalendarScreen>
   Widget build(BuildContext context) {
     return AppScaffoldWrapper(
       selectedBottomNavIndex: 0, // Home tab
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Stack(
           children: [
@@ -394,17 +395,14 @@ class _CalendarScreenState extends State<CalendarScreen>
   }
 
   Widget _buildHeader() {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: theme.colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
       ),
       child: Column(
         children: [
@@ -447,20 +445,16 @@ class _CalendarScreenState extends State<CalendarScreen>
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1A1A1A),
-                                ),
+                                style: theme.textTheme.headlineSmall,
                               ),
                             ),
                           ),
                           if (!_isDayViewExpanded) ...[
                             const SizedBox(width: 6),
-                            const Icon(
+                            Icon(
                               Icons.keyboard_arrow_down,
                               size: 28,
-                              color: Color(0xFF667EEA),
+                              color: theme.colorScheme.primary,
                             ),
                           ],
                         ],
@@ -472,7 +466,7 @@ class _CalendarScreenState extends State<CalendarScreen>
               IconButton(
                 icon: const Icon(Icons.add, size: 28),
                 onPressed: _createEvent,
-                color: const Color(0xFF667EEA),
+                color: theme.colorScheme.primary,
               ),
             ],
           ),
@@ -1043,79 +1037,20 @@ class _CalendarScreenState extends State<CalendarScreen>
   }
 
   Widget _buildEventCard(EventModel event) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: AttendUsListTile(
+        leadingIcon: Icons.event_available_outlined,
+        title: event.title.isEmpty ? 'Untitled event' : event.title,
+        subtitle:
+            '${DateFormat('h:mm a').format(event.selectedDateTime)} - ${event.location.isEmpty ? 'Location TBD' : event.location}',
+        trailing: event.private
+            ? const AttendUsStatusBadge(
+                label: 'Private',
+                tone: AttendUsStatusTone.warning,
+              )
+            : null,
         onTap: () => _openEvent(event),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Container(
-                width: 4,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF667EEA),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      event.title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.access_time,
-                          size: 14,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          DateFormat('h:mm a').format(event.selectedDateTime),
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Icon(
-                          Icons.location_on,
-                          size: 14,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            event.location,
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 13,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right, color: Color(0xFF9CA3AF)),
-            ],
-          ),
-        ),
       ),
     );
   }

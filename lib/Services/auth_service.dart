@@ -181,30 +181,32 @@ class AuthService extends ChangeNotifier {
       return false;
     }
   }
-  
+
   /// Ensure user data is fully loaded before facial recognition flows
   /// This method will wait for CustomerController to be populated from Firestore
   Future<bool> ensureUserDataLoaded() async {
     try {
       Logger.info('Ensuring user data is loaded for facial recognition...');
-      
+
       // If already loaded, return immediately
       if (CustomerController.logeInCustomer != null) {
-        Logger.info('User data already loaded: ${CustomerController.logeInCustomer!.name}');
+        Logger.info(
+          'User data already loaded: ${CustomerController.logeInCustomer!.name}',
+        );
         return true;
       }
-      
+
       // Check Firebase Auth
       final user = _auth.currentUser;
       if (user == null) {
         Logger.warning('No Firebase Auth user found');
         return false;
       }
-      
+
       // Try to load from Firestore with timeout
       Logger.info('Loading user data from Firestore...');
       CustomerModel? userData;
-      
+
       try {
         userData = await FirebaseFirestoreHelper()
             .getSingleCustomer(customerId: user.uid)
@@ -218,7 +220,7 @@ class AuthService extends ChangeNotifier {
       } catch (e) {
         Logger.warning('Failed to load user data from Firestore: $e');
       }
-      
+
       if (userData != null) {
         CustomerController.logeInCustomer = userData;
         Logger.success('User data loaded successfully: ${userData.name}');
@@ -336,10 +338,10 @@ class AuthService extends ChangeNotifier {
         key: _keyLastLoginTime,
         value: DateTime.now().toIso8601String(),
       );
-      
+
       // Disable guest mode when user logs in
       await GuestModeService().disableGuestMode();
-      
+
       Logger.info('User session saved');
     } catch (e) {
       Logger.error('Error saving user session', e);
@@ -393,10 +395,10 @@ class AuthService extends ChangeNotifier {
       await _secureStorage.delete(key: _keyUserEmail);
       await _secureStorage.delete(key: _keyLastLoginTime);
       CustomerController.logeInCustomer = null;
-      
+
       // Clear navigation state on logout
       await NavigationStateService().onLogout();
-      
+
       Logger.info('User session cleared');
     } catch (e) {
       Logger.error('Error clearing user session', e);
@@ -410,10 +412,10 @@ class AuthService extends ChangeNotifier {
   ) async {
     try {
       await _ensureFirebaseInitialized();
-      
+
       // Check if currently signed in anonymously (guest mode)
       final wasAnonymous = _auth.currentUser?.isAnonymous ?? false;
-      
+
       final credential = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
@@ -424,13 +426,13 @@ class AuthService extends ChangeNotifier {
         if (wasAnonymous) {
           Logger.info('Guest user successfully signed in with email/password');
         }
-        
+
         // Set minimal customer model immediately for fast navigation
         // This prevents the app from freezing when trying to access user data
         if (CustomerController.logeInCustomer == null) {
           _setMinimalCustomerFromFirebaseUser(credential.user!);
         }
-        
+
         // Do remaining work in background to avoid blocking UI
         Future.microtask(() => _completePostSignIn(credential.user!));
       }
@@ -560,10 +562,13 @@ class AuthService extends ChangeNotifier {
   ) async {
     try {
       final user = profileData['user'] as User;
-      
+
       // Log if this was an anonymous user upgrade
-      if (profileData.containsKey('wasAnonymous') && profileData['wasAnonymous'] == true) {
-        Logger.info('Guest user successfully upgraded to authenticated account via social login');
+      if (profileData.containsKey('wasAnonymous') &&
+          profileData['wasAnonymous'] == true) {
+        Logger.info(
+          'Guest user successfully upgraded to authenticated account via social login',
+        );
       }
 
       // Check if user exists in Firestore with timeout
@@ -593,40 +598,14 @@ class AuthService extends ChangeNotifier {
           }
         });
       } else {
-        // New user - create minimal profile immediately
+        // New user - create and persist the profile before navigation.
         final newCustomerModel = await _createEnhancedUserProfile(
           user,
           profileData,
         );
 
-        // Set in memory immediately
+        await _saveNewSocialUserProfile(newCustomerModel);
         CustomerController.logeInCustomer = newCustomerModel;
-
-        // Save to Firestore in background (non-blocking)
-        Future.microtask(() async {
-          try {
-            await FirebaseFirestore.instance
-                .collection(CustomerModel.firebaseKey)
-                .doc(newCustomerModel.uid)
-                .set(CustomerModel.getMap(newCustomerModel))
-                .timeout(const Duration(seconds: 5));
-            Logger.info('New user profile saved to Firestore');
-          } catch (e) {
-            Logger.error('Error saving new user profile to Firestore: $e');
-            // Retry once
-            try {
-              await Future.delayed(const Duration(seconds: 2));
-              await FirebaseFirestore.instance
-                  .collection(CustomerModel.firebaseKey)
-                  .doc(newCustomerModel.uid)
-                  .set(CustomerModel.getMap(newCustomerModel))
-                  .timeout(const Duration(seconds: 5));
-              Logger.info('New user profile saved on retry');
-            } catch (retryError) {
-              Logger.error('Failed to save user profile on retry: $retryError');
-            }
-          }
-        });
       }
 
       await _saveUserSession(user);
@@ -896,6 +875,26 @@ class AuthService extends ChangeNotifier {
       createdAt: DateTime.now(),
       isDiscoverable: true, // Default to discoverable
     );
+  }
+
+  Future<void> _saveNewSocialUserProfile(CustomerModel customer) async {
+    Future<void> writeProfile() {
+      return FirebaseFirestore.instance
+          .collection(CustomerModel.firebaseKey)
+          .doc(customer.uid)
+          .set(CustomerModel.getMap(customer), SetOptions(merge: true))
+          .timeout(const Duration(seconds: 8));
+    }
+
+    try {
+      await writeProfile();
+      Logger.info('New social user profile saved to Firestore');
+    } catch (error) {
+      Logger.warning('Initial social profile save failed: $error');
+      await Future.delayed(const Duration(milliseconds: 800));
+      await writeProfile();
+      Logger.info('New social user profile saved to Firestore on retry');
+    }
   }
 
   /// Update existing user profile with any new information from social login

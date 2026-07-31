@@ -85,46 +85,51 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnimation,
-          child: Column(
-            children: [
-              AppAppBarView.modernHeader(
-                context: context,
-                title: 'Feature Your Event',
-                subtitle:
-                    'Boost your event visibility and attract more attendees',
-              ),
-              Expanded(
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildBenefitsSection(),
-                        const SizedBox(height: 24),
-                        if (_isEventPassed) ...[
-                          _buildEventPassedSection(),
-                          const SizedBox(height: 24),
-                        ],
-                        if (widget.eventModel.isFeatured &&
-                            !_isEventPassed) ...[
-                          _buildAlreadyFeaturedSection(),
-                          const SizedBox(height: 24),
-                        ],
-                        _buildEventPreviewCard(event),
-                        if (_canFeatureEvent) ...[
-                          const SizedBox(height: 32),
-                          _buildDurationSection(),
-                        ],
-                        const SizedBox(height: 32),
-                      ],
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 980),
+              child: Column(
+                children: [
+                  AppAppBarView.modernHeader(
+                    context: context,
+                    title: 'Feature Your Event',
+                    subtitle:
+                        'Boost your event visibility and attract more attendees',
+                  ),
+                  Expanded(
+                    child: SlideTransition(
+                      position: _slideAnimation,
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildBenefitsSection(),
+                            const SizedBox(height: 24),
+                            if (_isEventPassed) ...[
+                              _buildEventPassedSection(),
+                              const SizedBox(height: 24),
+                            ],
+                            if (widget.eventModel.isFeatured &&
+                                !_isEventPassed) ...[
+                              _buildAlreadyFeaturedSection(),
+                              const SizedBox(height: 24),
+                            ],
+                            _buildEventPreviewCard(event),
+                            if (_canFeatureEvent) ...[
+                              const SizedBox(height: 32),
+                              _buildDurationSection(),
+                            ],
+                            const SizedBox(height: 32),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  _buildFeatureButton(),
+                ],
               ),
-              _buildFeatureButton(),
-            ],
+            ),
           ),
         ),
       ),

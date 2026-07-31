@@ -21,10 +21,22 @@ jobs:
       # Get Flutter dependencies
       - name: Get dependencies
         run: flutter pub get
+
+      - name: Validate map configuration
+        env:
+          GOOGLE_MAPS_WEB_API_KEY: ${{ secrets.GOOGLE_MAPS_WEB_API_KEY }}
+        run: test -n "$GOOGLE_MAPS_WEB_API_KEY"
       
       # Build Flutter web app
       - name: Build Flutter web
-        run: flutter build web --release
+        run: >-
+          flutter build web --release
+          --pwa-strategy=none
+          --no-wasm-dry-run
+          --dart-define=GOOGLE_MAPS_WEB_API_KEY=${{ secrets.GOOGLE_MAPS_WEB_API_KEY }}
+
+      - name: Enforce initial bundle budget
+        run: dart run tools/check_web_bundle_size.dart
       
       # Deploy to Firebase Hosting
       - uses: FirebaseExtended/action-hosting-deploy@v0

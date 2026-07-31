@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:attendus/screens/Home/dashboard_screen.dart';
 import 'package:attendus/Services/guest_mode_service.dart';
 import 'package:attendus/screens/Authentication/login_screen.dart';
+import 'package:attendus/Utils/attendus_theme.dart';
+import 'package:attendus/Utils/route_names.dart';
 import 'package:attendus/Utils/router.dart';
 
 class AppBottomNavigation extends StatefulWidget {
@@ -31,7 +33,7 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
     NavigationDestination(
       icon: Icon(Icons.apartment_outlined),
       selectedIcon: Icon(Icons.apartment),
-      label: 'Orgs',
+      label: 'Groups',
     ),
     NavigationDestination(
       icon: Icon(Icons.forum_outlined),
@@ -51,9 +53,7 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
   ];
 
   int _normalizeIndex(int index) {
-    if (index >= 5) return 4;
-    if (index < 0) return 0;
-    return index.clamp(0, _destinations.length - 1);
+    return RouteNames.normalizeDashboardTabIndex(index);
   }
 
   void _navigateToTab(int index) {
@@ -77,65 +77,50 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
     // OPTIMIZATION: Cache theme values to avoid repeated lookups
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final primary = colorScheme.primary;
-    final barColor = theme.cardColor;
-    final shadowColor = theme.shadowColor;
-
     // For guest mode, show custom simplified navigation
     if (isGuestMode) {
-      return _buildGuestModeNavigation(
-        context,
-        theme,
-        colorScheme,
-        primary,
-        barColor,
-        shadowColor,
-      );
+      return _buildGuestModeNavigation(context, colorScheme);
     }
 
     // For logged-in users, show full navigation
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          decoration: BoxDecoration(
-            color: barColor,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: widget.hasScrolledContent
-                ? [
-                    BoxShadow(
-                      color: shadowColor.withValues(alpha: 0.08),
-                      blurRadius: 16,
-                      spreadRadius: 0,
-                      offset: const Offset(0, 6),
-                    ),
-                  ]
-                : [],
-          ),
-          child: NavigationBarTheme(
-            data: NavigationBarThemeData(
-              backgroundColor: barColor,
-              indicatorColor: primary.withValues(alpha: 0.12),
-              labelTextStyle: WidgetStateProperty.all(
-                const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-              ),
-              iconTheme: WidgetStateProperty.resolveWith((states) {
-                final bool selected = states.contains(WidgetState.selected);
-                return IconThemeData(
-                  color: selected ? primary : colorScheme.onSurfaceVariant,
-                  size: 24,
-                );
-              }),
-            ),
-            child: NavigationBar(
-              height: 64,
-              selectedIndex: _normalizeIndex(widget.selectedIndex ?? 0),
-              labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
-              onDestinationSelected: _navigateToTab,
-              destinations: _destinations,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border(top: BorderSide(color: colorScheme.outlineVariant)),
+        boxShadow: widget.hasScrolledContent
+            ? AttendUsTokens.softShadow(
+                dark: theme.brightness == Brightness.dark,
+              )
+            : const [],
+      ),
+      child: NavigationBarTheme(
+        data: NavigationBarThemeData(
+          backgroundColor: colorScheme.surface,
+          indicatorColor: colorScheme.primaryContainer,
+          labelTextStyle: WidgetStateProperty.resolveWith(
+            (states) => TextStyle(
+              fontSize: 12,
+              fontWeight: states.contains(WidgetState.selected)
+                  ? FontWeight.w700
+                  : FontWeight.w600,
             ),
           ),
+          iconTheme: WidgetStateProperty.resolveWith((states) {
+            final selected = states.contains(WidgetState.selected);
+            return IconThemeData(
+              color: selected
+                  ? colorScheme.primary
+                  : colorScheme.onSurfaceVariant,
+              size: 24,
+            );
+          }),
+        ),
+        child: NavigationBar(
+          height: 68,
+          selectedIndex: _normalizeIndex(widget.selectedIndex ?? 0),
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          onDestinationSelected: _navigateToTab,
+          destinations: _destinations,
         ),
       ),
     );
@@ -143,53 +128,30 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
 
   Widget _buildGuestModeNavigation(
     BuildContext context,
-    ThemeData theme,
     ColorScheme colorScheme,
-    Color primary,
-    Color barColor,
-    Color shadowColor,
   ) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          decoration: BoxDecoration(
-            color: barColor,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: widget.hasScrolledContent
-                ? [
-                    BoxShadow(
-                      color: shadowColor.withValues(alpha: 0.08),
-                      blurRadius: 16,
-                      spreadRadius: 0,
-                      offset: const Offset(0, 6),
-                    ),
-                  ]
-                : [],
-          ),
-          child: Container(
-            height: 64,
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Home button on the left
-                _buildGuestNavButton(
-                  icon: Icons.home_outlined,
-                  selectedIcon: Icons.home,
-                  label: 'Home',
-                  isSelected: true,
-                  primary: primary,
-                  colorScheme: colorScheme,
-                  onTap: () {
-                    // Already on home, no action needed
-                  },
-                ),
-                // Login button on the right
-                _buildLoginButton(primary),
-              ],
-            ),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border(top: BorderSide(color: colorScheme.outlineVariant)),
+      ),
+      child: SizedBox(
+        height: 68,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildGuestNavButton(
+                icon: Icons.home_outlined,
+                selectedIcon: Icons.home,
+                label: 'Home',
+                isSelected: true,
+                colorScheme: colorScheme,
+                onTap: () {},
+              ),
+              _buildLoginButton(colorScheme),
+            ],
           ),
         ),
       ),
@@ -201,20 +163,20 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
     required IconData selectedIcon,
     required String label,
     required bool isSelected,
-    required Color primary,
     required ColorScheme colorScheme,
     required VoidCallback onTap,
   }) {
+    final primary = colorScheme.primary;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AttendUsTokens.radiusMd),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
               ? primary.withValues(alpha: 0.12)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AttendUsTokens.radiusMd),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -240,28 +202,17 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
     );
   }
 
-  Widget _buildLoginButton(Color primary) {
+  Widget _buildLoginButton(ColorScheme colorScheme) {
     return InkWell(
       onTap: () {
         RouterClass.nextScreenNormal(context, const LoginScreen());
       },
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AttendUsTokens.radiusMd),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [primary, primary.withValues(alpha: 0.8)],
-          ),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: primary.withValues(alpha: 0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: colorScheme.primary,
+          borderRadius: BorderRadius.circular(AttendUsTokens.radiusMd),
         ),
         child: const Column(
           mainAxisAlignment: MainAxisAlignment.center,

@@ -1,545 +1,338 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:intl/intl.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:attendus/models/event_model.dart';
-import 'package:attendus/screens/Events/single_event_screen.dart';
-import 'package:attendus/Utils/router.dart';
+
+import 'package:attendus/Services/guest_mode_service.dart';
 import 'package:attendus/Utils/logger.dart';
+import 'package:attendus/Utils/google_maps_bootstrap.dart';
+import 'package:attendus/Utils/router.dart';
+import 'package:attendus/models/event_model.dart';
+import 'package:attendus/screens/Authentication/create_account/create_account_screen.dart';
+import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
+import 'package:attendus/screens/Events/single_event_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:intl/intl.dart';
+
+bool isEventEligibleForGlobalMap(EventModel event, DateTime now) {
+  final status = event.status.toLowerCase();
+  final validStatus = status == 'scheduled' || status == 'active';
+  final validCoordinates =
+      event.latitude >= -90 &&
+      event.latitude <= 90 &&
+      event.longitude >= -180 &&
+      event.longitude <= 180 &&
+      !(event.latitude == 0 && event.longitude == 0);
+  return validStatus &&
+      !event.private &&
+      event.locationType != 'online' &&
+      validCoordinates &&
+      now.isBefore(event.eventEndTime.add(const Duration(hours: 2)));
+}
+
+enum GlobalMapCameraMode { singleEvent, eventBounds, userLocation, world }
+
+GlobalMapCameraMode selectGlobalMapCameraMode({
+  required int eventCount,
+  required bool hasBounds,
+  required bool hasUserLocation,
+}) {
+  if (eventCount == 1) return GlobalMapCameraMode.singleEvent;
+  if (eventCount > 1 && hasBounds) return GlobalMapCameraMode.eventBounds;
+  if (hasUserLocation) return GlobalMapCameraMode.userLocation;
+  return GlobalMapCameraMode.world;
+}
 
 class GlobalEventsMapScreen extends StatefulWidget {
-  const GlobalEventsMapScreen({super.key});
+  final Stream<List<EventModel>>? eventsForTesting;
+  final bool requestUserLocation;
+  final bool mapEnabled;
+
+  const GlobalEventsMapScreen({
+    super.key,
+    this.eventsForTesting,
+    this.requestUserLocation = true,
+    this.mapEnabled = true,
+  });
 
   @override
   State<GlobalEventsMapScreen> createState() => _GlobalEventsMapScreenState();
 }
 
 class _GlobalEventsMapScreenState extends State<GlobalEventsMapScreen> {
-  GoogleMapController? _mapController;
-  final Set<Marker> _markers = {};
+  final TextEditingController _searchController = TextEditingController();
   final List<EventModel> _allEvents = [];
-  List<EventModel> _filteredEvents = [];
+  final Set<Marker> _markers = {};
+
+  StreamSubscription<dynamic>? _subscription;
+  GoogleMapController? _mapController;
+  List<EventModel> _filteredEvents = const [];
+  LatLng? _userLocation;
+  LatLngBounds? _bounds;
+  MapType _mapType = MapType.normal;
   bool _isLoading = true;
   bool _isSearching = false;
-  final TextEditingController _searchController = TextEditingController();
-  MapType _currentMapType = MapType.normal;
-
-  // Map boundaries for fitting all markers
-  LatLngBounds? _bounds;
-
-  // User's current location
-  LatLng? _userLocation;
-  bool _hasMovedToUserLocation = false;
+  String? _loadError;
+  String? _locationNotice;
+  int _snapshotGeneration = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadEvents();
-    _getUserLocation();
+    _subscribeToEvents();
+    if (widget.requestUserLocation) _loadUserLocation();
   }
 
   @override
   void dispose() {
+    _subscription?.cancel();
     _mapController?.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  // Get user's current location
-  Future<void> _getUserLocation() async {
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        Logger.warning('Location services are disabled');
-        return;
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          Logger.warning('Location permission denied');
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        Logger.warning('Location permission permanently denied');
-        return;
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 10,
-        ),
+  void _subscribeToEvents() {
+    _subscription?.cancel();
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    final testEvents = widget.eventsForTesting;
+    if (testEvents != null) {
+      _subscription = testEvents.listen(
+        _processEvents,
+        onError: _handleEventsError,
       );
-
-      setState(() {
-        _userLocation = LatLng(position.latitude, position.longitude);
-      });
-
-      Logger.success(
-        'Got user location: ${position.latitude}, ${position.longitude}',
-      );
-
-      // Move camera to user location once map is ready
-      _moveToUserLocation();
-    } catch (e) {
-      Logger.error('Error getting user location: $e');
+      return;
     }
+    _subscription = FirebaseFirestore.instance
+        .collection(EventModel.firebaseKey)
+        .where('private', isEqualTo: false)
+        .snapshots()
+        .listen(_processSnapshot, onError: _handleEventsError);
   }
 
-  // Move camera to user's location with appropriate zoom
-  void _moveToUserLocation() {
-    if (_mapController != null &&
-        _userLocation != null &&
-        !_hasMovedToUserLocation) {
-      _hasMovedToUserLocation = true;
-      _mapController!.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: _userLocation!,
-            zoom: 12.0, // Good balance - shows neighborhood area
-          ),
-        ),
-      );
-      Logger.info('Moved map to user location with zoom 12.0');
-    }
+  void _handleEventsError(Object error, StackTrace stackTrace) {
+    Logger.error('Error loading map events', error, stackTrace);
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+      _loadError =
+          'Events could not be loaded. Check your connection and try again.';
+    });
   }
 
-  // Load all public, active events from Firestore
-  Future<void> _loadEvents() async {
-    setState(() => _isLoading = true);
+  Future<void> _processSnapshot(
+    QuerySnapshot<Map<String, dynamic>> snapshot,
+  ) async {
+    final events = <EventModel>[];
 
-    try {
-      // Get current time for filtering
-      final now = DateTime.now();
-
-      // Query for public events (removed status filter to get more events)
-      final snapshot = await FirebaseFirestore.instance
-          .collection(EventModel.firebaseKey)
-          .where('private', isEqualTo: false)
-          .get();
-
-      Logger.info(
-        'Loaded ${snapshot.docs.length} public events from Firestore',
-      );
-
-      _allEvents.clear();
-      _markers.clear();
-
-      int validLocationCount = 0;
-      int filteredOutCount = 0;
-      int geocodedCount = 0;
-
-      for (final doc in snapshot.docs) {
-        try {
-          final event = EventModel.fromJson(doc);
-
-          Logger.info(
-            'Processing event: ${event.title}, Status: ${event.status}, Lat: ${event.latitude}, Lng: ${event.longitude}, Location: ${event.location}',
-          );
-
-          // Calculate event end time (selectedDateTime + eventDuration hours)
-          final eventEndTime = event.selectedDateTime.add(
-            Duration(hours: event.eventDuration),
-          );
-
-          // Add 2 hours buffer after event ends
-          final cutoffTime = eventEndTime.add(const Duration(hours: 2));
-
-          // Check if event should be shown:
-          // Show if event hasn't ended + 2 hours yet
-          final shouldShowEvent = now.isBefore(cutoffTime);
-
-          if (!shouldShowEvent) {
-            filteredOutCount++;
-            Logger.info(
-              'Event ${event.title} filtered out - ended more than 2 hours ago',
-            );
-            continue;
-          }
-
-          // Try to get valid coordinates
-          double lat = event.latitude;
-          double lng = event.longitude;
-
-          // If no valid coordinates, try to geocode the location
-          if (lat == 0.0 && lng == 0.0 && event.location.isNotEmpty) {
-            try {
-              Logger.info('Attempting to geocode location: ${event.location}');
-              List<Location> locations = await locationFromAddress(
-                event.location,
-              );
-              if (locations.isNotEmpty) {
-                lat = locations.first.latitude;
-                lng = locations.first.longitude;
-                geocodedCount++;
-                Logger.success(
-                  'Geocoded ${event.title}: ${event.location} -> $lat, $lng',
-                );
-              }
-            } catch (e) {
-              Logger.warning(
-                'Could not geocode location for ${event.title}: ${event.location} - $e',
-              );
-            }
-          }
-
-          // Now check if we have valid coordinates
-          if (lat != 0.0 && lng != 0.0) {
-            // Update event coordinates if they were geocoded
-            if (event.latitude == 0.0 && event.longitude == 0.0) {
-              event.latitude = lat;
-              event.longitude = lng;
-            }
-
-            _allEvents.add(event);
-            final marker = await _createMarker(event);
-            _markers.add(marker);
-            validLocationCount++;
-            Logger.info(
-              '✓ Added marker for event: ${event.title} at $lat, $lng',
-            );
-          } else {
-            Logger.warning(
-              'Event ${event.title} has no valid coordinates and could not be geocoded',
-            );
-          }
-        } catch (e) {
-          Logger.error('Error processing event ${doc.id}: $e');
-        }
+    for (final doc in snapshot.docs) {
+      try {
+        final data = Map<String, dynamic>.from(doc.data());
+        data['id'] = data['id'] ?? doc.id;
+        events.add(EventModel.fromJson(data));
+      } catch (error) {
+        Logger.warning('Skipping invalid map event ${doc.id}: $error');
       }
-
-      Logger.info(
-        '📍 Map Summary: $validLocationCount markers created from ${snapshot.docs.length} events ($geocodedCount geocoded, $filteredOutCount time-filtered)',
-      );
-
-      // Calculate bounds for all markers
-      if (_allEvents.isNotEmpty) {
-        _calculateBounds();
-      }
-
-      setState(() {
-        _filteredEvents = List.from(_allEvents);
-        _isLoading = false;
-      });
-
-      // Only auto-fit to markers if we haven't centered on user location
-      // This prevents the map from jumping away from user's location
-      if (_markers.isNotEmpty && _userLocation == null) {
-        Future.delayed(const Duration(milliseconds: 800), () {
-          if (_bounds != null && _mapController != null && mounted) {
-            _mapController!.animateCamera(
-              CameraUpdate.newLatLngBounds(_bounds!, 100),
-            );
-            Logger.info('Auto-fitted map to show all markers');
-          }
-        });
-      }
-    } catch (e) {
-      Logger.error('Error loading events: $e');
-      setState(() => _isLoading = false);
     }
+
+    await _processEvents(events);
   }
 
-  // Calculate bounds to fit all markers
-  void _calculateBounds() {
-    if (_allEvents.isEmpty) return;
+  Future<void> _processEvents(List<EventModel> sourceEvents) async {
+    final generation = ++_snapshotGeneration;
+    final now = DateTime.now();
+    final events = sourceEvents
+        .where((event) => isEventEligibleForGlobalMap(event, now))
+        .toList(growable: false);
+    final markers = events.map(_markerFor).toSet();
 
-    double? minLat, maxLat, minLng, maxLng;
-
-    for (final event in _allEvents) {
-      minLat = minLat == null
-          ? event.latitude
-          : (event.latitude < minLat ? event.latitude : minLat);
-      maxLat = maxLat == null
-          ? event.latitude
-          : (event.latitude > maxLat ? event.latitude : maxLat);
-      minLng = minLng == null
-          ? event.longitude
-          : (event.longitude < minLng ? event.longitude : minLng);
-      maxLng = maxLng == null
-          ? event.longitude
-          : (event.longitude > maxLng ? event.longitude : maxLng);
-    }
-
-    if (minLat != null && maxLat != null && minLng != null && maxLng != null) {
-      _bounds = LatLngBounds(
-        southwest: LatLng(minLat, minLng),
-        northeast: LatLng(maxLat, maxLng),
-      );
-    }
+    if (!mounted || generation != _snapshotGeneration) return;
+    _allEvents
+      ..clear()
+      ..addAll(events);
+    _markers
+      ..clear()
+      ..addAll(markers);
+    _bounds = _calculateBounds(events);
+    setState(() {
+      _filteredEvents = List<EventModel>.from(events);
+      _isLoading = false;
+      _loadError = null;
+    });
+    if (mounted) _frameEvents();
   }
 
-  // Create a marker for an event with category-based color
-  Future<Marker> _createMarker(EventModel event) async {
-    // Create custom marker with enhanced visibility
-    final BitmapDescriptor markerIcon = await _getCustomMarkerIcon(event);
-
+  Marker _markerFor(EventModel event) {
     return Marker(
       markerId: MarkerId(event.id),
       position: LatLng(event.latitude, event.longitude),
-      icon: markerIcon,
+      icon: BitmapDescriptor.defaultMarkerWithHue(_markerHue(event)),
+      zIndexInt: event.isFeatured ? 1 : 0,
       infoWindow: InfoWindow(
         title: event.title,
         snippet: DateFormat('MMM d, y • h:mm a').format(event.selectedDateTime),
       ),
-      onTap: () => _showEventBottomSheet(event),
-      visible: true,
-      alpha: 1.0,
-      zIndexInt: event.isFeatured ? 1 : 0,
+      onTap: () => _showEvent(event),
     );
   }
 
-  // Get custom marker icon with proper color
-  Future<BitmapDescriptor> _getCustomMarkerIcon(EventModel event) async {
-    final double hue = _getMarkerColor(event);
-
-    // Use larger marker for featured events
-    if (event.isFeatured) {
-      return BitmapDescriptor.defaultMarkerWithHue(hue);
+  double _markerHue(EventModel event) {
+    if (event.isFeatured) return BitmapDescriptor.hueOrange;
+    final category = event.categories.isEmpty
+        ? ''
+        : event.categories.first.toLowerCase();
+    if (category.contains('music') || category.contains('concert')) {
+      return BitmapDescriptor.hueViolet;
     }
-
-    return BitmapDescriptor.defaultMarkerWithHue(hue);
-  }
-
-  // Get marker color based on event properties
-  double _getMarkerColor(EventModel event) {
-    // Featured events are orange
-    if (event.isFeatured) {
-      return BitmapDescriptor.hueOrange;
+    if (category.contains('sport') || category.contains('fitness')) {
+      return BitmapDescriptor.hueGreen;
     }
-
-    // Color-code by first category
-    if (event.categories.isNotEmpty) {
-      final category = event.categories.first.toLowerCase();
-
-      if (category.contains('music') || category.contains('concert')) {
-        return BitmapDescriptor.hueViolet;
-      } else if (category.contains('sport') || category.contains('fitness')) {
-        return BitmapDescriptor.hueGreen;
-      } else if (category.contains('business') ||
-          category.contains('networking')) {
-        return BitmapDescriptor.hueBlue;
-      } else if (category.contains('food') || category.contains('dining')) {
-        return BitmapDescriptor.hueRose;
-      } else if (category.contains('education') ||
-          category.contains('workshop')) {
-        return BitmapDescriptor.hueYellow;
-      } else if (category.contains('art') || category.contains('culture')) {
-        return BitmapDescriptor.hueCyan;
-      }
+    if (category.contains('business') || category.contains('networking')) {
+      return BitmapDescriptor.hueBlue;
     }
-
-    // Default color
+    if (category.contains('food') || category.contains('dining')) {
+      return BitmapDescriptor.hueRose;
+    }
+    if (category.contains('education') || category.contains('workshop')) {
+      return BitmapDescriptor.hueYellow;
+    }
     return BitmapDescriptor.hueRed;
   }
 
-  // Show event details in bottom sheet
-  void _showEventBottomSheet(EventModel event) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Handle bar
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Event image
-            if (event.imageUrl.isNotEmpty)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: CachedNetworkImage(
-                  imageUrl: event.imageUrl,
-                  height: 200,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                    height: 200,
-                    color: Colors.grey[200],
-                    child: const Center(child: CircularProgressIndicator()),
-                  ),
-                  errorWidget: (context, url, error) => Container(
-                    height: 200,
-                    color: Colors.grey[200],
-                    child: const Icon(Icons.event, size: 50),
-                  ),
-                ),
-              ),
-            const SizedBox(height: 16),
-
-            // Event title
-            Text(
-              event.title,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-
-            // Event date/time with duration
-            Row(
-              children: [
-                const Icon(Icons.calendar_today, size: 18, color: Colors.grey),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        DateFormat(
-                          'EEEE, MMMM d, y',
-                        ).format(event.selectedDateTime),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${DateFormat('h:mm a').format(event.selectedDateTime)} - ${DateFormat('h:mm a').format(event.selectedDateTime.add(Duration(hours: event.eventDuration)))}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Event location
-            Row(
-              children: [
-                const Icon(Icons.location_on, size: 18, color: Colors.grey),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    event.locationName ?? event.location,
-                    style: const TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
-                ),
-              ],
-            ),
-
-            // Categories
-            if (event.categories.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: event.categories.take(3).map((category) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      category,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.blue,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
-
-            const SizedBox(height: 20),
-
-            // View details button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context); // Close bottom sheet
-                  RouterClass.nextScreenNormal(
-                    context,
-                    SingleEventScreen(eventModel: event),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  'View Event Details',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ),
-
-            // Bottom padding for safe area
-            SizedBox(height: MediaQuery.of(context).padding.bottom),
-          ],
-        ),
-      ),
+  LatLngBounds? _calculateBounds(List<EventModel> events) {
+    if (events.length < 2) return null;
+    var minLat = events.first.latitude;
+    var maxLat = events.first.latitude;
+    var minLng = events.first.longitude;
+    var maxLng = events.first.longitude;
+    for (final event in events.skip(1)) {
+      minLat = event.latitude < minLat ? event.latitude : minLat;
+      maxLat = event.latitude > maxLat ? event.latitude : maxLat;
+      minLng = event.longitude < minLng ? event.longitude : minLng;
+      maxLng = event.longitude > maxLng ? event.longitude : maxLng;
+    }
+    return LatLngBounds(
+      southwest: LatLng(minLat, minLng),
+      northeast: LatLng(maxLat, maxLng),
     );
   }
 
-  // Filter events based on search query
-  void _filterEvents(String query) {
-    if (query.isEmpty) {
-      setState(() {
-        _filteredEvents = List.from(_allEvents);
-      });
-      return;
+  void _frameEvents() {
+    final controller = _mapController;
+    if (controller == null) return;
+    final mode = selectGlobalMapCameraMode(
+      eventCount: _allEvents.length,
+      hasBounds: _bounds != null,
+      hasUserLocation: _userLocation != null,
+    );
+    switch (mode) {
+      case GlobalMapCameraMode.singleEvent:
+        final event = _allEvents.first;
+        controller.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: LatLng(event.latitude, event.longitude),
+              zoom: 14,
+            ),
+          ),
+        );
+        break;
+      case GlobalMapCameraMode.eventBounds:
+        controller.animateCamera(CameraUpdate.newLatLngBounds(_bounds!, 80));
+        break;
+      case GlobalMapCameraMode.userLocation:
+        controller.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(target: _userLocation!, zoom: 10),
+          ),
+        );
+        break;
+      case GlobalMapCameraMode.world:
+        controller.animateCamera(
+          CameraUpdate.newCameraPosition(
+            const CameraPosition(target: LatLng(20, 0), zoom: 2),
+          ),
+        );
+        break;
     }
+  }
 
-    final lowerQuery = query.toLowerCase();
+  Future<void> _loadUserLocation({bool moveCamera = false}) async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        if (mounted) {
+          setState(() {
+            _locationNotice =
+                'Location services are off, so the map is showing a world view.';
+          });
+        }
+        return;
+      }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          setState(() {
+            _locationNotice =
+                'Location permission was not granted, so the map is showing a world view.';
+          });
+        }
+        return;
+      }
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _userLocation = LatLng(position.latitude, position.longitude);
+        _locationNotice = null;
+      });
+      if (moveCamera || _allEvents.isEmpty) _frameEvents();
+    } catch (error) {
+      Logger.warning('Could not get map location: $error');
+      if (mounted) {
+        setState(() {
+          _locationNotice =
+              'Your location could not be loaded. The map is showing a world view.';
+        });
+        if (moveCamera) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not get your location')),
+          );
+        }
+      }
+    }
+  }
+
+  void _filterEvents(String value) {
+    final query = value.trim().toLowerCase();
     setState(() {
-      _filteredEvents = _allEvents.where((event) {
-        return event.title.toLowerCase().contains(lowerQuery) ||
-            event.location.toLowerCase().contains(lowerQuery) ||
-            (event.locationName?.toLowerCase().contains(lowerQuery) ?? false) ||
-            event.categories.any(
-              (cat) => cat.toLowerCase().contains(lowerQuery),
-            ) ||
-            event.description.toLowerCase().contains(lowerQuery);
-      }).toList();
+      _isSearching = query.isNotEmpty;
+      _filteredEvents = query.isEmpty
+          ? List<EventModel>.from(_allEvents)
+          : _allEvents.where((event) {
+              return event.title.toLowerCase().contains(query) ||
+                  event.location.toLowerCase().contains(query) ||
+                  (event.locationName?.toLowerCase().contains(query) ??
+                      false) ||
+                  event.categories.any(
+                    (category) => category.toLowerCase().contains(query),
+                  );
+            }).toList();
     });
   }
 
-  // Zoom to selected event
-  void _zoomToEvent(EventModel event) {
-    setState(() => _isSearching = false);
-    _searchController.clear();
+  void _selectSearchResult(EventModel event) {
+    _searchFocus();
     _mapController?.animateCamera(
       CameraUpdate.newCameraPosition(
         CameraPosition(
@@ -548,267 +341,72 @@ class _GlobalEventsMapScreenState extends State<GlobalEventsMapScreen> {
         ),
       ),
     );
-    // Show bottom sheet after animation
-    Future.delayed(const Duration(milliseconds: 500), () {
-      _showEventBottomSheet(event);
+    Future<void>.delayed(const Duration(milliseconds: 350), () {
+      if (mounted) _showEvent(event);
     });
   }
 
-  // Fit all markers in view
-  void _fitAllMarkers() {
-    if (_bounds != null && _mapController != null) {
-      _mapController!.animateCamera(CameraUpdate.newLatLngBounds(_bounds!, 50));
-    }
+  void _searchFocus() {
+    FocusScope.of(context).unfocus();
+    setState(() => _isSearching = false);
   }
 
-  // Go to user's location
-  Future<void> _goToMyLocation() async {
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please enable location services')),
-          );
-        }
-        return;
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Location permission denied')),
-            );
-          }
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Location permission permanently denied. Please enable in settings.',
-              ),
-            ),
-          );
-        }
-        return;
-      }
-
-      final position = await Geolocator.getCurrentPosition();
-      _mapController?.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: LatLng(position.latitude, position.longitude),
-            zoom: 14,
-          ),
-        ),
-      );
-    } catch (e) {
-      Logger.error('Error getting location: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not get your location')),
-        );
-      }
-    }
-  }
-
-  // Calculate distance from user location to event
-  double _calculateDistance(EventModel event) {
-    if (_userLocation == null) {
-      return double.infinity;
-    }
-    return Geolocator.distanceBetween(
-      _userLocation!.latitude,
-      _userLocation!.longitude,
-      event.latitude,
-      event.longitude,
-    );
-  }
-
-  // Format distance for display (US units: feet/miles)
-  String _formatDistance(double distanceInMeters) {
-    if (distanceInMeters == double.infinity) {
-      return 'Unknown';
-    }
-    
-    // Convert meters to feet
-    final distanceInFeet = distanceInMeters * 3.28084;
-    
-    // If less than 1 mile (5280 feet), show in feet
-    if (distanceInFeet < 5280) {
-      return '${distanceInFeet.round()} ft';
-    }
-    
-    // Otherwise show in miles
-    final distanceInMiles = distanceInFeet / 5280;
-    return '${distanceInMiles.toStringAsFixed(1)} mi';
-  }
-
-  // Show events list modal sorted by distance
-  void _showEventsListModal() {
-    if (_allEvents.isEmpty) {
-      return;
-    }
-
-    // Sort events by distance from user location
-    final sortedEvents = List<EventModel>.from(_allEvents);
-    sortedEvents.sort((a, b) {
-      final distanceA = _calculateDistance(a);
-      final distanceB = _calculateDistance(b);
-      return distanceA.compareTo(distanceB);
-    });
-
-    showModalBottomSheet(
+  Future<void> _showEvent(EventModel event) async {
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.4,
-        minChildSize: 0.3,
-        maxChildSize: 0.45,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle bar
-              Container(
-                margin: const EdgeInsets.only(top: 12, bottom: 8),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
+              if (event.imageUrl.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: CachedNetworkImage(
+                    imageUrl: event.imageUrl,
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, _, _) => const SizedBox.shrink(),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              Text(
+                event.title,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-
-              // Header
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 8,
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.event, color: Colors.blue, size: 24),
-                    const SizedBox(width: 12),
-                    Text(
-                      '${sortedEvents.length} Events Nearby',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
+              const SizedBox(height: 12),
+              _detailRow(
+                Icons.calendar_today_outlined,
+                DateFormat(
+                  'EEEE, MMMM d, y • h:mm a',
+                ).format(event.selectedDateTime),
               ),
-              const Divider(height: 1),
-
-              // Events list
-              Expanded(
-                child: ListView.separated(
-                  controller: scrollController,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: sortedEvents.length,
-                  separatorBuilder: (context, index) =>
-                      const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final event = sortedEvents[index];
-                    final distance = _calculateDistance(event);
-                    final distanceText = _formatDistance(distance);
-
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 8,
-                      ),
-                      leading: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: event.imageUrl.isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: event.imageUrl,
-                                width: 60,
-                                height: 60,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => Container(
-                                  width: 60,
-                                  height: 60,
-                                  color: Colors.grey[200],
-                                  child: const Center(
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                ),
-                                errorWidget: (context, url, error) => Container(
-                                  width: 60,
-                                  height: 60,
-                                  color: Colors.grey[200],
-                                  child: const Icon(Icons.event, size: 30),
-                                ),
-                              )
-                            : Container(
-                                width: 60,
-                                height: 60,
-                                color: Colors.grey[200],
-                                child: const Icon(Icons.event, size: 30),
-                              ),
-                      ),
-                      title: Text(
-                        event.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                        ),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.location_on,
-                                size: 14,
-                                color: Colors.grey,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                distanceText,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.blue,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            DateFormat(
-                              'MMM d, y • h:mm a',
-                            ).format(event.selectedDateTime),
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ],
-                      ),
-                      onTap: () {
-                        Navigator.pop(context); // Close modal
-                        _zoomToEvent(event);
-                      },
+              const SizedBox(height: 8),
+              _detailRow(
+                Icons.location_on_outlined,
+                event.locationName?.isNotEmpty == true
+                    ? '${event.locationName}\n${event.location}'
+                    : event.location,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () {
+                    Navigator.pop(sheetContext);
+                    RouterClass.nextScreenNormal(
+                      context,
+                      SingleEventScreen(eventModel: event),
                     );
                   },
+                  child: const Text('View event details'),
                 ),
               ),
             ],
@@ -818,297 +416,338 @@ class _GlobalEventsMapScreenState extends State<GlobalEventsMapScreen> {
     );
   }
 
+  Widget _detailRow(IconData icon, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: Colors.grey[600]),
+        const SizedBox(width: 8),
+        Expanded(child: Text(text)),
+      ],
+    );
+  }
+
+  void _openCreateEvent() {
+    final user = FirebaseAuth.instance.currentUser;
+    final isGuest =
+        GuestModeService().isGuestMode || user == null || user.isAnonymous;
+    if (isGuest) {
+      _showGuestCreateDialog();
+      return;
+    }
+    RouterClass.nextScreenNormal(context, const PremiumEventCreationWrapper());
+  }
+
+  void _showGuestCreateDialog() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Account required'),
+        content: Text(
+          GuestModeService().getFeatureRestrictionMessage(
+            GuestFeature.createEvent,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              RouterClass.nextScreenNormal(
+                context,
+                const CreateAccountScreen(),
+              );
+            },
+            child: const Text('Create account'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final mapConfigurationError = GoogleMapsBootstrap.errorMessage;
     return Scaffold(
       body: Stack(
         children: [
-          // Google Map
-          GoogleMap(
-            onMapCreated: (controller) {
-              _mapController = controller;
-              Logger.info('Map created with ${_markers.length} markers');
-
-              // Move to user location if available
-              _moveToUserLocation();
-            },
-            initialCameraPosition: CameraPosition(
-              target: _userLocation ?? const LatLng(37.7749, -122.4194),
-              zoom: _userLocation != null ? 12.0 : 10.0,
-            ),
-            markers: _markers,
-            mapType: _currentMapType,
-            myLocationEnabled: true,
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled:
-                false, // Disabled to avoid overlap with Samsung nav bar
-            zoomGesturesEnabled: true,
-            scrollGesturesEnabled: true,
-            rotateGesturesEnabled: true,
-            tiltGesturesEnabled: true,
-            mapToolbarEnabled: false,
-            compassEnabled: true,
-            buildingsEnabled: true,
-            indoorViewEnabled: false,
-          ),
-
-          // Loading overlay
+          if (widget.mapEnabled && GoogleMapsBootstrap.isAvailable)
+            GoogleMap(
+              onMapCreated: (controller) {
+                _mapController = controller;
+                _frameEvents();
+              },
+              initialCameraPosition: const CameraPosition(
+                target: LatLng(20, 0),
+                zoom: 2,
+              ),
+              markers: _markers,
+              mapType: _mapType,
+              myLocationEnabled: _userLocation != null,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: false,
+              mapToolbarEnabled: false,
+              compassEnabled: true,
+            )
+          else
+            Container(color: const Color(0xFFE8EDF3)),
+          _topSearch(),
+          if (mapConfigurationError != null)
+            _mapConfigurationErrorCard(mapConfigurationError),
           if (_isLoading)
-            Container(
-              color: Colors.white,
-              child: const Center(child: CircularProgressIndicator()),
+            const Positioned(
+              top: 116,
+              left: 0,
+              right: 0,
+              child: Center(child: CircularProgressIndicator()),
             ),
+          if (!_isLoading && _loadError != null) _errorCard(),
+          if (mapConfigurationError == null &&
+              !_isLoading &&
+              _loadError == null &&
+              _allEvents.isEmpty)
+            _emptyCard(),
+          if (mapConfigurationError == null) _mapControls(),
+          if (!_isLoading && _allEvents.isNotEmpty) _eventCount(),
+        ],
+      ),
+    );
+  }
 
-          // Top search bar
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.3),
-                    Colors.transparent,
-                  ],
-                ),
+  Widget _mapConfigurationErrorCard(String message) {
+    return Positioned(
+      top: 116,
+      left: 16,
+      right: 16,
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.map_outlined, size: 40),
+              const SizedBox(height: 10),
+              const Text(
+                'Map unavailable',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
-              padding: EdgeInsets.only(
-                top: MediaQuery.of(context).padding.top + 8,
-                left: 16,
-                right: 16,
-                bottom: 16,
-              ),
-              child: Column(
-                children: [
-                  // Search bar
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+              const SizedBox(height: 6),
+              Text(message, textAlign: TextAlign.center),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _topSearch() {
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Material(
+                elevation: 5,
+                borderRadius: BorderRadius.circular(14),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: _filterEvents,
+                  decoration: InputDecoration(
+                    hintText: 'Search events on the map',
+                    prefixIcon: IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                    child: Row(
-                      children: [
-                        // Back button
-                        IconButton(
-                          icon: const Icon(Icons.arrow_back),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-
-                        // Search field
-                        Expanded(
-                          child: TextField(
-                            controller: _searchController,
-                            decoration: const InputDecoration(
-                              hintText: 'Search events...',
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 8,
-                              ),
-                            ),
-                            onChanged: (value) {
-                              _filterEvents(value);
-                              setState(() {
-                                _isSearching = value.isNotEmpty;
-                              });
-                            },
-                          ),
-                        ),
-
-                        // Clear button
-                        if (_searchController.text.isNotEmpty)
-                          IconButton(
+                    suffixIcon: _searchController.text.isEmpty
+                        ? null
+                        : IconButton(
                             icon: const Icon(Icons.clear),
                             onPressed: () {
                               _searchController.clear();
                               _filterEvents('');
-                              setState(() => _isSearching = false);
                             },
                           ),
-                      ],
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
                     ),
                   ),
-
-                  // Search results dropdown
-                  if (_isSearching && _filteredEvents.isNotEmpty)
-                    Container(
-                      margin: const EdgeInsets.only(top: 8),
-                      constraints: const BoxConstraints(maxHeight: 300),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        padding: const EdgeInsets.all(8),
-                        itemCount: _filteredEvents.length,
-                        separatorBuilder: (context, index) =>
-                            const Divider(height: 1),
-                        itemBuilder: (context, index) {
-                          final event = _filteredEvents[index];
-                          return ListTile(
-                            leading: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: CachedNetworkImage(
-                                imageUrl: event.imageUrl,
-                                width: 50,
-                                height: 50,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => Container(
-                                  width: 50,
-                                  height: 50,
-                                  color: Colors.grey[200],
-                                ),
-                                errorWidget: (context, url, error) => Container(
-                                  width: 50,
-                                  height: 50,
-                                  color: Colors.grey[200],
-                                  child: const Icon(Icons.event, size: 25),
-                                ),
-                              ),
-                            ),
-                            title: Text(
-                              event.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: Text(
-                              DateFormat(
-                                'MMM d, y',
-                              ).format(event.selectedDateTime),
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                            onTap: () => _zoomToEvent(event),
-                          );
-                        },
-                      ),
-                    ),
-                ],
+                ),
               ),
-            ),
-          ),
-
-          // Map controls (right side)
-          Positioned(
-            right: 16,
-            bottom: MediaQuery.of(context).padding.bottom + 120,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Map type toggle
-                FloatingActionButton.small(
-                  heroTag: 'map_type',
-                  backgroundColor: Colors.white,
-                  onPressed: () {
-                    setState(() {
-                      _currentMapType = _currentMapType == MapType.normal
-                          ? MapType.satellite
-                          : MapType.normal;
-                    });
-                  },
-                  child: Icon(
-                    _currentMapType == MapType.normal
-                        ? Icons.layers
-                        : Icons.map,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Fit all markers button
-                FloatingActionButton.small(
-                  heroTag: 'fit_all',
-                  backgroundColor: Colors.white,
-                  onPressed: _fitAllMarkers,
-                  child: const Icon(Icons.fit_screen, color: Colors.black87),
-                ),
-                const SizedBox(height: 12),
-
-                // My location button
-                FloatingActionButton.small(
-                  heroTag: 'my_location',
-                  backgroundColor: Colors.white,
-                  onPressed: _goToMyLocation,
-                  child: const Icon(Icons.my_location, color: Colors.black87),
-                ),
-              ],
-            ),
-          ),
-
-          // Event counter badge (bottom center) - Tappable
-          Positioned(
-            bottom: MediaQuery.of(context).padding.bottom + 16,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: InkWell(
-                onTap: _markers.isNotEmpty ? _showEventsListModal : null,
-                borderRadius: BorderRadius.circular(25),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
+              if (_isSearching)
+                Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  constraints: const BoxConstraints(maxHeight: 300),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(25),
+                    borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
+                        color: Colors.black.withValues(alpha: 0.14),
+                        blurRadius: 16,
                       ),
                     ],
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.event, size: 18, color: Colors.blue),
-                      const SizedBox(width: 8),
-                      Text(
-                        _markers.isEmpty
-                            ? 'No events with locations'
-                            : '${_markers.length} events on map',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                  child: _filteredEvents.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.all(18),
+                          child: Text('No matching events on the map'),
+                        )
+                      : ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: _filteredEvents.length,
+                          separatorBuilder: (_, _) => const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final event = _filteredEvents[index];
+                            return ListTile(
+                              leading: const Icon(Icons.event_outlined),
+                              title: Text(event.title),
+                              subtitle: Text(
+                                event.locationName ?? event.location,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              onTap: () => _selectSearchResult(event),
+                            );
+                          },
                         ),
-                      ),
-                      if (_markers.isNotEmpty) ...[
-                        const SizedBox(width: 4),
-                        const Icon(
-                          Icons.arrow_drop_up,
-                          size: 20,
-                          color: Colors.blue,
-                        ),
-                      ],
-                    ],
-                  ),
                 ),
-              ),
-            ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _mapControls() {
+    return Positioned(
+      right: 16,
+      bottom: MediaQuery.of(context).padding.bottom + 96,
+      child: Column(
+        children: [
+          FloatingActionButton.small(
+            heroTag: 'map_type',
+            backgroundColor: Colors.white,
+            onPressed: () {
+              setState(() {
+                _mapType = _mapType == MapType.normal
+                    ? MapType.satellite
+                    : MapType.normal;
+              });
+            },
+            child: const Icon(Icons.layers_outlined, color: Colors.black87),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton.small(
+            heroTag: 'fit_events',
+            backgroundColor: Colors.white,
+            onPressed: _frameEvents,
+            child: const Icon(Icons.fit_screen, color: Colors.black87),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton.small(
+            heroTag: 'my_location',
+            backgroundColor: Colors.white,
+            onPressed: () => _loadUserLocation(moveCamera: true),
+            child: const Icon(Icons.my_location, color: Colors.black87),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _emptyCard() {
+    return Positioned(
+      left: 24,
+      right: 24,
+      bottom: MediaQuery.of(context).padding.bottom + 24,
+      child: Card(
+        elevation: 8,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.map_outlined, size: 40),
+              const SizedBox(height: 10),
+              Text(
+                'No events with map locations yet',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Be the first to add an in-person event with a precise location.',
+                textAlign: TextAlign.center,
+              ),
+              if (_locationNotice != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _locationNotice!,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: _openCreateEvent,
+                icon: const Icon(Icons.add),
+                label: const Text('Create event'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _errorCard() {
+    return Positioned(
+      left: 24,
+      right: 24,
+      bottom: MediaQuery.of(context).padding.bottom + 24,
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: [
+              const Icon(Icons.cloud_off_outlined),
+              const SizedBox(width: 12),
+              Expanded(child: Text(_loadError!)),
+              TextButton(
+                onPressed: _subscribeToEvents,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _eventCount() {
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: MediaQuery.of(context).padding.bottom + 18,
+      child: Center(
+        child: Chip(
+          avatar: const Icon(Icons.event, size: 18),
+          label: Text(
+            '${_allEvents.length} ${_allEvents.length == 1 ? 'event' : 'events'} on map',
+          ),
+        ),
       ),
     );
   }

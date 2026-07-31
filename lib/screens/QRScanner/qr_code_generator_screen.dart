@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:attendus/Utils/colors.dart';
-import 'package:attendus/Utils/dimensions.dart';
 import 'package:attendus/Utils/toast.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class QRCodeGeneratorScreen extends StatefulWidget {
   final String eventId;
@@ -53,7 +53,7 @@ class _QRCodeGeneratorScreenState extends State<QRCodeGeneratorScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppThemeColor.pureBlackColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -67,6 +67,7 @@ class _QRCodeGeneratorScreenState extends State<QRCodeGeneratorScreen>
   }
 
   Widget _buildHeader() {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -76,25 +77,18 @@ class _QRCodeGeneratorScreenState extends State<QRCodeGeneratorScreen>
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.2),
+                color: theme.colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 Icons.arrow_back_ios,
-                color: AppThemeColor.pureWhiteColor,
+                color: theme.colorScheme.onSurface,
                 size: 20,
               ),
             ),
           ),
           const Spacer(),
-          Text(
-            'QR Code',
-            style: TextStyle(
-              color: AppThemeColor.pureWhiteColor,
-              fontSize: Dimensions.fontSizeLarge,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          Text('Check-in QR code', style: theme.textTheme.titleLarge),
           const Spacer(),
           Container(width: 40),
         ],
@@ -103,6 +97,7 @@ class _QRCodeGeneratorScreenState extends State<QRCodeGeneratorScreen>
   }
 
   Widget _buildQRCodeContent() {
+    final theme = Theme.of(context);
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
@@ -116,45 +111,25 @@ class _QRCodeGeneratorScreenState extends State<QRCodeGeneratorScreen>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // Event Info Card
-                  Container(
+                  AttendUsCard(
                     padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: AppThemeColor.pureWhiteColor.withValues(
-                        alpha: 0.1,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: AppThemeColor.pureWhiteColor.withValues(
-                          alpha: 0.2,
-                        ),
-                      ),
-                    ),
                     child: Column(
                       children: [
                         Icon(
                           Icons.event,
-                          color: AppThemeColor.darkBlueColor,
+                          color: theme.colorScheme.primary,
                           size: 40,
                         ),
                         const SizedBox(height: 15),
                         Text(
                           widget.eventName,
-                          style: TextStyle(
-                            color: AppThemeColor.pureWhiteColor,
-                            fontSize: Dimensions.fontSizeLarge,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: theme.textTheme.titleMedium,
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 10),
                         Text(
                           'Event Code: ${widget.eventId}',
-                          style: TextStyle(
-                            color: AppThemeColor.pureWhiteColor.withValues(
-                              alpha: 0.7,
-                            ),
-                            fontSize: Dimensions.fontSizeDefault,
-                          ),
+                          style: theme.textTheme.bodySmall,
                         ),
                       ],
                     ),
@@ -162,21 +137,8 @@ class _QRCodeGeneratorScreenState extends State<QRCodeGeneratorScreen>
                   const SizedBox(height: 40),
 
                   // QR Code Container
-                  Container(
+                  AttendUsCard(
                     padding: const EdgeInsets.all(30),
-                    decoration: BoxDecoration(
-                      color: AppThemeColor.pureWhiteColor,
-                      borderRadius: BorderRadius.circular(25),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppThemeColor.pureBlackColor.withValues(
-                            alpha: 0.2,
-                          ),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
                     child: Column(
                       children: [
                         QrImageView(
@@ -197,11 +159,7 @@ class _QRCodeGeneratorScreenState extends State<QRCodeGeneratorScreen>
                         const SizedBox(height: 20),
                         Text(
                           'Scan this QR code to sign in',
-                          style: TextStyle(
-                            color: AppThemeColor.pureBlackColor,
-                            fontSize: Dimensions.fontSizeDefault,
-                            fontWeight: FontWeight.w500,
-                          ),
+                          style: theme.textTheme.bodyMedium,
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -210,34 +168,21 @@ class _QRCodeGeneratorScreenState extends State<QRCodeGeneratorScreen>
                   const SizedBox(height: 30),
 
                   // Instructions
-                  Container(
+                  AttendUsCard(
                     padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(
-                        color: AppThemeColor.darkBlueColor.withValues(
-                          alpha: 0.3,
-                        ),
-                      ),
-                    ),
                     child: Column(
                       children: [
                         Row(
                           children: [
                             Icon(
                               Icons.info_outline,
-                              color: AppThemeColor.darkBlueColor,
+                              color: theme.colorScheme.primary,
                               size: 20,
                             ),
                             const SizedBox(width: 10),
                             Text(
                               'Instructions',
-                              style: TextStyle(
-                                color: AppThemeColor.darkBlueColor,
-                                fontSize: Dimensions.fontSizeDefault,
-                                fontWeight: FontWeight.w600,
-                              ),
+                              style: theme.textTheme.titleSmall,
                             ),
                           ],
                         ),
@@ -272,24 +217,13 @@ class _QRCodeGeneratorScreenState extends State<QRCodeGeneratorScreen>
   }
 
   Widget _buildInstructionItem({required IconData icon, required String text}) {
+    final theme = Theme.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          icon,
-          color: AppThemeColor.darkBlueColor.withValues(alpha: 0.7),
-          size: 16,
-        ),
+        Icon(icon, color: theme.colorScheme.primary, size: 16),
         const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(
-              color: AppThemeColor.darkBlueColor.withValues(alpha: 0.8),
-              fontSize: Dimensions.fontSizeSmall,
-            ),
-          ),
-        ),
+        Expanded(child: Text(text, style: theme.textTheme.bodySmall)),
       ],
     );
   }
@@ -299,78 +233,21 @@ class _QRCodeGeneratorScreenState extends State<QRCodeGeneratorScreen>
       padding: const EdgeInsets.all(30),
       child: Column(
         children: [
-          // Share QR Code Button
-          GestureDetector(
-            onTap: _shareQRCode,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 18),
-              decoration: BoxDecoration(
-                gradient: AppThemeColor.buttonGradient,
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppThemeColor.darkBlueColor.withValues(alpha: 0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.share,
-                    color: AppThemeColor.pureWhiteColor,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Share QR Code',
-                    style: TextStyle(
-                      color: AppThemeColor.pureWhiteColor,
-                      fontSize: Dimensions.fontSizeLarge,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
+          SizedBox(
+            width: double.infinity,
+            child: AttendUsButton.primary(
+              label: 'Share QR Code',
+              icon: Icons.share_outlined,
+              onPressed: _shareQRCode,
             ),
           ),
           const SizedBox(height: 15),
-
-          // Copy Event Code Button
-          GestureDetector(
-            onTap: _copyEventCode,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              decoration: BoxDecoration(
-                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(
-                  color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.copy,
-                    color: AppThemeColor.pureWhiteColor,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Copy Event Code',
-                    style: TextStyle(
-                      color: AppThemeColor.pureWhiteColor,
-                      fontSize: Dimensions.fontSizeDefault,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
+          SizedBox(
+            width: double.infinity,
+            child: AttendUsButton.secondary(
+              label: 'Copy Event Code',
+              icon: Icons.copy_outlined,
+              onPressed: _copyEventCode,
             ),
           ),
         ],

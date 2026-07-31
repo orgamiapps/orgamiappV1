@@ -5,10 +5,10 @@ import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/models/ticket_model.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/Utils/toast.dart';
-import 'package:attendus/Utils/app_app_bar_view.dart';
+import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/screens/MyProfile/Widgets/realistic_ticket_card.dart';
-import 'package:attendus/screens/MyProfile/Widgets/compact_ticket_card.dart';
 import 'package:attendus/screens/MyProfile/Widgets/ticket_stats_dashboard.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -299,63 +299,69 @@ class _MyTicketsScreenState extends State<MyTicketsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      body: Column(
-        children: [
-          // Modern header with white background
-          _isSearching ? _buildSearchHeader() : _buildNormalHeader(),
-          // Content - Fully scrollable
-          Expanded(
-            child: isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Color(0xFF667EEA),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            AttendUsTopBar(
+              title: 'My Tickets',
+              subtitle: 'Active passes, used tickets, and QR check-in codes.',
+              actions: [
+                IconButton(
+                  tooltip: _isSearching ? 'Close search' : 'Search tickets',
+                  icon: Icon(_isSearching ? Icons.close : Icons.search),
+                  onPressed: _toggleSearch,
+                ),
+                IconButton(
+                  tooltip: 'Sort tickets',
+                  icon: const Icon(Icons.sort),
+                  onPressed: _showSortOptions,
+                ),
+              ],
+            ),
+            Expanded(
+              child: isLoading
+                  ? const AttendUsLoadingState(label: 'Loading tickets')
+                  : RefreshIndicator(
+                      onRefresh: _loadUserTickets,
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            maxWidth: AttendUsTokens.pageMaxWidth,
+                          ),
+                          child: _buildScrollableContent(),
+                        ),
                       ),
                     ),
-                  )
-                : RefreshIndicator(
-                    onRefresh: _loadUserTickets,
-                    color: const Color(0xFF667EEA),
-                    child: _buildScrollableContent(),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNormalHeader() {
-    return AppAppBarView.modernHeader(
-      context: context,
-      title: 'My Tickets',
-      showBackButton: true,
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.search, color: Colors.black87),
-            onPressed: _toggleSearch,
-            tooltip: 'Search',
-          ),
-          IconButton(
-            icon: RotationTransition(
-              turns: Tween(begin: 0.0, end: 0.5).animate(
-                CurvedAnimation(
-                  parent: _tabAnimationController,
-                  curve: Curves.easeInOut,
-                ),
-              ),
-              child: const Icon(Icons.sort, color: Colors.black87),
             ),
-            onPressed: _showSortOptions,
-            tooltip: 'Sort',
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
+  // ignore: unused_element
+  Widget _buildNormalHeader() {
+    return AttendUsTopBar(
+      title: 'My Tickets',
+      subtitle: 'Active passes, used tickets, and QR check-in codes.',
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.search),
+          onPressed: _toggleSearch,
+          tooltip: 'Search',
+        ),
+        IconButton(
+          icon: const Icon(Icons.sort),
+          onPressed: _showSortOptions,
+          tooltip: 'Sort',
+        ),
+      ],
+    );
+  }
+
+  // ignore: unused_element
   Widget _buildSearchHeader() {
     final theme = Theme.of(context);
 
@@ -435,21 +441,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen>
   }
 
   Widget _buildTabBar() {
-    return Container(
-      margin: const EdgeInsets.all(20),
+    return AttendUsCard(
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            spreadRadius: 0,
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
       child: Row(
         children: [
           Expanded(
@@ -495,19 +489,12 @@ class _MyTicketsScreenState extends State<MyTicketsScreen>
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF667EEA) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFF667EEA).withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : [],
+          color: isSelected
+              ? Theme.of(context).colorScheme.primary
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(AttendUsTokens.radiusMd),
         ),
         child: Column(
           children: [
@@ -516,8 +503,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen>
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.white : const Color(0xFF6B7280),
-                fontFamily: 'Roboto',
+                color: isSelected
+                    ? Theme.of(context).colorScheme.onPrimary
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 6),
@@ -526,8 +514,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen>
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: isSelected ? Colors.white : const Color(0xFF1A1A1A),
-                fontFamily: 'Roboto',
+                color: isSelected
+                    ? Theme.of(context).colorScheme.onPrimary
+                    : Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ],
@@ -541,6 +530,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen>
 
     return CustomScrollView(
       slivers: [
+        SliverToBoxAdapter(child: _buildTicketControls()),
         // Stats dashboard
         if (_showStats && userTickets.isNotEmpty)
           SliverToBoxAdapter(
@@ -562,20 +552,96 @@ class _MyTicketsScreenState extends State<MyTicketsScreen>
         else
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate((context, index) {
-                final ticket = tickets[index];
-                return CompactTicketCard(
-                  ticket: ticket,
-                  event: _eventCache[ticket.eventId],
-                  index: index,
-                  onTap: () => _showTicketModal(ticket),
+            sliver: SliverLayoutBuilder(
+              builder: (context, constraints) {
+                final crossAxisCount = constraints.crossAxisExtent >= 980
+                    ? 2
+                    : 1;
+                return SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: crossAxisCount == 1 ? 3.1 : 2.5,
+                  ),
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final ticket = tickets[index];
+                    return AttendUsTicketPassCard(
+                      eventTitle: ticket.eventTitle,
+                      dateLabel: _formatTicketDate(ticket.eventDateTime),
+                      ticketLabel: ticket.isUsed ? 'Used' : 'Active',
+                      onTap: () => _showTicketModal(ticket),
+                    );
+                  }, childCount: tickets.length),
                 );
-              }, childCount: tickets.length),
+              },
             ),
           ),
       ],
     );
+  }
+
+  Widget _buildTicketControls() {
+    return Padding(
+      padding: AttendUsTokens.pagePadding,
+      child: AttendUsPageSection(
+        title: 'Ticket Wallet',
+        subtitle: '${userTickets.length} total tickets',
+        icon: Icons.confirmation_number_outlined,
+        framed: true,
+        child: Column(
+          children: [
+            if (_isSearching)
+              AttendUsSearchField(
+                controller: _searchController,
+                hintText: 'Search tickets',
+                onChanged: _onSearchChanged,
+                onClear: () => _onSearchChanged(''),
+              ),
+            if (_isSearching) const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                AttendUsStatusBadge(
+                  label:
+                      '${userTickets.where((ticket) => !ticket.isUsed).length} active',
+                  tone: AttendUsStatusTone.success,
+                  icon: Icons.verified_outlined,
+                ),
+                AttendUsStatusBadge(
+                  label:
+                      '${userTickets.where((ticket) => ticket.isUsed).length} used',
+                  tone: AttendUsStatusTone.neutral,
+                  icon: Icons.check_circle_outline,
+                ),
+                AttendUsStatusBadge(
+                  label: _sortLabel,
+                  tone: AttendUsStatusTone.info,
+                  icon: Icons.sort,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String get _sortLabel {
+    return switch (_sortBy) {
+      'date_asc' => 'Oldest first',
+      'name' => 'Event name',
+      'location' => 'Location',
+      _ => 'Newest first',
+    };
+  }
+
+  String _formatTicketDate(DateTime dateTime) {
+    final local = dateTime.toLocal();
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    return '$month/$day/${local.year}';
   }
 
   void _showTicketModal(TicketModel ticket) {
@@ -618,83 +684,17 @@ class _MyTicketsScreenState extends State<MyTicketsScreen>
       }
     }
 
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.0, end: 1.0),
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeOut,
-      builder: (context, value, child) {
-        return Transform.translate(
-          offset: Offset(0, 20 * (1 - value)),
-          child: Opacity(opacity: value, child: child),
-        );
-      },
-      child: Center(
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.all(40),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF667EEA).withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, size: 72, color: const Color(0xFF667EEA)),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  message,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F2937),
-                    fontFamily: 'Roboto',
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    color: Color(0xFF6B7280),
-                    fontFamily: 'Roboto',
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                if (!showSearchMessage && selectedTab == 0) ...[
-                  const SizedBox(height: 32),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    icon: const Icon(Icons.explore_outlined),
-                    label: const Text('Explore Events'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF667EEA),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 16,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 4,
-                      shadowColor: const Color(
-                        0xFF667EEA,
-                      ).withValues(alpha: 0.4),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
+    return AttendUsEmptyState(
+      icon: icon,
+      title: message,
+      message: subtitle,
+      action: !showSearchMessage && selectedTab == 0
+          ? AttendUsButton.primary(
+              label: 'Explore events',
+              icon: Icons.explore_outlined,
+              onPressed: () => Navigator.pop(context),
+            )
+          : null,
     );
   }
 
@@ -721,12 +721,13 @@ class _TicketModalViewState extends State<_TicketModalView> {
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (context, scrollController) {
+        final theme = Theme.of(context);
         return Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFF818CF8), // Purplish color from screenshot
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(28),
-              topRight: Radius.circular(28),
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(AttendUsTokens.radiusLg),
+              topRight: Radius.circular(AttendUsTokens.radiusLg),
             ),
           ),
           child: Column(
@@ -738,14 +739,7 @@ class _TicketModalViewState extends State<_TicketModalView> {
                   padding: const EdgeInsets.fromLTRB(0, 16, 16, 0),
                   child: IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: CircleAvatar(
-                      backgroundColor: Colors.black.withOpacity(0.2),
-                      child: const Icon(
-                        Icons.close,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
+                    icon: const Icon(Icons.close),
                   ),
                 ),
               ),

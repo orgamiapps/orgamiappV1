@@ -1,20 +1,71 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
 import 'package:attendus/Services/onnx_nlp_service.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  const channel = MethodChannel('attendus/onnx_nlp');
+
   group('ONNX NLP Service Tests', () {
     late OnnxNlpService nlpService;
 
     setUpAll(() async {
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            switch (call.method) {
+              case 'initializeModel':
+                return true;
+              case 'dispose':
+                return true;
+              case 'runInference':
+                final arguments = Map<String, dynamic>.from(
+                  call.arguments as Map,
+                );
+                final inputIds = List<int>.from(arguments['inputIds'] as List);
+                final logits = List<double>.filled(8, -2.0);
+
+                void boost(int index) => logits[index] = 5.0;
+
+                if (inputIds.contains(9428)) boost(0); // networking
+                if (inputIds.contains(4025) ||
+                    inputIds.contains(2189) ||
+                    inputIds.contains(2283)) {
+                  boost(1); // concert, music, party
+                }
+                if (inputIds.contains(2998)) boost(2); // sports
+                if (inputIds.contains(2338) ||
+                    inputIds.contains(2252) ||
+                    inputIds.contains(4930)) {
+                  boost(3); // book, club, workshop
+                }
+                if (inputIds.contains(2396)) boost(4); // art
+                if (inputIds.contains(2833)) boost(5); // food
+                if (inputIds.contains(6627)) boost(6); // tech
+
+                return {
+                  'logits': logits,
+                  'embeddings': List<double>.filled(8, 0.1),
+                };
+              default:
+                return null;
+            }
+          });
+
       nlpService = OnnxNlpService.instance;
       await nlpService.initialize();
     });
 
     test('Parse "find a book club near me"', () async {
       final result = await nlpService.parseQuery('find a book club near me');
-      
+
       expect(result, isNotNull);
-      expect(result['categories'], contains('book_club'));
+      expect(result['categories'], contains('Education & Learning'));
       expect(result['nearMe'], isTrue);
       expect(result['radiusKm'], greaterThan(0));
       expect(result['keywords'], contains('book'));
@@ -23,25 +74,25 @@ void main() {
 
     test('Parse "find a concert this weekend"', () async {
       final result = await nlpService.parseQuery('find a concert this weekend');
-      
+
       expect(result, isNotNull);
-      expect(result['categories'], contains('music'));
+      expect(result['categories'], contains('Entertainment'));
       expect(result['keywords'], contains('concert'));
-      
+
       final dateRange = result['dateRange'] as Map<String, String>;
       expect(dateRange, isNotEmpty);
       expect(dateRange.containsKey('start'), isTrue);
       expect(dateRange.containsKey('end'), isTrue);
-      
+
       // Verify it's actually this weekend
       final start = DateTime.parse(dateRange['start']!);
       final end = DateTime.parse(dateRange['end']!);
       final now = DateTime.now();
-      
+
       // Calculate next Saturday
       final daysToSaturday = 6 - now.weekday;
       final saturday = now.add(Duration(days: daysToSaturday));
-      
+
       // Check dates are within weekend range
       expect(start.weekday, equals(6)); // Saturday
       expect(end.difference(start).inDays, equals(2)); // 2 day span
@@ -49,16 +100,16 @@ void main() {
 
     test('Parse "tech workshop tomorrow"', () async {
       final result = await nlpService.parseQuery('tech workshop tomorrow');
-      
+
       expect(result, isNotNull);
-      expect(result['categories'], contains('tech'));
-      expect(result['categories'], contains('workshop'));
+      expect(result['categories'], contains('Technology'));
+      expect(result['categories'], contains('Education & Learning'));
       expect(result['keywords'], contains('tech'));
       expect(result['keywords'], contains('workshop'));
-      
+
       final dateRange = result['dateRange'] as Map<String, String>;
       expect(dateRange, isNotEmpty);
-      
+
       // Verify it's tomorrow
       final start = DateTime.parse(dateRange['start']!);
       final tomorrow = DateTime.now().add(const Duration(days: 1));
@@ -68,9 +119,9 @@ void main() {
 
     test('Parse "food festival within 10km"', () async {
       final result = await nlpService.parseQuery('food festival within 10km');
-      
+
       expect(result, isNotNull);
-      expect(result['categories'], contains('food'));
+      expect(result['categories'], contains('Food & Dining'));
       expect(result['keywords'], contains('food'));
       expect(result['keywords'], contains('festival'));
       expect(result['radiusKm'], equals(10.0));
@@ -78,9 +129,9 @@ void main() {
 
     test('Parse "art exhibition in 5 miles"', () async {
       final result = await nlpService.parseQuery('art exhibition in 5 miles');
-      
+
       expect(result, isNotNull);
-      expect(result['categories'], contains('art'));
+      expect(result['categories'], contains('Arts & Culture'));
       expect(result['keywords'], contains('art'));
       expect(result['keywords'], contains('exhibition'));
       // 5 miles = ~8km
@@ -89,14 +140,14 @@ void main() {
 
     test('Parse "networking event today"', () async {
       final result = await nlpService.parseQuery('networking event today');
-      
+
       expect(result, isNotNull);
-      expect(result['categories'], contains('networking'));
+      expect(result['categories'], contains('Social & Networking'));
       expect(result['keywords'], contains('networking'));
-      
+
       final dateRange = result['dateRange'] as Map<String, String>;
       expect(dateRange, isNotEmpty);
-      
+
       // Verify it's today
       final start = DateTime.parse(dateRange['start']!);
       final today = DateTime.now();
@@ -106,42 +157,50 @@ void main() {
 
     test('Parse "sports events next week"', () async {
       final result = await nlpService.parseQuery('sports events next week');
-      
+
       expect(result, isNotNull);
-      expect(result['categories'], contains('sports'));
+      expect(result['categories'], contains('Sports & Fitness'));
       expect(result['keywords'], contains('sports'));
-      
+
       final dateRange = result['dateRange'] as Map<String, String>;
       expect(dateRange, isNotEmpty);
-      
+
       // Verify it's next week
       final start = DateTime.parse(dateRange['start']!);
       final nextWeek = DateTime.now().add(const Duration(days: 7));
       expect(start.isAfter(DateTime.now()), isTrue);
-      expect(start.isBefore(DateTime.now().add(const Duration(days: 14))), isTrue);
+      expect(
+        start.isBefore(DateTime.now().add(const Duration(days: 14))),
+        isTrue,
+      );
     });
 
-    test('Parse complex query "find a music or party event near me this week"', () async {
-      final result = await nlpService.parseQuery('find a music or party event near me this week');
-      
-      expect(result, isNotNull);
-      
-      // Should detect multiple categories
-      final categories = result['categories'] as List<String>;
-      expect(categories.any((c) => c == 'music' || c == 'party'), isTrue);
-      
-      // Should detect location intent
-      expect(result['nearMe'], isTrue);
-      expect(result['radiusKm'], greaterThan(0));
-      
-      // Should detect time range
-      final dateRange = result['dateRange'] as Map<String, String>;
-      expect(dateRange, isNotEmpty);
-    });
+    test(
+      'Parse complex query "find a music or party event near me this week"',
+      () async {
+        final result = await nlpService.parseQuery(
+          'find a music or party event near me this week',
+        );
+
+        expect(result, isNotNull);
+
+        // Should detect multiple categories
+        final categories = List<String>.from(result['categories'] as List);
+        expect(categories, contains('Entertainment'));
+
+        // Should detect location intent
+        expect(result['nearMe'], isTrue);
+        expect(result['radiusKm'], greaterThan(0));
+
+        // Should detect time range
+        final dateRange = result['dateRange'] as Map<String, String>;
+        expect(dateRange, isNotEmpty);
+      },
+    );
 
     test('Parse ambiguous query "something fun"', () async {
       final result = await nlpService.parseQuery('something fun');
-      
+
       expect(result, isNotNull);
       expect(result['keywords'], contains('fun'));
       // Should have low confidence for ambiguous queries
@@ -156,8 +215,12 @@ void main() {
           'description': 'Monthly book discussion',
           'category': 'book_club',
           'location': {'lat': 37.7749, 'lng': -122.4194, 'name': 'SF Library'},
-          'startDate': DateTime.now().add(const Duration(days: 1)).toIso8601String(),
-          'endDate': DateTime.now().add(const Duration(days: 1, hours: 2)).toIso8601String(),
+          'startDate': DateTime.now()
+              .add(const Duration(days: 1))
+              .toIso8601String(),
+          'endDate': DateTime.now()
+              .add(const Duration(days: 1, hours: 2))
+              .toIso8601String(),
           'organizer': 'SF Readers',
         },
         {
@@ -166,8 +229,12 @@ void main() {
           'description': 'AI and ML workshop',
           'category': 'tech',
           'location': {'lat': 37.7749, 'lng': -122.4194, 'name': 'Tech Hub'},
-          'startDate': DateTime.now().add(const Duration(days: 2)).toIso8601String(),
-          'endDate': DateTime.now().add(const Duration(days: 2, hours: 3)).toIso8601String(),
+          'startDate': DateTime.now()
+              .add(const Duration(days: 2))
+              .toIso8601String(),
+          'endDate': DateTime.now()
+              .add(const Duration(days: 2, hours: 3))
+              .toIso8601String(),
           'organizer': 'Tech Community',
         },
       ];
@@ -178,7 +245,7 @@ void main() {
       // Query cached events
       final intent = {
         'categories': ['book_club'],
-        'keywords': ['book'],
+        'keywords': <String>[],
         'nearMe': true,
         'radiusKm': 10.0,
         'dateRange': {},
@@ -197,7 +264,9 @@ void main() {
 
     test('Confidence scoring', () async {
       // Clear, specific query should have high confidence
-      final clearResult = await nlpService.parseQuery('find a book club event near me tomorrow');
+      final clearResult = await nlpService.parseQuery(
+        'find a book club event near me tomorrow',
+      );
       expect(clearResult['confidence'], greaterThan(60.0));
 
       // Vague query should have low confidence
@@ -206,8 +275,10 @@ void main() {
     });
 
     test('Extract keywords filtering stop words', () async {
-      final result = await nlpService.parseQuery('find the best music event in the city');
-      
+      final result = await nlpService.parseQuery(
+        'find the best music event in the city',
+      );
+
       final keywords = result['keywords'] as List<String>;
       // Should filter out stop words like "the", "in"
       expect(keywords.contains('the'), isFalse);

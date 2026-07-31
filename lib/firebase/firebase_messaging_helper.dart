@@ -172,7 +172,7 @@ class FirebaseMessagingHelper {
         );
 
     await _localNotifications!.initialize(
-      initializationSettings,
+      settings: initializationSettings,
       onDidReceiveNotificationResponse: _onNotificationTapped,
     );
   }
@@ -395,9 +395,9 @@ class FirebaseMessagingHelper {
 
     final AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
-          'orgami_channel',
-          'Orgami Notifications',
-          channelDescription: 'Notifications for Orgami events and updates',
+          'attendus_channel',
+          'Attendus Notifications',
+          channelDescription: 'Notifications for Attendus events and updates',
           importance: Importance.max,
           priority: Priority.high,
           showWhen: true,
@@ -421,10 +421,10 @@ class FirebaseMessagingHelper {
     );
 
     await _localNotifications!.show(
-      DateTime.now().millisecondsSinceEpoch.remainder(100000),
-      message.notification?.title ?? 'New Notification',
-      message.notification?.body ?? '',
-      platformChannelSpecifics,
+      id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+      title: message.notification?.title ?? 'New Notification',
+      body: message.notification?.body ?? '',
+      notificationDetails: platformChannelSpecifics,
       payload: json.encode(message.data),
     );
   }
@@ -1339,7 +1339,7 @@ Future<void> _firebaseMessagingBackgroundHandler(
   if (kDebugMode) {
     Logger.info('📱 Handling background message: ${message.messageId}');
   }
-  
+
   // Store notification in Firestore for the user
   try {
     final FirebaseAuth auth = FirebaseAuth.instance;
@@ -1350,13 +1350,13 @@ Future<void> _firebaseMessagingBackgroundHandler(
           .doc(user.uid)
           .collection('notifications')
           .add({
-        'title': message.notification?.title ?? 'New Notification',
-        'body': message.notification?.body ?? '',
-        'type': message.data['type'] ?? 'general',
-        'createdAt': FieldValue.serverTimestamp(),
-        'isRead': false,
-        'data': message.data,
-      });
+            'title': message.notification?.title ?? 'New Notification',
+            'body': message.notification?.body ?? '',
+            'type': message.data['type'] ?? 'general',
+            'createdAt': FieldValue.serverTimestamp(),
+            'isRead': false,
+            'data': message.data,
+          });
     }
   } catch (e) {
     if (kDebugMode) {

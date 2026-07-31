@@ -60,8 +60,10 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
   DateTime? _lastCaptureTime;
 
   // Constants
-  static const Duration _captureInterval = Duration(milliseconds: 1200); // Reduced frequency
-  
+  static const Duration _captureInterval = Duration(
+    milliseconds: 1200,
+  ); // Reduced frequency
+
   // Navigation state for smooth transitions
   bool _isNavigating = false;
 
@@ -115,13 +117,13 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
       final hasPermission = await PermissionsHelperClass.checkCameraPermission(
         context: context,
       );
-      
+
       if (!hasPermission) {
         Logger.error('Camera permission denied');
         _showErrorAndExit('Camera permission is required for face enrollment');
         return;
       }
-      
+
       Logger.info('Camera permission granted, initializing camera...');
       _cameras = await availableCameras();
       if (_cameras == null || _cameras!.isEmpty) {
@@ -138,12 +140,18 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
         orElse: () => _cameras!.first,
       );
 
-      Logger.info('Using camera: ${frontCamera.name} (${frontCamera.lensDirection})');
+      Logger.info(
+        'Using camera: ${frontCamera.name} (${frontCamera.lensDirection})',
+      );
 
       _camera = frontCamera;
-      final imageFormat = Platform.isIOS ? ImageFormatGroup.bgra8888 : ImageFormatGroup.nv21;
-      Logger.info('Using image format: $imageFormat for platform: ${Platform.operatingSystem}');
-      
+      final imageFormat = Platform.isIOS
+          ? ImageFormatGroup.bgra8888
+          : ImageFormatGroup.nv21;
+      Logger.info(
+        'Using image format: $imageFormat for platform: ${Platform.operatingSystem}',
+      );
+
       _cameraController = CameraController(
         frontCamera,
         ResolutionPreset.medium, // Balance between quality and performance
@@ -169,16 +177,22 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
   }
 
   void _startImageStream() {
-    if (_cameraController == null || !_cameraController!.value.isInitialized || _isStreamActive) {
-      Logger.warning('Cannot start image stream: camera=${_cameraController != null}, initialized=${_cameraController?.value.isInitialized}, streamActive=$_isStreamActive');
+    if (_cameraController == null ||
+        !_cameraController!.value.isInitialized ||
+        _isStreamActive) {
+      Logger.warning(
+        'Cannot start image stream: camera=${_cameraController != null}, initialized=${_cameraController?.value.isInitialized}, streamActive=$_isStreamActive',
+      );
       return;
     }
 
     Logger.info('Starting image stream for face enrollment');
-    Logger.info('Camera info: width=${_cameraController!.value.previewSize?.width}, height=${_cameraController!.value.previewSize?.height}');
+    Logger.info(
+      'Camera info: width=${_cameraController!.value.previewSize?.width}, height=${_cameraController!.value.previewSize?.height}',
+    );
     _isStreamActive = true;
     _updateStatusMessage('Look straight at the camera');
-    
+
     try {
       _cameraController!.startImageStream(_processCameraImage);
       Logger.info('Image stream started successfully');
@@ -201,7 +215,10 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
 
   Future<void> _processCameraImage(CameraImage cameraImage) async {
     // Throttle processing
-    if (_isProcessing || _camera == null || _isEnrollmentComplete || _currentStep >= _requiredSteps) {
+    if (_isProcessing ||
+        _camera == null ||
+        _isEnrollmentComplete ||
+        _currentStep >= _requiredSteps) {
       return;
     }
 
@@ -215,17 +232,21 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     _lastCaptureTime = now;
 
     try {
-      Logger.debug('Processing camera image: format=${cameraImage.format.group}, width=${cameraImage.width}, height=${cameraImage.height}, planes=${cameraImage.planes.length}');
-      
+      Logger.debug(
+        'Processing camera image: format=${cameraImage.format.group}, width=${cameraImage.width}, height=${cameraImage.height}, planes=${cameraImage.planes.length}',
+      );
+
       // Convert camera image to ML Kit input image
       final inputImage = _faceService.convertCameraImage(cameraImage, _camera!);
-      
+
       if (inputImage == null) {
-        Logger.warning('Failed to convert camera image to InputImage - trying next frame');
+        Logger.warning(
+          'Failed to convert camera image to InputImage - trying next frame',
+        );
         // Don't show error to user, just try next frame
         return;
       }
-      
+
       Logger.debug('Successfully converted to InputImage');
 
       // Detect faces
@@ -243,14 +264,24 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
       }
 
       final face = faces.first;
-      Logger.debug('Face detected: boundingBox=${face.boundingBox}, headAngleY=${face.headEulerAngleY}, headAngleZ=${face.headEulerAngleZ}');
+      Logger.debug(
+        'Face detected: boundingBox=${face.boundingBox}, headAngleY=${face.headEulerAngleY}, headAngleZ=${face.headEulerAngleZ}',
+      );
 
       // Check if face is suitable for enrollment
       if (!_faceService.isFaceSuitable(face)) {
-        Logger.debug('Face not suitable for enrollment - checking requirements');
-        Logger.debug('Face area: ${face.boundingBox.width * face.boundingBox.height}');
-        Logger.debug('Head angles: Y=${face.headEulerAngleY}, Z=${face.headEulerAngleZ}');
-        Logger.debug('Eye open probability: left=${face.leftEyeOpenProbability}, right=${face.rightEyeOpenProbability}');
+        Logger.debug(
+          'Face not suitable for enrollment - checking requirements',
+        );
+        Logger.debug(
+          'Face area: ${face.boundingBox.width * face.boundingBox.height}',
+        );
+        Logger.debug(
+          'Head angles: Y=${face.headEulerAngleY}, Z=${face.headEulerAngleZ}',
+        );
+        Logger.debug(
+          'Eye open probability: left=${face.leftEyeOpenProbability}, right=${face.rightEyeOpenProbability}',
+        );
         if (mounted) {
           _updateStatusMessage(
             'Please look straight at the camera and keep still.',
@@ -258,7 +289,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
         }
         return;
       }
-      
+
       Logger.debug('Face is suitable for enrollment');
 
       // Extract features
@@ -276,7 +307,9 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
       _collectedFeatures.add(features);
       _currentStep++;
 
-      Logger.info('Face sample $_currentStep/$_requiredSteps captured successfully');
+      Logger.info(
+        'Face sample $_currentStep/$_requiredSteps captured successfully',
+      );
 
       // Update progress
       _progressAnimationController.animateTo(_currentStep / _requiredSteps);
@@ -296,7 +329,9 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
         }
       } else {
         // Complete enrollment after collecting all steps
-        Logger.info('All $_requiredSteps face samples collected, completing enrollment');
+        Logger.info(
+          'All $_requiredSteps face samples collected, completing enrollment',
+        );
         _stopImageStream();
         await _completeEnrollment();
       }
@@ -347,15 +382,21 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
 
       // Log identity details for debugging
       UserIdentityService.logIdentityDetails(userIdentity, 'Face Enrollment');
-      
+
       final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(
         widget.eventModel.id,
         userIdentity.userId,
       );
-      Logger.info('Enrollment will be saved to: FaceEnrollments/$enrollmentDocId');
+      Logger.info(
+        'Enrollment will be saved to: FaceEnrollments/$enrollmentDocId',
+      );
 
-      Logger.info('Enrolling face for event: ${widget.eventModel.id} (${widget.eventModel.title})');
-      Logger.info('Collected ${_collectedFeatures.length} face feature samples');
+      Logger.info(
+        'Enrolling face for event: ${widget.eventModel.id} (${widget.eventModel.title})',
+      );
+      Logger.info(
+        'Collected ${_collectedFeatures.length} face feature samples',
+      );
 
       // Enroll face with collected features
       final success = await _faceService.enrollUserFace(
@@ -380,7 +421,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
             _isCameraInitialized = false;
           });
         }
-        
+
         // Short delay to show the "Preparing scanner..." message
         await Future.delayed(Duration(milliseconds: 500));
 
@@ -390,22 +431,28 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
           Navigator.pushReplacement(
             context,
             PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) => FaceRecognitionScannerScreen(
-                eventModel: widget.eventModel,
-                guestUserId: userIdentity.isGuest ? userIdentity.userId : null,
-                guestUserName: userIdentity.isGuest ? userIdentity.userName : null,
-              ),
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  FaceRecognitionScannerScreen(
+                    eventModel: widget.eventModel,
+                    guestUserId: userIdentity.isGuest
+                        ? userIdentity.userId
+                        : null,
+                    guestUserName: userIdentity.isGuest
+                        ? userIdentity.userName
+                        : null,
+                  ),
               transitionDuration: Duration(milliseconds: 400),
               reverseTransitionDuration: Duration(milliseconds: 300),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                return FadeTransition(
-                  opacity: CurvedAnimation(
-                    parent: animation,
-                    curve: Curves.easeInOut,
-                  ),
-                  child: child,
-                );
-              },
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(
+                      opacity: CurvedAnimation(
+                        parent: animation,
+                        curve: Curves.easeInOut,
+                      ),
+                      child: child,
+                    );
+                  },
             ),
           ).then((_) {
             // Dispose camera after navigation starts
@@ -446,16 +493,19 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     _stepTimer?.cancel();
     _progressAnimationController.dispose();
     _stepAnimationController.dispose();
-    
+
     // Only dispose if not already disposed (prevents double disposal during navigation)
     if (_cameraController != null && _isCameraInitialized) {
-      _cameraController!.dispose().then((_) {
-        Logger.debug('Camera controller disposed');
-      }).catchError((e) {
-        Logger.error('Error disposing camera: $e');
-      });
+      _cameraController!
+          .dispose()
+          .then((_) {
+            Logger.debug('Camera controller disposed');
+          })
+          .catchError((e) {
+            Logger.error('Error disposing camera: $e');
+          });
     }
-    
+
     super.dispose();
   }
 
@@ -464,15 +514,18 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('Enroll Your Face'),
+        title: const Text('Secure face enrollment'),
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
       ),
       body: Stack(
         children: [
           // Camera preview
-          if (!_isNavigating && _isCameraInitialized && _cameraController != null)
+          if (!_isNavigating &&
+              _isCameraInitialized &&
+              _cameraController != null)
             Positioned.fill(child: CameraPreview(_cameraController!))
           else if (!_isNavigating)
             const Center(child: CircularProgressIndicator(color: Colors.white)),
@@ -505,7 +558,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
               right: 20,
               child: _buildInstructionsCard(),
             ),
-          
+
           // Loading overlay during navigation
           if (_isNavigating)
             Container(
@@ -530,10 +583,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
                     SizedBox(height: 12),
                     Text(
                       'This will only take a moment',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(color: Colors.white70, fontSize: 14),
                     ),
                   ],
                 ),

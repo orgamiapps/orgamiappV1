@@ -6,6 +6,7 @@ import 'package:attendus/models/subscription_model.dart';
 import 'package:attendus/Utils/app_app_bar_view.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/screens/Premium/subscription_management_screen.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class PremiumUpgradeScreenV2 extends StatefulWidget {
   const PremiumUpgradeScreenV2({super.key});
@@ -82,23 +83,24 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
         }
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF8F9FA),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
-          child: Column(
-            children: [
-              Align(
-                alignment: Alignment.topLeft,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 16.0, top: 8.0),
-                  child: AppAppBarView.modernBackButton(
-                    context: context,
-                    backgroundColor: Colors.white,
-                    iconColor: Colors.grey.shade800,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1080),
+              child: Column(
+                children: [
+                  Align(
+                    alignment: Alignment.topLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 16.0, top: 8.0),
+                      child: AppAppBarView.modernBackButton(context: context),
+                    ),
                   ),
-                ),
+                  Expanded(child: _buildBody()),
+                ],
               ),
-              Expanded(child: _buildBody()),
-            ],
+            ),
           ),
         ),
       ),
@@ -109,7 +111,21 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
     return Consumer<SubscriptionService>(
       builder: (context, subscriptionService, child) {
         if (subscriptionService.isLoading) {
-          return const Center(child: CircularProgressIndicator());
+          return const AttendUsLoadingState(label: 'Loading plans...');
+        }
+
+        if (PaymentPlaceholderService.paymentMode == 'unavailable') {
+          return AttendUsEmptyState(
+            icon: Icons.workspace_premium_outlined,
+            title: 'Premium subscriptions are not available yet',
+            message:
+                'Attendus premium plans will be available after production in-app purchases are configured for app store release.',
+            action: AttendUsButton.secondary(
+              label: 'Back to Account',
+              icon: Icons.arrow_back,
+              onPressed: () => Navigator.of(context).maybePop(),
+            ),
+          );
         }
 
         // If user already has an active subscription, redirect to management
@@ -125,7 +141,7 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
               );
             }
           });
-          return const Center(child: CircularProgressIndicator());
+          return const AttendUsLoadingState(label: 'Opening plan manager...');
         }
 
         return _buildUpgradeView();
@@ -481,7 +497,7 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
       final String productName =
           '${tier.displayName} ${billingPeriods[_selectedBillingIndex]}';
 
-      // Show Apple Pay placeholder UI
+      // Run premium purchase after production in-app purchases are configured
       final paymentSuccess = await PaymentPlaceholderService()
           .showApplePayPlaceholder(
             context: context,
@@ -493,7 +509,7 @@ class _PremiumUpgradeScreenV2State extends State<PremiumUpgradeScreenV2>
       if (!mounted) return;
 
       if (!paymentSuccess) {
-        // User cancelled payment
+        // Purchase unavailable or cancelled
         setState(() {
           _isProcessing = false;
         });

@@ -16,6 +16,7 @@ import 'package:intl/intl.dart';
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 import 'package:attendus/Utils/app_app_bar_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class AnalyticsDashboardScreen extends StatefulWidget {
   const AnalyticsDashboardScreen({super.key});
@@ -164,17 +165,13 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
 
     if (currentUser == null) {
       return AppScaffoldWrapper(
-        selectedBottomNavIndex: 5,
-        backgroundColor: AppThemeColor.backGroundColor,
+        selectedBottomNavIndex: 4,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
-          child: Center(
-            child: Text(
-              'Please log in to view analytics',
-              style: TextStyle(
-                fontSize: Dimensions.fontSizeLarge,
-                color: AppThemeColor.darkBlueColor,
-              ),
-            ),
+          child: AttendUsEmptyState(
+            icon: Icons.lock_outline,
+            title: 'Sign in required',
+            message: 'Please log in to view organizer analytics.',
           ),
         ),
       );
@@ -382,56 +379,19 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
 
   Widget _buildLoadingSkeleton() {
     return AppScaffoldWrapper(
-      selectedBottomNavIndex: 5,
-      backgroundColor: AppThemeColor.backGroundColor,
+      selectedBottomNavIndex: 4,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: AppAppBarView.modernHeader(
-                context: context,
-                title: 'Analytics Dashboard',
-                subtitle: 'Comprehensive insights across all your events',
-                showBackButton: true,
-              ),
+        child: Column(
+          children: [
+            AppAppBarView.modernHeader(
+              context: context,
+              title: 'Analytics Dashboard',
+              subtitle: 'Comprehensive insights across all your events',
+              showBackButton: true,
             ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
-                child: Column(
-                  children: [
-                    // Shimmer skeleton for metrics
-                    GridView.count(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisCount: 2,
-                      crossAxisSpacing: Dimensions.spaceSizedDefault,
-                      mainAxisSpacing: Dimensions.spaceSizedDefault,
-                      childAspectRatio: 1.2,
-                      children: List.generate(
-                        4,
-                        (index) => Container(
-                          decoration: BoxDecoration(
-                            color: AppThemeColor.lightBlueColor,
-                            borderRadius: BorderRadius.circular(
-                              Dimensions.radiusLarge,
-                            ),
-                          ),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                AppThemeColor.darkBlueColor.withValues(
-                                  alpha: 0.3,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            const Expanded(
+              child: AttendUsLoadingState(label: 'Loading analytics...'),
             ),
           ],
         ),
@@ -441,7 +401,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
 
   Widget _buildErrorView(String error) {
     return AppScaffoldWrapper(
-      selectedBottomNavIndex: 5,
+      selectedBottomNavIndex: 4,
       backgroundColor: AppThemeColor.backGroundColor,
       body: SafeArea(
         child: Center(
@@ -479,7 +439,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
 
   Widget _buildEmptyState() {
     return AppScaffoldWrapper(
-      selectedBottomNavIndex: 5,
+      selectedBottomNavIndex: 4,
       backgroundColor: AppThemeColor.backGroundColor,
       body: SafeArea(
         child: Center(
@@ -579,123 +539,130 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     bool isFromCache = false,
   }) {
     return AppScaffoldWrapper(
-      selectedBottomNavIndex: 5,
-      backgroundColor: AppThemeColor.backGroundColor,
+      selectedBottomNavIndex: 4,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            AppAppBarView.modernHeader(
-              context: context,
-              title: 'Analytics Dashboard',
-              subtitle: 'Comprehensive insights across all your events',
-              showBackButton: true,
-              trailing: IconButton(
-                icon: const Icon(Icons.download_rounded),
-                onPressed: () => _exportAnalytics(analytics),
-                tooltip: 'Export Analytics',
-              ),
-            ),
-            
-            // Cache indicator (only shown briefly)
-            if (isFromCache)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: Dimensions.paddingSizeDefault,
-                  vertical: Dimensions.paddingSizeSmall,
-                ),
-                margin: const EdgeInsets.symmetric(
-                  horizontal: Dimensions.paddingSizeDefault,
-                ),
-                decoration: BoxDecoration(
-                  color: AppThemeColor.lightBlueColor,
-                  borderRadius: BorderRadius.circular(
-                    Dimensions.radiusDefault,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1280),
+            child: Column(
+              children: [
+                // Header
+                AppAppBarView.modernHeader(
+                  context: context,
+                  title: 'Analytics Dashboard',
+                  subtitle: 'Comprehensive insights across all your events',
+                  showBackButton: true,
+                  trailing: IconButton(
+                    icon: const Icon(Icons.download_rounded),
+                    onPressed: () => _exportAnalytics(analytics),
+                    tooltip: 'Export Analytics',
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.cached,
-                      size: 16,
-                      color: AppThemeColor.darkBlueColor,
+
+                // Cache indicator (only shown briefly)
+                if (isFromCache)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: Dimensions.paddingSizeDefault,
+                      vertical: Dimensions.paddingSizeSmall,
                     ),
-                    const SizedBox(width: Dimensions.spaceSizeSmall),
-                    Text(
-                      'Refreshing...',
-                      style: TextStyle(
-                        fontSize: Dimensions.fontSizeSmall,
-                        color: AppThemeColor.darkBlueColor,
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: Dimensions.paddingSizeDefault,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppThemeColor.lightBlueColor,
+                      borderRadius: BorderRadius.circular(
+                        Dimensions.radiusDefault,
                       ),
                     ),
-                  ],
-                ),
-              ),
-            
-            // Content
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Time Period Filter
-                    _buildTimePeriodFilter(),
-
-                    const SizedBox(height: Dimensions.spaceSizedLarge),
-
-                    // Tab Bar
-                    Container(
-                      decoration: BoxDecoration(
-                        color: AppThemeColor.lightBlueColor,
-                        borderRadius: BorderRadius.circular(
-                          Dimensions.radiusDefault,
-                        ),
-                      ),
-                      child: TabBar(
-                        controller: _tabController,
-                        indicatorSize: TabBarIndicatorSize.tab,
-                        indicator: BoxDecoration(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.cached,
+                          size: 16,
                           color: AppThemeColor.darkBlueColor,
-                          borderRadius: BorderRadius.circular(
-                            Dimensions.radiusDefault,
+                        ),
+                        const SizedBox(width: Dimensions.spaceSizeSmall),
+                        Text(
+                          'Refreshing...',
+                          style: TextStyle(
+                            fontSize: Dimensions.fontSizeSmall,
+                            color: AppThemeColor.darkBlueColor,
                           ),
                         ),
-                        labelColor: AppThemeColor.pureWhiteColor,
-                        unselectedLabelColor: AppThemeColor.darkBlueColor,
-                        labelStyle: TextStyle(
-                          fontSize: Dimensions.fontSizeDefault,
-                          fontWeight: FontWeight.w600,
+                      ],
+                    ),
+                  ),
+
+                // Content
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(
+                      Dimensions.paddingSizeDefault,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Time Period Filter
+                        _buildTimePeriodFilter(),
+
+                        const SizedBox(height: Dimensions.spaceSizedLarge),
+
+                        // Tab Bar
+                        Container(
+                          decoration: BoxDecoration(
+                            color: AppThemeColor.lightBlueColor,
+                            borderRadius: BorderRadius.circular(
+                              Dimensions.radiusDefault,
+                            ),
+                          ),
+                          child: TabBar(
+                            controller: _tabController,
+                            indicatorSize: TabBarIndicatorSize.tab,
+                            indicator: BoxDecoration(
+                              color: AppThemeColor.darkBlueColor,
+                              borderRadius: BorderRadius.circular(
+                                Dimensions.radiusDefault,
+                              ),
+                            ),
+                            labelColor: AppThemeColor.pureWhiteColor,
+                            unselectedLabelColor: AppThemeColor.darkBlueColor,
+                            labelStyle: TextStyle(
+                              fontSize: Dimensions.fontSizeDefault,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            tabs: const [
+                              Tab(text: 'Overview'),
+                              Tab(text: 'AI Insights'),
+                              Tab(text: 'Trends'),
+                              Tab(text: 'Events'),
+                            ],
+                          ),
                         ),
-                        tabs: const [
-                          Tab(text: 'Overview'),
-                          Tab(text: 'AI Insights'),
-                          Tab(text: 'Trends'),
-                          Tab(text: 'Events'),
-                        ],
-                      ),
-                    ),
 
-                    const SizedBox(height: Dimensions.spaceSizedLarge),
+                        const SizedBox(height: Dimensions.spaceSizedLarge),
 
-                    // Tab Views - Takes remaining space
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildOverviewTab(analytics),
-                          _buildAIInsightsTab(),
-                          _buildTrendsTab(analytics),
-                          _buildEventsTab(analytics),
-                        ],
-                      ),
+                        // Tab Views - Takes remaining space
+                        Expanded(
+                          child: TabBarView(
+                            controller: _tabController,
+                            children: [
+                              _buildOverviewTab(analytics),
+                              _buildAIInsightsTab(),
+                              _buildTrendsTab(analytics),
+                              _buildEventsTab(analytics),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

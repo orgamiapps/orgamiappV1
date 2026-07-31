@@ -29,7 +29,9 @@ import 'package:attendus/models/subscription_model.dart';
 import 'package:attendus/Services/subscription_service.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:attendus/Utils/cached_image.dart';
+import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
 
 class AccountScreen extends StatefulWidget {
@@ -66,6 +68,13 @@ class _AccountScreenState extends State<AccountScreen> {
     try {
       if (mounted) {
         setState(() => _isLoadingSubscription = true);
+      }
+
+      if (Firebase.apps.isEmpty) {
+        Logger.debug(
+          'AccountScreen: Firebase unavailable; skipping subscription load',
+        );
+        return;
       }
 
       // Get subscription service and ensure it's initialized
@@ -157,14 +166,33 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Widget _bodyView() {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          const SizedBox(height: 20),
-          _buildProfileHeader(),
-          _buildSettingsSection(),
-        ],
-      ),
+    return Column(
+      children: [
+        const AttendUsTopBar(
+          title: 'Account',
+          subtitle: 'Profile, subscription, privacy, and support.',
+        ),
+        Expanded(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: AttendUsTokens.pageMaxWidth,
+              ),
+              child: SingleChildScrollView(
+                padding: AttendUsTokens.pagePadding,
+                child: Column(
+                  children: [
+                    _buildProfileHeader(),
+                    const SizedBox(height: 16),
+                    _buildSettingsSection(),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -172,9 +200,8 @@ class _AccountScreenState extends State<AccountScreen> {
     final user = CustomerController.logeInCustomer;
     final displayName = user?.name.trim().isNotEmpty == true
         ? user!.name.trim()
-        : FirebaseAuth.instance.currentUser?.displayName ?? 'AttendUs member';
-    final email =
-        user?.email ?? FirebaseAuth.instance.currentUser?.email ?? 'Signed in';
+        : _currentAuthDisplayName() ?? 'Attendus member';
+    final email = user?.email ?? _currentAuthEmail() ?? 'Signed in';
 
     // Show loading indicator if user data is being refreshed
     if (_isLoadingUserData && user != null) {
@@ -182,7 +209,6 @@ class _AccountScreenState extends State<AccountScreen> {
     }
 
     return AttendUsCard(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.all(18),
       child: Row(
         children: [
@@ -214,7 +240,10 @@ class _AccountScreenState extends State<AccountScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(displayName, style: Theme.of(context).textTheme.titleLarge),
+                Text(
+                  displayName,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
                 const SizedBox(height: 4),
                 Text(
                   email,
@@ -278,9 +307,33 @@ class _AccountScreenState extends State<AccountScreen> {
     final modelUrl = model?.profilePictureUrl;
     if (modelUrl != null && modelUrl.isNotEmpty) return modelUrl;
 
-    final authUrl = FirebaseAuth.instance.currentUser?.photoURL;
+    final authUrl = _currentAuthPhotoUrl();
     if (authUrl != null && authUrl.isNotEmpty) return authUrl;
     return null;
+  }
+
+  String? _currentAuthDisplayName() {
+    try {
+      return FirebaseAuth.instance.currentUser?.displayName;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String? _currentAuthEmail() {
+    try {
+      return FirebaseAuth.instance.currentUser?.email;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String? _currentAuthPhotoUrl() {
+    try {
+      return FirebaseAuth.instance.currentUser?.photoURL;
+    } catch (_) {
+      return null;
+    }
   }
 
   String _getUserInitial() {
@@ -297,158 +350,159 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Widget _buildSettingsSection() {
-    // Use Consumer instead of Selector for more reliable updates
-    return Consumer<SubscriptionService>(
-      builder: (context, subscriptionService, child) {
-        // Show loading state while subscription data is being fetched
-        final isLoading =
-            _isLoadingSubscription || subscriptionService.isLoading;
-        final hasPremium = subscriptionService.hasPremium;
+    SubscriptionService? subscriptionService;
+    try {
+      subscriptionService = Provider.of<SubscriptionService>(context);
+    } catch (e) {
+      Logger.warning('AccountScreen: Subscription provider unavailable: $e');
+    }
 
-        // Log current state for debugging
-        if (isLoading) {
-          Logger.debug('AccountScreen: Loading subscription data...');
-        } else {
-          Logger.debug('AccountScreen: hasPremium = $hasPremium');
-        }
+    final isLoading =
+        _isLoadingSubscription || (subscriptionService?.isLoading ?? false);
+    final hasPremium = subscriptionService?.hasPremium ?? false;
 
-        return Container(
-          margin: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Theme.of(context).shadowColor.withValues(alpha: 0.05),
-                spreadRadius: 0,
-                blurRadius: 20,
-                offset: const Offset(0, 4),
+    if (isLoading) {
+      Logger.debug('AccountScreen: Loading subscription data...');
+    } else {
+      Logger.debug('AccountScreen: hasPremium = $hasPremium');
+    }
+
+    return AttendUsPageSection(
+      title: 'Settings',
+      subtitle: 'Manage your plan, privacy, preferences, and account.',
+      icon: Icons.settings_outlined,
+      framed: false,
+      child: Column(
+        children: [
+          // Show loading indicator while fetching subscription data
+          if (isLoading) ...[
+            _buildPremiumLoadingItem(),
+            _buildDivider(),
+          ]
+          // Premium upgrade button at top (only show if not premium and not loading)
+          else if (!hasPremium) ...[
+            subscriptionService == null
+                ? _buildPremiumUnavailableItem()
+                : _buildPremiumUpgradeItem(),
+            _buildDivider(),
+          ]
+          // If user has premium, show premium management
+          else if (hasPremium && subscriptionService != null) ...[
+            _buildPremiumManageItem(subscriptionService),
+            _buildDivider(),
+          ],
+          // Premium Features (only show if user has premium)
+          if (hasPremium) ...[
+            _buildSettingsItem(
+              icon: Icons.workspace_premium,
+              title: 'Premium Features',
+              subtitle: 'Access analytics and advanced tools',
+              onTap: () => RouterClass.nextScreenNormal(
+                context,
+                const PremiumFeaturesScreen(),
               ),
-            ],
+            ),
+            _buildDivider(),
+          ],
+          // Feedback
+          _buildSettingsItem(
+            icon: Icons.feedback,
+            title: 'Feedback',
+            subtitle: 'Share your thoughts with us',
+            onTap: () =>
+                RouterClass.nextScreenNormal(context, FeedbackScreen()),
           ),
-          child: Column(
-            children: [
-              // Show loading indicator while fetching subscription data
-              if (isLoading) ...[
-                _buildPremiumLoadingItem(),
-                _buildDivider(),
-              ]
-              // Premium upgrade button at top (only show if not premium and not loading)
-              else if (!hasPremium) ...[
-                _buildPremiumUpgradeItem(),
-                _buildDivider(),
-              ]
-              // If user has premium, show premium management
-              else if (hasPremium) ...[
-                _buildPremiumManageItem(subscriptionService),
-                _buildDivider(),
-              ],
-              // Premium Features (only show if user has premium)
-              if (hasPremium) ...[
-                _buildSettingsItem(
-                  icon: Icons.workspace_premium,
-                  title: 'Premium Features',
-                  subtitle: 'Access analytics and advanced tools',
-                  onTap: () => RouterClass.nextScreenNormal(
-                    context,
-                    const PremiumFeaturesScreen(),
-                  ),
-                ),
-                _buildDivider(),
-              ],
-              // Feedback
-              _buildSettingsItem(
-                icon: Icons.feedback,
-                title: 'Feedback',
-                subtitle: 'Share your thoughts with us',
-                onTap: () =>
-                    RouterClass.nextScreenNormal(context, FeedbackScreen()),
-              ),
-              _buildDivider(),
-              _buildSettingsItem(
-                icon: Icons.block,
-                title: 'Blocked Users',
-                subtitle: 'Manage your blocked list',
-                onTap: () => RouterClass.nextScreenNormal(
-                  context,
-                  const BlockedUsersScreen(),
-                ),
-              ),
-              _buildDivider(),
-
-              _buildSettingsItem(
-                icon: CupertinoIcons.info,
-                title: 'About Us',
-                subtitle: 'Learn more about our app',
-                onTap: () => RouterClass.nextScreenNormal(
-                  context,
-                  const AboutUsScreen(),
-                ),
-              ),
-              _buildDivider(),
-              _buildSettingsItem(
-                icon: Icons.help,
-                title: 'Help',
-                subtitle: 'Get help and support',
-                onTap: () =>
-                    RouterClass.nextScreenNormal(context, const HelpScreen()),
-              ),
-              _buildDivider(),
-              _buildDarkModeToggle(),
-              _buildDivider(),
-
-              _buildSettingsItem(
-                icon: Icons.delete_forever,
-                title: 'Delete Account',
-                subtitle: 'Permanently delete your account',
-                onTap: () => RouterClass.nextScreenNormal(
-                  context,
-                  const DeleteAccountScreen(),
-                ),
-              ),
-              _buildDivider(),
-              _buildSettingsItem(
-                icon: Icons.privacy_tip,
-                title: 'Privacy Policy',
-                subtitle: 'Read our privacy policy',
-                onTap: () => RouterClass.nextScreenNormal(
-                  context,
-                  const PrivacyPolicyScreen(),
-                ),
-              ),
-              _buildDivider(),
-              _buildSettingsItem(
-                icon: CupertinoIcons.question_diamond,
-                title: 'Terms & Conditions',
-                subtitle: 'Read our terms of service',
-                onTap: () => RouterClass.nextScreenNormal(
-                  context,
-                  const TermsConditionsScreen(),
-                ),
-              ),
-              _buildDivider(),
-              _buildSettingsItem(
-                icon: Icons.logout,
-                title: 'Logout',
-                subtitle: 'Sign out of your account',
-                onTap: () async {
-                  try {
-                    await AuthService().signOut();
-                    if (mounted) {
-                      RouterClass().appRest(context: context);
-                    }
-                  } catch (e) {
-                    ShowToast().showNormalToast(
-                      msg: 'Error signing out. Please try again.',
-                    );
-                  }
-                },
-                isDestructive: true,
-              ),
-            ],
+          _buildDivider(),
+          _buildSettingsItem(
+            icon: Icons.block,
+            title: 'Blocked Users',
+            subtitle: 'Manage your blocked list',
+            onTap: () => RouterClass.nextScreenNormal(
+              context,
+              const BlockedUsersScreen(),
+            ),
           ),
-        );
-      },
+          _buildDivider(),
+
+          _buildSettingsItem(
+            icon: CupertinoIcons.info,
+            title: 'About Us',
+            subtitle: 'Learn more about our app',
+            onTap: () =>
+                RouterClass.nextScreenNormal(context, const AboutUsScreen()),
+          ),
+          _buildDivider(),
+          _buildSettingsItem(
+            icon: Icons.help,
+            title: 'Help',
+            subtitle: 'Get help and support',
+            onTap: () =>
+                RouterClass.nextScreenNormal(context, const HelpScreen()),
+          ),
+          _buildDivider(),
+          _buildDarkModeToggle(),
+          _buildDivider(),
+
+          _buildSettingsItem(
+            icon: Icons.delete_forever,
+            title: 'Delete Account',
+            subtitle: 'Permanently delete your account',
+            onTap: () => RouterClass.nextScreenNormal(
+              context,
+              const DeleteAccountScreen(),
+            ),
+          ),
+          _buildDivider(),
+          _buildSettingsItem(
+            icon: Icons.privacy_tip,
+            title: 'Privacy Policy',
+            subtitle: 'Read our privacy policy',
+            onTap: () => RouterClass.nextScreenNormal(
+              context,
+              const PrivacyPolicyScreen(),
+            ),
+          ),
+          _buildDivider(),
+          _buildSettingsItem(
+            icon: CupertinoIcons.question_diamond,
+            title: 'Terms & Conditions',
+            subtitle: 'Read our terms of service',
+            onTap: () => RouterClass.nextScreenNormal(
+              context,
+              const TermsConditionsScreen(),
+            ),
+          ),
+          _buildDivider(),
+          _buildSettingsItem(
+            icon: Icons.logout,
+            title: 'Logout',
+            subtitle: 'Sign out of your account',
+            onTap: () async {
+              try {
+                await AuthService().signOut();
+                if (mounted) {
+                  RouterClass().appRest(context: context);
+                }
+              } catch (e) {
+                ShowToast().showNormalToast(
+                  msg: 'Error signing out. Please try again.',
+                );
+              }
+            },
+            isDestructive: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPremiumUnavailableItem() {
+    return ListTile(
+      leading: const Icon(Icons.workspace_premium_outlined),
+      title: const Text('Subscription'),
+      subtitle: const Text('Premium options load after sign-in is ready'),
+      onTap: () =>
+          RouterClass.nextScreenNormal(context, const PremiumUpgradeScreenV2()),
     );
   }
 
@@ -513,50 +567,51 @@ class _AccountScreenState extends State<AccountScreen> {
 
         // Free tier - blend in with other items but with subtle upgrade hint
         if (tier == SubscriptionTier.free) {
-          return Container(
-            margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
-            decoration: BoxDecoration(
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+            child: Material(
               color: theme.colorScheme.primary.withValues(alpha: 0.03),
               borderRadius: BorderRadius.circular(12),
-            ),
-            child: ListTile(
-              onTap: () async {
-                await RouterClass.nextScreenNormal(
-                  context,
-                  const PremiumUpgradeScreenV2(),
-                );
-                if (mounted) {
-                  await _ensureSubscriptionLoaded();
-                }
-              },
-              leading: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
+              clipBehavior: Clip.antiAlias,
+              child: ListTile(
+                onTap: () async {
+                  await RouterClass.nextScreenNormal(
+                    context,
+                    const PremiumUpgradeScreenV2(),
+                  );
+                  if (mounted) {
+                    await _ensureSubscriptionLoaded();
+                  }
+                },
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.workspace_premium,
+                    color: theme.colorScheme.primary,
+                    size: 20,
+                  ),
                 ),
-                child: Icon(
-                  Icons.workspace_premium,
-                  color: theme.colorScheme.primary,
-                  size: 20,
+                title: const Text(
+                  'Upgrade to Premium',
+                  style: TextStyle(fontWeight: FontWeight.w600),
                 ),
-              ),
-              title: const Text(
-                'Upgrade to Premium',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              subtitle: const Text(
-                'Create more events and unlock analytics',
-                style: TextStyle(fontSize: 13),
-              ),
-              trailing: Icon(
-                Icons.chevron_right,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 8,
+                subtitle: const Text(
+                  'Create more events and unlock analytics',
+                  style: TextStyle(fontSize: 13),
+                ),
+                trailing: Icon(
+                  Icons.chevron_right,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 8,
+                ),
               ),
             ),
           );
@@ -578,131 +633,131 @@ class _AccountScreenState extends State<AccountScreen> {
           subtitle = 'Unlimited events • Active';
         }
 
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
-          decoration: BoxDecoration(
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+          child: Material(
             color: tierColor.withValues(alpha: 0.03),
             borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            children: [
-              ListTile(
-                onTap: () async {
-                  await RouterClass.nextScreenNormal(
-                    context,
-                    const SubscriptionManagementScreen(),
-                  );
-                  if (mounted) {
-                    await _ensureSubscriptionLoaded();
-                  }
-                },
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: tierColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    isBasic ? Icons.star : Icons.workspace_premium,
-                    color: tierColor,
-                    size: 20,
-                  ),
-                ),
-                title: Row(
-                  children: [
-                    Text(
-                      '${tier.displayName} Plan',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                ListTile(
+                  onTap: () async {
+                    await RouterClass.nextScreenNormal(
+                      context,
+                      const SubscriptionManagementScreen(),
+                    );
+                    if (mounted) {
+                      await _ensureSubscriptionLoaded();
+                    }
+                  },
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: tierColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'ACTIVE',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                    child: Icon(
+                      isBasic ? Icons.star : Icons.workspace_premium,
+                      color: tierColor,
+                      size: 20,
                     ),
-                  ],
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(subtitle, style: const TextStyle(fontSize: 13)),
-                    if (billingDate != null) ...[
-                      const SizedBox(height: 4),
+                  ),
+                  title: Row(
+                    children: [
                       Text(
-                        'Renews $billingDate',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: theme.colorScheme.onSurfaceVariant.withValues(
-                            alpha: 0.7,
+                        '${tier.displayName} Plan',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'ACTIVE',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                     ],
-                  ],
-                ),
-                trailing: Icon(
-                  Icons.chevron_right,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-              ),
-
-              // Optional: Show upgrade option for Basic users inline
-              if (isBasic)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-                  child: Row(
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: TextButton.icon(
-                          onPressed: () async {
-                            await RouterClass.nextScreenNormal(
-                              context,
-                              const PremiumUpgradeScreenV2(),
-                            );
-                            if (mounted) {
-                              await _ensureSubscriptionLoaded();
-                            }
-                          },
-                          icon: Icon(
-                            Icons.upgrade,
-                            size: 16,
-                            color: theme.colorScheme.primary,
+                      Text(subtitle, style: const TextStyle(fontSize: 13)),
+                      if (billingDate != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Renews $billingDate',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.7),
                           ),
-                          label: Text(
-                            'Upgrade to Premium',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
+                        ),
+                      ],
+                    ],
+                  ),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                ),
+
+                // Optional: Show upgrade option for Basic users inline
+                if (isBasic)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextButton.icon(
+                            onPressed: () async {
+                              await RouterClass.nextScreenNormal(
+                                context,
+                                const PremiumUpgradeScreenV2(),
+                              );
+                              if (mounted) {
+                                await _ensureSubscriptionLoaded();
+                              }
+                            },
+                            icon: Icon(
+                              Icons.upgrade,
+                              size: 16,
                               color: theme.colorScheme.primary,
                             ),
-                          ),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            label: Text(
+                              'Upgrade to Premium',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         );
       },

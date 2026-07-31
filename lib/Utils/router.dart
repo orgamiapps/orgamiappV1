@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:attendus/screens/Home/dashboard_screen.dart';
+import 'package:attendus/screens/Home/dashboard_screen.dart'
+    deferred as dashboard;
 import 'package:attendus/main.dart' show appNavigatorKey;
 import 'package:attendus/screens/Splash/second_splash_screen.dart';
 import 'package:attendus/Utils/logger.dart';
@@ -11,7 +12,9 @@ class RouterClass {
 
   // Optimized transition duration constants
   static const Duration _transitionDuration = Duration(milliseconds: 180);
-  static const Duration _reverseTransitionDuration = Duration(milliseconds: 150);
+  static const Duration _reverseTransitionDuration = Duration(
+    milliseconds: 150,
+  );
 
   Future<T?> appLogout<T>({required BuildContext context}) =>
       Navigator.of(context, rootNavigator: false).pushAndRemoveUntil(
@@ -38,13 +41,14 @@ class RouterClass {
         ),
       );
 
-  Future<T?> homeScreenRoute<T>({required BuildContext context}) {
+  Future<T?> homeScreenRoute<T>({required BuildContext context}) async {
+    await dashboard.loadLibrary();
     final navigator =
         appNavigatorKey.currentState ??
         Navigator.of(context, rootNavigator: true);
     return navigator.pushAndRemoveUntil(
       PageRouteBuilder(
-        pageBuilder: (ctx, a, b) => const DashboardScreen(),
+        pageBuilder: (ctx, a, b) => dashboard.DashboardScreen(),
         transitionsBuilder: (ctx, animation, secondaryAnimation, child) {
           // Optimized fade transition with faster curve
           return FadeTransition(
@@ -61,7 +65,7 @@ class RouterClass {
     );
   }
 
-/// Optimized page route with faster transitions
+  /// Optimized page route with faster transitions
   static PageRouteBuilder<T> optimizedPageRoute<T>(
     Widget page, {
     bool useSlideTransition = false,
@@ -75,8 +79,10 @@ class RouterClass {
           const end = Offset.zero;
           const curve = Curves.easeOutCubic;
 
-          final tween = Tween(begin: begin, end: end)
-              .chain(CurveTween(curve: curve));
+          final tween = Tween(
+            begin: begin,
+            end: end,
+          ).chain(CurveTween(curve: curve));
 
           return SlideTransition(
             position: animation.drive(tween),
@@ -85,9 +91,7 @@ class RouterClass {
         } else {
           // Fast fade transition
           return FadeTransition(
-            opacity: animation.drive(
-              CurveTween(curve: Curves.easeOut),
-            ),
+            opacity: animation.drive(CurveTween(curve: Curves.easeOut)),
             child: child,
           );
         }
@@ -140,11 +144,14 @@ class RouterClass {
         (route) => false,
       );
     } catch (e) {
-      Logger.error('Navigation error in nextScreenAndReplacementAndRemoveUntil', e);
+      Logger.error(
+        'Navigation error in nextScreenAndReplacementAndRemoveUntil',
+        e,
+      );
       return Future.value(null);
     }
   }
-  
+
   /// Safely pop the navigation stack
   static void safelyPop(BuildContext context) {
     try {
@@ -157,7 +164,7 @@ class RouterClass {
       Logger.error('Error during navigation pop', e);
     }
   }
-  
+
   /// Safely check if we can pop the navigation stack
   static bool canPop(BuildContext context) {
     try {

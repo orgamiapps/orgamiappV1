@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:geocoding/geocoding.dart';
+import 'package:attendus/Utils/geocoding_compat.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:attendus/screens/Events/add_questions_prompt_screen.dart';
@@ -280,12 +280,12 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
           .collection(EventModel.firebaseKey)
           .doc(widget.eventModel!.id)
           .update({
-        'latitude': selectedLocation!.latitude,
-        'longitude': selectedLocation!.longitude,
-        'radius': radius,
-        'location': address,
-        'getLocation': true,
-      });
+            'latitude': selectedLocation!.latitude,
+            'longitude': selectedLocation!.longitude,
+            'radius': radius,
+            'location': address,
+            'getLocation': true,
+          });
 
       if (kDebugMode) {
         debugPrint('✅ SUCCESS: Event location updated successfully');
@@ -293,9 +293,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
 
       if (!mounted) return;
 
-      ShowToast().showNormalToast(
-        msg: 'Location updated successfully!',
-      );
+      ShowToast().showNormalToast(msg: 'Location updated successfully!');
 
       // Wait a moment for the toast to show, then pop
       await Future.delayed(const Duration(milliseconds: 500));
@@ -308,9 +306,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
 
       if (!mounted) return;
 
-      ShowToast().showNormalToast(
-        msg: 'Failed to update location: $e',
-      );
+      ShowToast().showNormalToast(msg: 'Failed to update location: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -390,7 +386,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFBFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: FadeTransition(opacity: _fadeAnimation, child: _bodyView()),
       ),
@@ -673,35 +669,38 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
                 color: Colors.transparent,
                 child: InkWell(
                   borderRadius: BorderRadius.circular(16),
-                  onTap: _isSaving ? null : () {
-                    if (kDebugMode) {
-                      debugPrint('Selected Location: $selectedLocation');
-                      debugPrint('Selected Radius: $radius feet');
-                    }
+                  onTap: _isSaving
+                      ? null
+                      : () {
+                          if (kDebugMode) {
+                            debugPrint('Selected Location: $selectedLocation');
+                            debugPrint('Selected Radius: $radius feet');
+                          }
 
-                    // If editing an existing event, save the location
-                    if (widget.eventModel != null) {
-                      _saveLocationToEvent();
-                    } else {
-                      // Otherwise, continue to next screen in event creation flow
-                      RouterClass.nextScreenNormal(
-                        context,
-                        AddQuestionsPromptScreen(
-                          selectedDateTime: widget.selectedDateTime,
-                          eventDurationHours: widget.eventDurationHours,
-                          selectedLocation: selectedLocation!,
-                          radios: radius,
-                          selectedSignInMethods:
-                              widget.selectedSignInMethods ??
-                              const ['qr_code', 'manual_code'],
-                          manualCode: widget.manualCode,
-                          preselectedOrganizationId:
-                              widget.preselectedOrganizationId,
-                          forceOrganizationEvent: widget.forceOrganizationEvent,
-                        ),
-                      );
-                    }
-                  },
+                          // If editing an existing event, save the location
+                          if (widget.eventModel != null) {
+                            _saveLocationToEvent();
+                          } else {
+                            // Otherwise, continue to next screen in event creation flow
+                            RouterClass.nextScreenNormal(
+                              context,
+                              AddQuestionsPromptScreen(
+                                selectedDateTime: widget.selectedDateTime,
+                                eventDurationHours: widget.eventDurationHours,
+                                selectedLocation: selectedLocation!,
+                                radios: radius,
+                                selectedSignInMethods:
+                                    widget.selectedSignInMethods ??
+                                    const ['qr_code', 'manual_code'],
+                                manualCode: widget.manualCode,
+                                preselectedOrganizationId:
+                                    widget.preselectedOrganizationId,
+                                forceOrganizationEvent:
+                                    widget.forceOrganizationEvent,
+                              ),
+                            );
+                          }
+                        },
                   child: Center(
                     child: _isSaving
                         ? const SizedBox(

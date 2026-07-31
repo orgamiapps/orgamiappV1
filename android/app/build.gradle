@@ -6,12 +6,34 @@ plugins {
     id "com.google.gms.google-services"
 }
 
-def kotlin_version = '2.1.0'
+def kotlin_version = '2.3.10'
+def mapsAndroidApiKey = System.getenv('GOOGLE_MAPS_ANDROID_API_KEY') ?: ''
+
+if (!mapsAndroidApiKey) {
+    def localPropertiesFile = rootProject.file('local.properties')
+    if (localPropertiesFile.exists()) {
+        def localProperties = new Properties()
+        localPropertiesFile.withInputStream { localProperties.load(it) }
+        mapsAndroidApiKey = localProperties.getProperty('GOOGLE_MAPS_ANDROID_API_KEY', '')
+    }
+}
+
+def isReleaseBuild = gradle.startParameter.taskNames.any {
+    it.toLowerCase().contains('release')
+}
+if (isReleaseBuild && !mapsAndroidApiKey) {
+    throw new GradleException(
+        'GOOGLE_MAPS_ANDROID_API_KEY is required for Android release builds.'
+    )
+}
 
 android {
     namespace = "com.stormdeve.orgami"
     compileSdk = 36
-    ndkVersion = "27.0.12077973"
+    // Use the highest NDK required by native plugins (currently `jni`).
+    // Newer NDK releases remain backward-compatible with plugins that request
+    // older versions.
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -32,6 +54,8 @@ android {
         targetSdk = rootProject.ext.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // Preserve Flutter's `applicationName` placeholder while adding Maps.
+        manifestPlaceholders["GOOGLE_MAPS_ANDROID_API_KEY"] = mapsAndroidApiKey
     }
 
     buildTypes {

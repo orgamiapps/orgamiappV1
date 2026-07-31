@@ -214,7 +214,7 @@ class _AttendeeNotificationScreenState extends State<AttendeeNotificationScreen>
   @override
   Widget build(BuildContext context) {
     return AppScaffoldWrapper(
-      selectedBottomNavIndex: 5, // Account tab
+      selectedBottomNavIndex: 4, // Account tab
       backgroundColor: AppThemeColor.backGroundColor,
       body: SafeArea(
         child: Column(
@@ -222,7 +222,8 @@ class _AttendeeNotificationScreenState extends State<AttendeeNotificationScreen>
             AppAppBarView.modernHeader(
               context: context,
               title: 'Send Notifications',
-              subtitle: 'Send SMS or in-app notifications to previous attendees',
+              subtitle:
+                  'Send SMS or in-app notifications to previous attendees',
             ),
 
             // Tab Bar

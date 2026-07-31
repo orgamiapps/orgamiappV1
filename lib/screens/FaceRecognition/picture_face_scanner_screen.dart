@@ -67,18 +67,16 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
   int _scanAttempts = 0;
   Timer? _autoScanTimer;
   Timer? _initializationTimeout;
-  
+
   // Caching enrollments with user names for faster matching
   Map<String, EnrollmentCache>? _cachedEnrollments;
-  
+
   // Constants
   static const SCANNER_INIT_TIMEOUT = Duration(seconds: 30);
 
   // Animation
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-
-  
 
   @override
   void initState() {
@@ -101,7 +99,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
 
   void _startScanning() async {
     _updateState(ScanState.INITIALIZING);
-    
+
     // Start initialization timeout
     _initializationTimeout = Timer(SCANNER_INIT_TIMEOUT, () {
       _handleInitializationTimeout();
@@ -109,7 +107,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
 
     try {
       _updateStatus('Initializing scanner...');
-      
+
       // Run enrollment check and face detector initialization in parallel
       final results = await Future.wait([
         _checkEnrollmentStatus(),
@@ -118,10 +116,10 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
           return false;
         }),
       ]);
-      
+
       final isEnrolled = results[0];
       final faceDetectorReady = results[1];
-      
+
       if (!isEnrolled) {
         _initializationTimeout?.cancel();
         _updateState(ScanState.NOT_ENROLLED);
@@ -129,7 +127,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
         _showEnrollmentPrompt();
         return;
       }
-      
+
       if (!faceDetectorReady) {
         _initializationTimeout?.cancel();
         _handleError('Failed to initialize face detection');
@@ -171,7 +169,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
       return false;
     }
   }
-  
+
   Future<bool> _performEnrollmentCheck() async {
     try {
       // Get user identity using centralized service
@@ -187,7 +185,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
 
       // Log identity details for debugging
       UserIdentityService.logIdentityDetails(userIdentity, 'Scanner Check');
-      
+
       final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(
         widget.eventModel.id,
         userIdentity.userId,
@@ -199,10 +197,12 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
         eventId: widget.eventModel.id,
       );
 
-      _logTimestamp('Enrollment status for ${userIdentity.userName}: $isEnrolled');
-      
+      _logTimestamp(
+        'Enrollment status for ${userIdentity.userName}: $isEnrolled',
+      );
+
       // Identity resolved; proceed to enrollment check
-      
+
       return isEnrolled;
     } catch (e) {
       _logTimestamp('Error in enrollment check: $e');
@@ -221,7 +221,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
     );
 
     _faceDetector = FaceDetector(options: options);
-    
+
     // Initialize with progress updates
     await _faceService.initialize(
       useFastMode: false,
@@ -362,12 +362,12 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
       }
 
       FaceMatchResult? matchResult;
-      
+
       // Try matching with cache first for faster performance
       if (_cachedEnrollments != null && _cachedEnrollments!.isNotEmpty) {
         matchResult = await _matchFaceWithCache(face);
       }
-      
+
       // Fallback to service method if cache matching fails
       if (matchResult == null || !matchResult.matched) {
         matchResult = await _faceService.matchFace(
@@ -398,7 +398,9 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
     _logTimestamp('✅ Face matched successfully!');
     _logTimestamp('  - User: ${matchResult.userName}');
     _logTimestamp('  - UserID: ${matchResult.userId}');
-    _logTimestamp('  - Confidence: ${(matchResult.confidence * 100).toStringAsFixed(1)}%');
+    _logTimestamp(
+      '  - Confidence: ${(matchResult.confidence * 100).toStringAsFixed(1)}%',
+    );
 
     // Haptic feedback - use medium impact for smoother feel
     HapticFeedback.mediumImpact();
@@ -430,7 +432,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
 
   void _handleNoMatch(FaceMatchResult? matchResult) {
     _updateState(ScanState.NO_MATCH);
-    
+
     // Provide helpful feedback based on similarity score
     if (matchResult != null && matchResult.confidence > 0.5) {
       _updateStatus('Almost there! Please adjust your position.');
@@ -502,12 +504,12 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
 
       // No questions - save attendance directly
       _logTimestamp('No event questions, saving attendance directly');
-      
+
       // Save with retry logic for reliability
       const maxRetries = 3;
       int attempts = 0;
       bool saved = false;
-      
+
       while (!saved && attempts < maxRetries) {
         attempts++;
         try {
@@ -515,30 +517,38 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
               .collection(AttendanceModel.firebaseKey)
               .doc(attendanceId)
               .set(attendance.toJson(), SetOptions(merge: false));
-          
+
           // Verify the save was successful
           final savedDoc = await FirebaseFirestore.instance
               .collection(AttendanceModel.firebaseKey)
               .doc(attendanceId)
               .get();
-          
+
           if (savedDoc.exists) {
             saved = true;
             final savedData = savedDoc.data();
-            _logTimestamp('✅ Attendance saved to Firestore: ${AttendanceModel.firebaseKey}/$attendanceId (attempt $attempts)');
-            _logTimestamp('✅ Verified - UserName in saved doc: ${savedData?['userName']}');
-            _logTimestamp('✅ Verified - EventID in saved doc: ${savedData?['eventId']}');
+            _logTimestamp(
+              '✅ Attendance saved to Firestore: ${AttendanceModel.firebaseKey}/$attendanceId (attempt $attempts)',
+            );
+            _logTimestamp(
+              '✅ Verified - UserName in saved doc: ${savedData?['userName']}',
+            );
+            _logTimestamp(
+              '✅ Verified - EventID in saved doc: ${savedData?['eventId']}',
+            );
           } else {
             throw Exception('Document was not saved - verification failed');
           }
         } catch (e) {
-          _logTimestamp('⚠️ Failed to save attendance (attempt $attempts/$maxRetries): $e');
+          _logTimestamp(
+            '⚠️ Failed to save attendance (attempt $attempts/$maxRetries): $e',
+          );
           if (attempts < maxRetries) {
             await Future.delayed(Duration(milliseconds: 500 * attempts));
           }
         }
       }
-      
+
       if (!saved) {
         throw Exception('Failed to save attendance after $maxRetries attempts');
       }
@@ -551,13 +561,15 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
         _logTimestamp('Warning: Failed to clear attendance cache: $e');
       }
 
-      _logTimestamp('✅ User $userName signed in successfully via facial recognition');
+      _logTimestamp(
+        '✅ User $userName signed in successfully via facial recognition',
+      );
     } catch (e) {
       _logTimestamp('❌ Failed to record attendance: $e');
       throw e;
     }
   }
-  
+
   /// Load enrollments into cache with user names for faster matching
   Future<void> _loadEnrollmentsCache() async {
     try {
@@ -579,13 +591,15 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
         );
       }
 
-      _logTimestamp('Cached ${_cachedEnrollments!.length} enrollments with user names');
+      _logTimestamp(
+        'Cached ${_cachedEnrollments!.length} enrollments with user names',
+      );
     } catch (e) {
       _logTimestamp('Failed to load enrollments cache: $e');
       _cachedEnrollments = {};
     }
   }
-  
+
   /// Match face using cached enrollments (faster than querying Firebase)
   Future<FaceMatchResult?> _matchFaceWithCache(Face detectedFace) async {
     if (_cachedEnrollments == null || _cachedEnrollments!.isEmpty) {
@@ -617,7 +631,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
 
       if (similarity > highestSimilarity) {
         highestSimilarity = similarity;
-        
+
         if (similarity >= matchingThreshold) {
           bestMatch = FaceMatchResult(
             matched: true,
@@ -682,7 +696,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
     _errorMessage = message;
     ShowToast().showNormalToast(msg: message);
   }
-  
+
   void _handleInitializationTimeout() {
     _logTimestamp('Initialization timeout after 30 seconds');
     _updateState(ScanState.ERROR);
@@ -691,7 +705,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
     ShowToast().showNormalToast(
       msg: 'Face scanner initialization timeout. Please try again.',
     );
-    
+
     // Clean up resources
     _cameraController?.dispose();
     _faceDetector?.close();
@@ -792,10 +806,9 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
-        title: Text(
-          'Face Recognition Sign-In',
-          style: TextStyle(color: Colors.white),
-        ),
+        foregroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        title: const Text('Face recognition check-in'),
         actions: const [],
       ),
       body: Stack(
@@ -807,7 +820,8 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
             Center(child: CircularProgressIndicator(color: Colors.white)),
 
           // Face Guide
-          if (_currentState == ScanState.READY || _currentState == ScanState.SCANNING)
+          if (_currentState == ScanState.READY ||
+              _currentState == ScanState.SCANNING)
             CustomPaint(
               painter: ScannerGuidePainter(animation: _pulseAnimation),
               child: Container(),
@@ -815,8 +829,6 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
 
           // Status Panel
           _buildStatusPanel(),
-
-          
 
           // Manual Scan Button
           if (_currentState == ScanState.READY && !_isScanning)
@@ -881,8 +893,6 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
       ),
     );
   }
-
-  
 
   Widget _buildScanButton() {
     return Positioned(
@@ -1080,23 +1090,54 @@ class ScannerGuidePainter extends CustomPainter {
     final bottom = center.dy + radius;
 
     // Top-left corner
-    canvas.drawLine(Offset(left, top), Offset(left + cornerSize, top), cornerPaint);
-    canvas.drawLine(Offset(left, top), Offset(left, top + cornerSize), cornerPaint);
+    canvas.drawLine(
+      Offset(left, top),
+      Offset(left + cornerSize, top),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(left, top),
+      Offset(left, top + cornerSize),
+      cornerPaint,
+    );
 
     // Top-right corner
-    canvas.drawLine(Offset(right, top), Offset(right - cornerSize, top), cornerPaint);
-    canvas.drawLine(Offset(right, top), Offset(right, top + cornerSize), cornerPaint);
+    canvas.drawLine(
+      Offset(right, top),
+      Offset(right - cornerSize, top),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(right, top),
+      Offset(right, top + cornerSize),
+      cornerPaint,
+    );
 
     // Bottom-left corner
-    canvas.drawLine(Offset(left, bottom), Offset(left + cornerSize, bottom), cornerPaint);
-    canvas.drawLine(Offset(left, bottom), Offset(left, bottom - cornerSize), cornerPaint);
+    canvas.drawLine(
+      Offset(left, bottom),
+      Offset(left + cornerSize, bottom),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(left, bottom),
+      Offset(left, bottom - cornerSize),
+      cornerPaint,
+    );
 
     // Bottom-right corner
-    canvas.drawLine(Offset(right, bottom), Offset(right - cornerSize, bottom), cornerPaint);
-    canvas.drawLine(Offset(right, bottom), Offset(right, bottom - cornerSize), cornerPaint);
+    canvas.drawLine(
+      Offset(right, bottom),
+      Offset(right - cornerSize, bottom),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(right, bottom),
+      Offset(right, bottom - cornerSize),
+      cornerPaint,
+    );
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
-
