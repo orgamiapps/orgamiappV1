@@ -34,6 +34,7 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/dist/
 .firebase/
 analyze_output.txt
 launch_analyze_output.txt
