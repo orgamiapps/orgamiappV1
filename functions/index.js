@@ -305,6 +305,13 @@ exports.reverseGeocode = onCall(
 // Initialize Firebase Admin SDK
 const admin = require("firebase-admin");
 admin.initializeApp();
+
+// Separate, secured Windows administrator API. The desktop client uses Firebase
+// Auth ID tokens over HTTPS and never receives Admin SDK or Stripe credentials.
+const {createAdminApi} = require("./admin/api");
+const {createMetricsAggregator} = require("./admin/metrics");
+exports.adminApi = createAdminApi(admin);
+exports.aggregateAdminMetricsDaily = createMetricsAggregator(admin);
 // Optional Twilio setup for SMS sending
 let twilioClient = null;
 try {
@@ -2987,14 +2994,33 @@ exports.submitUserReport = onCall({region: "us-central1"}, async (request) => {
 exports.setAdminByEmail = onCall({ region: "us-central1" }, async (req) => {
   const caller = req.auth?.token;
   if (!caller || caller.admin !== true) {
-    throw new Error("PERMISSION_DENIED: Admins only");
+    throw new HttpsError("permission-denied", "Administrators only");
   }
-  const { email, admin } = req.data || {};
-  if (!email || typeof admin !== 'boolean') {
-    throw new Error("INVALID_ARGUMENT: { email, admin } required");
+  const callerRole = await admin.firestore().collection("admin_roles").doc(req.auth.uid).get();
+  if (!callerRole.exists || callerRole.get("active") !== true ||
+      !(callerRole.get("roles") || []).includes("super_admin")) {
+    throw new HttpsError("permission-denied", "Super administrators only");
+  }
+  const {email, enabled} = req.data || {};
+  if (!email || typeof enabled !== "boolean") {
+    throw new HttpsError("invalid-argument", "{ email, enabled } required");
   }
   const user = await admin.auth().getUserByEmail(email);
-  await admin.auth().setCustomUserClaims(user.uid, { admin });
+  const existingClaims = user.customClaims || {};
+  await admin.auth().setCustomUserClaims(user.uid, {...existingClaims, admin: enabled});
+  await admin.firestore().collection("admin_audit_logs").doc().create({
+    actorUid: req.auth.uid,
+    actorEmail: req.auth.token.email || null,
+    actorRoles: callerRole.get("roles"),
+    action: "admin.coarse-claim.update",
+    targetType: "account",
+    targetId: user.uid,
+    reason: "Legacy secured setAdminByEmail callable",
+    requestId: `legacy-${Date.now()}`,
+    before: {admin: existingClaims.admin === true},
+    after: {admin: enabled},
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
   return { status: "ok" };
 });
 
@@ -3902,8 +3928,13 @@ exports.sendBasicTierUsageReminder = onSchedule({
 exports.backfillUserAnalytics = onCall({ region: "us-central1" }, async (req) => {
   try {
     // Require admin auth (check if caller has admin custom claim)
-    if (!req.auth) {
-      throw new Error("Authentication required");
+    if (!req.auth || req.auth.token.admin !== true) {
+      throw new HttpsError("permission-denied", "Administrator access required");
+    }
+    const role = await admin.firestore().collection("admin_roles").doc(req.auth.uid).get();
+    if (!role.exists || role.get("active") !== true ||
+        !(role.get("roles") || []).some((item) => item === "super_admin" || item === "analyst")) {
+      throw new HttpsError("permission-denied", "Analyst or super administrator role required");
     }
 
     logger.info("Starting user analytics backfill...");
