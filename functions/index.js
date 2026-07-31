@@ -3001,9 +3001,13 @@ exports.setAdminByEmail = onCall({ region: "us-central1" }, async (req) => {
       !(callerRole.get("roles") || []).includes("super_admin")) {
     throw new HttpsError("permission-denied", "Super administrators only");
   }
-  const {email, enabled} = req.data || {};
-  if (!email || typeof enabled !== "boolean") {
-    throw new HttpsError("invalid-argument", "{ email, enabled } required");
+  const {email, enabled, reason, confirmed} = req.data || {};
+  if (!email || typeof enabled !== "boolean" || confirmed !== true ||
+      typeof reason !== "string" || reason.trim().length < 10 || reason.length > 500) {
+    throw new HttpsError(
+      "invalid-argument",
+      "{ email, enabled, confirmed: true, reason (10-500 chars) } required",
+    );
   }
   const user = await admin.auth().getUserByEmail(email);
   const existingClaims = user.customClaims || {};
@@ -3015,7 +3019,7 @@ exports.setAdminByEmail = onCall({ region: "us-central1" }, async (req) => {
     action: "admin.coarse-claim.update",
     targetType: "account",
     targetId: user.uid,
-    reason: "Legacy secured setAdminByEmail callable",
+    reason: reason.trim(),
     requestId: `legacy-${Date.now()}`,
     before: {admin: existingClaims.admin === true},
     after: {admin: enabled},
@@ -3936,6 +3940,27 @@ exports.backfillUserAnalytics = onCall({ region: "us-central1" }, async (req) =>
         !(role.get("roles") || []).some((item) => item === "super_admin" || item === "analyst")) {
       throw new HttpsError("permission-denied", "Analyst or super administrator role required");
     }
+    const {reason, confirmed} = req.data || {};
+    if (confirmed !== true || typeof reason !== "string" ||
+        reason.trim().length < 10 || reason.length > 500) {
+      throw new HttpsError(
+        "invalid-argument",
+        "{ confirmed: true, reason (10-500 chars) } required",
+      );
+    }
+    await admin.firestore().collection("admin_audit_logs").doc().create({
+      actorUid: req.auth.uid,
+      actorEmail: req.auth.token.email || null,
+      actorRoles: role.get("roles"),
+      action: "analytics.backfill.requested",
+      targetType: "user_analytics",
+      targetId: "all-event-creators",
+      reason: reason.trim(),
+      requestId: `backfill-${Date.now()}`,
+      before: null,
+      after: {status: "started"},
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
 
     logger.info("Starting user analytics backfill...");
     const db = admin.firestore();
