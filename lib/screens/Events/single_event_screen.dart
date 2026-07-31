@@ -68,7 +68,7 @@ import 'package:attendus/screens/FaceRecognition/picture_face_scanner_screen.dar
 import 'package:attendus/screens/FaceRecognition/picture_face_enrollment_screen.dart';
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 import 'package:attendus/screens/Events/Widget/delete_event_dialogue.dart';
-import 'package:attendus/services/event_flyer_generator.dart';
+import 'package:attendus/Services/event_flyer_generator.dart';
 import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
 import 'dart:io';
