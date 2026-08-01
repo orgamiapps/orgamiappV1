@@ -31,12 +31,12 @@ if (-not (Test-Path -LiteralPath $exe)) { throw "Windows release executable was 
 $runtimeFiles = @("flutter_windows.dll", "data\app.so", "data\flutter_assets\AssetManifest.bin")
 foreach ($runtimeFile in $runtimeFiles) { if (-not (Test-Path -LiteralPath (Join-Path $releaseRoot $runtimeFile))) { throw "Release smoke test failed: missing $runtimeFile" } }
 
-$isccCandidates = @(
+$isccCandidates = @(@(
   (Get-Command iscc.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue),
   "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
   "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
   "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
-) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+) | Where-Object { $_ -and (Test-Path -LiteralPath $_) })
 New-Item -ItemType Directory -Force -Path $distRoot | Out-Null
 if ($isccCandidates.Count -gt 0) {
   & $isccCandidates[0] "/DMyAppVersion=$Version" "/DBuildRoot=$releaseRoot" "/DOutputRoot=$distRoot" (Join-Path $repoRoot "installer\attendus_admin.iss")

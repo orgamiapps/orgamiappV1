@@ -1,7 +1,7 @@
 name: attendus_admin
 description: Secure Windows administration console for Attendus.
 publish_to: none
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ^3.9.0
