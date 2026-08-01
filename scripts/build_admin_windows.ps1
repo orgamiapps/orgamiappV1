@@ -13,6 +13,9 @@ $distRoot = Join-Path $repoRoot "dist"
 if ([string]::IsNullOrWhiteSpace($env:ATTENDUS_FIREBASE_API_KEY)) {
   throw "Set ATTENDUS_FIREBASE_API_KEY to the Firebase web API key after restricting it to required Firebase APIs and the distributed application."
 }
+if ([string]::IsNullOrWhiteSpace($env:ATTENDUS_GOOGLE_OAUTH_CLIENT_ID) -or $env:ATTENDUS_GOOGLE_OAUTH_CLIENT_ID -notmatch '^[A-Za-z0-9-]+\.apps\.googleusercontent\.com$') {
+  throw "Set ATTENDUS_GOOGLE_OAUTH_CLIENT_ID to a Google OAuth 2.0 Desktop app client ID for orgami-66nxok."
+}
 if (-not (Get-Command flutter -ErrorAction SilentlyContinue)) { throw "Flutter is required on the build machine." }
 
 Push-Location $appRoot
@@ -20,7 +23,7 @@ try {
   flutter pub get
   if (-not $SkipTests) { flutter test }
   flutter analyze
-  flutter build windows --release --build-name $Version --dart-define="ATTENDUS_FIREBASE_API_KEY=$($env:ATTENDUS_FIREBASE_API_KEY)" --dart-define="ATTENDUS_ADMIN_API_URL=$ApiUrl"
+  flutter build windows --release --build-name $Version --dart-define="ATTENDUS_FIREBASE_API_KEY=$($env:ATTENDUS_FIREBASE_API_KEY)" --dart-define="ATTENDUS_GOOGLE_OAUTH_CLIENT_ID=$($env:ATTENDUS_GOOGLE_OAUTH_CLIENT_ID)" --dart-define="ATTENDUS_ADMIN_API_URL=$ApiUrl"
 } finally { Pop-Location }
 
 $exe = Join-Path $releaseRoot "attendus_admin.exe"

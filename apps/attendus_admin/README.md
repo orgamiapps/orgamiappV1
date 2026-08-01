@@ -8,12 +8,13 @@ Use a Firebase API key that is restricted in Google Cloud to only the required F
 
 ```powershell
 $env:ATTENDUS_FIREBASE_API_KEY = "restricted-public-firebase-key"
-flutter run -d windows --dart-define="ATTENDUS_FIREBASE_API_KEY=$env:ATTENDUS_FIREBASE_API_KEY" --dart-define="ATTENDUS_ADMIN_API_URL=http://127.0.0.1:5001/orgami-66nxok/us-central1/adminApi"
+$env:ATTENDUS_GOOGLE_OAUTH_CLIENT_ID = "desktop-client-id.apps.googleusercontent.com"
+flutter run -d windows --dart-define="ATTENDUS_FIREBASE_API_KEY=$env:ATTENDUS_FIREBASE_API_KEY" --dart-define="ATTENDUS_GOOGLE_OAUTH_CLIENT_ID=$env:ATTENDUS_GOOGLE_OAUTH_CLIENT_ID" --dart-define="ATTENDUS_ADMIN_API_URL=http://127.0.0.1:5001/orgami-66nxok/us-central1/adminApi"
 ```
 
 The API must be deployed or running in the Firebase Emulator Suite. A valid administrator needs both the `admin: true` custom claim and an active `admin_roles/{uid}` document. Never create either from this desktop client.
 
-Email/password and Google sign-in are supported. Before using Google sign-in, enable the Google provider in Firebase Console under **Authentication → Sign-in method** for `orgami-66nxok`. The Windows client uses Firebase Auth's native system-browser provider flow and does not embed a Google client secret. The selected Google email must already represent a Firebase Auth user that has been granted the required administrator claim and role.
+Email/password and Google sign-in are supported. Before using Google sign-in, enable the Google provider in Firebase Console under **Authentication → Sign-in method** for `orgami-66nxok`. In Google Cloud Console, open **APIs & Services → Credentials**, create an OAuth 2.0 Client ID with application type **Desktop app**, and supply its public client ID as `ATTENDUS_GOOGLE_OAUTH_CLIENT_ID` when building. Do not create or embed a client secret. The Windows client opens the system browser, obtains short-lived Google tokens, and exchanges them for a Firebase credential. The selected Google email must represent a Firebase Auth user with the required administrator claim and role.
 
 ## Installer
 
@@ -21,6 +22,7 @@ Install Flutter, Visual Studio 2022 Desktop development with C++, and Inno Setup
 
 ```powershell
 $env:ATTENDUS_FIREBASE_API_KEY = "restricted-public-firebase-key"
+$env:ATTENDUS_GOOGLE_OAUTH_CLIENT_ID = "desktop-client-id.apps.googleusercontent.com"
 .\scripts\build_admin_windows.ps1 -Version 1.0.0
 ```
 

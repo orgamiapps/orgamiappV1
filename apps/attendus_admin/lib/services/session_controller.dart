@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../core/permissions.dart';
+import '../google_oauth_config.dart';
 import '../models/api_models.dart';
 import 'admin_api_client.dart';
 
@@ -22,6 +24,9 @@ class SessionController extends ChangeNotifier {
   }
   final FirebaseAuth _auth;
   final AdminApiClient _api;
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: const ['email', 'profile'],
+  );
   StreamSubscription<User?>? _subscription;
   SessionStatus status = SessionStatus.loading;
   AdminPermissions permissions = const AdminPermissions({});
@@ -58,9 +63,24 @@ class SessionController extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      final provider = GoogleAuthProvider()
-        ..setCustomParameters({'prompt': 'select_account'});
-      await _auth.signInWithProvider(provider);
+      if (!isGoogleDesktopOAuthConfigured) {
+        throw StateError(
+          'Google desktop OAuth is not configured in this build.',
+        );
+      }
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        error = 'Google sign-in was canceled.';
+        status = SessionStatus.signedOut;
+        notifyListeners();
+        return;
+      }
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      await _auth.signInWithCredential(credential);
     } on FirebaseAuthException catch (e) {
       error = switch (e.code) {
         'web-context-cancelled' ||
@@ -72,8 +92,13 @@ class SessionController extends ChangeNotifier {
       };
       status = SessionStatus.signedOut;
       notifyListeners();
+    } on StateError catch (e) {
+      error = e.message;
+      status = SessionStatus.signedOut;
+      notifyListeners();
     } catch (_) {
-      error = 'Google sign-in could not be completed.';
+      error =
+          'Google sign-in could not be completed. Check the desktop OAuth client configuration.';
       status = SessionStatus.signedOut;
       notifyListeners();
     }
@@ -99,7 +124,13 @@ class SessionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> signOut() => _auth.signOut();
+  Future<void> signOut() async {
+    if (isGoogleDesktopOAuthConfigured) {
+      await _googleSignIn.signOut();
+    }
+    await _auth.signOut();
+  }
+
   @override
   void dispose() {
     _subscription?.cancel();
