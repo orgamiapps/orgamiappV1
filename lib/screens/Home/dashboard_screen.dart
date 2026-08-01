@@ -19,8 +19,13 @@ import 'package:attendus/widgets/deferred_screen_loader.dart';
 
 class DashboardScreen extends StatefulWidget {
   final int initialIndex;
+  final bool restoreSavedTab;
 
-  const DashboardScreen({super.key, this.initialIndex = 0});
+  const DashboardScreen({
+    super.key,
+    this.initialIndex = 0,
+    this.restoreSavedTab = true,
+  });
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -75,6 +80,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _restoreTabIndexIfNeeded() async {
+    if (!widget.restoreSavedTab) {
+      Logger.debug('DashboardScreen: Saved tab restore disabled');
+      return;
+    }
     if (widget.initialIndex != 0) {
       Logger.debug(
         'DashboardScreen: Using provided initialIndex: $_selectedIndex',

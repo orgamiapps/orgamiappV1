@@ -182,10 +182,21 @@
       });
     }
 
-    // Remove Flutter's deprecated app-cache worker before bootstrapping. The
-    // cleanup is capped so Safari storage APIs can never hold up startup.
+    // Remove the retired Flutter app-cache worker once. Repeating this on
+    // every visit discards the large engine/app cache and makes returning
+    // users download the application again.
     (async function bootstrapAttendus() {
+      const cleanupKey = 'attendus-legacy-flutter-cache-cleanup-v1';
+      let needsCleanup = true;
+      try {
+        needsCleanup = window.localStorage.getItem(cleanupKey) !== 'done';
+      } catch (_) {
+        // Storage can be unavailable in private browsing. The cleanup remains
+        // best-effort and is still capped below.
+      }
+
       const cleanup = (async function cleanupLegacyFlutterCache() {
+        if (!needsCleanup) return;
         try {
           if ('serviceWorker' in navigator) {
             const registrations = await navigator.serviceWorker.getRegistrations();
@@ -211,6 +222,12 @@
           }
         } catch (error) {
           console.warn('Legacy Flutter cache cleanup was skipped:', error);
+        } finally {
+          try {
+            window.localStorage.setItem(cleanupKey, 'done');
+          } catch (_) {
+            // Persistent storage is optional; startup must still continue.
+          }
         }
       })();
 

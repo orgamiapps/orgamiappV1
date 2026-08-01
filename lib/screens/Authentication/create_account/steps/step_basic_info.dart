@@ -400,7 +400,8 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
                 ShowToast().showNormalToast(msg: 'Login error');
               }
             } else {
-              if (!FirebaseGoogleAuthHelper.lastGoogleCancelled) {
+              if (!FirebaseGoogleAuthHelper.lastGoogleCancelled &&
+                  !FirebaseGoogleAuthHelper.lastGoogleRedirectStarted) {
                 ShowToast().showNormalToast(
                   msg:
                       FirebaseGoogleAuthHelper.lastGoogleErrorMessage ??

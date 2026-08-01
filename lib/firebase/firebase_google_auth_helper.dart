@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:attendus/Utils/app_constants.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
@@ -11,12 +12,14 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   static bool lastGoogleCancelled = false;
+  static bool lastGoogleRedirectStarted = false;
   static bool lastAppleCancelled = false;
   static String? lastGoogleErrorMessage;
   static String? lastAppleErrorMessage;
 
   Future<Map<String, dynamic>?> loginWithGoogle() async {
     lastGoogleCancelled = false;
+    lastGoogleRedirectStarted = false;
     lastGoogleErrorMessage = null;
 
     try {
@@ -24,6 +27,16 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
         ..addScope('email')
         ..addScope('profile')
         ..setCustomParameters({'prompt': 'select_account'});
+
+      // Mobile browsers can replace the current tab while completing a popup
+      // sign-in. Use Firebase's redirect flow there so the result can be
+      // recovered reliably when Attendus is loaded again.
+      if (_usesGoogleRedirectFlow) {
+        Logger.info('Starting Google redirect sign-in for mobile web');
+        lastGoogleRedirectStarted = true;
+        await _auth.signInWithRedirect(provider);
+        return null;
+      }
 
       final UserCredential credential = kIsWeb
           ? await _auth
@@ -76,6 +89,52 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
       return null;
     }
   }
+
+  /// Completes a Google redirect after a mobile web OAuth round trip.
+  ///
+  /// A successful redirect reloads the Flutter app, so the original button
+  /// callback no longer exists. The startup auth gate calls this before it
+  /// decides whether to show onboarding or the authenticated app.
+  Future<Map<String, dynamic>?> completeGoogleRedirectSignIn() async {
+    if (!kIsWeb) return null;
+
+    try {
+      final credential = await _auth.getRedirectResult().timeout(
+        const Duration(seconds: 45),
+      );
+      final user = credential.user;
+      if (user == null) return null;
+
+      final isGoogleSignIn = user.providerData.any(
+        (provider) => provider.providerId == 'google.com',
+      );
+      if (!isGoogleSignIn) return null;
+
+      Logger.info('Completed Google redirect sign-in: ${user.uid}');
+      return _profileDataFromUser(user, providerId: 'google.com');
+    } on FirebaseAuthException catch (error) {
+      if (_isAuthCancellation(error)) {
+        Logger.info('Google redirect sign-in cancelled: ${error.code}');
+        return null;
+      }
+      Logger.error(
+        'Google redirect sign-in failed: ${error.code} ${error.message}',
+        error,
+      );
+      return null;
+    } on TimeoutException catch (error) {
+      Logger.error('Google redirect result timed out', error);
+      return null;
+    } catch (error) {
+      Logger.error('Could not complete Google redirect sign-in', error);
+      return null;
+    }
+  }
+
+  static bool get _usesGoogleRedirectFlow =>
+      kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
 
   Future<Map<String, dynamic>?> loginWithApple() async {
     lastAppleCancelled = false;

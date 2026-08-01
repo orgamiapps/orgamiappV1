@@ -279,27 +279,13 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   Widget _buildDiscoveryHeader({required bool isGuestMode}) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 840;
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (wide)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(flex: 3, child: _buildSearchLauncher()),
-                    const SizedBox(width: 16),
-                    Expanded(flex: 4, child: _buildQuickActionGrid(wide: true)),
-                  ],
-                )
-              else ...[
-                _buildSearchLauncher(),
-                const SizedBox(height: 12),
-                _buildQuickActionGrid(wide: false),
-              ],
+              _buildQuickActionRow(),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
@@ -347,77 +333,48 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
     );
   }
 
-  Widget _buildSearchLauncher() {
-    final theme = Theme.of(context);
-    return AttendUsCard(
-      padding: const EdgeInsets.all(16),
-      onTap: () => RouterClass.nextScreenNormal(context, const SearchScreen()),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(AttendUsTokens.radiusMd),
-            ),
-            child: Icon(Icons.search, color: theme.colorScheme.primary),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Search Attendus', style: theme.textTheme.titleMedium),
-                const SizedBox(height: 2),
-                Text(
-                  'Find events, groups, locations, and people',
-                  style: theme.textTheme.bodySmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          Icon(Icons.arrow_forward, color: theme.colorScheme.onSurfaceVariant),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActionGrid({required bool wide}) {
+  Widget _buildQuickActionRow() {
     final actions = [
       _DiscoveryQuickAction(
+        key: const ValueKey('discover-shortcut-search'),
+        icon: Icons.search,
+        title: 'Search',
+        tone: AttendUsStatusTone.info,
+        onTap: () {
+          RouterClass.nextScreenNormal(context, const SearchScreen());
+        },
+      ),
+      _DiscoveryQuickAction(
+        key: const ValueKey('discover-shortcut-map'),
         icon: Icons.public,
         title: 'Map',
-        subtitle: 'Global view',
         tone: AttendUsStatusTone.info,
         onTap: () {
           RouterClass.nextScreenNormal(context, const GlobalEventsMapScreen());
         },
       ),
       _DiscoveryQuickAction(
+        key: const ValueKey('discover-shortcut-check-in'),
         icon: Icons.fact_check_outlined,
         title: 'Check in',
-        subtitle: 'Scan QR',
         tone: AttendUsStatusTone.success,
         onTap: () {
           RouterClass.nextScreenNormal(context, const QRScannerFlowScreen());
         },
       ),
       _DiscoveryQuickAction(
+        key: const ValueKey('discover-shortcut-calendar'),
         icon: Icons.calendar_month_outlined,
         title: 'Calendar',
-        subtitle: 'Agenda',
         tone: AttendUsStatusTone.warning,
         onTap: () {
           RouterClass.nextScreenNormal(context, const CalendarScreen());
         },
       ),
       _DiscoveryQuickAction(
+        key: const ValueKey('discover-shortcut-create'),
         icon: Icons.add_circle_outline,
         title: 'Create',
-        subtitle: 'Organizer',
         tone: AttendUsStatusTone.neutral,
         onTap: () {
           if (_isGuestMode) {
@@ -432,17 +389,16 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
       ),
     ];
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: actions.length,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: wide ? 4 : 2,
-        mainAxisExtent: 86,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
+    return SizedBox(
+      key: const ValueKey('discover-shortcut-row'),
+      height: 76,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: actions.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (context, index) =>
+            SizedBox(width: 112, child: actions[index]),
       ),
-      itemBuilder: (context, index) => actions[index],
     );
   }
 
@@ -840,14 +796,13 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
 class _DiscoveryQuickAction extends StatelessWidget {
   final IconData icon;
   final String title;
-  final String subtitle;
   final AttendUsStatusTone tone;
   final VoidCallback onTap;
 
   const _DiscoveryQuickAction({
+    super.key,
     required this.icon,
     required this.title,
-    required this.subtitle,
     required this.tone,
     required this.onTap,
   });
@@ -856,31 +811,18 @@ class _DiscoveryQuickAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return AttendUsCard(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       onTap: onTap,
-      child: Row(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           AttendUsStatusBadge(label: '', icon: icon, tone: tone),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: theme.textTheme.titleSmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  subtitle,
-                  style: theme.textTheme.bodySmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: theme.textTheme.labelLarge,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

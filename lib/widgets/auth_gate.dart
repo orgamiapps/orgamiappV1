@@ -10,6 +10,7 @@ import 'package:attendus/Services/auth_service.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Services/subscription_service.dart';
 import 'package:attendus/Services/navigation_state_service.dart';
+import 'package:attendus/firebase/firebase_google_auth_helper.dart';
 import 'package:attendus/Utils/route_builder.dart' deferred as route_builder;
 import 'package:attendus/widgets/deferred_screen_loader.dart';
 import 'package:provider/provider.dart';
@@ -27,7 +28,6 @@ class _AuthGateState extends State<AuthGate> {
   bool _isChecking = true;
   bool _isLoggedIn = false;
   Widget? _restoredWidget;
-  StreamSubscription<User?>? _authStateSubscription;
   final NavigationStateService _navStateService = NavigationStateService();
 
   @override
@@ -46,6 +46,29 @@ class _AuthGateState extends State<AuthGate> {
     try {
       Logger.debug('🔄 AuthGate: Checking Firebase Auth state...');
 
+      // Mobile web Google OAuth returns by reloading Attendus. Consume the
+      // redirect before checking currentUser so startup cannot incorrectly
+      // send the newly signed-in user back to onboarding.
+      final redirectProfile = await FirebaseGoogleAuthHelper()
+          .completeGoogleRedirectSignIn();
+      if (redirectProfile != null) {
+        final redirectUser = redirectProfile['user'] as User;
+        try {
+          await AuthService().handleSocialLoginSuccessWithProfileData(
+            redirectProfile,
+          );
+        } catch (error) {
+          // Authentication already succeeded. A temporary profile persistence
+          // failure must not send the user back to Welcome.
+          Logger.warning(
+            'AuthGate: Google profile setup will retry in background: $error',
+          );
+          await AuthService().ensureInMemoryUserModel();
+        }
+        _setUserAndNavigate(redirectUser, restoreNavigation: false);
+        return;
+      }
+
       // Firebase should already be initialized in main.dart
       // Skip redundant initialization to speed up startup
 
@@ -63,51 +86,40 @@ class _AuthGateState extends State<AuthGate> {
         return;
       }
 
-      // If no immediate user, we need to wait briefly for auth state
-      // But immediately show not logged in if still no user after short wait
-      Logger.debug('🔄 AuthGate: No immediate user, checking auth state...');
+      // Restoring a durable web session from browser storage is asynchronous.
+      // Wait for Firebase's authoritative initial event instead of racing it
+      // with a short UI timer.
+      Logger.debug('🔄 AuthGate: Waiting for initial auth state...');
+      User? restoredUser;
+      try {
+        restoredUser = await FirebaseAuth.instance
+            .authStateChanges()
+            .first
+            .timeout(const Duration(seconds: 10));
+      } on TimeoutException {
+        // Do not discard a user that became available while waiting for an
+        // unusually delayed stream event.
+        restoredUser = FirebaseAuth.instance.currentUser;
+        Logger.warning('AuthGate: Initial auth-state check timed out');
+      }
 
-      bool authChecked = false;
+      if (!mounted || !_isChecking) return;
 
-      // Listen for the first auth state change
-      _authStateSubscription = FirebaseAuth.instance.authStateChanges().listen((
-        User? user,
-      ) {
-        if (!mounted || authChecked) return;
-        authChecked = true;
+      Logger.debug(
+        '🔍 AuthGate: Initial auth state: ${restoredUser?.uid ?? 'null'}',
+      );
+      if (restoredUser != null) {
+        _setUserAndNavigate(restoredUser);
+        return;
+      }
 
-        Logger.debug('🔍 AuthGate: Auth state changed: ${user?.uid ?? 'null'}');
-
-        if (user != null) {
-          Logger.debug(
-            '✅ AuthGate: Firebase user found via state change: ${user.uid}',
-          );
-          _setUserAndNavigate(user);
-        } else {
-          Logger.debug('❌ AuthGate: No user found via state change');
-          setState(() {
-            _isLoggedIn = false;
-            _isChecking = false;
-          });
-        }
-
-        _authStateSubscription?.cancel();
-      });
-
-      // Much shorter timeout - if no user after 300ms, show login screen
-      // OPTIMIZATION: Reduced from 500ms to 300ms for faster initial screen display
-      Timer(const Duration(milliseconds: 300), () {
-        if (mounted && _isChecking && !authChecked) {
-          Logger.debug('⏰ AuthGate: Quick timeout - showing login screen');
-          _authStateSubscription?.cancel();
-          setState(() {
-            _isLoggedIn = false;
-            _isChecking = false;
-          });
-        }
+      setState(() {
+        _isLoggedIn = false;
+        _isChecking = false;
       });
     } catch (e) {
       Logger.error('AuthGate: Error checking auth state', e);
+      if (!mounted) return;
       setState(() {
         _isLoggedIn = false;
         _isChecking = false;
@@ -115,7 +127,7 @@ class _AuthGateState extends State<AuthGate> {
     }
   }
 
-  void _setUserAndNavigate(User user) async {
+  void _setUserAndNavigate(User user, {bool restoreNavigation = true}) async {
     if (!mounted || !_isChecking) return;
 
     // Set minimal customer model for immediate navigation
@@ -130,8 +142,11 @@ class _AuthGateState extends State<AuthGate> {
     // Try to restore navigation state
     Widget? restoredScreen;
     try {
+      if (!restoreNavigation) {
+        await _navStateService.clearNavigationState();
+      }
       final shouldRestore = await _navStateService.shouldRestore();
-      if (shouldRestore) {
+      if (restoreNavigation && shouldRestore) {
         Logger.info('AuthGate: Attempting to restore navigation state');
         final savedRoute = await _navStateService.restoreNavigationState();
 
@@ -153,7 +168,8 @@ class _AuthGateState extends State<AuthGate> {
     restoredScreen ??= DeferredScreenLoader(
       loadLibrary: dashboard.loadLibrary,
       loadingLabel: 'Loading dashboard',
-      builder: () => dashboard.DashboardScreen(),
+      builder: () =>
+          dashboard.DashboardScreen(restoreSavedTab: restoreNavigation),
     );
 
     if (!mounted) return;
@@ -208,12 +224,6 @@ class _AuthGateState extends State<AuthGate> {
         Logger.warning('Background AuthService init failed: $e');
       }
     });
-  }
-
-  @override
-  void dispose() {
-    _authStateSubscription?.cancel();
-    super.dispose();
   }
 
   @override

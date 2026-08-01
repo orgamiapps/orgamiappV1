@@ -84,7 +84,7 @@ void main() {
     await tester.pumpWidget(_app(isGuestMode: false));
 
     final titleFinder = find.text('Discover');
-    final searchFinder = find.text('Search Attendus');
+    final searchFinder = find.byKey(const ValueKey('discover-shortcut-search'));
     final bottomNavFinder = find.byType(NavigationBar);
     final titleY = tester.getTopLeft(titleFinder).dy;
     final bottomNavY = tester.getTopLeft(bottomNavFinder).dy;
@@ -103,6 +103,41 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Private group events'), findsOneWidget);
+  });
+
+  testWidgets('Discover shortcuts form one horizontally scrollable row', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(_app(isGuestMode: false));
+
+    final rowFinder = find.byKey(const ValueKey('discover-shortcut-row'));
+
+    expect(rowFinder, findsOneWidget);
+    expect(find.text('Search'), findsOneWidget);
+    expect(find.text('Map'), findsOneWidget);
+    expect(find.text('Check in'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('discover-shortcut-create')),
+      findsNothing,
+    );
+    expect(find.text('Global view'), findsNothing);
+    expect(find.text('Scan QR'), findsNothing);
+    expect(find.text('Agenda'), findsNothing);
+    expect(find.text('Organizer'), findsNothing);
+
+    await tester.drag(rowFinder, const Offset(-300, 0));
+    await tester.pump();
+
+    expect(find.text('Calendar'), findsOneWidget);
+    expect(find.text('Create'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('discover-shortcut-create')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('guest Discover banner joins the same continuous scroll', (

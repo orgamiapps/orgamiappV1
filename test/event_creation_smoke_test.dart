@@ -1,9 +1,23 @@
 import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/screens/Events/create_event_screen.dart';
+import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('event creation does not require a subscription', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AttendUsTheme.light,
+        home: const PremiumEventCreationWrapper(),
+      ),
+    );
+
+    expect(find.byType(CreateEventScreen), findsOneWidget);
+    expect(find.text('Premium Required'), findsNothing);
+    expect(find.text('Create event'), findsWidgets);
+  });
+
   testWidgets('create event form shell renders', (tester) async {
     await tester.pumpWidget(
       MaterialApp(theme: AttendUsTheme.light, home: const CreateEventScreen()),

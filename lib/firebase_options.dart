@@ -48,7 +48,10 @@ class DefaultFirebaseOptions {
     appId: '1:951311475019:web:65b1de24d2f3a8d289c8ce',
     messagingSenderId: '951311475019',
     projectId: 'orgami-66nxok',
-    authDomain: 'orgami-66nxok.firebaseapp.com',
+    // Keep web OAuth on the same origin as the production app. This is
+    // required for reliable redirect state persistence in mobile browsers
+    // that partition third-party storage.
+    authDomain: 'attendus.app',
     storageBucket: 'orgami-66nxok.appspot.com',
   );
 

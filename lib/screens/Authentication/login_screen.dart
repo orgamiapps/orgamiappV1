@@ -123,7 +123,8 @@ class _LoginScreenState extends State<LoginScreen> {
         await AuthService().ensureInMemoryUserModel();
         await Future.delayed(const Duration(milliseconds: 120));
         if (mounted) RouterClass().homeScreenRoute(context: context);
-      } else if (!FirebaseGoogleAuthHelper.lastGoogleCancelled) {
+      } else if (!FirebaseGoogleAuthHelper.lastGoogleCancelled &&
+          !FirebaseGoogleAuthHelper.lastGoogleRedirectStarted) {
         ShowToast().showNormalToast(
           msg:
               FirebaseGoogleAuthHelper.lastGoogleErrorMessage ??

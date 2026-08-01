@@ -48,7 +48,8 @@ class RouterClass {
         Navigator.of(context, rootNavigator: true);
     return navigator.pushAndRemoveUntil(
       PageRouteBuilder(
-        pageBuilder: (ctx, a, b) => dashboard.DashboardScreen(),
+        pageBuilder: (ctx, a, b) =>
+            dashboard.DashboardScreen(restoreSavedTab: false),
         transitionsBuilder: (ctx, animation, secondaryAnimation, child) {
           // Optimized fade transition with faster curve
           return FadeTransition(

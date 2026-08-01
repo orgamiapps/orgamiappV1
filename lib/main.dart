@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:attendus/Services/app_deferred_services.dart'
+    deferred as deferred_services;
 import 'package:attendus/widgets/auth_gate.dart';
 import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/Utils/logger.dart';
@@ -11,21 +13,11 @@ import 'package:attendus/Services/creation_limit_service.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:attendus/Utils/error_handler.dart';
-import 'package:firebase_messaging/firebase_messaging.dart' as fcm;
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter/foundation.dart'
-    show kIsWeb, kDebugMode, defaultTargetPlatform, TargetPlatform;
-import 'package:attendus/Services/notification_service.dart';
-import 'package:attendus/firebase/firebase_messaging_helper.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
-import 'package:attendus/Utils/platform_helper.dart';
 import 'package:attendus/Utils/emulator_config.dart';
 import 'package:attendus/Services/firebase_initializer.dart';
 import 'package:attendus/Services/navigation_state_service.dart';
-import 'package:attendus/Utils/app_constants.dart';
-import 'package:attendus/Utils/google_maps_bootstrap.dart';
 import 'package:attendus/widgets/app_startup_gate.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
@@ -52,9 +44,6 @@ void main() {
   Logger.info('Starting Firebase initialization in parallel with first paint');
   final firebaseInitialization = FirebaseInitializer.initializeOnce();
 
-  // Stripe configuration is synchronous and does not need to wait for Firebase.
-  Stripe.publishableKey = 'pk_test_YOUR_PUBLISHABLE_KEY';
-
   // Build the app after Firebase is ready
   // Use lazy initialization for providers to improve startup time
   // OPTIMIZATION: Create ThemeProvider synchronously to avoid async SharedPreferences call on startup
@@ -72,7 +61,12 @@ void main() {
       );
     }
 
-    unawaited(_initializeBackgroundServices());
+    _configureFirestore();
+    // Let authentication and the dashboard win the initial network/CPU race.
+    // Optional integrations can load shortly after the useful UI is visible.
+    Future.delayed(const Duration(seconds: 5), () {
+      unawaited(_initializeDeferredServices());
+    });
     _scheduleProviderInitialization();
   }
 
@@ -100,7 +94,9 @@ void main() {
   WidgetsBinding.instance.addPostFrameCallback((_) async {
     // Google Maps can take up to 15 seconds to load on a slow or filtered
     // network. It is optional at startup and must not delay the first frame.
-    unawaited(_initializeGoogleMaps());
+    Future.delayed(const Duration(seconds: 5), () {
+      unawaited(_initializeGoogleMaps());
+    });
 
     // OPTIMIZATION: Load theme preference asynchronously without blocking UI
     // The ThemeProvider is already initialized, just load the saved preference
@@ -160,18 +156,14 @@ void _scheduleProviderInitialization() {
 
 Future<void> _initializeGoogleMaps() async {
   try {
-    await GoogleMapsBootstrap.initialize(AppConstants.googleMapsWebApiKey);
-    if (!GoogleMapsBootstrap.isAvailable &&
-        GoogleMapsBootstrap.errorMessage != null) {
-      Logger.warning(GoogleMapsBootstrap.errorMessage!);
-    }
+    await deferred_services.loadLibrary();
+    await deferred_services.initializeGoogleMaps();
   } catch (e) {
     Logger.warning('Google Maps initialization failed: $e');
   }
 }
 
-/// Initialize background services after app startup
-Future<void> _initializeBackgroundServices() async {
+void _configureFirestore() {
   try {
     // PERFORMANCE: Configure Firestore settings with aggressive memory optimization
     // Reduced cache size for faster startup and less memory pressure
@@ -185,87 +177,7 @@ Future<void> _initializeBackgroundServices() async {
           : 20 * 1024 * 1024, // 20MB in release (reduced from 40MB)
     );
 
-    // Quick connectivity check without blocking
-    Connectivity()
-        .checkConnectivity()
-        .then((connectivityResult) {
-          // Handle connectivity result (List<ConnectivityResult> in newer API)
-          final bool isOffline =
-              connectivityResult.isEmpty ||
-              connectivityResult.every((c) => c == ConnectivityResult.none);
-
-          final bool isReachable = !isOffline;
-
-          // App Check is already activated above; avoid duplicate activation here
-
-          // Configure Firestore network based on connectivity
-          if (!isReachable) {
-            FirebaseFirestore.instance.disableNetwork().catchError((e) {
-              Logger.warning('Failed to disable network: $e');
-            });
-          }
-
-          // iOS/web foreground presentation options
-          if (kIsWeb || defaultTargetPlatform == TargetPlatform.iOS) {
-            fcm.FirebaseMessaging.instance
-                .setForegroundNotificationPresentationOptions(
-                  alert: true,
-                  badge: true,
-                  sound: true,
-                )
-                .catchError((e) {
-                  Logger.warning('Failed to set notification options: $e');
-                });
-          }
-
-          // Android notifications permission - avoid prompting on emulator
-          if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-            PlatformHelper.isEmulator().then((isEmulator) {
-              if (isEmulator) {
-                Logger.info(
-                  'Skipping Android notification permission on emulator',
-                );
-                return;
-              }
-              final plugin = FlutterLocalNotificationsPlugin();
-              plugin
-                  .resolvePlatformSpecificImplementation<
-                    AndroidFlutterLocalNotificationsPlugin
-                  >()
-                  ?.requestNotificationsPermission()
-                  .catchError((e) {
-                    Logger.warning(
-                      'Failed to request notification permission: $e',
-                    );
-                    return false;
-                  });
-            });
-          }
-
-          // PERFORMANCE: Initialize notifications in background with minimal delay
-          // OPTIMIZATION: Reduced from 500ms to 300ms
-          Future.delayed(const Duration(milliseconds: 300), () {
-            NotificationService.initialize().catchError((e) {
-              Logger.warning('Notification service initialization failed: $e');
-              return;
-            });
-          });
-
-          // PERFORMANCE: Initialize Firebase Messaging in background if online
-          // OPTIMIZATION: Reduced delay from 3s to 2s
-          if (isReachable) {
-            Future.delayed(const Duration(seconds: 2), () {
-              FirebaseMessagingHelper().initialize().catchError((e) {
-                Logger.warning('Firebase Messaging initialization failed: $e');
-              });
-            });
-          }
-        })
-        .catchError((e) {
-          Logger.warning('Connectivity check failed: $e');
-        });
-
-    Logger.success('Background services initialized');
+    Logger.success('Firestore configured');
   } catch (e, st) {
     Logger.error('Background services initialization failed: $e');
     Logger.error('Background services stack trace: ${st.toString()}');
@@ -281,6 +193,16 @@ Future<void> _initializeBackgroundServices() async {
     } catch (fallbackError) {
       Logger.error('Even fallback configuration failed: $fallbackError');
     }
+  }
+}
+
+Future<void> _initializeDeferredServices() async {
+  try {
+    await deferred_services.loadLibrary();
+    await deferred_services.initializeOptionalServices();
+  } catch (e, st) {
+    Logger.error('Deferred services initialization failed: $e');
+    Logger.error('Deferred services stack trace: ${st.toString()}');
   }
 }
 
