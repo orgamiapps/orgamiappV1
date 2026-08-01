@@ -44,6 +44,22 @@ void main() {
     expect(email, 'admin@example.com');
     expect(password, 'secret-value');
   });
+  testWidgets('Google sign-in invokes the federated authentication callback', (
+    tester,
+  ) async {
+    var called = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SignInScreen(
+          onSignIn: (_, _) async {},
+          onGoogleSignIn: () async => called = true,
+        ),
+      ),
+    );
+    await tester.tap(find.text('Continue with Google'));
+    await tester.pump();
+    expect(called, isTrue);
+  });
   testWidgets('unauthorized and error states offer retry', (tester) async {
     var retried = false;
     await tester.pumpWidget(

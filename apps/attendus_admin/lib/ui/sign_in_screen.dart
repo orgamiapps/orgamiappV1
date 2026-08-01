@@ -3,8 +3,14 @@ import 'package:provider/provider.dart';
 import '../services/session_controller.dart';
 
 class SignInScreen extends StatefulWidget {
-  const SignInScreen({super.key, this.onSignIn, this.errorText});
+  const SignInScreen({
+    super.key,
+    this.onSignIn,
+    this.onGoogleSignIn,
+    this.errorText,
+  });
   final Future<void> Function(String, String)? onSignIn;
+  final Future<void> Function()? onGoogleSignIn;
   final String? errorText;
   @override
   State<SignInScreen> createState() => _SignInScreenState();
@@ -95,6 +101,50 @@ class _SignInScreenState extends State<SignInScreen> {
                         child: Text('Sign in'),
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Expanded(child: Divider()),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            'or',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                        const Expanded(child: Divider()),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      onPressed: _googleSignIn,
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 13),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircleAvatar(
+                              radius: 11,
+                              backgroundColor: Colors.white,
+                              child: Text(
+                                'G',
+                                style: TextStyle(
+                                  color: Color(0xFF4285F4),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 10),
+                            Flexible(
+                              child: Text(
+                                'Continue with Google',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 14),
                     const Text(
                       'Access requires an administrator claim and an active role.',
@@ -116,6 +166,14 @@ class _SignInScreenState extends State<SignInScreen> {
       } else {
         context.read<SessionController>().signIn(email.text, password.text);
       }
+    }
+  }
+
+  void _googleSignIn() {
+    if (widget.onGoogleSignIn != null) {
+      widget.onGoogleSignIn!();
+    } else {
+      context.read<SessionController>().signInWithGoogle();
     }
   }
 }

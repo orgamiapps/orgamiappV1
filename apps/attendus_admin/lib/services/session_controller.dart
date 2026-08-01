@@ -53,6 +53,32 @@ class SessionController extends ChangeNotifier {
     }
   }
 
+  Future<void> signInWithGoogle() async {
+    status = SessionStatus.loading;
+    error = null;
+    notifyListeners();
+    try {
+      final provider = GoogleAuthProvider()
+        ..setCustomParameters({'prompt': 'select_account'});
+      await _auth.signInWithProvider(provider);
+    } on FirebaseAuthException catch (e) {
+      error = switch (e.code) {
+        'web-context-cancelled' ||
+        'canceled' ||
+        'cancelled-popup-request' => 'Google sign-in was canceled.',
+        'account-exists-with-different-credential' =>
+          'This email already uses a different sign-in method. Sign in with that method first.',
+        _ => e.message ?? 'Google sign-in failed.',
+      };
+      status = SessionStatus.signedOut;
+      notifyListeners();
+    } catch (_) {
+      error = 'Google sign-in could not be completed.';
+      status = SessionStatus.signedOut;
+      notifyListeners();
+    }
+  }
+
   Future<void> refreshAccess() async {
     status = SessionStatus.checkingAccess;
     error = null;

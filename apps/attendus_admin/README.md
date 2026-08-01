@@ -13,6 +13,8 @@ flutter run -d windows --dart-define="ATTENDUS_FIREBASE_API_KEY=$env:ATTENDUS_FI
 
 The API must be deployed or running in the Firebase Emulator Suite. A valid administrator needs both the `admin: true` custom claim and an active `admin_roles/{uid}` document. Never create either from this desktop client.
 
+Email/password and Google sign-in are supported. Before using Google sign-in, enable the Google provider in Firebase Console under **Authentication → Sign-in method** for `orgami-66nxok`. The Windows client uses Firebase Auth's native system-browser provider flow and does not embed a Google client secret. The selected Google email must already represent a Firebase Auth user that has been granted the required administrator claim and role.
+
 ## Installer
 
 Install Flutter, Visual Studio 2022 Desktop development with C++, and Inno Setup 6 on the build machine only. The target Windows 11 x64 PC needs none of them. Then run:

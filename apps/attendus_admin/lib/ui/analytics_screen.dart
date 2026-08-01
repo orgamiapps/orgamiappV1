@@ -57,13 +57,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       final daily =
           ((response['data'] as Map<String, dynamic>)['daily'] as List? ??
           const []);
-      if (mounted)
+      if (mounted) {
         setState(
           () => rows = daily
               .cast<Map>()
               .map((row) => row.cast<String, dynamic>())
               .toList(),
         );
+      }
     } on ApiException catch (e) {
       if (mounted) setState(() => error = e);
     } finally {
@@ -189,9 +190,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       ),
     ].join('\r\n');
     await File(path).writeAsBytes(utf8.encode(csv), flush: true);
-    if (mounted)
+    if (mounted) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('CSV exported to $path')));
+    }
   }
 }

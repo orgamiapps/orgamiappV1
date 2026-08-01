@@ -263,7 +263,7 @@ class _AdminShellState extends State<AdminShell> {
         final response = await context.read<AdminApiClient>().getJson(
           '/v1/accounts/${row['uid']}',
         );
-        if (context.mounted)
+        if (context.mounted) {
           await showDialog<void>(
             context: context,
             builder: (_) => AlertDialog(
@@ -286,11 +286,13 @@ class _AdminShellState extends State<AdminShell> {
               ],
             ),
           );
+        }
       } on ApiException catch (e) {
-        if (context.mounted)
+        if (context.mounted) {
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(SnackBar(content: Text(e.message)));
+        }
       }
       return;
     }
@@ -527,10 +529,11 @@ class _AdminShellState extends State<AdminShell> {
         reload();
       }
     } on ApiException catch (e) {
-      if (context.mounted)
+      if (context.mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
     }
   }
 }
