@@ -10,7 +10,7 @@
 const {setGlobalOptions} = require("firebase-functions");
 const {onDocumentCreated, onDocumentUpdated, onDocumentWritten} = require("firebase-functions/v2/firestore");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
-const {onCall, HttpsError} = require("firebase-functions/v2/https");
+const {onCall, onRequest, HttpsError} = require("firebase-functions/v2/https");
 const {defineSecret} = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
 
@@ -310,6 +310,7 @@ admin.initializeApp();
 // Auth ID tokens over HTTPS and never receives Admin SDK or Stripe credentials.
 const {createAdminApi} = require("./admin/api");
 const {createMetricsAggregator} = require("./admin/metrics");
+const {createAdminDispatchHandlers} = require("./notifications/admin-dispatch");
 exports.adminApi = createAdminApi(admin);
 exports.aggregateAdminMetricsDaily = createMetricsAggregator(admin);
 // Optional Twilio setup for SMS sending
@@ -329,137 +330,22 @@ try {
   logger.error('Failed to initialize Twilio', e);
 }
 
-/**
- * Callable: sendCustomNotifications
- * Input: { userIds: string[], title: string, body: string, type?: string, data?: object }
- * Behavior: Saves to users/{uid}/notifications and sends FCM if token exists.
- */
-exports.sendCustomNotifications = onCall({ region: 'us-central1' }, async (req) => {
-  try {
-    const caller = req.auth?.uid || 'anonymous';
-    const { userIds, title, body, type = 'custom', data = {} } = req.data || {};
-    if (!Array.isArray(userIds) || userIds.length === 0 || !title || !body) {
-      throw new Error("INVALID_ARGUMENT: { userIds[], title, body } required");
-    }
-
-    const db = admin.firestore();
-    const messaging = admin.messaging();
-    const now = admin.firestore.Timestamp.now();
-
-    const results = [];
-    let sentCount = 0;
-    for (const userId of userIds) {
-      try {
-        // Save to Firestore first
-        const notificationRef = await db.collection('users').doc(userId).collection('notifications').add({
-          title,
-          body,
-          type,
-          createdAt: now,
-          isRead: false,
-          data,
-          createdBy: caller,
-        });
-
-        // Attempt to push via FCM
-        const userDoc = await db.collection('users').doc(userId).get();
-        const token = userDoc.exists ? userDoc.data().fcmToken : null;
-        if (token) {
-          const message = {
-            token,
-            notification: { title, body },
-            data: {
-              type: String(type),
-              notificationId: notificationRef.id,
-              click_action: 'FLUTTER_NOTIFICATION_CLICK',
-              ...Object.entries(data || {}).reduce((acc, [k, v]) => {
-                acc[String(k)] = String(v);
-                return acc;
-              }, {}),
-            },
-            android: { notification: { channelId: 'orgami_channel', priority: 'high', defaultSound: true, defaultVibrateTimings: true } },
-            apns: { payload: { aps: { sound: 'default', badge: 1 } } },
-          };
-          await messaging.send(message);
-        }
-        sentCount++;
-        results.push({ userId, status: 'ok' });
-      } catch (e) {
-        logger.error('Failed notifying user', { userId, error: e });
-        results.push({ userId, status: 'error', error: String(e?.message || e) });
-      }
-    }
-
-    // Write a history record
-    await db.collection('notification_history').add({
-      type: 'in_app',
-      title,
-      message: body,
-      totalRecipients: userIds.length,
-      successCount: sentCount,
-      timestamp: now,
-      meta: { createdBy: caller, type },
-    });
-    return { status: 'ok', results };
-  } catch (err) {
-    logger.error('sendCustomNotifications failed', err);
-    throw new Error(`INTERNAL: ${err.message}`);
-  }
+const adminDispatch = createAdminDispatchHandlers({
+  admin,
+  twilioClient,
+  twilioFromNumber: process.env.TWILIO_FROM_NUMBER,
+  logger,
 });
 
-/**
- * Callable: sendBulkSms
- * Input: { phoneNumbers: string[], message: string, meta?: { eventId?, label? } }
- * Uses Twilio if configured; otherwise no-ops and records history entry.
- */
-exports.sendBulkSms = onCall({ region: 'us-central1' }, async (req) => {
-  try {
-    const { phoneNumbers, message, meta = {} } = req.data || {};
-    if (!Array.isArray(phoneNumbers) || phoneNumbers.length === 0 || !message) {
-      throw new Error('INVALID_ARGUMENT: { phoneNumbers[], message } required');
-    }
+exports.sendCustomNotifications = onCall(
+  {region: "us-central1", enforceAppCheck: true, maxInstances: 5},
+  adminDispatch.sendCustomNotifications,
+);
 
-    const db = admin.firestore();
-    const fromNumber = process.env.TWILIO_FROM_NUMBER;
-
-    let sent = 0;
-    let failed = 0;
-    const failures = [];
-
-    if (twilioClient && fromNumber) {
-      // Best-effort sequential send to stay within free-tier limits; batch if needed later
-      for (const to of phoneNumbers) {
-        try {
-          await twilioClient.messages.create({ to, from: fromNumber, body: message });
-          sent++;
-        } catch (e) {
-          failed++;
-          failures.push({ to, error: String(e?.message || e) });
-        }
-      }
-    } else {
-      // No-op fallback in dev; treat as unsent but not erroring loudly
-      logger.info('Twilio not configured; skipping actual SMS send');
-    }
-
-    // Record a history doc for observability
-    await db.collection('notification_history').add({
-      type: 'sms',
-      message,
-      totalRecipients: phoneNumbers.length,
-      successCount: sent,
-      failureCount: failed,
-      failures: failures.slice(0, 10),
-      meta,
-      timestamp: admin.firestore.Timestamp.now(),
-    });
-
-    return { status: 'ok', total: phoneNumbers.length, sent, failed };
-  } catch (err) {
-    logger.error('sendBulkSms failed', err);
-    throw new Error(`INTERNAL: ${err.message}`);
-  }
-});
+exports.sendBulkSms = onCall(
+  {region: "us-central1", enforceAppCheck: true, maxInstances: 2},
+  adminDispatch.sendBulkSms,
+);
 
 // For cost control, you can set the maximum number of containers that can be
 // running at the same time. This helps mitigate the impact of unexpected
@@ -4148,4 +4034,72 @@ exports.backfillUserAnalytics = onCall({ region: "us-central1" }, async (req) =>
     logger.error("❌ Error in backfillUserAnalytics:", error);
     throw error;
   }
+});
+
+// ============================================================================
+// SAFETY-FIRST PAYMENT CONTAINMENT
+// ============================================================================
+// These final exports intentionally override the legacy handlers above. The
+// legacy clients trusted caller-supplied amounts and entitlement targets. They
+// remain unavailable until the server-authoritative payment module and signed,
+// idempotent Stripe webhook have completed staging verification.
+
+function paymentTemporarilyUnavailable(req) {
+  const uid = req.auth?.uid;
+  const provider = req.auth?.token?.firebase?.sign_in_provider;
+  if (!uid || provider === "anonymous") {
+    throw new HttpsError("unauthenticated", "A signed-in account is required.");
+  }
+  throw new HttpsError(
+    "failed-precondition",
+    "Paid checkout is temporarily unavailable while Attendus completes a security upgrade.",
+  );
+}
+
+const disabledPaymentCallableOptions = {
+  region: "us-central1",
+  enforceAppCheck: true,
+  maxInstances: 2,
+};
+
+exports.createTicketPaymentIntent = onCall(
+  disabledPaymentCallableOptions,
+  paymentTemporarilyUnavailable,
+);
+exports.confirmTicketPayment = onCall(
+  disabledPaymentCallableOptions,
+  paymentTemporarilyUnavailable,
+);
+exports.createTicketUpgradePaymentIntent = onCall(
+  disabledPaymentCallableOptions,
+  paymentTemporarilyUnavailable,
+);
+exports.createFeaturePaymentIntent = onCall(
+  disabledPaymentCallableOptions,
+  paymentTemporarilyUnavailable,
+);
+exports.confirmFeaturePayment = onCall(
+  disabledPaymentCallableOptions,
+  paymentTemporarilyUnavailable,
+);
+
+exports.stripeWebhook = onRequest(
+  {region: "us-central1", maxInstances: 2},
+  (_req, res) => {
+    res.set("Cache-Control", "no-store");
+    res.status(503).json({
+      error: "payment_processing_temporarily_unavailable",
+    });
+  },
+);
+
+exports.applyScheduledPlanChanges = onSchedule({
+  schedule: "0 */6 * * *",
+  timeZone: "UTC",
+  region: "us-central1",
+}, async () => {
+  logger.warn(
+    "Scheduled plan mutation is disabled until Stripe is authoritative.",
+  );
+  return {disabled: true};
 });

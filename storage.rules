@@ -1,0 +1,75 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function fullUser() {
+      return request.auth != null &&
+        request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    function validImage(maxBytes) {
+      return request.resource != null &&
+        request.resource.size <= maxBytes &&
+        request.resource.contentType.matches('image/(jpeg|png|webp|heic|heif)');
+    }
+
+    function orgMember(orgId) {
+      return fullUser() &&
+        firestore.exists(
+          /databases/(default)/documents/Organizations/$(orgId)/Members/$(request.auth.uid)
+        ) &&
+        firestore.get(
+          /databases/(default)/documents/Organizations/$(orgId)/Members/$(request.auth.uid)
+        ).data.status == 'approved';
+    }
+
+    function orgAdmin(orgId) {
+      return orgMember(orgId) &&
+        firestore.get(
+          /databases/(default)/documents/Organizations/$(orgId)/Members/$(request.auth.uid)
+        ).data.role in ['Admin', 'admin', 'Owner', 'owner'];
+    }
+
+    match /profile_pictures/{fileName} {
+      allow read: if true;
+      allow create, update: if fullUser() &&
+        fileName == request.auth.uid + '.jpg' && validImage(5 * 1024 * 1024);
+      allow delete: if fullUser() && fileName == request.auth.uid + '.jpg';
+    }
+
+    match /user_banners/{uid}/{fileName} {
+      allow read: if true;
+      allow create, update: if fullUser() && request.auth.uid == uid &&
+        validImage(10 * 1024 * 1024);
+      allow delete: if fullUser() && request.auth.uid == uid;
+    }
+
+    match /organizations/{orgId}/{fileName} {
+      allow read: if true;
+      allow create, update: if orgAdmin(orgId) && validImage(10 * 1024 * 1024);
+      allow delete: if orgAdmin(orgId);
+    }
+
+    match /groups/{orgId}/photos/{fileName} {
+      allow read: if true;
+      allow create: if orgMember(orgId) &&
+        fileName.matches(request.auth.uid + '_.*') &&
+        validImage(10 * 1024 * 1024);
+      allow update: if false;
+      allow delete: if orgAdmin(orgId) ||
+        (fullUser() && fileName.matches(request.auth.uid + '_.*'));
+    }
+
+    // Legacy event image names do not contain an owner or event ID. New clients
+    // will migrate to owner-scoped paths; until then uploads are authenticated,
+    // immutable, type checked, and size bounded.
+    match /events_images/{fileName} {
+      allow read: if true;
+      allow create: if fullUser() && validImage(10 * 1024 * 1024);
+      allow update, delete: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

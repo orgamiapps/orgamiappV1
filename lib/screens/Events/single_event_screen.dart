@@ -47,6 +47,7 @@ import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Services/ticket_payment_service.dart';
 import 'package:attendus/Services/face_recognition_service.dart';
 import 'package:attendus/Services/live_quiz_service.dart';
+import 'package:attendus/config/safety_flags.dart';
 import 'package:attendus/screens/LiveQuiz/quiz_builder_screen.dart';
 import 'package:attendus/screens/LiveQuiz/quiz_host_screen.dart';
 import 'package:attendus/screens/LiveQuiz/quiz_participant_screen.dart';
@@ -3405,6 +3406,15 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     try {
       // Check if the event has a ticket price
       if (eventModel.ticketPrice != null && eventModel.ticketPrice! > 0) {
+        if (!SafetyFlags.paidCheckoutEnabled) {
+          if (mounted) {
+            setState(() => _isGettingTicket = false);
+          }
+          ShowToast().showNormalToast(
+            msg: SafetyFlags.paymentMaintenanceMessage,
+          );
+          return;
+        }
         // Handle paid ticket
         await _purchaseTicket();
       } else {
@@ -3460,22 +3470,10 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
 
   Future<void> _purchaseTicket() async {
     try {
-      // Create a temporary ticket ID
-      final ticketId = FirebaseFirestore.instance
-          .collection('Tickets')
-          .doc()
-          .id;
-
       // Create payment intent
       final paymentData = await TicketPaymentService.createTicketPaymentIntent(
         eventId: eventModel.id,
-        ticketId: ticketId,
-        amount: eventModel.ticketPrice!,
-        customerUid: CustomerController.logeInCustomer!.uid,
-        customerName: CustomerController.logeInCustomer!.name,
-        customerEmail: CustomerController.logeInCustomer!.email,
-        creatorUid: eventModel.customerUid,
-        eventTitle: eventModel.title,
+        ticketTypeId: 'general',
       );
 
       // Process payment
@@ -3485,28 +3483,15 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       );
 
       if (paymentSuccess) {
-        // Confirm payment and issue ticket
-        await TicketPaymentService.confirmTicketPayment(
-          paymentIntentId: paymentData['paymentIntentId'],
-          ticketId: ticketId,
-          eventId: eventModel.id,
-        );
-
-        // Issue the paid ticket
-        await TicketPaymentService.issuePaidTicket(
-          eventId: eventModel.id,
-          customerUid: CustomerController.logeInCustomer!.uid,
-          customerName: CustomerController.logeInCustomer!.name,
-          eventModel: eventModel,
-          paymentIntentId: paymentData['paymentIntentId'],
-        );
-
         if (mounted) {
           setState(() {
             _isGettingTicket = false;
           });
 
-          ShowToast().showNormalToast(msg: 'Ticket purchased successfully!');
+          ShowToast().showNormalToast(
+            msg:
+                'Payment received. Your ticket will appear after verification.',
+          );
           // Refresh ticket status
           checkUserTicket(updateUI: true);
 

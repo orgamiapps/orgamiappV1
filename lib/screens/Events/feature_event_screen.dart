@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/models/payment_model.dart';
@@ -8,6 +7,7 @@ import 'package:attendus/Services/payment_service.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Utils/app_app_bar_view.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
+import 'package:attendus/config/safety_flags.dart';
 
 class FeatureEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -40,7 +40,9 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
   }
 
   bool get _canFeatureEvent {
-    return !_isEventPassed && !widget.eventModel.isFeatured;
+    return SafetyFlags.eventFeaturingEnabled &&
+        !_isEventPassed &&
+        !widget.eventModel.isFeatured;
   }
 
   @override
@@ -104,6 +106,30 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            if (!SafetyFlags.eventFeaturingEnabled) ...[
+                              AttendUsCard(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(Icons.security_update_good),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          SafetyFlags.paymentMaintenanceMessage,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodyLarge,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                            ],
                             _buildBenefitsSection(),
                             const SizedBox(height: 24),
                             if (_isEventPassed) ...[
@@ -827,10 +853,17 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
   }
 
   Future<void> _processPaymentAndFeature() async {
+    if (!SafetyFlags.eventFeaturingEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(SafetyFlags.paymentMaintenanceMessage)),
+      );
+      return;
+    }
     if ((_selectedDays == null && !_untilEvent) ||
         _loading ||
-        !_canFeatureEvent)
+        !_canFeatureEvent) {
       return;
+    }
 
     setState(() => _loading = true);
 
@@ -857,7 +890,6 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
       final paymentData = await PaymentService.createPaymentIntent(
         eventId: widget.eventModel.id,
         durationDays: durationDays,
-        customerUid: FirebaseAuth.instance.currentUser!.uid,
       );
 
       _clientSecret = paymentData['clientSecret'];

@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import '../Utils/logger.dart';
 import 'user_identity_service.dart';
+import '../config/safety_flags.dart';
 
 /// Professional facial recognition service for event attendance
 /// Handles face detection, enrollment, matching, and secure storage
@@ -23,7 +24,8 @@ class FaceRecognitionService {
 
   // Face detection configuration
   static const double _minFaceSize = 0.15;
-  static const double _matchingThreshold = 0.65; // Lowered for better recognition
+  static const double _matchingThreshold =
+      0.65; // Lowered for better recognition
   static const int _requiredFacesForEnrollment = 3;
 
   // Performance mode - can be toggled for real-time vs accuracy
@@ -31,9 +33,12 @@ class FaceRecognitionService {
 
   /// Initialize the face detection service
   Future<void> initialize({
-    bool useFastMode = true, 
+    bool useFastMode = true,
     Function(String)? onProgress,
   }) async {
+    if (!SafetyFlags.biometricCheckInEnabled) {
+      throw StateError(SafetyFlags.biometricMaintenanceMessage);
+    }
     if (_isInitialized) {
       Logger.debug('FaceRecognitionService already initialized');
       return;
@@ -43,21 +48,21 @@ class FaceRecognitionService {
       onProgress?.call('Checking ML Kit availability...');
       Logger.info('Initializing FaceDetector with ML Kit...');
       _useFastMode = useFastMode;
-      
+
       // First check if ML Kit is available with timeout
       bool mlKitAvailable = false;
       try {
         onProgress?.call('Loading ML Kit models...');
-        
+
         // Create a test detector to check if models are available
         final testOptions = FaceDetectorOptions(
           performanceMode: FaceDetectorMode.fast,
           enableLandmarks: false,
           enableClassification: false,
         );
-        
+
         final testDetector = FaceDetector(options: testOptions);
-        
+
         // Test with a simple operation
         await testDetector.close().timeout(
           Duration(seconds: 5),
@@ -65,7 +70,7 @@ class FaceRecognitionService {
             throw TimeoutException('ML Kit model check timeout');
           },
         );
-        
+
         mlKitAvailable = true;
         onProgress?.call('ML Kit models ready');
       } catch (e) {
@@ -84,20 +89,24 @@ class FaceRecognitionService {
             : FaceDetectorMode.accurate,
       );
 
-      Logger.debug('Creating FaceDetector with options: '
+      Logger.debug(
+        'Creating FaceDetector with options: '
         'landmarks=true, classification=true, tracking=true, '
-        'minFaceSize=$_minFaceSize, mode=${_useFastMode ? "fast" : "accurate"}');
+        'minFaceSize=$_minFaceSize, mode=${_useFastMode ? "fast" : "accurate"}',
+      );
 
       onProgress?.call('Initializing face detector...');
       _faceDetector = FaceDetector(options: options);
-      
+
       // If ML Kit wasn't initially available, it might download now
       if (!mlKitAvailable) {
-        onProgress?.call('Downloading ML Kit models (this may take a moment)...');
+        onProgress?.call(
+          'Downloading ML Kit models (this may take a moment)...',
+        );
         // Give some time for model download
         await Future.delayed(Duration(seconds: 2));
       }
-      
+
       _isInitialized = true;
       onProgress?.call('Face detection ready');
       Logger.info(
@@ -108,7 +117,9 @@ class FaceRecognitionService {
       Logger.error('Failed to initialize FaceRecognitionService: $e');
       Logger.error('Stack trace: $stackTrace');
       Logger.error('This could be due to:');
-      Logger.error('1. ML Kit model not downloaded (requires internet on first use)');
+      Logger.error(
+        '1. ML Kit model not downloaded (requires internet on first use)',
+      );
       Logger.error('2. Insufficient device storage');
       Logger.error('3. Google Play Services issue (Android)');
       Logger.error('4. Platform-specific configuration missing');
@@ -119,6 +130,7 @@ class FaceRecognitionService {
 
   /// Detect faces in the provided image
   Future<List<Face>> detectFaces(InputImage inputImage) async {
+    if (!SafetyFlags.biometricCheckInEnabled) return const [];
     if (!_isInitialized) {
       Logger.warning('FaceDetector not initialized, initializing now...');
       await initialize();
@@ -135,7 +147,9 @@ class FaceRecognitionService {
     } catch (e, stackTrace) {
       Logger.error('Face detection failed: $e');
       Logger.error('Stack trace: $stackTrace');
-      Logger.error('Input image metadata: size=${inputImage.metadata?.size}, format=${inputImage.metadata?.format}, rotation=${inputImage.metadata?.rotation}');
+      Logger.error(
+        'Input image metadata: size=${inputImage.metadata?.size}, format=${inputImage.metadata?.format}, rotation=${inputImage.metadata?.rotation}',
+      );
       return [];
     }
   }
@@ -160,7 +174,9 @@ class FaceRecognitionService {
 
     // At least one eye should be open (more lenient than requiring both)
     if (leftEyeOpen != null && rightEyeOpen != null) {
-      final maxEyeOpen = leftEyeOpen > rightEyeOpen ? leftEyeOpen : rightEyeOpen;
+      final maxEyeOpen = leftEyeOpen > rightEyeOpen
+          ? leftEyeOpen
+          : rightEyeOpen;
       if (maxEyeOpen < 0.3) return false; // Lowered from 0.5
     }
 
@@ -244,6 +260,7 @@ class FaceRecognitionService {
     required String eventId,
     required List<List<double>> faceFeatures, // Multiple face samples
   }) async {
+    if (!SafetyFlags.biometricCheckInEnabled) return false;
     try {
       if (faceFeatures.length < _requiredFacesForEnrollment) {
         Logger.warning('Insufficient face samples for enrollment');
@@ -254,13 +271,16 @@ class FaceRecognitionService {
       final avgFeatures = _calculateAverageFeatures(faceFeatures);
 
       // Generate consistent document ID
-      final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(eventId, userId);
-      
+      final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(
+        eventId,
+        userId,
+      );
+
       // Store in Firestore with retry logic
       const maxRetries = 3;
       int attempts = 0;
       bool saved = false;
-      
+
       while (!saved && attempts < maxRetries) {
         attempts++;
         try {
@@ -277,15 +297,21 @@ class FaceRecognitionService {
                 'version': '1.0', // For future compatibility
               });
           saved = true;
-          Logger.info('Enrollment saved to Firestore: FaceEnrollments/$enrollmentDocId (attempt $attempts)');
+          Logger.info(
+            'Enrollment saved to Firestore: FaceEnrollments/$enrollmentDocId (attempt $attempts)',
+          );
         } catch (e) {
-          Logger.warning('Failed to save enrollment (attempt $attempts/$maxRetries): $e');
+          Logger.warning(
+            'Failed to save enrollment (attempt $attempts/$maxRetries): $e',
+          );
           if (attempts < maxRetries) {
-            await Future.delayed(Duration(milliseconds: 500 * attempts)); // Exponential backoff
+            await Future.delayed(
+              Duration(milliseconds: 500 * attempts),
+            ); // Exponential backoff
           }
         }
       }
-      
+
       if (!saved) {
         Logger.error('Failed to save enrollment after $maxRetries attempts');
         return false;
@@ -296,9 +322,11 @@ class FaceRecognitionService {
         userId: userId,
         eventId: eventId,
       );
-      
+
       if (verified) {
-        Logger.success('✅ User $userId enrolled successfully for event $eventId - verified!');
+        Logger.success(
+          '✅ User $userId enrolled successfully for event $eventId - verified!',
+        );
         return true;
       } else {
         Logger.error('❌ Enrollment verification failed for user $userId');
@@ -309,7 +337,7 @@ class FaceRecognitionService {
       return false;
     }
   }
-  
+
   /// Verify that enrollment was saved successfully
   Future<bool> verifyEnrollmentSaved({
     required String userId,
@@ -318,26 +346,34 @@ class FaceRecognitionService {
     const maxRetries = 3;
     const timeout = Duration(seconds: 10);
     int attempts = 0;
-    
+
     while (attempts < maxRetries) {
       attempts++;
       try {
-        final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(eventId, userId);
-        Logger.debug('Verifying enrollment saved at: FaceEnrollments/$enrollmentDocId (attempt $attempts)');
-        
+        final enrollmentDocId =
+            UserIdentityService.generateEnrollmentDocumentId(eventId, userId);
+        Logger.debug(
+          'Verifying enrollment saved at: FaceEnrollments/$enrollmentDocId (attempt $attempts)',
+        );
+
         // Add timeout to Firebase query
         final doc = await FirebaseFirestore.instance
             .collection('FaceEnrollments')
             .doc(enrollmentDocId)
             .get()
-            .timeout(timeout, onTimeout: () {
-              throw TimeoutException('Enrollment verification timeout after ${timeout.inSeconds}s');
-            });
-        
+            .timeout(
+              timeout,
+              onTimeout: () {
+                throw TimeoutException(
+                  'Enrollment verification timeout after ${timeout.inSeconds}s',
+                );
+              },
+            );
+
         if (doc.exists) {
           final data = doc.data();
-          if (data != null && 
-              data['userId'] == userId && 
+          if (data != null &&
+              data['userId'] == userId &&
               data['eventId'] == eventId &&
               data['faceFeatures'] != null &&
               (data['faceFeatures'] as List).isNotEmpty) {
@@ -345,28 +381,42 @@ class FaceRecognitionService {
             return true;
           }
         }
-        
-        Logger.error('❌ Enrollment verification failed - document not found or invalid');
+
+        Logger.error(
+          '❌ Enrollment verification failed - document not found or invalid',
+        );
         return false;
       } on TimeoutException catch (e) {
-        Logger.warning('Enrollment verification timeout (attempt $attempts/$maxRetries): $e');
+        Logger.warning(
+          'Enrollment verification timeout (attempt $attempts/$maxRetries): $e',
+        );
         if (attempts < maxRetries) {
-          await Future.delayed(Duration(milliseconds: 500 * attempts)); // Exponential backoff
+          await Future.delayed(
+            Duration(milliseconds: 500 * attempts),
+          ); // Exponential backoff
         } else {
-          Logger.error('Failed to verify enrollment after $maxRetries attempts');
+          Logger.error(
+            'Failed to verify enrollment after $maxRetries attempts',
+          );
           return false;
         }
       } catch (e) {
-        Logger.warning('Error verifying enrollment (attempt $attempts/$maxRetries): $e');
+        Logger.warning(
+          'Error verifying enrollment (attempt $attempts/$maxRetries): $e',
+        );
         if (attempts < maxRetries) {
-          await Future.delayed(Duration(milliseconds: 500 * attempts)); // Exponential backoff
+          await Future.delayed(
+            Duration(milliseconds: 500 * attempts),
+          ); // Exponential backoff
         } else {
-          Logger.error('Failed to verify enrollment after $maxRetries attempts: $e');
+          Logger.error(
+            'Failed to verify enrollment after $maxRetries attempts: $e',
+          );
           return false;
         }
       }
     }
-    
+
     return false;
   }
 
@@ -416,7 +466,9 @@ class FaceRecognitionService {
         );
 
         final userName = data['userName'] as String?;
-        Logger.debug('Similarity with ${userName ?? "Unknown"}: ${(similarity * 100).toStringAsFixed(1)}%');
+        Logger.debug(
+          'Similarity with ${userName ?? "Unknown"}: ${(similarity * 100).toStringAsFixed(1)}%',
+        );
 
         if (similarity > highestSimilarity) {
           highestSimilarity = similarity;
@@ -458,48 +510,69 @@ class FaceRecognitionService {
     required String userId,
     required String eventId,
   }) async {
+    if (!SafetyFlags.biometricCheckInEnabled) return false;
     const maxRetries = 3;
     const timeout = Duration(seconds: 10);
     int attempts = 0;
-    
+
     while (attempts < maxRetries) {
       attempts++;
       try {
-        final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(eventId, userId);
-        Logger.debug('Checking enrollment at: FaceEnrollments/$enrollmentDocId (attempt $attempts)');
-        
+        final enrollmentDocId =
+            UserIdentityService.generateEnrollmentDocumentId(eventId, userId);
+        Logger.debug(
+          'Checking enrollment at: FaceEnrollments/$enrollmentDocId (attempt $attempts)',
+        );
+
         // Add timeout to Firebase query
         final doc = await FirebaseFirestore.instance
             .collection('FaceEnrollments')
             .doc(enrollmentDocId)
             .get()
-            .timeout(timeout, onTimeout: () {
-              throw TimeoutException('Enrollment check timeout after ${timeout.inSeconds}s');
-            });
-        
+            .timeout(
+              timeout,
+              onTimeout: () {
+                throw TimeoutException(
+                  'Enrollment check timeout after ${timeout.inSeconds}s',
+                );
+              },
+            );
+
         final exists = doc.exists;
-        Logger.info('Enrollment status for user $userId at event $eventId: $exists');
-        
+        Logger.info(
+          'Enrollment status for user $userId at event $eventId: $exists',
+        );
+
         return exists;
       } on TimeoutException catch (e) {
-        Logger.warning('Enrollment check timeout (attempt $attempts/$maxRetries): $e');
+        Logger.warning(
+          'Enrollment check timeout (attempt $attempts/$maxRetries): $e',
+        );
         if (attempts < maxRetries) {
-          await Future.delayed(Duration(milliseconds: 500 * attempts)); // Exponential backoff
+          await Future.delayed(
+            Duration(milliseconds: 500 * attempts),
+          ); // Exponential backoff
         } else {
           Logger.error('Failed to check enrollment after $maxRetries attempts');
           return false;
         }
       } catch (e) {
-        Logger.warning('Failed to check enrollment (attempt $attempts/$maxRetries): $e');
+        Logger.warning(
+          'Failed to check enrollment (attempt $attempts/$maxRetries): $e',
+        );
         if (attempts < maxRetries) {
-          await Future.delayed(Duration(milliseconds: 500 * attempts)); // Exponential backoff
+          await Future.delayed(
+            Duration(milliseconds: 500 * attempts),
+          ); // Exponential backoff
         } else {
-          Logger.error('Failed to check enrollment status after $maxRetries attempts: $e');
+          Logger.error(
+            'Failed to check enrollment status after $maxRetries attempts: $e',
+          );
           return false;
         }
       }
     }
-    
+
     return false;
   }
 
@@ -509,14 +582,19 @@ class FaceRecognitionService {
     required String eventId,
   }) async {
     try {
-      final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(eventId, userId);
-      
+      final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(
+        eventId,
+        userId,
+      );
+
       await FirebaseFirestore.instance
           .collection('FaceEnrollments')
           .doc(enrollmentDocId)
           .delete();
-      
-      Logger.info('Deleted enrollment for user $userId in event $eventId (doc: $enrollmentDocId)');
+
+      Logger.info(
+        'Deleted enrollment for user $userId in event $eventId (doc: $enrollmentDocId)',
+      );
       return true;
     } catch (e) {
       Logger.error('Failed to delete enrollment: $e');
@@ -559,23 +637,26 @@ class FaceRecognitionService {
       // Handle image data based on format
       Uint8List bytes;
       int bytesPerRow;
-      
+
       // Check if this is NV21/YUV420 format
-      if (format == InputImageFormat.nv21 || format == InputImageFormat.yuv420) {
+      if (format == InputImageFormat.nv21 ||
+          format == InputImageFormat.yuv420) {
         // For NV21/YUV420, combine Y, U, and V planes properly
-        if (cameraImage.planes.length >= 1) {
+        if (cameraImage.planes.isNotEmpty) {
           // Calculate expected size for NV21
           final int ySize = cameraImage.planes[0].bytes.length;
-          final int uvSize = cameraImage.planes.length > 1 
-              ? cameraImage.planes.skip(1).fold<int>(0, (sum, plane) => sum + plane.bytes.length)
+          final int uvSize = cameraImage.planes.length > 1
+              ? cameraImage.planes
+                    .skip(1)
+                    .fold<int>(0, (total, plane) => total + plane.bytes.length)
               : 0;
-          
+
           // Create a properly sized buffer
           bytes = Uint8List(ySize + uvSize);
-          
+
           // Copy Y plane
           bytes.setRange(0, ySize, cameraImage.planes[0].bytes);
-          
+
           // Copy UV planes if they exist
           if (cameraImage.planes.length > 1) {
             int offset = ySize;
@@ -588,7 +669,7 @@ class FaceRecognitionService {
               }
             }
           }
-          
+
           bytesPerRow = cameraImage.planes[0].bytesPerRow;
         } else {
           Logger.error('Invalid number of planes for NV21/YUV420 format');
@@ -599,8 +680,10 @@ class FaceRecognitionService {
         bytes = cameraImage.planes[0].bytes;
         bytesPerRow = cameraImage.planes[0].bytesPerRow;
       }
-      
-      Logger.debug('Converting camera image: format=$format, size=${cameraImage.width}x${cameraImage.height}, rotation=$rotation, bytesLength=${bytes.length}');
+
+      Logger.debug(
+        'Converting camera image: format=$format, size=${cameraImage.width}x${cameraImage.height}, rotation=$rotation, bytesLength=${bytes.length}',
+      );
 
       return InputImage.fromBytes(
         bytes: bytes,
@@ -617,10 +700,14 @@ class FaceRecognitionService {
     } catch (e, stack) {
       Logger.error('Failed to convert camera image: $e');
       Logger.error('Stack trace: $stack');
-      Logger.error('Camera image info: width=${cameraImage.width}, height=${cameraImage.height}, format=${cameraImage.format.raw}, planes=${cameraImage.planes.length}');
+      Logger.error(
+        'Camera image info: width=${cameraImage.width}, height=${cameraImage.height}, format=${cameraImage.format.raw}, planes=${cameraImage.planes.length}',
+      );
       if (cameraImage.planes.isNotEmpty) {
         for (int i = 0; i < cameraImage.planes.length; i++) {
-          Logger.error('Plane $i: bytesLength=${cameraImage.planes[i].bytes.length}, bytesPerRow=${cameraImage.planes[i].bytesPerRow}');
+          Logger.error(
+            'Plane $i: bytesLength=${cameraImage.planes[i].bytes.length}, bytesPerRow=${cameraImage.planes[i].bytesPerRow}',
+          );
         }
       }
       return null;

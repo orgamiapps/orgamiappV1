@@ -15,6 +15,7 @@ import 'package:attendus/screens/FaceRecognition/picture_face_scanner_screen.dar
 import 'package:attendus/Services/face_recognition_service.dart';
 import 'package:attendus/screens/FaceRecognition/picture_face_enrollment_screen.dart';
 import 'package:attendus/Services/guest_mode_service.dart';
+import 'package:attendus/config/safety_flags.dart';
 
 /// Modern, streamlined sign-in flow screen
 /// Professional UI/UX following Material Design 3 principles
@@ -321,20 +322,21 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
           ),
         ),
         const SizedBox(height: 20),
-        // Location + facial recognition available to all (guests need to input name)
-        _buildMethodCard(
-          icon: Icons.location_on,
-          iconColor: const Color(0xFF10B981),
-          title: 'Location & Facial Recognition',
-          subtitle: isGuestMode
-              ? 'Secure verification (name required)'
-              : 'Automatic detection & biometric',
-          badge: 'MOST SECURE',
-          badgeColor: const Color(0xFF10B981),
-          isLoading: _isLocationCheckLoading,
-          onTap: _handleLocationFacialSignIn,
-        ),
-        const SizedBox(height: 16),
+        if (SafetyFlags.biometricCheckInEnabled) ...[
+          _buildMethodCard(
+            icon: Icons.location_on,
+            iconColor: const Color(0xFF10B981),
+            title: 'Location & Facial Recognition',
+            subtitle: isGuestMode
+                ? 'Secure verification (name required)'
+                : 'Automatic detection & biometric',
+            badge: 'MOST SECURE',
+            badgeColor: const Color(0xFF10B981),
+            isLoading: _isLocationCheckLoading,
+            onTap: _handleLocationFacialSignIn,
+          ),
+          const SizedBox(height: 16),
+        ],
         _buildMethodCard(
           icon: Icons.qr_code_scanner,
           iconColor: const Color(0xFF667EEA),
@@ -987,6 +989,10 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
   /// Handle Location and Facial Recognition Sign-In
   /// This is the most secure method combining geofence and biometric verification
   Future<void> _handleLocationFacialSignIn() async {
+    if (!SafetyFlags.biometricCheckInEnabled) {
+      ShowToast().showNormalToast(msg: SafetyFlags.biometricMaintenanceMessage);
+      return;
+    }
     // Prevent multiple simultaneous requests
     if (_isLocationCheckLoading) return;
 
@@ -1375,6 +1381,10 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
 
   /// Handle facial recognition for a specific event
   Future<void> _handleFacialRecognitionForEvent(EventModel event) async {
+    if (!SafetyFlags.biometricCheckInEnabled) {
+      ShowToast().showNormalToast(msg: SafetyFlags.biometricMaintenanceMessage);
+      return;
+    }
     try {
       final isGuestMode = GuestModeService().isGuestMode;
 
