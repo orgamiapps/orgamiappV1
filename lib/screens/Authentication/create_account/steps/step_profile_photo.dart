@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:attendus/controller/customer_controller.dart';
@@ -21,7 +19,7 @@ class StepProfilePhoto extends StatefulWidget {
 }
 
 class _StepProfilePhotoState extends State<StepProfilePhoto> {
-  File? _image;
+  SelectedImageData? _image;
   bool _isUploading = false;
   String? _error;
 
@@ -108,7 +106,7 @@ class _StepProfilePhotoState extends State<StepProfilePhoto> {
                 child: CircleAvatar(
                   radius: 72,
                   backgroundColor: Theme.of(context).colorScheme.surface,
-                  backgroundImage: _image != null ? FileImage(_image!) : null,
+                  backgroundImage: _image?.imageProvider,
                   child: _image == null
                       ? Icon(
                           Icons.person,

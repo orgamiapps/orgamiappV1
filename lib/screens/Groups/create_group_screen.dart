@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:attendus/firebase/organization_helper.dart';
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/firebase/firebase_storage_helper.dart';
 import 'package:attendus/Services/creation_limit_service.dart';
@@ -24,8 +23,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   final _descCtlr = TextEditingController();
   String _category = 'Business';
   bool _submitting = false;
-  File? _logoFile;
-  File? _bannerFile;
+  SelectedImageData? _logoFile;
+  SelectedImageData? _bannerFile;
 
   final _helper = OrganizationHelper();
 
@@ -75,13 +74,13 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         );
       }
       if (logoUrl != null || bannerUrl != null) {
+        final imageUpdates = <String, String>{};
+        if (logoUrl != null) imageUpdates['logoUrl'] = logoUrl;
+        if (bannerUrl != null) imageUpdates['bannerUrl'] = bannerUrl;
         await FirebaseFirestore.instance
             .collection('Organizations')
             .doc(id)
-            .update({
-              if (logoUrl != null) 'logoUrl': logoUrl,
-              if (bannerUrl != null) 'bannerUrl': bannerUrl,
-            });
+            .update(imageUpdates);
       }
       if (mounted) {
         setState(() => _submitting = false);
@@ -288,7 +287,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 class _ImagePickerTile extends StatelessWidget {
   final String label;
   final String hint;
-  final File? file;
+  final SelectedImageData? file;
   final VoidCallback onClear;
   final VoidCallback onPick;
   final bool isBanner;
@@ -346,8 +345,8 @@ class _ImagePickerTile extends StatelessWidget {
                     )
                   : ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.file(
-                        file!,
+                      child: Image(
+                        image: file!.imageProvider,
                         width: double.infinity,
                         height: isBanner ? 120 : 100,
                         fit: BoxFit.cover,

@@ -1,164 +1,202 @@
-import 'dart:io';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image/image.dart' as img;
-import 'package:path_provider/path_provider.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
+
 import 'package:attendus/Utils/logger.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:image/image.dart' as img;
+import 'package:image_picker/image_picker.dart';
+
+/// An image selected by the user that is safe to use on web and native.
+class SelectedImageData {
+  const SelectedImageData({
+    required this.bytes,
+    required this.name,
+    this.mimeType,
+  });
+
+  final Uint8List bytes;
+  final String name;
+  final String? mimeType;
+
+  ImageProvider<Object> get imageProvider => MemoryImage(bytes);
+
+  static Future<SelectedImageData> fromXFile(XFile file) async {
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) {
+      throw const FormatException('The selected image is empty.');
+    }
+    if (bytes.length > FirebaseStorageHelper.maxSelectedImageBytes) {
+      throw const FormatException(
+        'The selected image exceeds the 10 MB limit.',
+      );
+    }
+    if (img.decodeImage(bytes) == null) {
+      throw const FormatException(
+        'The selected file is not a supported image.',
+      );
+    }
+    return SelectedImageData(
+      bytes: bytes,
+      name: file.name,
+      mimeType: file.mimeType,
+    );
+  }
+}
 
 class FirebaseStorageHelper {
+  static const int maxSelectedImageBytes = 10 * 1024 * 1024;
   static final FirebaseStorage _storage = FirebaseStorage.instance;
   static final ImagePicker _picker = ImagePicker();
 
-  // Pick image from gallery
-  static Future<File?> pickImageFromGallery() async {
+  static Future<SelectedImageData?> pickImageFromGallery() =>
+      _pickImage(ImageSource.gallery);
+
+  static Future<SelectedImageData?> pickImageFromCamera() =>
+      _pickImage(ImageSource.camera);
+
+  static Future<SelectedImageData?> _pickImage(ImageSource source) async {
     try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-      if (image != null) {
-        return File(image.path);
-      }
-      return null;
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('Error picking image: $e', e);
-      }
+      final image = await _picker.pickImage(source: source);
+      return image == null ? null : SelectedImageData.fromXFile(image);
+    } catch (error, stackTrace) {
+      Logger.error('Image selection failed.', error, stackTrace);
       return null;
     }
   }
 
-  // Pick image from camera
-  static Future<File?> pickImageFromCamera() async {
-    try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.camera);
-      if (image != null) {
-        return File(image.path);
-      }
-      return null;
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('Error picking image: $e', e);
-      }
-      return null;
-    }
-  }
-
-  // Upload profile picture
   static Future<String?> uploadProfilePicture(
     String userId,
-    File imageFile,
+    SelectedImageData image,
   ) async {
     try {
-      final Reference ref = _storage.ref().child(
-        'profile_pictures/$userId.jpg',
+      final bytes = _resizeAsJpeg(image.bytes, width: 512, height: 512);
+      return _uploadBytes(
+        path: 'profile_pictures/$userId.jpg',
+        bytes: bytes,
+        contentType: 'image/jpeg',
       );
-      final UploadTask uploadTask = ref.putFile(imageFile);
-      final TaskSnapshot snapshot = await uploadTask;
-      final String downloadUrl = await snapshot.ref.getDownloadURL();
-      return downloadUrl;
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('Error uploading profile picture: $e', e);
-      }
+    } catch (error, stackTrace) {
+      Logger.error('Profile picture upload failed.', error, stackTrace);
       return null;
     }
   }
 
-  // Delete profile picture
   static Future<bool> deleteProfilePicture(String userId) async {
     try {
-      final Reference ref = _storage.ref().child(
-        'profile_pictures/$userId.jpg',
-      );
-      await ref.delete();
+      await _storage.ref('profile_pictures/$userId.jpg').delete();
       return true;
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('Error deleting profile picture: $e', e);
-      }
+    } catch (error, stackTrace) {
+      Logger.error('Profile picture deletion failed.', error, stackTrace);
       return false;
     }
   }
 
-  // Upload organization asset (logo or banner)
   static Future<String?> uploadOrganizationImage({
     required String organizationId,
-    required File imageFile,
+    required SelectedImageData imageFile,
     required bool isBanner,
   }) async {
     try {
-      // Decode and compress
-      final bytes = await imageFile.readAsBytes();
-      img.Image? decoded = img.decodeImage(bytes);
-      if (decoded == null) return null;
-
-      // Target sizes
-      final int targetW = isBanner ? 1600 : 512;
-      final int targetH = isBanner ? 600 : 512;
-      decoded = img.copyResize(decoded, width: targetW, height: targetH, interpolation: img.Interpolation.cubic);
-
-      // Encode
-      final List<int> outBytes = isBanner
-          ? img.encodeJpg(decoded, quality: 80)
-          : img.encodePng(decoded, level: 6);
-
-      // Write to temp file
-      final dir = await getTemporaryDirectory();
-      final String fileName = isBanner ? 'banner' : 'logo';
-      final String tmpPath = '${dir.path}/${fileName}_${DateTime.now().millisecondsSinceEpoch}.${isBanner ? 'jpg' : 'png'}';
-      final File tmpFile = File(tmpPath)..writeAsBytesSync(outBytes);
-
-      final Reference ref = _storage.ref().child(
-        'organizations/$organizationId/${fileName}_${DateTime.now().millisecondsSinceEpoch}.${isBanner ? 'jpg' : 'png'}',
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = isBanner
+          ? 'banner_$timestamp.jpg'
+          : 'logo_$timestamp.png';
+      final bytes = isBanner
+          ? _resizeAsJpeg(imageFile.bytes, width: 1600, height: 600)
+          : _resizeAsPng(imageFile.bytes, width: 512, height: 512);
+      return _uploadBytes(
+        path: 'organizations/$organizationId/$fileName',
+        bytes: bytes,
+        contentType: isBanner ? 'image/jpeg' : 'image/png',
       );
-      final UploadTask uploadTask = ref.putFile(tmpFile);
-      final TaskSnapshot snapshot = await uploadTask;
-      final String downloadUrl = await snapshot.ref.getDownloadURL();
-      return downloadUrl;
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('Error uploading organization image: $e', e);
-      }
+    } catch (error, stackTrace) {
+      Logger.error('Organization image upload failed.', error, stackTrace);
       return null;
     }
   }
 
-  // Upload user banner
   static Future<String?> uploadUserBanner({
     required String userId,
-    required File imageFile,
+    required SelectedImageData imageFile,
   }) async {
     try {
-      // Decode and compress for banner aspect
-      final bytes = await imageFile.readAsBytes();
-      img.Image? decoded = img.decodeImage(bytes);
-      if (decoded == null) return null;
-      final int targetW = 1600;
-      final int targetH = 600;
-      decoded = img.copyResize(
-        decoded,
-        width: targetW,
-        height: targetH,
-        interpolation: img.Interpolation.cubic,
+      final bytes = _resizeAsJpeg(imageFile.bytes, width: 1600, height: 600);
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      return _uploadBytes(
+        path: 'user_banners/$userId/banner_$timestamp.jpg',
+        bytes: bytes,
+        contentType: 'image/jpeg',
       );
-
-      final List<int> outBytes = img.encodeJpg(decoded, quality: 80);
-
-      final dir = await getTemporaryDirectory();
-      final String tmpPath = '${dir.path}/user_banner_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final File tmpFile = File(tmpPath)..writeAsBytesSync(outBytes);
-
-      final Reference ref = _storage.ref().child(
-        'user_banners/$userId/banner_${DateTime.now().millisecondsSinceEpoch}.jpg',
-      );
-      final UploadTask uploadTask = ref.putFile(tmpFile);
-      final TaskSnapshot snapshot = await uploadTask;
-      final String downloadUrl = await snapshot.ref.getDownloadURL();
-      return downloadUrl;
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('Error uploading user banner: $e', e);
-      }
+    } catch (error, stackTrace) {
+      Logger.error('User banner upload failed.', error, stackTrace);
       return null;
     }
+  }
+
+  static Future<String> uploadGroupPhoto({
+    required String organizationId,
+    required String userId,
+    required String uploadId,
+    required int index,
+    required SelectedImageData image,
+  }) async {
+    final bytes = _resizeAsJpeg(image.bytes, width: 1920, height: 1920);
+    return _uploadBytes(
+      path: 'groups/$organizationId/photos/${userId}_${uploadId}_$index.jpg',
+      bytes: bytes,
+      contentType: 'image/jpeg',
+    );
+  }
+
+  static Future<String> _uploadBytes({
+    required String path,
+    required Uint8List bytes,
+    required String contentType,
+  }) async {
+    final snapshot = await _storage
+        .ref(path)
+        .putData(bytes, SettableMetadata(contentType: contentType));
+    return snapshot.ref.getDownloadURL();
+  }
+
+  static Uint8List _resizeAsJpeg(
+    Uint8List bytes, {
+    required int width,
+    required int height,
+  }) {
+    final decoded = _decode(bytes);
+    final resized = img.copyResize(
+      decoded,
+      width: width,
+      height: height,
+      interpolation: img.Interpolation.cubic,
+    );
+    return Uint8List.fromList(img.encodeJpg(resized, quality: 82));
+  }
+
+  static Uint8List _resizeAsPng(
+    Uint8List bytes, {
+    required int width,
+    required int height,
+  }) {
+    final decoded = _decode(bytes);
+    final resized = img.copyResize(
+      decoded,
+      width: width,
+      height: height,
+      interpolation: img.Interpolation.cubic,
+    );
+    return Uint8List.fromList(img.encodePng(resized, level: 6));
+  }
+
+  static img.Image _decode(Uint8List bytes) {
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) {
+      throw const FormatException(
+        'The selected file is not a supported image.',
+      );
+    }
+    return decoded;
   }
 }

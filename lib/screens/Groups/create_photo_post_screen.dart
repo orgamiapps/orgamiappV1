@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 import 'package:attendus/Utils/app_app_bar_view.dart';
+import 'package:attendus/firebase/firebase_storage_helper.dart';
 
 class CreatePhotoPostScreen extends StatefulWidget {
   final String organizationId;
@@ -17,7 +16,7 @@ class CreatePhotoPostScreen extends StatefulWidget {
 class _CreatePhotoPostScreenState extends State<CreatePhotoPostScreen> {
   final _captionController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  final List<File> _selectedImages = [];
+  final List<SelectedImageData> _selectedImages = [];
   bool _isPosting = false;
   bool _isMember = false;
   bool _checkingPermission = true;
@@ -63,14 +62,15 @@ class _CreatePhotoPostScreenState extends State<CreatePhotoPostScreen> {
       );
 
       if (pickedFiles.isNotEmpty) {
+        final remainingSlots = 10 - _selectedImages.length;
+        final selected = await Future.wait(
+          pickedFiles.take(remainingSlots).map(SelectedImageData.fromXFile),
+        );
         setState(() {
-          // Limit to 10 images total
-          final remainingSlots = 10 - _selectedImages.length;
-          final filesToAdd = pickedFiles.take(remainingSlots);
-          _selectedImages.addAll(filesToAdd.map((xFile) => File(xFile.path)));
+          _selectedImages.addAll(selected);
         });
 
-        if (pickedFiles.length > 10 - _selectedImages.length) {
+        if (pickedFiles.length > remainingSlots && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Maximum 10 photos allowed per post')),
           );
@@ -93,8 +93,9 @@ class _CreatePhotoPostScreenState extends State<CreatePhotoPostScreen> {
       );
 
       if (photo != null && _selectedImages.length < 10) {
+        final selected = await SelectedImageData.fromXFile(photo);
         setState(() {
-          _selectedImages.add(File(photo.path));
+          _selectedImages.add(selected);
         });
       } else if (_selectedImages.length >= 10) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -120,19 +121,14 @@ class _CreatePhotoPostScreenState extends State<CreatePhotoPostScreen> {
     final String userId = FirebaseAuth.instance.currentUser!.uid;
 
     for (int i = 0; i < _selectedImages.length; i++) {
-      final File image = _selectedImages[i];
-      final String fileName =
-          'groups/${widget.organizationId}/photos/${userId}_${timestamp}_$i.jpg';
-
       try {
-        final Reference ref = FirebaseStorage.instance.ref().child(fileName);
-        final UploadTask uploadTask = ref.putFile(
-          image,
-          SettableMetadata(contentType: 'image/jpeg'),
+        final downloadUrl = await FirebaseStorageHelper.uploadGroupPhoto(
+          organizationId: widget.organizationId,
+          userId: userId,
+          uploadId: timestamp,
+          index: i,
+          image: _selectedImages[i],
         );
-
-        final TaskSnapshot snapshot = await uploadTask;
-        final String downloadUrl = await snapshot.ref.getDownloadURL();
         imageUrls.add(downloadUrl);
       } catch (e) {
         throw Exception('Failed to upload image ${i + 1}: $e');
@@ -415,8 +411,9 @@ class _CreatePhotoPostScreenState extends State<CreatePhotoPostScreen> {
                                           borderRadius: BorderRadius.circular(
                                             16,
                                           ),
-                                          child: Image.file(
-                                            _selectedImages[0],
+                                          child: Image(
+                                            image: _selectedImages[0]
+                                                .imageProvider,
                                             width: double.infinity,
                                             height: double.infinity,
                                             fit: BoxFit.cover,
@@ -450,8 +447,9 @@ class _CreatePhotoPostScreenState extends State<CreatePhotoPostScreen> {
                                               ClipRRect(
                                                 borderRadius:
                                                     BorderRadius.circular(12),
-                                                child: Image.file(
-                                                  _selectedImages[index],
+                                                child: Image(
+                                                  image: _selectedImages[index]
+                                                      .imageProvider,
                                                   width: double.infinity,
                                                   height: double.infinity,
                                                   fit: BoxFit.cover,

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:attendus/models/customer_model.dart';
@@ -1604,8 +1603,12 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     }
   }
 
-  void _shareProfile() {
-    Share.share('Check out ${_getDisplayName()}\'s profile on Attendus!');
+  Future<void> _shareProfile() async {
+    await SharePlus.instance.share(
+      ShareParams(
+        text: 'Check out ${_getDisplayName()}\'s profile on Attendus!',
+      ),
+    );
   }
 
   void _showProfileOptions(BuildContext context) {
@@ -1757,8 +1760,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       backgroundColor: Colors.transparent,
       builder: (context) {
         // Local staged files for live preview inside the sheet
-        File? sheetBannerFile;
-        File? sheetAvatarFile;
+        SelectedImageData? sheetBannerFile;
+        SelectedImageData? sheetAvatarFile;
 
         return DraggableScrollableSheet(
           expand: false,
@@ -1839,8 +1842,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       context: context,
       builder: (context) {
         // Local staged files for live preview inside the dialog
-        File? dialogBannerFile;
-        File? dialogAvatarFile;
+        SelectedImageData? dialogBannerFile;
+        SelectedImageData? dialogAvatarFile;
 
         return Dialog(
           shape: RoundedRectangleBorder(
@@ -1900,8 +1903,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     TextEditingController nameController,
     TextEditingController usernameController,
     TextEditingController bioController, {
-    File? stagedBannerFile,
-    File? stagedAvatarFile,
+    SelectedImageData? stagedBannerFile,
+    SelectedImageData? stagedAvatarFile,
     required VoidCallback onChangeBanner,
     required VoidCallback onChangeAvatar,
     required VoidCallback onSave,
@@ -2083,8 +2086,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     TextEditingController nameController,
     TextEditingController usernameController,
     TextEditingController bioController, {
-    File? stagedAvatarFile,
-    File? stagedBannerFile,
+    SelectedImageData? stagedAvatarFile,
+    SelectedImageData? stagedBannerFile,
   }) async {
     if (!mounted) return;
 
@@ -2147,8 +2150,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 class _EditMediaSection extends StatelessWidget {
   final String? bannerUrl;
   final String? avatarUrl;
-  final File? bannerFile;
-  final File? avatarFile;
+  final SelectedImageData? bannerFile;
+  final SelectedImageData? avatarFile;
   final VoidCallback onChangeBanner;
   final VoidCallback onChangeAvatar;
 
@@ -2195,7 +2198,7 @@ class _EditMediaSection extends StatelessWidget {
                   radius: avatarRadius,
                   backgroundColor: const Color(0xFFE5E7EB),
                   backgroundImage: avatarFile != null
-                      ? FileImage(avatarFile!)
+                      ? avatarFile!.imageProvider
                       : (avatarUrl != null && avatarUrl!.isNotEmpty)
                       ? NetworkImage(avatarUrl!)
                       : null,

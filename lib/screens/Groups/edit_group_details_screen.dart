@@ -4,7 +4,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/models/organization_model.dart';
 import 'package:attendus/firebase/organization_helper.dart';
 import 'package:attendus/firebase/firebase_storage_helper.dart';
-import 'dart:io';
 
 class EditGroupDetailsScreen extends StatefulWidget {
   final String organizationId;
@@ -35,8 +34,8 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
   bool _hasChanges = false;
 
   // Image management
-  File? _logoFile;
-  File? _bannerFile;
+  SelectedImageData? _logoFile;
+  SelectedImageData? _bannerFile;
   String? _currentLogoUrl;
   String? _currentBannerUrl;
 
@@ -774,7 +773,7 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
 class _ImagePickerTile extends StatelessWidget {
   final String label;
   final String hint;
-  final File? file;
+  final SelectedImageData? file;
   final String? currentImageUrl;
   final VoidCallback onClear;
   final VoidCallback onPick;
@@ -856,8 +855,8 @@ class _ImagePickerTile extends StatelessWidget {
       // Show selected file
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Image.file(
-          file!,
+        child: Image(
+          image: file!.imageProvider,
           width: double.infinity,
           height: isBanner ? 120 : 100,
           fit: BoxFit.cover,
