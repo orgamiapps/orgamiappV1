@@ -82,10 +82,7 @@ class AppAppBarView {
             ),
           ),
           // Optional trailing widget
-          if (trailing != null) ...[
-            const SizedBox(width: 12),
-            trailing,
-          ],
+          if (trailing != null) ...[const SizedBox(width: 12), trailing],
         ],
       ),
     );
@@ -108,7 +105,8 @@ class AppAppBarView {
         child: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: backgroundColor ??
+            color:
+                backgroundColor ??
                 theme.colorScheme.surfaceContainerHighest.withValues(
                   alpha: theme.brightness == Brightness.dark ? 0.6 : 0.8,
                 ),
@@ -130,7 +128,9 @@ class AppAppBarView {
 
   // ========== Legacy methods (deprecated - use modernHeader instead) ==========
 
-  @Deprecated('Use modernHeader instead. This method will be removed in a future version.')
+  @Deprecated(
+    'Use modernHeader instead. This method will be removed in a future version.',
+  )
   static Widget appBarView({
     required BuildContext context,
     required String title,
@@ -161,7 +161,9 @@ class AppAppBarView {
     );
   }
 
-  @Deprecated('Use modernBackButton instead. This method will be removed in a future version.')
+  @Deprecated(
+    'Use modernBackButton instead. This method will be removed in a future version.',
+  )
   static Widget appBarWithOnlyBackButton({
     required BuildContext context,
     Color? backButtonColor,

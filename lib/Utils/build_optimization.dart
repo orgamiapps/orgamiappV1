@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 /// Optimization utilities for widget building and performance
 class BuildOptimization {
@@ -15,21 +16,18 @@ class BuildOptimization {
     Key? key,
   }) {
     return ListView.builder(
+      scrollCacheExtent: ScrollCacheExtent.pixels(500.0),
       key: key,
       controller: controller,
       padding: padding,
       itemCount: itemCount,
       itemBuilder: (context, index) {
         // Wrap items in RepaintBoundary to isolate repaints
-        return RepaintBoundary(
-          child: itemBuilder(context, index),
-        );
+        return RepaintBoundary(child: itemBuilder(context, index));
       },
       itemExtent: itemExtent,
       shrinkWrap: shrinkWrap,
       physics: physics,
-      // Add cache extent for better scrolling performance
-      cacheExtent: 500.0,
       // Use const physics when possible
       addAutomaticKeepAlives: true,
       addRepaintBoundaries: true,
@@ -49,6 +47,7 @@ class BuildOptimization {
     Key? key,
   }) {
     return GridView.builder(
+      scrollCacheExtent: ScrollCacheExtent.pixels(500.0),
       key: key,
       controller: controller,
       padding: padding,
@@ -56,14 +55,10 @@ class BuildOptimization {
       gridDelegate: gridDelegate,
       itemBuilder: (context, index) {
         // Wrap items in RepaintBoundary to isolate repaints
-        return RepaintBoundary(
-          child: itemBuilder(context, index),
-        );
+        return RepaintBoundary(child: itemBuilder(context, index));
       },
       shrinkWrap: shrinkWrap,
       physics: physics,
-      // Add cache extent for better scrolling performance
-      cacheExtent: 500.0,
       addAutomaticKeepAlives: true,
       addRepaintBoundaries: true,
       addSemanticIndexes: true,
@@ -72,10 +67,7 @@ class BuildOptimization {
 
   /// Wraps a widget with RepaintBoundary to prevent unnecessary repaints
   static Widget isolateRepaints(Widget child, {Key? key}) {
-    return RepaintBoundary(
-      key: key,
-      child: child,
-    );
+    return RepaintBoundary(key: key, child: child);
   }
 
   /// Creates an optimized container with cached decoration
@@ -114,8 +106,7 @@ class BuildOptimization {
 
     return () {
       final now = DateTime.now();
-      if (lastActionTime == null ||
-          now.difference(lastActionTime!) >= delay) {
+      if (lastActionTime == null || now.difference(lastActionTime!) >= delay) {
         lastActionTime = now;
         callback();
       }
@@ -168,16 +159,11 @@ class BuildOptimization {
     Widget Function() builder, {
     List<Object?>? dependencies,
   }) {
-    return _MemoizedWidget(
-      builder: builder,
-      dependencies: dependencies ?? [],
-    );
+    return _MemoizedWidget(builder: builder, dependencies: dependencies ?? []);
   }
 
   /// Optimizes heavy computation by running it in a separate isolate (for complex calculations)
-  static Future<T> computeAsync<T>(
-    T Function() computation,
-  ) async {
+  static Future<T> computeAsync<T>(T Function() computation) async {
     // For simple operations, just run synchronously
     // For complex operations, this could use compute() from foundation
     return computation();
@@ -218,7 +204,7 @@ class BuildOptimization {
                 child: CircularProgressIndicator(
                   value: loadingProgress.expectedTotalBytes != null
                       ? loadingProgress.cumulativeBytesLoaded /
-                          loadingProgress.expectedTotalBytes!
+                            loadingProgress.expectedTotalBytes!
                       : null,
                 ),
               );
@@ -233,10 +219,7 @@ class _MemoizedWidget extends StatefulWidget {
   final Widget Function() builder;
   final List<Object?> dependencies;
 
-  const _MemoizedWidget({
-    required this.builder,
-    required this.dependencies,
-  });
+  const _MemoizedWidget({required this.builder, required this.dependencies});
 
   @override
   State<_MemoizedWidget> createState() => _MemoizedWidgetState();
@@ -305,4 +288,3 @@ extension WidgetOptimizationExtensions on Widget {
     );
   }
 }
-

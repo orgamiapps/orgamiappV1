@@ -407,7 +407,9 @@ class _GroupAnalyticsDashboardScreenState
     final File file = File(fileName);
     await file.writeAsBytes(bytes, flush: true);
 
-    await Share.shareXFiles([XFile(fileName)], text: 'Group Analytics Export');
+    await SharePlus.instance.share(
+      ShareParams(files: [XFile(fileName)], text: 'Group Analytics Export'),
+    );
   }
 
   @override

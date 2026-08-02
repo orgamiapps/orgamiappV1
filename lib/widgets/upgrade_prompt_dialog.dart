@@ -45,10 +45,12 @@ class UpgradePromptDialog {
     required SubscriptionTier currentTier,
   }) async {
     final isBasic = currentTier == SubscriptionTier.basic;
-    
+
     return _showUpgradeDialog(
       context: context,
-      title: isBasic ? 'Unlimited Events with Premium' : 'Upgrade to Create More Events',
+      title: isBasic
+          ? 'Unlimited Events with Premium'
+          : 'Upgrade to Create More Events',
       description: isBasic
           ? 'Remove the monthly limit and create unlimited events with Premium.'
           : 'Choose a plan to start creating events and building your community.',
@@ -115,11 +117,7 @@ class UpgradePromptDialog {
                           color: Colors.white.withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(
-                          icon,
-                          size: 40,
-                          color: Colors.white,
-                        ),
+                        child: Icon(icon, size: 40, color: Colors.white),
                       ),
                       const SizedBox(height: 16),
                       Text(
@@ -157,32 +155,36 @@ class UpgradePromptDialog {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      ...features.map((feature) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                                    shape: BoxShape.circle,
+                      ...features.map(
+                        (feature) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primary.withValues(
+                                    alpha: 0.1,
                                   ),
-                                  child: Icon(
-                                    Icons.check,
-                                    size: 14,
-                                    color: theme.colorScheme.primary,
-                                  ),
+                                  shape: BoxShape.circle,
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    feature,
-                                    style: theme.textTheme.bodyMedium,
-                                  ),
+                                child: Icon(
+                                  Icons.check,
+                                  size: 14,
+                                  color: theme.colorScheme.primary,
                                 ),
-                              ],
-                            ),
-                          )),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  feature,
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 24),
 
                       // Buttons
@@ -192,7 +194,9 @@ class UpgradePromptDialog {
                             child: OutlinedButton(
                               onPressed: () => Navigator.pop(dialogContext),
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                                 side: BorderSide(
                                   color: theme.colorScheme.outline,
                                 ),
@@ -219,7 +223,9 @@ class UpgradePromptDialog {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: theme.colorScheme.primary,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -244,4 +250,3 @@ class UpgradePromptDialog {
     );
   }
 }
-

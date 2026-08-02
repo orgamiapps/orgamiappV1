@@ -33,19 +33,19 @@ class PictureFaceEnrollmentScreen extends StatefulWidget {
 }
 
 enum EnrollmentState {
-  INITIALIZING,
-  READY,
-  CAPTURING,
-  PROCESSING,
-  COMPLETE,
-  ERROR,
+  initializing,
+  ready,
+  capturing,
+  processing,
+  complete,
+  error,
 }
 
 class _PictureFaceEnrollmentScreenState
     extends State<PictureFaceEnrollmentScreen>
     with TickerProviderStateMixin {
   // State Management
-  EnrollmentState _currentState = EnrollmentState.INITIALIZING;
+  EnrollmentState _currentState = EnrollmentState.initializing;
   String _statusMessage = 'Initializing camera...';
   String _errorMessage = '';
 
@@ -60,13 +60,13 @@ class _PictureFaceEnrollmentScreenState
 
   // Enrollment Progress
   int _capturedSamples = 0;
-  static const int REQUIRED_SAMPLES = 5;
+  static const int requiredSamples = 5;
   final List<List<double>> _faceFeatures = [];
   bool _isCapturing = false;
 
   // Timers
   Timer? _timeoutTimer;
-  static const Duration ENROLLMENT_TIMEOUT = Duration(seconds: 45);
+  static const Duration enrollmentTimeout = Duration(seconds: 45);
 
   // Animation
   late AnimationController _pulseController;
@@ -98,10 +98,10 @@ class _PictureFaceEnrollmentScreenState
   }
 
   void _startEnrollment() async {
-    _updateState(EnrollmentState.INITIALIZING);
+    _updateState(EnrollmentState.initializing);
 
     // Set timeout
-    _timeoutTimer = Timer(ENROLLMENT_TIMEOUT, () {
+    _timeoutTimer = Timer(enrollmentTimeout, () {
       _logTimestamp('Enrollment timeout');
       _handleError('Enrollment took too long. Please try again.');
     });
@@ -129,12 +129,12 @@ class _PictureFaceEnrollmentScreenState
       await _initializeCamera();
 
       // Step 4: Ready to capture
-      _updateState(EnrollmentState.READY);
+      _updateState(EnrollmentState.ready);
       _updateStatus('Tap the capture button when ready');
 
       // Auto-capture after 2 seconds
       Future.delayed(Duration(seconds: 2), () {
-        if (mounted && _currentState == EnrollmentState.READY) {
+        if (mounted && _currentState == EnrollmentState.ready) {
           _capturePhoto();
         }
       });
@@ -208,7 +208,7 @@ class _PictureFaceEnrollmentScreenState
       return;
     }
 
-    if (_capturedSamples >= REQUIRED_SAMPLES) {
+    if (_capturedSamples >= requiredSamples) {
       _completeEnrollment();
       return;
     }
@@ -218,11 +218,11 @@ class _PictureFaceEnrollmentScreenState
       _attempts++;
     });
 
-    _updateState(EnrollmentState.CAPTURING);
+    _updateState(EnrollmentState.capturing);
     _updateStatus('Capturing... Hold still');
 
     try {
-      _logTimestamp('Taking picture ${_attempts}...');
+      _logTimestamp('Taking picture $_attempts...');
 
       // Take picture
       final XFile imageFile = await _cameraController!.takePicture();
@@ -232,10 +232,10 @@ class _PictureFaceEnrollmentScreenState
       await _processCapturedImage(imageFile);
 
       // Schedule next capture if needed
-      if (_capturedSamples < REQUIRED_SAMPLES && mounted) {
+      if (_capturedSamples < requiredSamples && mounted) {
         Future.delayed(Duration(milliseconds: 1500), () {
-          if (mounted && _capturedSamples < REQUIRED_SAMPLES) {
-            _updateState(EnrollmentState.READY);
+          if (mounted && _capturedSamples < requiredSamples) {
+            _updateState(EnrollmentState.ready);
             _updateStatus('Preparing next capture...');
 
             Future.delayed(Duration(milliseconds: 500), () {
@@ -252,7 +252,7 @@ class _PictureFaceEnrollmentScreenState
 
       // Retry after delay
       Future.delayed(Duration(milliseconds: 1000), () {
-        if (mounted && _capturedSamples < REQUIRED_SAMPLES) {
+        if (mounted && _capturedSamples < requiredSamples) {
           _capturePhoto();
         }
       });
@@ -297,7 +297,7 @@ class _PictureFaceEnrollmentScreenState
       _capturedSamples++;
 
       _logTimestamp('Sample $_capturedSamples captured successfully');
-      _updateStatus('Captured $_capturedSamples of $REQUIRED_SAMPLES samples');
+      _updateStatus('Captured $_capturedSamples of $requiredSamples samples');
 
       // Haptic feedback
       HapticFeedback.mediumImpact();
@@ -309,7 +309,7 @@ class _PictureFaceEnrollmentScreenState
         _logTimestamp('Could not delete temp file: $e');
       }
 
-      if (_capturedSamples >= REQUIRED_SAMPLES) {
+      if (_capturedSamples >= requiredSamples) {
         _completeEnrollment();
       }
     } catch (e, stack) {
@@ -320,7 +320,7 @@ class _PictureFaceEnrollmentScreenState
 
   Future<void> _completeEnrollment() async {
     _logTimestamp('Completing enrollment...');
-    _updateState(EnrollmentState.PROCESSING);
+    _updateState(EnrollmentState.processing);
     _updateStatus('Saving enrollment data...');
 
     _timeoutTimer?.cancel();
@@ -333,7 +333,7 @@ class _PictureFaceEnrollmentScreenState
       );
 
       if (userIdentity == null) {
-        _logTimestamp('ERROR: No user identity available');
+        _logTimestamp('error: No user identity available');
         throw Exception('User not logged in. Please sign in first.');
       }
 
@@ -361,7 +361,7 @@ class _PictureFaceEnrollmentScreenState
 
       _logTimestamp('✅ Enrollment saved and verified successfully!');
 
-      _updateState(EnrollmentState.COMPLETE);
+      _updateState(EnrollmentState.complete);
       _updateStatus('Enrollment successful!');
       _logTimestamp('Enrollment completed successfully');
 
@@ -415,7 +415,7 @@ class _PictureFaceEnrollmentScreenState
   }
 
   void _handleError(String message) {
-    _updateState(EnrollmentState.ERROR);
+    _updateState(EnrollmentState.error);
     _errorMessage = message;
     ShowToast().showNormalToast(msg: message);
   }
@@ -444,7 +444,7 @@ class _PictureFaceEnrollmentScreenState
 
   void _retryEnrollment() {
     setState(() {
-      _currentState = EnrollmentState.INITIALIZING;
+      _currentState = EnrollmentState.initializing;
       _capturedSamples = 0;
       _faceFeatures.clear();
       _attempts = 0;
@@ -491,17 +491,17 @@ class _PictureFaceEnrollmentScreenState
 
   Color _getStateColor() {
     switch (_currentState) {
-      case EnrollmentState.INITIALIZING:
+      case EnrollmentState.initializing:
         return Colors.blue;
-      case EnrollmentState.READY:
+      case EnrollmentState.ready:
         return Colors.green;
-      case EnrollmentState.CAPTURING:
+      case EnrollmentState.capturing:
         return Colors.orange;
-      case EnrollmentState.PROCESSING:
+      case EnrollmentState.processing:
         return Colors.purple;
-      case EnrollmentState.COMPLETE:
+      case EnrollmentState.complete:
         return Colors.green;
-      case EnrollmentState.ERROR:
+      case EnrollmentState.error:
         return Colors.red;
     }
   }
@@ -528,12 +528,12 @@ class _PictureFaceEnrollmentScreenState
             Center(child: CircularProgressIndicator(color: Colors.white)),
 
           // Face Guide
-          if (!_isNavigating && _currentState != EnrollmentState.ERROR)
+          if (!_isNavigating && _currentState != EnrollmentState.error)
             CustomPaint(
               painter: FaceGuidePainter(
                 animation: _pulseAnimation,
                 capturedSamples: _capturedSamples,
-                requiredSamples: REQUIRED_SAMPLES,
+                requiredSamples: requiredSamples,
               ),
               child: Container(),
             ),
@@ -546,12 +546,12 @@ class _PictureFaceEnrollmentScreenState
 
           // Capture Button
           if (!_isNavigating &&
-              _currentState == EnrollmentState.READY &&
+              _currentState == EnrollmentState.ready &&
               !_isCapturing)
             _buildCaptureButton(),
 
           // Error Dialog
-          if (!_isNavigating && _currentState == EnrollmentState.ERROR)
+          if (!_isNavigating && _currentState == EnrollmentState.error)
             _buildErrorDialog(),
 
           // Loading overlay during navigation
@@ -618,18 +618,18 @@ class _PictureFaceEnrollmentScreenState
               ),
               textAlign: TextAlign.center,
             ),
-            if (_currentState == EnrollmentState.CAPTURING ||
-                _currentState == EnrollmentState.READY) ...[
+            if (_currentState == EnrollmentState.capturing ||
+                _currentState == EnrollmentState.ready) ...[
               SizedBox(height: 15),
               LinearProgressIndicator(
-                value: _capturedSamples / REQUIRED_SAMPLES,
+                value: _capturedSamples / requiredSamples,
                 backgroundColor: Colors.white.withValues(alpha: 0.3),
                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 minHeight: 6,
               ),
               SizedBox(height: 10),
               Text(
-                '$_capturedSamples / $REQUIRED_SAMPLES samples',
+                '$_capturedSamples / $requiredSamples samples',
                 style: TextStyle(color: Colors.white, fontSize: 14),
               ),
             ],
@@ -646,7 +646,7 @@ class _PictureFaceEnrollmentScreenState
       right: 20,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(REQUIRED_SAMPLES, (index) {
+        children: List.generate(requiredSamples, (index) {
           final isComplete = index < _capturedSamples;
           final isCurrent = index == _capturedSamples;
 
@@ -740,16 +740,16 @@ class _PictureFaceEnrollmentScreenState
               children: [
                 TextButton(
                   onPressed: _skipEnrollment,
-                  child: Text('Skip'),
                   style: TextButton.styleFrom(foregroundColor: Colors.grey),
+                  child: Text('Skip'),
                 ),
                 ElevatedButton(
                   onPressed: _retryEnrollment,
-                  child: Text('Try Again'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
                   ),
+                  child: Text('Try Again'),
                 ),
               ],
             ),

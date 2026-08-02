@@ -63,7 +63,7 @@ class FirebaseInitializer {
             );
           } else {
             await FirebaseAppCheck.instance
-                .activate(webProvider: ReCaptchaV3Provider(siteKey))
+                .activate(providerWeb: ReCaptchaV3Provider(siteKey))
                 .timeout(const Duration(seconds: 3));
             Logger.info('Firebase App Check activated for web');
           }
@@ -73,16 +73,16 @@ class FirebaseInitializer {
           return;
         }
 
-        final AndroidProvider androidProvider = kDebugMode
-            ? AndroidProvider.debug
-            : AndroidProvider.playIntegrity;
-        final AppleProvider appleProvider = kDebugMode
-            ? AppleProvider.debug
-            : AppleProvider.deviceCheck;
+        final AndroidAppCheckProvider androidProvider = kDebugMode
+            ? const AndroidDebugProvider()
+            : const AndroidPlayIntegrityProvider();
+        final AppleAppCheckProvider appleProvider = kDebugMode
+            ? const AppleDebugProvider()
+            : const AppleDeviceCheckProvider();
 
         await FirebaseAppCheck.instance.activate(
-          androidProvider: androidProvider,
-          appleProvider: appleProvider,
+          providerAndroid: androidProvider,
+          providerApple: appleProvider,
         );
 
         Logger.info(

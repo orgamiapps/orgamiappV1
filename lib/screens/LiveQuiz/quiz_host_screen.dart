@@ -1492,7 +1492,7 @@ class QuizAnalyticsWidget extends StatelessWidget {
                 ],
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );

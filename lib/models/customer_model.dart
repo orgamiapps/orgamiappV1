@@ -83,8 +83,10 @@ class CustomerModel {
           true, // Default to true for backward compatibility
       favorites: List<String>.from(d['favorites'] ?? []), // Saved events field
       createdAt: parsedCreatedAt,
-      eventsCreated: d['eventsCreated'] ?? 0, // Default to 0 for backward compatibility
-      groupsCreated: d['groupsCreated'] ?? 0, // Default to 0 for backward compatibility
+      eventsCreated:
+          d['eventsCreated'] ?? 0, // Default to 0 for backward compatibility
+      groupsCreated:
+          d['groupsCreated'] ?? 0, // Default to 0 for backward compatibility
     );
   }
 

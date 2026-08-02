@@ -1675,8 +1675,10 @@ class _NewMessageScreenState extends State<NewMessageScreen>
     return value;
   }
 
-  void _inviteFriends() {
-    Share.share('Join me on Attendus to chat and collaborate!');
+  Future<void> _inviteFriends() async {
+    await SharePlus.instance.share(
+      ShareParams(text: 'Join me on Attendus to chat and collaborate!'),
+    );
   }
 
   void _discoverPeople() {

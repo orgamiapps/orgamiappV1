@@ -24,7 +24,7 @@ class _LiveLeaderboardWidgetState extends State<LiveLeaderboardWidget>
   final _liveQuizService = LiveQuizService();
 
   List<QuizParticipantModel> _participants = [];
-  Map<String, int> _previousRanks = {};
+  final Map<String, int> _previousRanks = {};
   StreamSubscription<List<QuizParticipantModel>>? _participantsSubscription;
 
   // Animation controllers
@@ -611,7 +611,7 @@ class CompactLeaderboardWidget extends StatelessWidget {
                     ],
                   ),
                 );
-              }).toList(),
+              }),
             ],
           ),
         );

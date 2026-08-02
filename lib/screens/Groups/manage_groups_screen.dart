@@ -785,8 +785,9 @@ class _ManageGroupsScreenState extends State<ManageGroupsScreen> {
                   await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          CreateAnnouncementScreen(organizationId: organizationId),
+                      builder: (_) => CreateAnnouncementScreen(
+                        organizationId: organizationId,
+                      ),
                     ),
                   );
                 },

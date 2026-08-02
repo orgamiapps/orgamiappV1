@@ -12,7 +12,7 @@ class OptimizedFirestoreHelper {
   static final Map<String, DateTime> _cacheTimestamps = {};
   static const Duration _cacheExpiry = Duration(minutes: 5);
   static const int _maxCacheSize = 100; // Prevent unlimited cache growth
-  
+
   // Track cache hits for optimization insights
   static int _cacheHits = 0;
   static int _cacheMisses = 0;
@@ -49,10 +49,12 @@ class OptimizedFirestoreHelper {
 
     // Check cache first
     if (_isValidCache(cacheKey)) {
-      Logger.debug('Returning cached user data (hits: $_cacheHits, misses: $_cacheMisses)');
+      Logger.debug(
+        'Returning cached user data (hits: $_cacheHits, misses: $_cacheMisses)',
+      );
       return _cache[cacheKey] as CustomerModel?;
     }
-    
+
     // Enforce cache size limit before adding new entries
     _enforceCacheSizeLimit();
 
@@ -197,7 +199,7 @@ class OptimizedFirestoreHelper {
       _cacheHits++;
       return true;
     }
-    
+
     _cacheMisses++;
     return false;
   }
@@ -232,7 +234,7 @@ class OptimizedFirestoreHelper {
     _cacheMisses = 0;
     Logger.debug('All cache cleared');
   }
-  
+
   /// Enforce cache size limit to prevent memory issues
   static void _enforceCacheSizeLimit() {
     if (_cache.length >= _maxCacheSize) {
@@ -240,14 +242,16 @@ class OptimizedFirestoreHelper {
       final entriesToRemove = (_maxCacheSize * 0.2).round();
       final sortedEntries = _cacheTimestamps.entries.toList()
         ..sort((a, b) => a.value.compareTo(b.value));
-      
+
       for (var i = 0; i < entriesToRemove && i < sortedEntries.length; i++) {
         final key = sortedEntries[i].key;
         _cache.remove(key);
         _cacheTimestamps.remove(key);
       }
-      
-      Logger.debug('Enforced cache size limit: removed $entriesToRemove entries');
+
+      Logger.debug(
+        'Enforced cache size limit: removed $entriesToRemove entries',
+      );
     }
   }
 
@@ -256,7 +260,7 @@ class OptimizedFirestoreHelper {
     final hitRate = _cacheHits + _cacheMisses > 0
         ? (_cacheHits / (_cacheHits + _cacheMisses) * 100).toStringAsFixed(1)
         : '0.0';
-    
+
     return {
       'totalEntries': _cache.length,
       'memoryUsage': _cache.length * 1000, // Rough estimation

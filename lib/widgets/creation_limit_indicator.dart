@@ -60,11 +60,7 @@ class CreationLimitIndicator extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: const [
-          Icon(
-            Icons.star_rounded,
-            size: 16,
-            color: Colors.white,
-          ),
+          Icon(Icons.star_rounded, size: 16, color: Colors.white),
           SizedBox(width: 4),
           Text(
             'Premium',
@@ -86,7 +82,7 @@ class CreationLimitIndicator extends StatelessWidget {
     final remaining = type == CreationType.event
         ? limitService.eventsRemaining
         : limitService.groupsRemaining;
-    
+
     final isLow = remaining <= 1;
     final color = isLow ? const Color(0xFFEF4444) : const Color(0xFF6366F1);
 
@@ -95,10 +91,7 @@ class CreationLimitIndicator extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: color.withValues(alpha: 0.3),
-          width: 1,
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -129,15 +122,15 @@ class CreationLimitIndicator extends StatelessWidget {
     final remaining = type == CreationType.event
         ? limitService.eventsRemaining
         : limitService.groupsRemaining;
-    
+
     final progress = type == CreationType.event
         ? limitService.getEventProgress()
         : limitService.getGroupProgress();
-    
+
     final total = type == CreationType.event
         ? CreationLimitService.freeEventLimit
         : CreationLimitService.freeGroupLimit;
-    
+
     final created = total - remaining;
     final isLow = remaining <= 1;
     final typeName = type == CreationType.event ? 'Events' : 'Groups';
@@ -147,10 +140,7 @@ class CreationLimitIndicator extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFFE5E7EB),
-          width: 1,
-        ),
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -288,8 +278,4 @@ class CreationLimitIndicator extends StatelessWidget {
   }
 }
 
-enum CreationType {
-  event,
-  group,
-}
-
+enum CreationType { event, group }

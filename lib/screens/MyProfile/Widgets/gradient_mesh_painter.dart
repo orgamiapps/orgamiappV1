@@ -37,32 +37,26 @@ class GradientMeshPainter extends CustomPainter {
       );
 
       final paint = Paint()..shader = gradient;
-      canvas.drawCircle(
-        positions[i],
-        size.width * 0.6,
-        paint,
-      );
+      canvas.drawCircle(positions[i], size.width * 0.6, paint);
     }
 
     // Add animated waves for VIP tickets
     if (isVIP) {
       final wavePaint = Paint()
         ..style = PaintingStyle.fill
-        ..shader = ui.Gradient.linear(
-          Offset(0, size.height),
-          Offset(size.width, 0),
-          [
-            const Color(0xFFFFD700).withValues(alpha: 0.08),
-            const Color(0xFFFFA500).withValues(alpha: 0.05),
-            const Color(0xFFFF69B4).withValues(alpha: 0.03),
-          ],
-        );
+        ..shader =
+            ui.Gradient.linear(Offset(0, size.height), Offset(size.width, 0), [
+              const Color(0xFFFFD700).withValues(alpha: 0.08),
+              const Color(0xFFFFA500).withValues(alpha: 0.05),
+              const Color(0xFFFF69B4).withValues(alpha: 0.03),
+            ]);
 
       final path = Path();
       path.moveTo(0, size.height * 0.7);
 
       for (double x = 0; x <= size.width; x += 5) {
-        final y = size.height * 0.7 +
+        final y =
+            size.height * 0.7 +
             math.sin((x / size.width) * math.pi * 4 + animation * math.pi * 2) *
                 15;
         path.lineTo(x, y);
@@ -80,4 +74,3 @@ class GradientMeshPainter extends CustomPainter {
   bool shouldRepaint(GradientMeshPainter oldDelegate) =>
       animation != oldDelegate.animation || isVIP != oldDelegate.isVIP;
 }
-

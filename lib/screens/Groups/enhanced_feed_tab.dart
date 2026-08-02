@@ -200,15 +200,21 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
   }
 
   // Handle pin/unpin with optimistic UI updates
-  Future<void> _togglePin(String postId, bool isEvent, bool currentlyPinned) async {
+  Future<void> _togglePin(
+    String postId,
+    bool isEvent,
+    bool currentlyPinned,
+  ) async {
     if (!_isAdmin) return;
 
     try {
       // Optimistic update
       setState(() {
-        final index = _posts.indexWhere((post) =>
-            post['id'] == postId &&
-            (isEvent ? post['type'] == 'event' : post['type'] == 'feed'));
+        final index = _posts.indexWhere(
+          (post) =>
+              post['id'] == postId &&
+              (isEvent ? post['type'] == 'event' : post['type'] == 'feed'),
+        );
 
         if (index != -1) {
           _posts[index]['data']['isPinned'] = !currentlyPinned;
@@ -236,9 +242,9 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
         final collection = isEvent
             ? db.collection('Events')
             : db
-                .collection('Organizations')
-                .doc(widget.organizationId)
-                .collection('Feed');
+                  .collection('Organizations')
+                  .doc(widget.organizationId)
+                  .collection('Feed');
 
         final snap = await collection.where('isPinned', isEqualTo: true).get();
         int maxOrder = 0;
@@ -253,10 +259,10 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
       final docRef = isEvent
           ? db.collection('Events').doc(postId)
           : db
-              .collection('Organizations')
-              .doc(widget.organizationId)
-              .collection('Feed')
-              .doc(postId);
+                .collection('Organizations')
+                .doc(widget.organizationId)
+                .collection('Feed')
+                .doc(postId);
 
       await docRef.update({
         'isPinned': !currentlyPinned,
@@ -282,10 +288,7 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
       await _loadPosts();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -609,8 +612,9 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
       }
 
       final feedType = post['feedType'];
-      if (_selectedFilter == 'Announcements' && feedType == 'announcement')
+      if (_selectedFilter == 'Announcements' && feedType == 'announcement') {
         return true;
+      }
       if (_selectedFilter == 'Polls' && feedType == 'poll') return true;
       if (_selectedFilter == 'Photos' && feedType == 'photo') return true;
 
@@ -735,7 +739,11 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                       organizationId: widget.organizationId,
                       currentUserId: _currentUser?.uid,
                       onLike: () => _toggleEventLike(postId),
-                      onPin: () => _togglePin(postId, true, postData['isPinned'] ?? false),
+                      onPin: () => _togglePin(
+                        postId,
+                        true,
+                        postData['isPinned'] ?? false,
+                      ),
                       isAdmin: _isAdmin,
                     ),
                   );
@@ -755,7 +763,11 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                       currentUserId: _currentUser?.uid,
                       isAdmin: _isAdmin,
                       onLike: () => _toggleLike(postId),
-                      onPin: () => _togglePin(postId, false, postData['isPinned'] ?? false),
+                      onPin: () => _togglePin(
+                        postId,
+                        false,
+                        postData['isPinned'] ?? false,
+                      ),
                     ),
                   );
                 } else if (feedType == 'photo') {
@@ -768,7 +780,11 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                       organizationId: widget.organizationId,
                       currentUserId: _currentUser?.uid,
                       onLike: () => _toggleLike(postId),
-                      onPin: () => _togglePin(postId, false, postData['isPinned'] ?? false),
+                      onPin: () => _togglePin(
+                        postId,
+                        false,
+                        postData['isPinned'] ?? false,
+                      ),
                       isAdmin: _isAdmin,
                     ),
                   );
@@ -781,7 +797,11 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                       docId: postId,
                       organizationId: widget.organizationId,
                       onLike: () => _toggleLike(postId),
-                      onPin: () => _togglePin(postId, false, postData['isPinned'] ?? false),
+                      onPin: () => _togglePin(
+                        postId,
+                        false,
+                        postData['isPinned'] ?? false,
+                      ),
                       isAdmin: _isAdmin,
                       currentUserId: _currentUser?.uid,
                     ),

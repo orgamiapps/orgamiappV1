@@ -77,6 +77,7 @@ class _CreatePhotoPostScreenState extends State<CreatePhotoPostScreen> {
         }
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error picking images: $e')));
@@ -97,12 +98,13 @@ class _CreatePhotoPostScreenState extends State<CreatePhotoPostScreen> {
         setState(() {
           _selectedImages.add(selected);
         });
-      } else if (_selectedImages.length >= 10) {
+      } else if (_selectedImages.length >= 10 && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Maximum 10 photos allowed per post')),
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error taking photo: $e')));

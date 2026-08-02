@@ -127,6 +127,7 @@ void _scheduleProviderInitialization() {
     try {
       final context = appNavigatorKey.currentContext;
       if (context == null) return;
+      if (!context.mounted) return;
 
       final subscriptionService = Provider.of<SubscriptionService>(
         context,
@@ -139,6 +140,7 @@ void _scheduleProviderInitialization() {
       Future.delayed(const Duration(milliseconds: 300), () {
         final currentContext = appNavigatorKey.currentContext;
         if (currentContext == null) return;
+        if (!currentContext.mounted) return;
 
         final creationLimitService = Provider.of<CreationLimitService>(
           currentContext,

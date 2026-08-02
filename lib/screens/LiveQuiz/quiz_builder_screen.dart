@@ -91,9 +91,7 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen>
       }
 
       // If no quiz found by ID or no ID provided, try to find by event ID
-      if (quiz == null) {
-        quiz = await _liveQuizService.getQuizByEventId(widget.eventId);
-      }
+      quiz ??= await _liveQuizService.getQuizByEventId(widget.eventId);
 
       if (quiz != null) {
         _titleController.text = quiz.title;
@@ -513,7 +511,7 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen>
                 ),
                 child: _buildQuestionCard(question, index),
               );
-            }).toList(),
+            }),
         ],
       ),
     );
@@ -963,21 +961,22 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen>
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Time per Question'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [10, 15, 20, 30, 45, 60, 90, 120].map((seconds) {
-            return ListTile(
-              title: Text('${seconds} seconds'),
-              leading: Radio<int>(
-                value: seconds,
-                groupValue: _timePerQuestion,
-                onChanged: (value) {
-                  setState(() => _timePerQuestion = value!);
-                  Navigator.pop(context);
-                },
-              ),
-            );
-          }).toList(),
+        content: RadioGroup<int>(
+          groupValue: _timePerQuestion,
+          onChanged: (value) {
+            if (value == null) return;
+            setState(() => _timePerQuestion = value);
+            Navigator.pop(context);
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [10, 15, 20, 30, 45, 60, 90, 120].map((seconds) {
+              return ListTile(
+                title: Text('$seconds seconds'),
+                leading: Radio<int>(value: seconds),
+              );
+            }).toList(),
+          ),
         ),
       ),
     );
@@ -988,21 +987,24 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen>
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Maximum Participants'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [50, 100, 250, 500, 1000].map((limit) {
-            return ListTile(
-              title: Text(limit == 1000 ? 'Unlimited' : '$limit participants'),
-              leading: Radio<int>(
-                value: limit,
-                groupValue: _maxParticipants,
-                onChanged: (value) {
-                  setState(() => _maxParticipants = value!);
-                  Navigator.pop(context);
-                },
-              ),
-            );
-          }).toList(),
+        content: RadioGroup<int>(
+          groupValue: _maxParticipants,
+          onChanged: (value) {
+            if (value == null) return;
+            setState(() => _maxParticipants = value);
+            Navigator.pop(context);
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [50, 100, 250, 500, 1000].map((limit) {
+              return ListTile(
+                title: Text(
+                  limit == 1000 ? 'Unlimited' : '$limit participants',
+                ),
+                leading: Radio<int>(value: limit),
+              );
+            }).toList(),
+          ),
         ),
       ),
     );
@@ -1012,6 +1014,7 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen>
     // Save quiz details first to get a quizId if it's a new quiz
     final quizId = _quizId ?? await _handleQuizSave();
     if (quizId == null) return;
+    if (!mounted) return;
 
     final newQuestion = await Navigator.push<QuizQuestionModel>(
       context,
@@ -1304,7 +1307,9 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
     switch (question.type) {
       case QuestionType.multipleChoice:
         _options = List.from(question.options);
-        while (_options.length < 4) _options.add('');
+        while (_options.length < 4) {
+          _options.add('');
+        }
         _correctOptionIndex = question.correctOptionIndex ?? 0;
         break;
       case QuestionType.trueFalse:
@@ -1393,23 +1398,29 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          ...QuestionType.values.map((type) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: ListTile(
-                leading: Radio<QuestionType>(
-                  value: type,
-                  groupValue: _selectedType,
-                  onChanged: (value) => setState(() => _selectedType = value!),
-                  activeColor: const Color(0xFF667EEA),
-                ),
-                title: Text(_getTypeTitle(type)),
-                subtitle: Text(_getTypeDescription(type)),
-                contentPadding: EdgeInsets.zero,
-                onTap: () => setState(() => _selectedType = type),
-              ),
-            );
-          }).toList(),
+          RadioGroup<QuestionType>(
+            groupValue: _selectedType,
+            onChanged: (value) {
+              if (value != null) setState(() => _selectedType = value);
+            },
+            child: Column(
+              children: QuestionType.values.map((type) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: ListTile(
+                    leading: Radio<QuestionType>(
+                      value: type,
+                      activeColor: const Color(0xFF667EEA),
+                    ),
+                    title: Text(_getTypeTitle(type)),
+                    subtitle: Text(_getTypeDescription(type)),
+                    contentPadding: EdgeInsets.zero,
+                    onTap: () => setState(() => _selectedType = type),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
         ],
       ),
     );
@@ -1521,66 +1532,71 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          ..._options.asMap().entries.map((entry) {
-            final index = entry.key;
-            final option = entry.value;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                children: [
-                  Radio<int>(
-                    value: index,
-                    groupValue: _correctOptionIndex,
-                    onChanged: (value) =>
-                        setState(() => _correctOptionIndex = value!),
-                    activeColor: const Color(0xFF667EEA),
-                  ),
-                  Expanded(
-                    child: TextFormField(
-                      initialValue: option,
-                      onChanged: (value) => _options[index] = value,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Option cannot be empty';
-                        }
-                        return null;
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'Option ${index + 1}',
-                        filled: true,
-                        fillColor: _correctOptionIndex == index
-                            ? const Color(0xFF667EEA).withValues(alpha: 0.1)
-                            : const Color(0xFFF9FAFB),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(
-                            color: _correctOptionIndex == index
-                                ? const Color(0xFF667EEA)
-                                : Colors.grey.withValues(alpha: 0.2),
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(
-                            color: _correctOptionIndex == index
-                                ? const Color(0xFF667EEA)
-                                : Colors.grey.withValues(alpha: 0.2),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF667EEA),
-                            width: 2,
+          RadioGroup<int>(
+            groupValue: _correctOptionIndex,
+            onChanged: (value) {
+              if (value != null) setState(() => _correctOptionIndex = value);
+            },
+            child: Column(
+              children: _options.asMap().entries.map((entry) {
+                final index = entry.key;
+                final option = entry.value;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    children: [
+                      Radio<int>(
+                        value: index,
+                        activeColor: const Color(0xFF667EEA),
+                      ),
+                      Expanded(
+                        child: TextFormField(
+                          initialValue: option,
+                          onChanged: (value) => _options[index] = value,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Option cannot be empty';
+                            }
+                            return null;
+                          },
+                          decoration: InputDecoration(
+                            hintText: 'Option ${index + 1}',
+                            filled: true,
+                            fillColor: _correctOptionIndex == index
+                                ? const Color(0xFF667EEA).withValues(alpha: 0.1)
+                                : const Color(0xFFF9FAFB),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                color: _correctOptionIndex == index
+                                    ? const Color(0xFF667EEA)
+                                    : Colors.grey.withValues(alpha: 0.2),
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                color: _correctOptionIndex == index
+                                    ? const Color(0xFF667EEA)
+                                    : Colors.grey.withValues(alpha: 0.2),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                color: Color(0xFF667EEA),
+                                width: 2,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
-            );
-          }).toList(),
+                );
+              }).toList(),
+            ),
+          ),
         ],
       ),
     );
@@ -1614,27 +1630,31 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          ListTile(
-            leading: Radio<int>(
-              value: 0,
-              groupValue: _correctOptionIndex,
-              onChanged: (value) =>
-                  setState(() => _correctOptionIndex = value!),
-              activeColor: const Color(0xFF667EEA),
+          RadioGroup<int>(
+            groupValue: _correctOptionIndex,
+            onChanged: (value) {
+              if (value != null) setState(() => _correctOptionIndex = value);
+            },
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Radio<int>(
+                    value: 0,
+                    activeColor: Color(0xFF667EEA),
+                  ),
+                  title: const Text('True'),
+                  onTap: () => setState(() => _correctOptionIndex = 0),
+                ),
+                ListTile(
+                  leading: const Radio<int>(
+                    value: 1,
+                    activeColor: Color(0xFF667EEA),
+                  ),
+                  title: const Text('False'),
+                  onTap: () => setState(() => _correctOptionIndex = 1),
+                ),
+              ],
             ),
-            title: const Text('True'),
-            onTap: () => setState(() => _correctOptionIndex = 0),
-          ),
-          ListTile(
-            leading: Radio<int>(
-              value: 1,
-              groupValue: _correctOptionIndex,
-              onChanged: (value) =>
-                  setState(() => _correctOptionIndex = value!),
-              activeColor: const Color(0xFF667EEA),
-            ),
-            title: const Text('False'),
-            onTap: () => setState(() => _correctOptionIndex = 1),
           ),
         ],
       ),
@@ -1735,7 +1755,7 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
                 ],
               ),
             );
-          }).toList(),
+          }),
           const SizedBox(height: 12),
           SwitchListTile(
             title: const Text('Case Sensitive'),

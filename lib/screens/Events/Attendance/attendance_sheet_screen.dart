@@ -358,10 +358,12 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
       final file = File(filePath);
       if (await file.exists()) {
         // Share the file
-        await Share.shareXFiles(
-          [XFile(filePath)],
-          text: 'Attendance Sheet for ${eventModel.title}',
-          subject: 'Event Attendance Sheet',
+        await SharePlus.instance.share(
+          ShareParams(
+            files: [XFile(filePath)],
+            text: 'Attendance Sheet for ${eventModel.title}',
+            subject: 'Event Attendance Sheet',
+          ),
         );
       } else {
         if (mounted) {

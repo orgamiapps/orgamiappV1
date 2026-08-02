@@ -29,10 +29,10 @@ class BadgeService {
       }
 
       final userData = CustomerModel.fromFirestore(userDoc);
-      
+
       // Calculate user statistics
       final stats = await _calculateUserStatistics(userId);
-      
+
       // Create badge model
       final badge = UserBadgeModel.createFromUserData(
         uid: userId,
@@ -49,10 +49,9 @@ class BadgeService {
 
       // Save badge to Firestore
       await _saveBadgeToFirestore(badge);
-      
+
       debugPrint('Badge generated successfully for ${userData.name}');
       return badge;
-
     } catch (e) {
       debugPrint('Error generating badge: $e');
       return null;
@@ -90,7 +89,7 @@ class BadgeService {
           totalDwellHours += attendance.dwellTime!.inMinutes / 60.0;
         }
       }
-      
+
       debugPrint('Total dwell hours: $totalDwellHours');
 
       // Get unique events attended (to avoid counting multiple check-ins)
@@ -107,7 +106,6 @@ class BadgeService {
         'totalDwellHours': totalDwellHours,
         'totalAttendanceRecords': eventsAttended,
       };
-
     } catch (e) {
       debugPrint('Error calculating statistics: $e');
       return {
@@ -126,7 +124,7 @@ class BadgeService {
           .collection(UserBadgeModel.firebaseKey)
           .doc(badge.uid)
           .set(badge.toMap(), SetOptions(merge: true));
-      
+
       debugPrint('Badge saved to Firestore for ${badge.userName}');
     } catch (e) {
       debugPrint('Error saving badge to Firestore: $e');
@@ -159,12 +157,12 @@ class BadgeService {
     try {
       // Try to get existing badge
       UserBadgeModel? badge = await getUserBadge(userId);
-      
+
       if (badge != null) {
         // Check if badge needs updating (older than 24 hours)
         final now = DateTime.now();
         final daysSinceUpdate = now.difference(badge.lastUpdated).inDays;
-        
+
         if (daysSinceUpdate >= 1) {
           debugPrint('Badge needs updating, regenerating...');
           badge = await generateUserBadge(userId);
@@ -174,7 +172,7 @@ class BadgeService {
         debugPrint('No existing badge found, generating new one...');
         badge = await generateUserBadge(userId);
       }
-      
+
       return badge;
     } catch (e) {
       debugPrint('Error in getOrGenerateBadge: $e');
@@ -183,13 +181,17 @@ class BadgeService {
   }
 
   /// Update badge statistics after user activity
-  Future<void> updateBadgeAfterActivity(String userId, String activityType) async {
+  Future<void> updateBadgeAfterActivity(
+    String userId,
+    String activityType,
+  ) async {
     try {
-      debugPrint('Updating badge after activity: $activityType for user: $userId');
-      
+      debugPrint(
+        'Updating badge after activity: $activityType for user: $userId',
+      );
+
       // Simply regenerate the badge with current stats
       await generateUserBadge(userId);
-      
     } catch (e) {
       debugPrint('Error updating badge after activity: $e');
     }
@@ -204,7 +206,9 @@ class BadgeService {
           .limit(limit)
           .get();
 
-      return query.docs.map((doc) => UserBadgeModel.fromFirestore(doc)).toList();
+      return query.docs
+          .map((doc) => UserBadgeModel.fromFirestore(doc))
+          .toList();
     } catch (e) {
       debugPrint('Error getting leaderboard: $e');
       return [];
@@ -218,7 +222,7 @@ class BadgeService {
           .collection(UserBadgeModel.firebaseKey)
           .doc(userId)
           .delete();
-      
+
       debugPrint('Badge deleted for user: $userId');
     } catch (e) {
       debugPrint('Error deleting badge: $e');
@@ -230,7 +234,7 @@ class BadgeService {
   Future<void> bulkUpdateAllBadges() async {
     try {
       debugPrint('Starting bulk badge update...');
-      
+
       // Get all users
       final usersQuery = await _firestore
           .collection(CustomerModel.firebaseKey)
@@ -245,7 +249,7 @@ class BadgeService {
           continue;
         }
       }
-      
+
       debugPrint('Bulk badge update completed');
     } catch (e) {
       debugPrint('Error in bulk badge update: $e');
@@ -260,15 +264,18 @@ class BadgeService {
           .collection(UserBadgeModel.firebaseKey)
           .get();
 
-      final badges = query.docs.map((doc) => UserBadgeModel.fromFirestore(doc)).toList();
-      
+      final badges = query.docs
+          .map((doc) => UserBadgeModel.fromFirestore(doc))
+          .toList();
+
       final levelCounts = <String, int>{};
       var totalEventsCreated = 0;
       var totalEventsAttended = 0;
       var totalDwellHours = 0.0;
 
       for (final badge in badges) {
-        levelCounts[badge.badgeLevel] = (levelCounts[badge.badgeLevel] ?? 0) + 1;
+        levelCounts[badge.badgeLevel] =
+            (levelCounts[badge.badgeLevel] ?? 0) + 1;
         totalEventsCreated += badge.eventsCreated;
         totalEventsAttended += badge.eventsAttended;
         totalDwellHours += badge.totalDwellHours;
@@ -280,7 +287,9 @@ class BadgeService {
         'totalEventsCreated': totalEventsCreated,
         'totalEventsAttended': totalEventsAttended,
         'totalDwellHours': totalDwellHours,
-        'averageEventsPerUser': badges.isNotEmpty ? totalEventsCreated / badges.length : 0,
+        'averageEventsPerUser': badges.isNotEmpty
+            ? totalEventsCreated / badges.length
+            : 0,
       };
     } catch (e) {
       debugPrint('Error getting badge statistics: $e');

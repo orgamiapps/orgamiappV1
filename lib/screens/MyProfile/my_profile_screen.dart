@@ -52,7 +52,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   // Pagination state for each tab
   Map<int, DocumentSnapshot?> _lastDocuments = {};
   Map<int, bool> _hasMore = {1: true, 2: true, 3: true};
-  Map<int, bool> _isFetchingMore = {1: false, 2: false, 3: false};
+  final Map<int, bool> _isFetchingMore = {1: false, 2: false, 3: false};
 
   // Badge related fields
   UserBadgeModel? _userBadge;

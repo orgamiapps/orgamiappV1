@@ -1566,10 +1566,12 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
       );
       await file.writeAsBytes(bytes);
 
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text:
-            'Attendus Ticket • ${ticket.eventTitle} • Code: ${ticket.ticketCode}',
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          text:
+              'Attendus Ticket • ${ticket.eventTitle} • Code: ${ticket.ticketCode}',
+        ),
       );
     } catch (e) {
       debugPrint('Error sharing ticket: $e');

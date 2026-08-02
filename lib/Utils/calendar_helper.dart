@@ -35,10 +35,7 @@ class CalendarHelper {
             const SizedBox(width: 12),
             const Text(
               'Add to Calendar',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -48,10 +45,7 @@ class CalendarHelper {
           children: [
             Text(
               'Choose your calendar app:',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
             const SizedBox(height: 16),
             _buildCalendarOptionButton(
@@ -112,10 +106,7 @@ class CalendarHelper {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: Colors.grey[600]),
-            ),
+            child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
           ),
         ],
       ),
@@ -166,10 +157,7 @@ class CalendarHelper {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                   ],
                 ),
@@ -271,4 +259,3 @@ class CalendarHelper {
     }
   }
 }
-

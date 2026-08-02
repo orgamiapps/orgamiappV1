@@ -4,7 +4,11 @@ class FullScreenImageViewer extends StatelessWidget {
   final String imageUrl;
   final String heroTag;
 
-  const FullScreenImageViewer({super.key, required this.imageUrl, required this.heroTag});
+  const FullScreenImageViewer({
+    super.key,
+    required this.imageUrl,
+    required this.heroTag,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +18,11 @@ class FullScreenImageViewer extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.black,
         iconTheme: const IconThemeData(color: Colors.white),
-        titleTextStyle: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
+        titleTextStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+        ),
         elevation: 0,
         title: const Text('Profile Photo'),
       ),
@@ -42,7 +50,11 @@ class FullScreenImageViewer extends StatelessWidget {
                     return Container(
                       color: Colors.grey.shade900,
                       child: const Center(
-                        child: Icon(Icons.broken_image, color: Colors.white70, size: 40),
+                        child: Icon(
+                          Icons.broken_image,
+                          color: Colors.white70,
+                          size: 40,
+                        ),
                       ),
                     );
                   },
@@ -55,5 +67,3 @@ class FullScreenImageViewer extends StatelessWidget {
     );
   }
 }
-
-

@@ -463,10 +463,13 @@ class _ShareQRDialogState extends State<ShareQRDialog>
       imageFile.writeAsBytesSync(capturedQR);
 
       final file = XFile(imagePath);
-      await Share.shareXFiles(
-        [file],
-        text: 'Join my event: $eventTitle\nLocation: $eventLocation\nEvent ID: $uniqueId',
-        subject: 'Event QR Code - $eventTitle',
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [file],
+          text:
+              'Join my event: $eventTitle\nLocation: $eventLocation\nEvent ID: $uniqueId',
+          subject: 'Event QR Code - $eventTitle',
+        ),
       );
 
       _btnCtlr.reset();

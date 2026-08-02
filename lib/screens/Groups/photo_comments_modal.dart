@@ -28,7 +28,7 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseFirestoreHelper _firestoreHelper = FirebaseFirestoreHelper();
   final User? _currentUser = FirebaseAuth.instance.currentUser;
-  
+
   bool _isSubmitting = false;
   final FocusNode _focusNode = FocusNode();
 
@@ -50,9 +50,8 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
 
     try {
       final currentUserData = CustomerController.logeInCustomer;
-      final userName = currentUserData?.name ?? 
-                       currentUserData?.username ?? 
-                       'Anonymous';
+      final userName =
+          currentUserData?.name ?? currentUserData?.username ?? 'Anonymous';
       final userPhotoUrl = currentUserData?.profilePictureUrl;
 
       await _db
@@ -62,13 +61,13 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
           .doc(widget.postId)
           .collection('Comments')
           .add({
-        'userId': _currentUser.uid,
-        'userName': userName,
-        'userPhotoUrl': userPhotoUrl,
-        'comment': text,
-        'createdAt': FieldValue.serverTimestamp(),
-        'likes': [],
-      });
+            'userId': _currentUser.uid,
+            'userName': userName,
+            'userPhotoUrl': userPhotoUrl,
+            'comment': text,
+            'createdAt': FieldValue.serverTimestamp(),
+            'likes': [],
+          });
 
       // Update comment count on the post
       await _db
@@ -76,9 +75,7 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
           .doc(widget.organizationId)
           .collection('Feed')
           .doc(widget.postId)
-          .update({
-        'commentCount': FieldValue.increment(1),
-      });
+          .update({'commentCount': FieldValue.increment(1)});
 
       _commentController.clear();
       _focusNode.unfocus();
@@ -130,9 +127,7 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
           .doc(widget.organizationId)
           .collection('Feed')
           .doc(widget.postId)
-          .update({
-        'commentCount': FieldValue.increment(-1),
-      });
+          .update({'commentCount': FieldValue.increment(-1)});
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -196,9 +191,9 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading profile: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading profile: $e')));
       }
     }
   }
@@ -231,10 +226,7 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               border: Border(
-                bottom: BorderSide(
-                  color: Colors.grey.shade200,
-                  width: 1,
-                ),
+                bottom: BorderSide(color: Colors.grey.shade200, width: 1),
               ),
             ),
             child: Row(
@@ -249,8 +241,9 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
                       .collection('Comments')
                       .snapshots(),
                   builder: (context, snapshot) {
-                    final count = snapshot.data?.docs.length ?? 
-                                  widget.initialCommentCount;
+                    final count =
+                        snapshot.data?.docs.length ??
+                        widget.initialCommentCount;
                     return Text(
                       'Comments ($count)',
                       style: const TextStyle(
@@ -286,9 +279,7 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF667EEA),
-                    ),
+                    child: CircularProgressIndicator(color: Color(0xFF667EEA)),
                   );
                 }
 
@@ -339,8 +330,9 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
                     final commentText = data['comment'] as String? ?? '';
                     final createdAt = data['createdAt'] as Timestamp?;
                     final likes = List<String>.from(data['likes'] ?? []);
-                    final isLiked = _currentUser != null && 
-                                   likes.contains(_currentUser.uid);
+                    final isLiked =
+                        _currentUser != null &&
+                        likes.contains(_currentUser.uid);
                     final isOwn = userId == _currentUser?.uid;
 
                     return _CommentItem(
@@ -372,10 +364,7 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border(
-                top: BorderSide(
-                  color: Colors.grey.shade200,
-                  width: 1,
-                ),
+                top: BorderSide(color: Colors.grey.shade200, width: 1),
               ),
               boxShadow: [
                 BoxShadow(
@@ -393,15 +382,18 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
                   CircleAvatar(
                     radius: 18,
                     backgroundColor: const Color(0xFF667EEA),
-                    backgroundImage: CustomerController
-                                .logeInCustomer?.profilePictureUrl != null
+                    backgroundImage:
+                        CustomerController.logeInCustomer?.profilePictureUrl !=
+                            null
                         ? NetworkImage(
                             CustomerController
-                                .logeInCustomer!.profilePictureUrl!,
+                                .logeInCustomer!
+                                .profilePictureUrl!,
                           )
                         : null,
-                    child: CustomerController
-                                .logeInCustomer?.profilePictureUrl == null
+                    child:
+                        CustomerController.logeInCustomer?.profilePictureUrl ==
+                            null
                         ? Text(
                             (CustomerController.logeInCustomer?.name ?? 'U')
                                 .substring(0, 1)
@@ -431,15 +423,11 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(24),
-                            borderSide: BorderSide(
-                              color: Colors.grey.shade300,
-                            ),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(24),
-                            borderSide: BorderSide(
-                              color: Colors.grey.shade300,
-                            ),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(24),
@@ -691,4 +679,3 @@ class _CommentItem extends StatelessWidget {
     );
   }
 }
-

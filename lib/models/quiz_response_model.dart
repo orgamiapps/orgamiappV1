@@ -8,21 +8,22 @@ class QuizResponseModel {
   final String questionId;
   final String participantId;
   final int questionIndex;
-  
+
   // Answer data
-  final dynamic answer; // int for multiple choice/true-false, String for short answer
+  final dynamic
+  answer; // int for multiple choice/true-false, String for short answer
   final DateTime submittedAt;
   final int timeToAnswer; // milliseconds taken to answer
-  
+
   // Scoring
   final bool isCorrect;
   final int pointsEarned;
   final double? similarityScore; // for short answer questions
-  
+
   // Metadata
   final bool isLate; // submitted after time limit
   final int questionTimeLimit; // time limit for this question
-  
+
   const QuizResponseModel({
     required this.id,
     required this.quizId,
@@ -47,7 +48,8 @@ class QuizResponseModel {
       participantId: data['participantId'] ?? '',
       questionIndex: data['questionIndex'] ?? 0,
       answer: data['answer'],
-      submittedAt: (data['submittedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      submittedAt:
+          (data['submittedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       timeToAnswer: data['timeToAnswer'] ?? 0,
       isCorrect: data['isCorrect'] ?? false,
       pointsEarned: data['pointsEarned'] ?? 0,
@@ -121,18 +123,18 @@ class QuizResponseModel {
     }
     return 'No answer';
   }
-  
+
   String get timeToAnswerDisplay {
     final seconds = timeToAnswer / 1000;
     return '${seconds.toStringAsFixed(1)}s';
   }
-  
+
   double get responseTimePercentage {
     if (questionTimeLimit <= 0) return 0.0;
     final responseTimeSeconds = timeToAnswer / 1000;
     return (responseTimeSeconds / questionTimeLimit).clamp(0.0, 1.0);
   }
-  
+
   String get speedBonus {
     final percentage = responseTimePercentage;
     if (percentage <= 0.25) return 'Lightning Fast!';
@@ -140,20 +142,20 @@ class QuizResponseModel {
     if (percentage <= 0.75) return 'Good Timing';
     return 'Just in Time';
   }
-  
+
   // Calculate bonus points based on response speed (if correct)
   int get speedBonusPoints {
     if (!isCorrect) return 0;
-    
+
     final percentage = responseTimePercentage;
     if (percentage <= 0.25) return (pointsEarned * 0.5).round(); // 50% bonus
-    if (percentage <= 0.50) return (pointsEarned * 0.3).round(); // 30% bonus  
+    if (percentage <= 0.50) return (pointsEarned * 0.3).round(); // 30% bonus
     if (percentage <= 0.75) return (pointsEarned * 0.1).round(); // 10% bonus
     return 0; // No bonus
   }
-  
+
   int get totalPoints => pointsEarned + speedBonusPoints;
-  
+
   // Factory method for creating a response
   factory QuizResponseModel.create({
     required String quizId,
@@ -169,13 +171,14 @@ class QuizResponseModel {
   }) {
     final submittedAt = DateTime.now();
     final isLate = timeToAnswer > (questionTimeLimit * 1000);
-    
+
     // Calculate points with potential penalty for late submission
     int pointsEarned = isCorrect ? basePoints : 0;
     if (isLate && isCorrect) {
-      pointsEarned = (pointsEarned * 0.5).round(); // 50% penalty for late correct answers
+      pointsEarned = (pointsEarned * 0.5)
+          .round(); // 50% penalty for late correct answers
     }
-    
+
     return QuizResponseModel(
       id: '', // Will be set by Firestore
       quizId: quizId,
@@ -202,7 +205,7 @@ class QuestionResponseStats {
   final Map<String, int> answerDistribution; // answer -> count
   final double averageResponseTime;
   final double accuracyPercentage;
-  
+
   const QuestionResponseStats({
     required this.questionId,
     required this.totalResponses,
@@ -211,8 +214,11 @@ class QuestionResponseStats {
     required this.averageResponseTime,
     required this.accuracyPercentage,
   });
-  
-  factory QuestionResponseStats.fromResponses(String questionId, List<QuizResponseModel> responses) {
+
+  factory QuestionResponseStats.fromResponses(
+    String questionId,
+    List<QuizResponseModel> responses,
+  ) {
     if (responses.isEmpty) {
       return QuestionResponseStats(
         questionId: questionId,
@@ -223,28 +229,31 @@ class QuestionResponseStats {
         accuracyPercentage: 0.0,
       );
     }
-    
+
     final correctCount = responses.where((r) => r.isCorrect).length;
-    final averageTime = responses
-        .map((r) => r.timeToAnswer)
-        .reduce((a, b) => a + b) / responses.length / 1000; // Convert to seconds
-    
+    final averageTime =
+        responses.map((r) => r.timeToAnswer).reduce((a, b) => a + b) /
+        responses.length /
+        1000; // Convert to seconds
+
     final distribution = <String, int>{};
     for (final response in responses) {
       final answerKey = response.answerDisplay;
       distribution[answerKey] = (distribution[answerKey] ?? 0) + 1;
     }
-    
+
     return QuestionResponseStats(
       questionId: questionId,
       totalResponses: responses.length,
       correctResponses: correctCount,
       answerDistribution: distribution,
       averageResponseTime: averageTime,
-      accuracyPercentage: responses.isEmpty ? 0.0 : (correctCount / responses.length) * 100,
+      accuracyPercentage: responses.isEmpty
+          ? 0.0
+          : (correctCount / responses.length) * 100,
     );
   }
-  
+
   String get accuracyDisplay => '${accuracyPercentage.toStringAsFixed(1)}%';
   String get averageTimeDisplay => '${averageResponseTime.toStringAsFixed(1)}s';
 }

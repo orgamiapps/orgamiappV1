@@ -83,7 +83,9 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
 
   Future<void> _checkPermissions() async {
     try {
-      final hasPermission = await PermissionsHelperClass.checkCameraPermission(context: context);
+      final hasPermission = await PermissionsHelperClass.checkCameraPermission(
+        context: context,
+      );
       QRDebugHelper.logCameraPermissionStatus(hasPermission);
       setState(() {
         _isCameraPermissionGranted = hasPermission;
@@ -223,7 +225,9 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
                       child: Text(
                         'Enter code manually instead',
                         style: TextStyle(
-                          color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.8),
+                          color: AppThemeColor.pureWhiteColor.withValues(
+                            alpha: 0.8,
+                          ),
                           fontSize: Dimensions.fontSizeDefault,
                         ),
                       ),
@@ -745,17 +749,17 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
     setState(() {
       this.controller = controller;
     });
-    
+
     controller.scannedDataStream.listen((scanData) async {
       if (scanData.code != null) {
         final scannedCode = scanData.code!;
-        
+
         // Use debug helper to log scan results
         QRDebugHelper.logQRScanResult(scannedCode);
-        
+
         // Handle different QR code formats
         String? eventCode;
-        
+
         // Check for event QR code format
         if (scannedCode.contains('orgami_app_code_')) {
           eventCode = scannedCode.split('orgami_app_code_').last;
@@ -776,7 +780,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
           );
           return;
         }
-        
+
         if (eventCode != null) {
           _codeController.text = eventCode;
           setState(() {

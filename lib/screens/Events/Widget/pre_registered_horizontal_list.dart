@@ -371,17 +371,20 @@ class _PreRegisteredHorizontalListState
                                                 : allUsers.length,
                                             itemBuilder: (context, index) {
                                               final attendee = allUsers[index];
-                                              final customer = customers.firstWhere(
-                                                (c) =>
-                                                    c.uid == attendee.customerUid,
-                                                orElse: () => CustomerModel(
-                                                  uid: attendee.customerUid,
-                                                  name: attendee.userName,
-                                                  email: '',
-                                                  createdAt: DateTime.now(),
-                                                ),
-                                              );
-                                              final isAnon = attendee.isAnonymous;
+                                              final customer = customers
+                                                  .firstWhere(
+                                                    (c) =>
+                                                        c.uid ==
+                                                        attendee.customerUid,
+                                                    orElse: () => CustomerModel(
+                                                      uid: attendee.customerUid,
+                                                      name: attendee.userName,
+                                                      email: '',
+                                                      createdAt: DateTime.now(),
+                                                    ),
+                                                  );
+                                              final isAnon =
+                                                  attendee.isAnonymous;
 
                                               return GestureDetector(
                                                 onTap: () {
@@ -414,7 +417,8 @@ class _PreRegisteredHorizontalListState
                                                         width: 56,
                                                         height: 56,
                                                         decoration: BoxDecoration(
-                                                          shape: BoxShape.circle,
+                                                          shape:
+                                                              BoxShape.circle,
                                                           gradient: isAnon
                                                               ? const LinearGradient(
                                                                   begin: Alignment
@@ -430,10 +434,9 @@ class _PreRegisteredHorizontalListState
                                                                     ),
                                                                   ],
                                                                 )
-                                                              : (attendee.id
-                                                                        .startsWith(
-                                                                          'ticket_',
-                                                                        )
+                                                              : (attendee.id.startsWith(
+                                                                      'ticket_',
+                                                                    )
                                                                     ? const LinearGradient(
                                                                         begin: Alignment
                                                                             .topLeft,
@@ -468,7 +471,8 @@ class _PreRegisteredHorizontalListState
                                                                   ? const Color(
                                                                       0xFF6B7280,
                                                                     ).withValues(
-                                                                      alpha: 0.3,
+                                                                      alpha:
+                                                                          0.3,
                                                                     )
                                                                   : (attendee.id.startsWith(
                                                                           'ticket_',
@@ -487,10 +491,11 @@ class _PreRegisteredHorizontalListState
                                                                           )),
                                                               spreadRadius: 0,
                                                               blurRadius: 8,
-                                                              offset: const Offset(
-                                                                0,
-                                                                4,
-                                                              ),
+                                                              offset:
+                                                                  const Offset(
+                                                                    0,
+                                                                    4,
+                                                                  ),
                                                             ),
                                                           ],
                                                         ),
@@ -521,8 +526,7 @@ class _PreRegisteredHorizontalListState
                                                                               stackTrace,
                                                                             ) {
                                                                               return Container(
-                                                                                color:
-                                                                                    Colors.transparent,
+                                                                                color: Colors.transparent,
                                                                                 child: const Icon(
                                                                                   Icons.person,
                                                                                   size: 28,
@@ -537,9 +541,10 @@ class _PreRegisteredHorizontalListState
                                                                         child: const Icon(
                                                                           Icons
                                                                               .person,
-                                                                          size: 28,
-                                                                          color: Colors
-                                                                              .white,
+                                                                          size:
+                                                                              28,
+                                                                          color:
+                                                                              Colors.white,
                                                                         ),
                                                                       )),
                                                         ),
@@ -560,8 +565,8 @@ class _PreRegisteredHorizontalListState
                                                           textAlign:
                                                               TextAlign.center,
                                                           maxLines: 2,
-                                                          overflow:
-                                                              TextOverflow.ellipsis,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
                                                           style: TextStyle(
                                                             color: isAnon
                                                                 ? const Color(
@@ -573,7 +578,8 @@ class _PreRegisteredHorizontalListState
                                                             fontSize: 12,
                                                             fontWeight:
                                                                 FontWeight.w500,
-                                                            fontFamily: 'Roboto',
+                                                            fontFamily:
+                                                                'Roboto',
                                                           ),
                                                         ),
                                                       ),

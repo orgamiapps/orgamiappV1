@@ -24,19 +24,21 @@ class _QRCodeModalState extends State<QRCodeModal>
     super.initState();
     // Boost screen brightness for better QR code scanning
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
-    
+
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _controller.forward();
   }
@@ -186,8 +188,9 @@ class _QRCodeModalState extends State<QRCodeModal>
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            DateFormat('EEE, MMM dd • h:mm a')
-                                .format(widget.ticket.eventDateTime),
+                            DateFormat(
+                              'EEE, MMM dd • h:mm a',
+                            ).format(widget.ticket.eventDateTime),
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.7),
                               fontSize: 14,
@@ -230,4 +233,3 @@ class _QRCodeModalState extends State<QRCodeModal>
     );
   }
 }
-

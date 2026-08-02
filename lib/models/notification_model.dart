@@ -5,7 +5,7 @@ class NotificationModel {
   final String title;
   final String body;
   final String
-      type; // 'event_reminder', 'new_event', 'group_event', 'ticket_update', 'event_feedback', 'general', etc.
+  type; // 'event_reminder', 'new_event', 'group_event', 'ticket_update', 'event_feedback', 'general', etc.
   final String? eventId;
   final String? eventTitle;
   final DateTime createdAt;

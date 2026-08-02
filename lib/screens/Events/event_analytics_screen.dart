@@ -2961,10 +2961,12 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
       await file.writeAsString(csvString);
 
       // Share file
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        subject: 'Event Analytics - ${widget.eventId}',
-        text: 'Event analytics data exported from Attendus app',
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          subject: 'Event Analytics - ${widget.eventId}',
+          text: 'Event analytics data exported from Attendus app',
+        ),
       );
       if (!mounted) return;
       ShowToast().showSnackBar('Data exported successfully', context);

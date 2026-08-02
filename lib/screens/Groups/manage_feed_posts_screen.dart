@@ -1292,7 +1292,7 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
               Navigator.pop(context);
               try {
                 await _db.collection('Events').doc(eventId).delete();
-                if (mounted) {
+                if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Event deleted'),
@@ -1301,7 +1301,7 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
                   );
                 }
               } catch (e) {
-                if (mounted) {
+                if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Error deleting event: $e')),
                   );

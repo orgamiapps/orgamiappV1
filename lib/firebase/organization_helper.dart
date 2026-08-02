@@ -51,7 +51,13 @@ class OrganizationHelper {
         final data = doc.data()!;
         final String name = (data['name'] ?? data['title'] ?? '').toString();
         // Be tolerant to different logo field names that may exist in DB
-        final String? logo = (data['logoUrl'] ?? data['logo_url'] ?? data['logo'] ?? data['profileImage'] ?? data['imageUrl'])?.toString();
+        final String? logo =
+            (data['logoUrl'] ??
+                    data['logo_url'] ??
+                    data['logo'] ??
+                    data['profileImage'] ??
+                    data['imageUrl'])
+                ?.toString();
         list.add({'id': doc.id, 'name': name, 'logoUrl': logo ?? ''});
       }
       list.sort(
@@ -90,12 +96,7 @@ class OrganizationHelper {
 
       // Fetch all organizations in parallel
       final futures = orgIds
-          .map(
-            (id) => _firestore
-                .collection('Organizations')
-                .doc(id)
-                .get(),
-          )
+          .map((id) => _firestore.collection('Organizations').doc(id).get())
           .toList();
 
       // Wait for all with error handling
@@ -111,7 +112,14 @@ class OrganizationHelper {
             final data = orgSnap.data()!;
             final String name = data['name']?.toString() ?? '';
             // Support multiple possible logo fields
-            final String logo = (data['logoUrl'] ?? data['logo_url'] ?? data['logo'] ?? data['profileImage'] ?? data['imageUrl'])?.toString() ?? '';
+            final String logo =
+                (data['logoUrl'] ??
+                        data['logo_url'] ??
+                        data['logo'] ??
+                        data['profileImage'] ??
+                        data['imageUrl'])
+                    ?.toString() ??
+                '';
             result.add({'id': orgSnap.id, 'name': name, 'logoUrl': logo});
           }
         }
@@ -336,7 +344,7 @@ class OrganizationHelper {
           .doc(organizationId)
           .collection('Members')
           .doc(userId)
-          .update({if (role != null) 'role': role, 'permissions': permissions});
+          .update({'role': ?role, 'permissions': permissions});
       return true;
     } catch (e) {
       Logger.error('Failed to update member permissions: $e');

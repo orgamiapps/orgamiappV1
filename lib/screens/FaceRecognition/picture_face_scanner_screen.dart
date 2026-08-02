@@ -36,20 +36,20 @@ class PictureFaceScannerScreen extends StatefulWidget {
 }
 
 enum ScanState {
-  INITIALIZING,
-  READY,
-  SCANNING,
-  MATCHING,
-  SUCCESS,
-  NOT_ENROLLED,
-  NO_MATCH,
-  ERROR,
+  initializing,
+  ready,
+  scanning,
+  matching,
+  success,
+  notEnrolled,
+  noMatch,
+  error,
 }
 
 class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
     with TickerProviderStateMixin {
   // State
-  ScanState _currentState = ScanState.INITIALIZING;
+  ScanState _currentState = ScanState.initializing;
   String _statusMessage = 'Initializing scanner...';
   String _errorMessage = '';
 
@@ -72,7 +72,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
   Map<String, EnrollmentCache>? _cachedEnrollments;
 
   // Constants
-  static const SCANNER_INIT_TIMEOUT = Duration(seconds: 30);
+  static const scannerInitTimeout = Duration(seconds: 30);
 
   // Animation
   late AnimationController _pulseController;
@@ -98,10 +98,10 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
   }
 
   void _startScanning() async {
-    _updateState(ScanState.INITIALIZING);
+    _updateState(ScanState.initializing);
 
     // Start initialization timeout
-    _initializationTimeout = Timer(SCANNER_INIT_TIMEOUT, () {
+    _initializationTimeout = Timer(scannerInitTimeout, () {
       _handleInitializationTimeout();
     });
 
@@ -122,7 +122,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
 
       if (!isEnrolled) {
         _initializationTimeout?.cancel();
-        _updateState(ScanState.NOT_ENROLLED);
+        _updateState(ScanState.notEnrolled);
         _updateStatus('Face not enrolled for this event');
         _showEnrollmentPrompt();
         return;
@@ -142,7 +142,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
       _initializationTimeout?.cancel();
 
       // Ready to scan
-      _updateState(ScanState.READY);
+      _updateState(ScanState.ready);
       _updateStatus('Position your face to sign in');
 
       // Start auto-scan
@@ -179,7 +179,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
       );
 
       if (userIdentity == null) {
-        _logTimestamp('ERROR: No user identity available');
+        _logTimestamp('error: No user identity available');
         return false;
       }
 
@@ -273,14 +273,14 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
   void _startAutoScan() {
     // Auto-scan every 1.5 seconds for faster recognition (reduced from 2 seconds)
     _autoScanTimer = Timer.periodic(Duration(milliseconds: 1500), (timer) {
-      if (mounted && _currentState == ScanState.READY && !_isScanning) {
+      if (mounted && _currentState == ScanState.ready && !_isScanning) {
         _scanFace();
       }
     });
 
     // Also scan immediately after initialization
     Future.delayed(Duration(milliseconds: 300), () {
-      if (mounted && _currentState == ScanState.READY) {
+      if (mounted && _currentState == ScanState.ready) {
         _scanFace();
       }
     });
@@ -296,11 +296,11 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
       _scanAttempts++;
     });
 
-    _updateState(ScanState.SCANNING);
+    _updateState(ScanState.scanning);
     _updateStatus('Scanning... Hold still');
 
     try {
-      _logTimestamp('Taking scan photo ${_scanAttempts}...');
+      _logTimestamp('Taking scan photo $_scanAttempts...');
 
       // Take picture
       final XFile imageFile = await _cameraController!.takePicture();
@@ -317,7 +317,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
       }
     } catch (e) {
       _logTimestamp('Scan error: $e');
-      _updateState(ScanState.READY);
+      _updateState(ScanState.ready);
       _updateStatus('Scan failed, retrying...');
     } finally {
       setState(() {
@@ -338,7 +338,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
       _logTimestamp('Faces detected in scan: ${faces.length}');
 
       if (faces.isEmpty) {
-        _updateState(ScanState.READY);
+        _updateState(ScanState.ready);
         _updateStatus('No face detected - position your face in the frame');
         return;
       }
@@ -347,13 +347,13 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
 
       // Check if face is suitable with helpful feedback
       if (!_faceService.isFaceSuitable(face)) {
-        _updateState(ScanState.READY);
+        _updateState(ScanState.ready);
         _updateStatus('Please look straight at the camera');
         return;
       }
 
       // Match face - use cached enrollments if available
-      _updateState(ScanState.MATCHING);
+      _updateState(ScanState.matching);
       _updateStatus('Matching face...');
 
       // Load enrollments cache if not already loaded
@@ -385,14 +385,14 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
       }
     } catch (e, stack) {
       _logTimestamp('Scan processing error: $e\n$stack');
-      _updateState(ScanState.READY);
+      _updateState(ScanState.ready);
       _updateStatus('Processing failed, retrying...');
     }
   }
 
   Future<void> _handleSuccessfulMatch(FaceMatchResult matchResult) async {
     _autoScanTimer?.cancel();
-    _updateState(ScanState.SUCCESS);
+    _updateState(ScanState.success);
     _updateStatus('Welcome, ${matchResult.userName}!');
 
     _logTimestamp('✅ Face matched successfully!');
@@ -412,7 +412,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
 
       // Only show success toast and navigate if we're still on this screen
       // (if questions exist, we'll have navigated away)
-      if (mounted && _currentState == ScanState.SUCCESS) {
+      if (mounted && _currentState == ScanState.success) {
         ShowToast().showNormalToast(
           msg: 'Welcome, ${matchResult.userName}! Signed in successfully.',
         );
@@ -431,7 +431,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
   }
 
   void _handleNoMatch(FaceMatchResult? matchResult) {
-    _updateState(ScanState.NO_MATCH);
+    _updateState(ScanState.noMatch);
 
     // Provide helpful feedback based on similarity score
     if (matchResult != null && matchResult.confidence > 0.5) {
@@ -444,8 +444,8 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
 
     // Reset to ready after shorter delay for faster retry
     Future.delayed(Duration(milliseconds: 1500), () {
-      if (mounted && _currentState == ScanState.NO_MATCH) {
-        _updateState(ScanState.READY);
+      if (mounted && _currentState == ScanState.noMatch) {
+        _updateState(ScanState.ready);
         _updateStatus('Position your face to sign in');
       }
     });
@@ -566,7 +566,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
       );
     } catch (e) {
       _logTimestamp('❌ Failed to record attendance: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -692,14 +692,14 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
   }
 
   void _handleError(String message) {
-    _updateState(ScanState.ERROR);
+    _updateState(ScanState.error);
     _errorMessage = message;
     ShowToast().showNormalToast(msg: message);
   }
 
   void _handleInitializationTimeout() {
     _logTimestamp('Initialization timeout after 30 seconds');
-    _updateState(ScanState.ERROR);
+    _updateState(ScanState.error);
     _errorMessage = 'Initialization took too long. Please try again.';
     _updateStatus('Timeout: Please go back and try again');
     ShowToast().showNormalToast(
@@ -736,7 +736,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
 
   void _retryScanning() {
     setState(() {
-      _currentState = ScanState.INITIALIZING;
+      _currentState = ScanState.initializing;
       _scanAttempts = 0;
       _errorMessage = '';
     });
@@ -760,42 +760,42 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
 
   Color _getStateColor() {
     switch (_currentState) {
-      case ScanState.INITIALIZING:
+      case ScanState.initializing:
         return Colors.blue;
-      case ScanState.READY:
+      case ScanState.ready:
         return Colors.green;
-      case ScanState.SCANNING:
+      case ScanState.scanning:
         return Colors.orange;
-      case ScanState.MATCHING:
+      case ScanState.matching:
         return Colors.purple;
-      case ScanState.SUCCESS:
+      case ScanState.success:
         return Colors.green;
-      case ScanState.NOT_ENROLLED:
+      case ScanState.notEnrolled:
         return Colors.orange;
-      case ScanState.NO_MATCH:
+      case ScanState.noMatch:
         return Colors.red;
-      case ScanState.ERROR:
+      case ScanState.error:
         return Colors.red;
     }
   }
 
   IconData _getStateIcon() {
     switch (_currentState) {
-      case ScanState.INITIALIZING:
+      case ScanState.initializing:
         return Icons.hourglass_empty;
-      case ScanState.READY:
+      case ScanState.ready:
         return Icons.face_unlock_outlined;
-      case ScanState.SCANNING:
+      case ScanState.scanning:
         return Icons.face_retouching_natural;
-      case ScanState.MATCHING:
+      case ScanState.matching:
         return Icons.fingerprint;
-      case ScanState.SUCCESS:
+      case ScanState.success:
         return Icons.check_circle;
-      case ScanState.NOT_ENROLLED:
+      case ScanState.notEnrolled:
         return Icons.person_add_alt_1;
-      case ScanState.NO_MATCH:
+      case ScanState.noMatch:
         return Icons.error_outline;
-      case ScanState.ERROR:
+      case ScanState.error:
         return Icons.error;
     }
   }
@@ -820,8 +820,8 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
             Center(child: CircularProgressIndicator(color: Colors.white)),
 
           // Face Guide
-          if (_currentState == ScanState.READY ||
-              _currentState == ScanState.SCANNING)
+          if (_currentState == ScanState.ready ||
+              _currentState == ScanState.scanning)
             CustomPaint(
               painter: ScannerGuidePainter(animation: _pulseAnimation),
               child: Container(),
@@ -831,13 +831,13 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
           _buildStatusPanel(),
 
           // Manual Scan Button
-          if (_currentState == ScanState.READY && !_isScanning)
+          if (_currentState == ScanState.ready && !_isScanning)
             _buildScanButton(),
 
           // Success/Error Overlays
-          if (_currentState == ScanState.SUCCESS) _buildSuccessOverlay(),
-          if (_currentState == ScanState.ERROR) _buildErrorDialog(),
-          if (_currentState == ScanState.NO_MATCH) _buildNoMatchOverlay(),
+          if (_currentState == ScanState.success) _buildSuccessOverlay(),
+          if (_currentState == ScanState.error) _buildErrorDialog(),
+          if (_currentState == ScanState.noMatch) _buildNoMatchOverlay(),
         ],
       ),
     );
@@ -1014,16 +1014,16 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
               children: [
                 TextButton(
                   onPressed: _goBack,
-                  child: Text('Cancel'),
                   style: TextButton.styleFrom(foregroundColor: Colors.grey),
+                  child: Text('Cancel'),
                 ),
                 ElevatedButton(
                   onPressed: _retryScanning,
-                  child: Text('Retry'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
                   ),
+                  child: Text('Retry'),
                 ),
               ],
             ),

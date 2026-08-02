@@ -141,9 +141,7 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
                 title: 'Create Announcement',
                 subtitle: 'Share important updates with members',
               ),
-              const Expanded(
-                child: Center(child: CircularProgressIndicator()),
-              ),
+              const Expanded(child: Center(child: CircularProgressIndicator())),
             ],
           ),
         ),
@@ -167,16 +165,26 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.lock_outline, size: 64, color: Colors.grey.shade400),
+                        Icon(
+                          Icons.lock_outline,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
                         const SizedBox(height: 16),
                         const Text(
                           'Admin Access Required',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           'Only group admins can create announcements',
-                          style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 24),
@@ -212,7 +220,9 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFF667EEA),
+                        ),
                       ),
                     )
                   : TextButton(
@@ -229,90 +239,90 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
             ),
             Expanded(
               child: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            TextFormField(
-              controller: _titleController,
-              decoration: InputDecoration(
-                labelText: 'Announcement Title',
-                hintText: 'Enter a title for your announcement',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: const Icon(Icons.title),
-              ),
-              maxLength: 100,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Please enter a title';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _contentController,
-              decoration: InputDecoration(
-                labelText: 'Content',
-                hintText: 'What would you like to announce?',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                alignLabelWithHint: true,
-              ),
-              maxLines: 8,
-              maxLength: 1000,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Please enter announcement content';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: SwitchListTile(
-                title: const Text('Pin this announcement'),
-                subtitle: const Text(
-                  'Pinned announcements appear at the top of the feed',
-                ),
-                value: _isPinned,
-                onChanged: (value) {
-                  setState(() => _isPinned = value);
-                },
-                activeThumbColor: const Color(0xFF667EEA),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.blue.shade700),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'This announcement will be visible to all group members in the Feed tab.',
-                      style: TextStyle(
-                        color: Colors.blue.shade700,
-                        fontSize: 13,
+                key: _formKey,
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    TextFormField(
+                      controller: _titleController,
+                      decoration: InputDecoration(
+                        labelText: 'Announcement Title',
+                        hintText: 'Enter a title for your announcement',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        prefixIcon: const Icon(Icons.title),
+                      ),
+                      maxLength: 100,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter a title';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _contentController,
+                      decoration: InputDecoration(
+                        labelText: 'Content',
+                        hintText: 'What would you like to announce?',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        alignLabelWithHint: true,
+                      ),
+                      maxLines: 8,
+                      maxLength: 1000,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter announcement content';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    Card(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: SwitchListTile(
+                        title: const Text('Pin this announcement'),
+                        subtitle: const Text(
+                          'Pinned announcements appear at the top of the feed',
+                        ),
+                        value: _isPinned,
+                        onChanged: (value) {
+                          setState(() => _isPinned = value);
+                        },
+                        activeThumbColor: const Color(0xFF667EEA),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+                    const SizedBox(height: 24),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.blue.shade700),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'This announcement will be visible to all group members in the Feed tab.',
+                              style: TextStyle(
+                                color: Colors.blue.shade700,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],

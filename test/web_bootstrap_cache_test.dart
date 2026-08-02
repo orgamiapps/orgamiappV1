@@ -34,14 +34,8 @@ void main() {
     () {
       final deployScript = File('deploy_web.sh').readAsStringSync();
 
-      expect(
-        deployScript,
-        contains('dart run tools/retain_web_releases.dart'),
-      );
-      expect(
-        deployScript,
-        contains('dart run tools/package_web_release.dart'),
-      );
+      expect(deployScript, contains('dart run tools/retain_web_releases.dart'));
+      expect(deployScript, contains('dart run tools/package_web_release.dart'));
       expect(
         deployScript,
         contains('dart run tools/check_deferred_web_chunks.dart'),

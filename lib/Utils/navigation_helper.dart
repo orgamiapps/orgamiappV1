@@ -9,10 +9,10 @@ class NavigationHelper {
   static const int accountTabIndex = 5;
 
   /// Get the appropriate bottom navigation index based on screen context
-  /// 
+  ///
   /// Use this when you want the bottom navigation to highlight the most
   /// relevant tab for the current screen context.
-  /// 
+  ///
   /// For screens that don't have a clear association, use null to show
   /// no tab as selected.
   static int? getBottomNavIndexForScreen(String screenType) {
@@ -24,7 +24,7 @@ class NavigationHelper {
       case 'calendar':
       case 'qr_scanner':
         return homeTabIndex;
-      
+
       // Group/Organization-related screens
       case 'groups':
       case 'group_profile':
@@ -36,14 +36,14 @@ class NavigationHelper {
       case 'ticket_management':
       case 'attendee_management':
         return groupsTabIndex;
-      
+
       // Messaging-related screens
       case 'messages':
       case 'messaging':
       case 'chat':
       case 'new_message':
         return messagesTabIndex;
-      
+
       // Profile-related screens
       case 'profile':
       case 'my_profile':
@@ -52,12 +52,12 @@ class NavigationHelper {
       case 'following':
       case 'my_tickets':
         return profileTabIndex;
-      
+
       // Notification-related screens
       case 'notifications':
       case 'notification_settings':
         return notificationsTabIndex;
-      
+
       // Account/Settings-related screens
       case 'account':
       case 'settings':
@@ -65,7 +65,7 @@ class NavigationHelper {
       case 'blocked_users':
       case 'about':
         return accountTabIndex;
-      
+
       // Screens with no clear association
       default:
         return null;
@@ -74,11 +74,11 @@ class NavigationHelper {
 
   /// Tab labels for reference
   static const List<String> tabLabels = [
-    'Home',      // 0
-    'Groups',    // 1  
-    'Messages',  // 2
-    'Profile',   // 3
-    'Alerts',    // 4
-    'Account',   // 5
+    'Home', // 0
+    'Groups', // 1
+    'Messages', // 2
+    'Profile', // 3
+    'Alerts', // 4
+    'Account', // 5
   ];
 }

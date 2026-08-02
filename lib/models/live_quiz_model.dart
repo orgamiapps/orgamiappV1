@@ -14,14 +14,14 @@ class LiveQuizModel {
   final DateTime createdAt;
   final DateTime? startedAt;
   final DateTime? endedAt;
-  
+
   // Quiz Settings
   final int timePerQuestion; // seconds
   final bool autoAdvance;
   final bool showLeaderboard;
   final bool allowAnonymous;
   final int maxParticipants;
-  
+
   // Current State
   final int? currentQuestionIndex;
   final DateTime? currentQuestionStartedAt;
@@ -69,7 +69,8 @@ class LiveQuizModel {
       allowAnonymous: data['allowAnonymous'] ?? true,
       maxParticipants: data['maxParticipants'] ?? 1000,
       currentQuestionIndex: data['currentQuestionIndex'],
-      currentQuestionStartedAt: (data['currentQuestionStartedAt'] as Timestamp?)?.toDate(),
+      currentQuestionStartedAt: (data['currentQuestionStartedAt'] as Timestamp?)
+          ?.toDate(),
       totalQuestions: data['totalQuestions'] ?? 0,
       participantCount: data['participantCount'] ?? 0,
     );
@@ -97,8 +98,8 @@ class LiveQuizModel {
       'allowAnonymous': allowAnonymous,
       'maxParticipants': maxParticipants,
       'currentQuestionIndex': currentQuestionIndex,
-      'currentQuestionStartedAt': currentQuestionStartedAt != null 
-          ? Timestamp.fromDate(currentQuestionStartedAt!) 
+      'currentQuestionStartedAt': currentQuestionStartedAt != null
+          ? Timestamp.fromDate(currentQuestionStartedAt!)
           : null,
       'totalQuestions': totalQuestions,
       'participantCount': participantCount,
@@ -141,7 +142,8 @@ class LiveQuizModel {
       allowAnonymous: allowAnonymous ?? this.allowAnonymous,
       maxParticipants: maxParticipants ?? this.maxParticipants,
       currentQuestionIndex: currentQuestionIndex ?? this.currentQuestionIndex,
-      currentQuestionStartedAt: currentQuestionStartedAt ?? this.currentQuestionStartedAt,
+      currentQuestionStartedAt:
+          currentQuestionStartedAt ?? this.currentQuestionStartedAt,
       totalQuestions: totalQuestions ?? this.totalQuestions,
       participantCount: participantCount ?? this.participantCount,
     );
@@ -153,24 +155,25 @@ class LiveQuizModel {
   bool get isEnded => status == QuizStatus.ended;
   bool get isPaused => status == QuizStatus.paused;
   bool get hasStarted => startedAt != null;
-  
-  bool get hasCurrentQuestion => currentQuestionIndex != null && 
-      currentQuestionIndex! >= 0 && 
+
+  bool get hasCurrentQuestion =>
+      currentQuestionIndex != null &&
+      currentQuestionIndex! >= 0 &&
       currentQuestionIndex! < totalQuestions;
-  
+
   Duration? get timeRemainingForCurrentQuestion {
     if (!hasCurrentQuestion || currentQuestionStartedAt == null) return null;
-    
+
     final elapsed = DateTime.now().difference(currentQuestionStartedAt!);
     final remaining = Duration(seconds: timePerQuestion) - elapsed;
     return remaining.isNegative ? Duration.zero : remaining;
   }
-  
+
   bool get isCurrentQuestionExpired {
     final remaining = timeRemainingForCurrentQuestion;
     return remaining != null && remaining == Duration.zero;
   }
-  
+
   double get progressPercentage {
     if (totalQuestions == 0) return 0.0;
     if (currentQuestionIndex == null) return 0.0;

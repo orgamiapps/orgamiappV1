@@ -1549,9 +1549,12 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
       final file = File('${directory.path}/analytics_export.txt');
       await file.writeAsString(buffer.toString());
 
-      await Share.shareXFiles([
-        XFile(file.path),
-      ], subject: 'Analytics Dashboard Export');
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          subject: 'Analytics Dashboard Export',
+        ),
+      );
 
       if (mounted) {
         ShowToast().showNormalToast(msg: 'Analytics exported successfully');

@@ -72,7 +72,7 @@ class _FaceRecognitionScannerScreenState
     milliseconds: 1500,
   ); // Reduced frequency
   static const Duration _successDelay = Duration(seconds: 2);
-  static const Duration SCANNER_INIT_TIMEOUT = Duration(seconds: 30);
+  static const Duration scannerInitTimeout = Duration(seconds: 30);
 
   @override
   void initState() {
@@ -83,7 +83,7 @@ class _FaceRecognitionScannerScreenState
 
   void _startInitialization() async {
     // Start initialization timeout
-    _initializationTimeout = Timer(SCANNER_INIT_TIMEOUT, () {
+    _initializationTimeout = Timer(scannerInitTimeout, () {
       _handleInitializationTimeout();
     });
 

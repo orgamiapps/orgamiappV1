@@ -55,6 +55,7 @@ class RouterClass {
       });
       return null;
     }
+    if (!context.mounted) return null;
     final navigator =
         appNavigatorKey.currentState ??
         Navigator.of(context, rootNavigator: true);

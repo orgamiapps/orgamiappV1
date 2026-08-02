@@ -8,7 +8,8 @@ class SuggestedContactsScreen extends StatefulWidget {
   const SuggestedContactsScreen({super.key});
 
   @override
-  State<SuggestedContactsScreen> createState() => _SuggestedContactsScreenState();
+  State<SuggestedContactsScreen> createState() =>
+      _SuggestedContactsScreenState();
 }
 
 class _SuggestedContactsScreenState extends State<SuggestedContactsScreen> {
@@ -29,7 +30,9 @@ class _SuggestedContactsScreenState extends State<SuggestedContactsScreen> {
     try {
       // Placeholder strategy: show popular discoverable users (or recently active)
       // You can later replace with actual contact-matched list
-      final users = await FirebaseFirestoreHelper().searchUsers(searchQuery: '');
+      final users = await FirebaseFirestoreHelper().searchUsers(
+        searchQuery: '',
+      );
       final currentId = CustomerController.logeInCustomer?.uid;
       _users = users
           .where((u) => u.uid != currentId && (u.isDiscoverable))
@@ -91,9 +94,7 @@ class _SuggestedContactsScreenState extends State<SuggestedContactsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('People You May Know'),
-      ),
+      appBar: AppBar(title: const Text('People You May Know')),
       body: Column(
         children: [
           Padding(
@@ -124,9 +125,11 @@ class _SuggestedContactsScreenState extends State<SuggestedContactsScreen> {
                       final isFollowing = _followStatus[user.uid] ?? false;
                       return ListTile(
                         leading: CircleAvatar(
-                          child: Text(user.name.isNotEmpty
-                              ? user.name[0].toUpperCase()
-                              : '?'),
+                          child: Text(
+                            user.name.isNotEmpty
+                                ? user.name[0].toUpperCase()
+                                : '?',
+                          ),
                         ),
                         title: Text(user.name),
                         subtitle: user.username != null
@@ -138,8 +141,9 @@ class _SuggestedContactsScreenState extends State<SuggestedContactsScreen> {
                             backgroundColor: isFollowing
                                 ? Colors.grey.shade200
                                 : AppThemeColor.darkBlueColor,
-                            foregroundColor:
-                                isFollowing ? Colors.black87 : Colors.white,
+                            foregroundColor: isFollowing
+                                ? Colors.black87
+                                : Colors.white,
                           ),
                           child: Text(isFollowing ? 'Following' : 'Follow'),
                         ),
@@ -152,5 +156,3 @@ class _SuggestedContactsScreenState extends State<SuggestedContactsScreen> {
     );
   }
 }
-
-

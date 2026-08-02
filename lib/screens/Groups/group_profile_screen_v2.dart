@@ -150,7 +150,9 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
     final data = doc.data();
     final name = (data?['name'] ?? '').toString();
     final description = (data?['description'] ?? '').toString();
-    await Share.share('Check out $name on Attendus!\n$description');
+    await SharePlus.instance.share(
+      ShareParams(text: 'Check out $name on Attendus!\n$description'),
+    );
   }
 
   Widget _buildDefaultBanner(BuildContext context) {

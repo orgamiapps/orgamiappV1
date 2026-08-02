@@ -9,18 +9,18 @@ class QuizParticipantModel {
   final String displayName;
   final DateTime joinedAt;
   final bool isAnonymous;
-  
+
   // Current status
   final int currentScore;
   final int questionsAnswered;
   final int correctAnswers;
   final bool isActive; // still participating
   final DateTime lastActiveAt;
-  
+
   // Rankings
   final int? currentRank;
   final int? bestRank; // highest rank achieved during quiz
-  
+
   const QuizParticipantModel({
     required this.id,
     required this.quizId,
@@ -49,7 +49,8 @@ class QuizParticipantModel {
       questionsAnswered: data['questionsAnswered'] ?? 0,
       correctAnswers: data['correctAnswers'] ?? 0,
       isActive: data['isActive'] ?? true,
-      lastActiveAt: (data['lastActiveAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      lastActiveAt:
+          (data['lastActiveAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       currentRank: data['currentRank'],
       bestRank: data['bestRank'],
     );
@@ -115,23 +116,23 @@ class QuizParticipantModel {
     if (questionsAnswered == 0) return 0.0;
     return (correctAnswers / questionsAnswered) * 100;
   }
-  
+
   String get accuracyDisplay {
     return '${accuracyPercentage.toStringAsFixed(1)}%';
   }
-  
+
   bool get hasAnsweredQuestions => questionsAnswered > 0;
-  
+
   String get rankDisplay {
     if (currentRank == null) return 'Unranked';
     return _getRankSuffix(currentRank!);
   }
-  
+
   String get bestRankDisplay {
     if (bestRank == null) return 'N/A';
     return _getRankSuffix(bestRank!);
   }
-  
+
   String _getRankSuffix(int rank) {
     if (rank % 100 >= 11 && rank % 100 <= 13) {
       return '${rank}th';
@@ -147,22 +148,35 @@ class QuizParticipantModel {
         return '${rank}th';
     }
   }
-  
+
   // Factory method for creating anonymous participants
   factory QuizParticipantModel.anonymous({
     required String quizId,
     String? customDisplayName,
   }) {
     final anonymousNames = [
-      'Quiz Master', 'Brain Teaser', 'Smart Cookie', 'Trivia King',
-      'Quiz Wizard', 'Know-It-All', 'Curious Cat', 'Fact Finder',
-      'Quiz Champion', 'Bright Mind', 'Sharp Thinker', 'Clever Clogs',
-      'Quiz Hero', 'Mental Giant', 'Quick Wit', 'Brainy Bunch'
+      'Quiz Master',
+      'Brain Teaser',
+      'Smart Cookie',
+      'Trivia King',
+      'Quiz Wizard',
+      'Know-It-All',
+      'Curious Cat',
+      'Fact Finder',
+      'Quiz Champion',
+      'Bright Mind',
+      'Sharp Thinker',
+      'Clever Clogs',
+      'Quiz Hero',
+      'Mental Giant',
+      'Quick Wit',
+      'Brainy Bunch',
     ];
-    
-    final randomName = customDisplayName ?? 
+
+    final randomName =
+        customDisplayName ??
         '${anonymousNames[DateTime.now().millisecondsSinceEpoch % anonymousNames.length]} ${DateTime.now().millisecondsSinceEpoch % 9999}';
-    
+
     return QuizParticipantModel(
       id: '', // Will be set by Firestore
       quizId: quizId,
@@ -172,7 +186,7 @@ class QuizParticipantModel {
       lastActiveAt: DateTime.now(),
     );
   }
-  
+
   // Factory method for authenticated participants
   factory QuizParticipantModel.authenticated({
     required String quizId,

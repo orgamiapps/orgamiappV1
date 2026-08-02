@@ -26,12 +26,12 @@ class AttendUsTokens {
   static const EdgeInsets pagePadding = EdgeInsets.all(20);
 
   static List<BoxShadow> softShadow({bool dark = false}) => [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: dark ? 0.26 : 0.06),
-          blurRadius: dark ? 18 : 14,
-          offset: const Offset(0, 8),
-        ),
-      ];
+    BoxShadow(
+      color: Colors.black.withValues(alpha: dark ? 0.26 : 0.06),
+      blurRadius: dark ? 18 : 14,
+      offset: const Offset(0, 8),
+    ),
+  ];
 }
 
 class AttendUsTheme {
@@ -147,8 +147,10 @@ class AttendUsTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AttendUsTokens.radiusMd),
           borderSide: BorderSide(color: scheme.outlineVariant),

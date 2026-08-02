@@ -23,11 +23,10 @@ class CreateAccountData {
     if (dateOfBirth == null) return null;
     final now = DateTime.now();
     int age = now.year - dateOfBirth!.year;
-    final hasHadBirthdayThisYear = (now.month > dateOfBirth!.month) ||
+    final hasHadBirthdayThisYear =
+        (now.month > dateOfBirth!.month) ||
         (now.month == dateOfBirth!.month && now.day >= dateOfBirth!.day);
     if (!hasHadBirthdayThisYear) age -= 1;
     return age;
   }
 }
-
-

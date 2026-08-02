@@ -3,12 +3,7 @@ import 'package:flutter/foundation.dart';
 // import 'package:nfc_manager/nfc_manager.dart';
 // import 'package:nfc_manager/nfc_manager_android.dart';
 // import 'package:ndef_record/ndef_record.dart';
-import 'dart:convert';
 import 'dart:async';
-import 'dart:io' show Platform;
-import '../firebase/firebase_firestore_helper.dart';
-import '../models/ticket_model.dart';
-import '../models/badge_model.dart';
 
 /// Service for handling NFC badge activation functionality
 /// Enables event organizers to activate tickets by tapping user badges
@@ -17,8 +12,6 @@ class NFCBadgeService {
   static final NFCBadgeService _instance = NFCBadgeService._internal();
   factory NFCBadgeService() => _instance;
   NFCBadgeService._internal();
-
-  final FirebaseFirestoreHelper _firestore = FirebaseFirestoreHelper();
 
   /// Check if NFC is available on the device
   /// Temporarily disabled due to plugin registration issues

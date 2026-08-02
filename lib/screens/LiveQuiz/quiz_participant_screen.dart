@@ -2022,7 +2022,7 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
           ),
           const SizedBox(height: 12),
           Text(
-            '${_pointsEarned} Points',
+            '$_pointsEarned Points',
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
@@ -2115,8 +2115,9 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
   }
 
   Widget _buildSelectedAnswerPreview() {
-    if (_currentQuestion == null || _selectedAnswer == null)
+    if (_currentQuestion == null || _selectedAnswer == null) {
       return const SizedBox();
+    }
 
     return Container(
       width: double.infinity,

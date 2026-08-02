@@ -306,6 +306,7 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
                 if (!mounted) return;
                 await AuthService().ensureInMemoryUserModel();
                 await Future.delayed(const Duration(milliseconds: 120));
+                if (!context.mounted) return;
                 RouterClass().homeScreenRoute(context: context);
               } catch (e) {
                 ShowToast().showNormalToast(msg: 'Login error');
@@ -347,6 +348,7 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
                 if (!mounted) return;
                 await AuthService().ensureInMemoryUserModel();
                 await Future.delayed(const Duration(milliseconds: 120));
+                if (!context.mounted) return;
                 RouterClass().homeScreenRoute(context: context);
               } catch (e) {
                 ShowToast().showNormalToast(msg: 'Login error');

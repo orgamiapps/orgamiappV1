@@ -8,13 +8,10 @@ import 'package:flutter_test/flutter_test.dart';
 Widget _wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
 
 class _FakeDeferredLoadRecovery implements DeferredLoadRecovery {
-  _FakeDeferredLoadRecovery({
-    this.canRefreshApp = true,
-    this.claimResult = false,
-  });
+  _FakeDeferredLoadRecovery({this.claimResult = false});
 
   @override
-  final bool canRefreshApp;
+  final bool canRefreshApp = true;
   bool claimResult;
   int refreshCalls = 0;
   final List<String> claimedKeys = [];

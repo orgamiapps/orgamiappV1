@@ -71,7 +71,7 @@ class EventFlyerGenerator {
 class EventFlyerWidget extends StatelessWidget {
   final EventModel event;
 
-  const EventFlyerWidget({Key? key, required this.event}) : super(key: key);
+  const EventFlyerWidget({super.key, required this.event});
 
   @override
   Widget build(BuildContext context) {

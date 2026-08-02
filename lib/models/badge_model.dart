@@ -168,7 +168,7 @@ class UserBadgeModel {
   static String? parseBadgeQr(String data) {
     const oldPrefix = 'orgami_user_';
     const newPrefix = 'attendus_user_';
-    
+
     // Support both old and new prefixes for backward compatibility
     if (data.startsWith(newPrefix)) {
       return data.substring(newPrefix.length);

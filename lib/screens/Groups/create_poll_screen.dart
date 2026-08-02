@@ -103,6 +103,7 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
     );
 
     if (picked != null) {
+      if (!mounted) return;
       final TimeOfDay? time = await showTimePicker(
         context: context,
         initialTime: TimeOfDay.now(),

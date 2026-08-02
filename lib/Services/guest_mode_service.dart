@@ -12,7 +12,7 @@ class GuestModeService extends ChangeNotifier {
   GuestModeService._internal();
 
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    aOptions: AndroidOptions(),
     iOptions: IOSOptions(
       accessibility: KeychainAccessibility.first_unlock_this_device,
     ),
@@ -123,8 +123,9 @@ class GuestModeService extends ChangeNotifier {
 
   /// Check if a feature is available in guest mode
   bool isFeatureAvailable(GuestFeature feature) {
-    if (!_isGuestMode)
+    if (!_isGuestMode) {
       return true; // All features available for logged-in users
+    }
 
     switch (feature) {
       case GuestFeature.viewEvents:

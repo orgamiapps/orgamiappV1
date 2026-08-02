@@ -17,7 +17,7 @@ class SignInMethodsDisplay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final availableMethods = eventModel.getAvailableSignInMethods();
-    
+
     if (availableMethods.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -90,8 +90,7 @@ class SignInMethodsDisplay extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           // Show security tier badge if using new system
-          if (eventModel.signInSecurityTier != null)
-            _buildSecurityTierBadge(),
+          if (eventModel.signInSecurityTier != null) _buildSecurityTierBadge(),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -106,12 +105,12 @@ class SignInMethodsDisplay extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildSecurityTierBadge() {
     String tierText;
     Color tierColor;
     IconData tierIcon;
-    
+
     switch (eventModel.signInSecurityTier) {
       case 'most_secure':
         tierText = 'Most Secure';
@@ -136,7 +135,7 @@ class SignInMethodsDisplay extends StatelessWidget {
       default:
         return const SizedBox.shrink();
     }
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -149,10 +148,7 @@ class SignInMethodsDisplay extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: tierColor.withValues(alpha: 0.3),
-          width: 1,
-        ),
+        border: Border.all(color: tierColor.withValues(alpha: 0.3), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

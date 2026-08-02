@@ -512,6 +512,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       );
     }
 
+    if (!mounted) return;
+
     try {
       final position = await LocationHelper.getCurrentLocation(
         showErrorDialog: true,
@@ -2507,15 +2509,17 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       );
 
       // Close the preview dialog after successful generation
-      if (mounted) {
+      if (dialogContext.mounted) {
         Navigator.of(dialogContext).pop();
       }
 
       // Share the flyer image
-      await Share.shareXFiles(
-        [XFile(flyerFile.path)],
-        text:
-            '${eventModel.title}\n\nJoin us at: https://attendus.app/event/${eventModel.id}',
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(flyerFile.path)],
+          text:
+              '${eventModel.title}\n\nJoin us at: https://attendus.app/event/${eventModel.id}',
+        ),
       );
 
       // Clean up the temporary file after sharing
@@ -2528,7 +2532,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       print('Error in _generateAndShareFlyer: $e');
 
       // Close the preview dialog if still open
-      if (mounted && Navigator.of(dialogContext).canPop()) {
+      if (dialogContext.mounted && Navigator.of(dialogContext).canPop()) {
         Navigator.of(dialogContext).pop();
       }
 
@@ -2561,7 +2565,7 @@ ${eventModel.description}
 Join us at: $eventUrl
 ''';
 
-      Share.share(shareText);
+      await SharePlus.instance.share(ShareParams(text: shareText));
     }
   }
 
@@ -5991,7 +5995,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                                     .getSingleCustomer(
                                       customerId: attendee.customerUid,
                                     );
-                                if (customer != null && mounted) {
+                                if (customer != null && context.mounted) {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(

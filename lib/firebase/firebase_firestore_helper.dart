@@ -402,7 +402,7 @@ class FirebaseFirestoreHelper {
   static void clearCache() {
     _cache.clear();
   }
-  
+
   // Clear attendance cache for a specific event
   void clearAttendanceCache(String eventId) {
     try {

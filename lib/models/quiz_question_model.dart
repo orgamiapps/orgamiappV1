@@ -11,20 +11,20 @@ class QuizQuestionModel {
   final QuestionType type;
   final String question;
   final String? imageUrl;
-  
+
   // Multiple Choice & True/False
   final List<String> options;
   final int? correctOptionIndex; // For multiple choice and true/false
-  
+
   // Short Answer
   final List<String> acceptableAnswers; // For short answer questions
   final bool caseSensitive;
-  
+
   // Settings
   final int timeLimit; // seconds, overrides quiz default if set
   final int points;
   final String? explanation; // Shown after answering
-  
+
   const QuizQuestionModel({
     required this.id,
     required this.quizId,
@@ -52,10 +52,12 @@ class QuizQuestionModel {
       ),
       question: data['question'] ?? '',
       imageUrl: data['imageUrl'],
-      options: data['options'] != null ? List<String>.from(data['options']) : [],
+      options: data['options'] != null
+          ? List<String>.from(data['options'])
+          : [],
       correctOptionIndex: data['correctOptionIndex'],
-      acceptableAnswers: data['acceptableAnswers'] != null 
-          ? List<String>.from(data['acceptableAnswers']) 
+      acceptableAnswers: data['acceptableAnswers'] != null
+          ? List<String>.from(data['acceptableAnswers'])
           : [],
       caseSensitive: data['caseSensitive'] ?? false,
       timeLimit: data['timeLimit'] ?? 30,
@@ -123,10 +125,10 @@ class QuizQuestionModel {
   bool get isMultipleChoice => type == QuestionType.multipleChoice;
   bool get isTrueFalse => type == QuestionType.trueFalse;
   bool get isShortAnswer => type == QuestionType.shortAnswer;
-  
+
   bool get hasImage => imageUrl != null && imageUrl!.isNotEmpty;
   bool get hasExplanation => explanation != null && explanation!.isNotEmpty;
-  
+
   String get typeDisplayName {
     switch (type) {
       case QuestionType.multipleChoice:
@@ -137,27 +139,27 @@ class QuizQuestionModel {
         return 'Short Answer';
     }
   }
-  
+
   // Validation
   bool get isValid {
     if (question.trim().isEmpty) return false;
-    
+
     switch (type) {
       case QuestionType.multipleChoice:
-        return options.length >= 2 && 
-               correctOptionIndex != null && 
-               correctOptionIndex! >= 0 && 
-               correctOptionIndex! < options.length;
-               
+        return options.length >= 2 &&
+            correctOptionIndex != null &&
+            correctOptionIndex! >= 0 &&
+            correctOptionIndex! < options.length;
+
       case QuestionType.trueFalse:
-        return correctOptionIndex != null && 
-               (correctOptionIndex == 0 || correctOptionIndex == 1);
-               
+        return correctOptionIndex != null &&
+            (correctOptionIndex == 0 || correctOptionIndex == 1);
+
       case QuestionType.shortAnswer:
         return acceptableAnswers.isNotEmpty;
     }
   }
-  
+
   // Answer checking
   bool isAnswerCorrect(dynamic answer) {
     switch (type) {
@@ -167,38 +169,45 @@ class QuizQuestionModel {
           return answer == correctOptionIndex;
         }
         return false;
-        
+
       case QuestionType.shortAnswer:
         if (answer is String) {
           final userAnswer = caseSensitive ? answer : answer.toLowerCase();
           return acceptableAnswers.any((acceptable) {
-            final target = caseSensitive ? acceptable : acceptable.toLowerCase();
+            final target = caseSensitive
+                ? acceptable
+                : acceptable.toLowerCase();
             return target == userAnswer;
           });
         }
         return false;
     }
   }
-  
+
   // For short answer questions, return similarity score
   double getAnswerSimilarity(String userAnswer) {
     if (type != QuestionType.shortAnswer) return 0.0;
-    
-    final cleanUserAnswer = caseSensitive ? userAnswer.trim() : userAnswer.trim().toLowerCase();
-    
+
+    final cleanUserAnswer = caseSensitive
+        ? userAnswer.trim()
+        : userAnswer.trim().toLowerCase();
+
     double maxSimilarity = 0.0;
     for (final acceptable in acceptableAnswers) {
-      final cleanAcceptable = caseSensitive ? acceptable.trim() : acceptable.trim().toLowerCase();
-      
+      final cleanAcceptable = caseSensitive
+          ? acceptable.trim()
+          : acceptable.trim().toLowerCase();
+
       // Simple similarity calculation (can be enhanced)
       if (cleanAcceptable == cleanUserAnswer) {
         return 1.0;
-      } else if (cleanAcceptable.contains(cleanUserAnswer) || cleanUserAnswer.contains(cleanAcceptable)) {
+      } else if (cleanAcceptable.contains(cleanUserAnswer) ||
+          cleanUserAnswer.contains(cleanAcceptable)) {
         final similarity = cleanUserAnswer.length / cleanAcceptable.length;
         maxSimilarity = similarity > maxSimilarity ? similarity : maxSimilarity;
       }
     }
-    
+
     return maxSimilarity;
   }
 

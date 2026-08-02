@@ -43,7 +43,7 @@ class _SocialLoginViewState extends State<SocialLoginView> {
                 // Ensure in-memory session model is ready before navigating
                 await AuthService().ensureInMemoryUserModel();
                 await Future.delayed(const Duration(milliseconds: 120));
-                if (!mounted) return;
+                if (!context.mounted) return;
                 RouterClass().homeScreenRoute(context: context);
               } catch (e) {
                 ShowToast().showNormalToast(

@@ -30,11 +30,7 @@ class AppThemeColor {
   static const Color lightGrayColor = Color(0xFF94A3B8);
 
   static const Gradient buttonGradient = LinearGradient(
-    colors: [
-      primaryIndigo,
-      primaryPurple,
-      primaryIndigo,
-    ],
+    colors: [primaryIndigo, primaryPurple, primaryIndigo],
     tileMode: TileMode.clamp,
   );
 
