@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 
+const _downloadBatchSize = 6;
+const _maxDownloadAttempts = 4;
+
 Future<void> main(List<String> arguments) async {
   if (arguments.length != 1) {
     stderr.writeln('Usage: dart run tools/retain_web_releases.dart BASE_URL');
@@ -10,26 +13,20 @@ Future<void> main(List<String> arguments) async {
 
   final baseUri = Uri.parse(arguments.single);
   final webDirectory = Directory('build/web');
-  final client = HttpClient();
+  final client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
   try {
     final manifestUri = baseUri.resolve(
       'release-manifest.json?retain=${DateTime.now().millisecondsSinceEpoch}',
     );
-    final request = await client.getUrl(manifestUri);
-    request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
-    final response = await request.close();
-    final bytes = await response.fold<List<int>>(
-      <int>[],
-      (buffer, chunk) => buffer..addAll(chunk),
+    final manifestDownload = await _downloadWithRetry(
+      client,
+      manifestUri,
+      allowNotFound: true,
     );
-    if (response.statusCode == HttpStatus.notFound) {
+    final bytes = manifestDownload.bytes;
+    if (manifestDownload.statusCode == HttpStatus.notFound) {
       stdout.writeln('No prior web release manifest was found.');
       return;
-    }
-    if (response.statusCode != HttpStatus.ok) {
-      throw HttpException(
-        'Could not download $manifestUri: HTTP ${response.statusCode}',
-      );
     }
 
     final bodyText = utf8.decode(bytes);
@@ -51,8 +48,8 @@ Future<void> main(List<String> arguments) async {
       }
     }
 
-    for (var offset = 0; offset < files.length; offset += 12) {
-      final batch = files.skip(offset).take(12);
+    for (var offset = 0; offset < files.length; offset += _downloadBatchSize) {
+      final batch = files.skip(offset).take(_downloadBatchSize);
       await Future.wait(
         batch.map(
           (file) => _downloadReleaseFile(client, baseUri, webDirectory, file),
@@ -81,22 +78,65 @@ Future<void> _downloadReleaseFile(
       path.contains('..')) {
     throw FormatException('Unsafe release path in manifest: $path');
   }
-  final request = await client.getUrl(baseUri.resolve(path));
-  request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
-  final response = await request.close();
-  final bytes = await response.fold<List<int>>(
-    <int>[],
-    (buffer, chunk) => buffer..addAll(chunk),
-  );
-  if (response.statusCode != HttpStatus.ok ||
-      expectedBytes is! int ||
-      bytes.length != expectedBytes) {
-    throw HttpException(
-      'Retained release validation failed for $path: '
-      'HTTP ${response.statusCode}, ${bytes.length}/$expectedBytes bytes',
-    );
+  if (expectedBytes is! int || expectedBytes < 0) {
+    throw FormatException('Invalid byte length for retained release: $path');
   }
+  final download = await _downloadWithRetry(
+    client,
+    baseUri.resolve(path),
+    expectedBytes: expectedBytes,
+  );
   final output = File('${webDirectory.path}/$path');
   output.parent.createSync(recursive: true);
-  output.writeAsBytesSync(bytes);
+  output.writeAsBytesSync(download.bytes);
+}
+
+Future<_Download> _downloadWithRetry(
+  HttpClient client,
+  Uri uri, {
+  int? expectedBytes,
+  bool allowNotFound = false,
+}) async {
+  Object? lastError;
+  for (var attempt = 1; attempt <= _maxDownloadAttempts; attempt += 1) {
+    try {
+      final request = await client.getUrl(uri);
+      request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
+      final response = await request.close().timeout(
+        const Duration(seconds: 30),
+      );
+      final bytes = await response
+          .fold<List<int>>(<int>[], (buffer, chunk) => buffer..addAll(chunk))
+          .timeout(const Duration(seconds: 60));
+      final validNotFound =
+          allowNotFound && response.statusCode == HttpStatus.notFound;
+      final validSuccess =
+          response.statusCode == HttpStatus.ok &&
+          (expectedBytes == null || bytes.length == expectedBytes);
+      if (validNotFound || validSuccess) {
+        return _Download(response.statusCode, bytes);
+      }
+      lastError = HttpException(
+        'HTTP ${response.statusCode}, ${bytes.length}/${expectedBytes ?? "?"} '
+        'bytes from $uri',
+      );
+    } catch (error) {
+      lastError = error;
+    }
+
+    if (attempt < _maxDownloadAttempts) {
+      await Future<void>.delayed(Duration(milliseconds: 500 * attempt));
+    }
+  }
+  throw HttpException(
+    'Download validation failed after $_maxDownloadAttempts attempts for '
+    '$uri: $lastError',
+  );
+}
+
+final class _Download {
+  const _Download(this.statusCode, this.bytes);
+
+  final int statusCode;
+  final List<int> bytes;
 }

@@ -55,4 +55,15 @@ void main() {
       );
     },
   );
+
+  test('retained release downloads retry validated immutable assets', () {
+    final retentionTool = File(
+      'tools/retain_web_releases.dart',
+    ).readAsStringSync();
+
+    expect(retentionTool, contains('const _maxDownloadAttempts = 4'));
+    expect(retentionTool, contains('expectedBytes: expectedBytes'));
+    expect(retentionTool, contains('bytes.length == expectedBytes'));
+    expect(retentionTool, contains('Duration(milliseconds: 500 * attempt)'));
+  });
 }
