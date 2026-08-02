@@ -1,0 +1,178 @@
+name: Attendus CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: attendus-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: 3.44.6
+  NODE_VERSION: 22
+
+jobs:
+  flutter-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed lib test tools
+      - run: flutter analyze
+      - run: flutter test --exclude-tags=emulator
+
+  web-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - name: Build production-shaped web bundle
+        run: >-
+          flutter build web --release
+          --pwa-strategy=none
+          --no-wasm-dry-run
+          --dart-define=GOOGLE_MAPS_WEB_API_KEY=ci-placeholder-key
+      - name: Install retirement worker
+        run: cp web/flutter_service_worker_retirement.js build/web/flutter_service_worker.js
+      - name: Retain supported production releases
+        run: dart run tools/retain_web_releases.dart https://attendus.app/
+      - run: dart run tools/package_web_release.dart
+      - run: dart run tools/check_deferred_web_chunks.dart
+      - run: dart run tools/check_web_bundle_size.dart
+
+  functions:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - name: Reject critical and high production vulnerabilities
+        run: npm audit --omit=dev --audit-level=high
+
+  firebase-emulators:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+        working-directory: functions
+      - name: Adversarial Firestore and Storage rules tests
+        run: >-
+          npx firebase-tools emulators:exec
+          --config ../firebase.json
+          --project demo-attendus-ci
+          --only firestore,storage
+          "node --test --test-concurrency=1 test/firestore-rules.test.js test/storage-rules.test.js"
+        working-directory: functions
+      - name: Auth, Functions, and account-erasure integration tests
+        run: >-
+          npx firebase-tools emulators:exec
+          --config ../firebase.json
+          --project demo-attendus-ci
+          --only auth,firestore,storage,functions
+          "node --test --test-concurrency=1 test/admin-emulator.test.js"
+        working-directory: functions
+
+  android-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - run: dart run tools/check_android_release_config.dart
+      - name: Generate isolated CI release certificate
+        run: >-
+          keytool -genkeypair -noprompt
+          -keystore "$RUNNER_TEMP/attendus-ci-release.jks"
+          -storepass ci-release-password
+          -keypass ci-release-password
+          -alias attendus-ci-release
+          -keyalg RSA -keysize 3072 -validity 2
+          -dname "CN=Attendus CI, OU=Engineering, O=Attendus, C=US"
+      - name: Build signed release APKs
+        env:
+          GOOGLE_MAPS_ANDROID_API_KEY: ci-placeholder-key
+          ATTENDUS_ANDROID_STORE_FILE: ${{ runner.temp }}/attendus-ci-release.jks
+          ATTENDUS_ANDROID_STORE_PASSWORD: ci-release-password
+          ATTENDUS_ANDROID_KEY_ALIAS: attendus-ci-release
+          ATTENDUS_ANDROID_KEY_PASSWORD: ci-release-password
+        run: flutter build apk --release --split-per-abi
+      - name: Verify release signatures and supported ABIs
+        shell: bash
+        run: |
+          set -euo pipefail
+          apksigner="$(find "$ANDROID_SDK_ROOT/build-tools" -name apksigner -type f | sort -V | tail -1)"
+          test -x "$apksigner"
+          mapfile -t apks < <(find build/app/outputs/flutter-apk -name 'app-*-release.apk' -type f | sort)
+          test "${#apks[@]}" -eq 2
+          for apk in "${apks[@]}"; do
+            output="$($apksigner verify --print-certs "$apk")"
+            grep -q 'CN=Attendus CI' <<<"$output"
+            if grep -q 'CN=Android Debug' <<<"$output"; then
+              echo "Debug certificate detected in $apk" >&2
+              exit 1
+            fi
+          done
+
+  ios-release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - name: Configure non-secret CI Maps placeholder
+        run: echo 'GOOGLE_MAPS_IOS_API_KEY=ci-placeholder-key' > ios/Flutter/Maps.xcconfig
+      - name: Compile unsigned iOS release
+        run: flutter build ios --release --no-codesign
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2

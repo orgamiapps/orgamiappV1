@@ -8,6 +8,22 @@ plugins {
 
 def kotlin_version = '2.3.10'
 def mapsAndroidApiKey = System.getenv('GOOGLE_MAPS_ANDROID_API_KEY') ?: ''
+def signingProperties = new Properties()
+def signingPropertiesFile = rootProject.file('key.properties')
+if (signingPropertiesFile.exists()) {
+    signingPropertiesFile.withInputStream { signingProperties.load(it) }
+}
+
+def releaseStoreFile = System.getenv('ATTENDUS_ANDROID_STORE_FILE') ?:
+    signingProperties.getProperty('storeFile', '')
+def releaseStorePassword = System.getenv('ATTENDUS_ANDROID_STORE_PASSWORD') ?:
+    signingProperties.getProperty('storePassword', '')
+def releaseKeyAlias = System.getenv('ATTENDUS_ANDROID_KEY_ALIAS') ?:
+    signingProperties.getProperty('keyAlias', '')
+def releaseKeyPassword = System.getenv('ATTENDUS_ANDROID_KEY_PASSWORD') ?:
+    signingProperties.getProperty('keyPassword', '')
+def hasReleaseSigning = releaseStoreFile && releaseStorePassword &&
+    releaseKeyAlias && releaseKeyPassword
 
 if (!mapsAndroidApiKey) {
     def localPropertiesFile = rootProject.file('local.properties')
@@ -24,6 +40,12 @@ def isReleaseBuild = gradle.startParameter.taskNames.any {
 if (isReleaseBuild && !mapsAndroidApiKey) {
     throw new GradleException(
         'GOOGLE_MAPS_ANDROID_API_KEY is required for Android release builds.'
+    )
+}
+if (isReleaseBuild && !hasReleaseSigning) {
+    throw new GradleException(
+        'Android release signing is required. Configure key.properties or the ' +
+        'ATTENDUS_ANDROID_STORE_* and ATTENDUS_ANDROID_KEY_* environment variables.'
     )
 }
 
@@ -56,30 +78,31 @@ android {
         versionName = flutter.versionName
         // Preserve Flutter's `applicationName` placeholder while adding Maps.
         manifestPlaceholders["GOOGLE_MAPS_ANDROID_API_KEY"] = mapsAndroidApiKey
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a'
+        }
+    }
+
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                storeFile = rootProject.file(releaseStoreFile)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+            signingConfig = signingConfigs.release
             // Disable code shrinking to avoid R8 missing classes for Stripe push provisioning
             minifyEnabled false
             shrinkResources false
         }
     }
 
-    // Build only arm64 to reduce build size/time
-    packagingOptions {
-        jniLibs {
-            excludes += [
-                "**/armeabi/**",
-                "**/armeabi-v7a/**",
-                "**/x86/**",
-                "**/x86_64/**"
-            ]
-        }
-    }
 }
 
 dependencies {
