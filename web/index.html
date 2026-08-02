@@ -186,6 +186,13 @@
     // code. A controlled page must navigate once after unregistering so the
     // next document is outside the old worker's cache-first lifecycle.
     (async function bootstrapAttendus() {
+      const deploymentOrigins = [
+        '__ATTENDUS_PRIMARY_ORIGIN__',
+        '__ATTENDUS_SECONDARY_ORIGIN__',
+        '__ATTENDUS_FIREBASE_HOSTING_ORIGIN__',
+        '__ATTENDUS_FIREBASE_APP_ORIGIN__',
+      ];
+      const workerBridgeEnabled = __ATTENDUS_WORKER_BRIDGE_ENABLED__;
       const cleanupKey = 'attendus-legacy-flutter-cache-cleanup-v3';
       const reloadGuardKey = 'attendus-legacy-worker-reload-v3';
       const currentUrl = new URL(window.location.href);
@@ -194,10 +201,7 @@
         try {
           const targetUrl = new URL(returnTarget);
           const allowedOrigins = new Set([
-            'https://attendus.app',
-            'https://www.attendus.app',
-            'https://orgami-66nxok.web.app',
-            'https://orgami-66nxok.firebaseapp.com',
+            ...deploymentOrigins,
             `http://127.0.0.1:${window.location.port}`,
             `http://localhost:${window.location.port}`,
           ]);
@@ -214,24 +218,23 @@
       }
 
       function migrationBridgeUrl(returnUrl) {
-        let bridgeOrigin;
-        switch (window.location.hostname) {
-          case 'attendus.app':
-          case 'www.attendus.app':
-            bridgeOrigin = 'https://orgami-66nxok.web.app';
-            break;
-          case 'orgami-66nxok.web.app':
-          case 'orgami-66nxok.firebaseapp.com':
-            bridgeOrigin = 'https://attendus.app';
-            break;
-          case '127.0.0.1':
-            bridgeOrigin = `http://localhost:${window.location.port}`;
-            break;
-          case 'localhost':
-            bridgeOrigin = `http://127.0.0.1:${window.location.port}`;
-            break;
-          default:
-            return null;
+        let bridgeOrigin = null;
+        if (workerBridgeEnabled) {
+          if (window.location.origin === deploymentOrigins[0] ||
+              window.location.origin === deploymentOrigins[1]) {
+            bridgeOrigin = deploymentOrigins[2];
+          } else if (window.location.origin === deploymentOrigins[2] ||
+                     window.location.origin === deploymentOrigins[3]) {
+            bridgeOrigin = deploymentOrigins[0];
+          }
+        }
+        if (window.location.hostname === '127.0.0.1') {
+          bridgeOrigin = `http://localhost:${window.location.port}`;
+        } else if (window.location.hostname === 'localhost') {
+          bridgeOrigin = `http://127.0.0.1:${window.location.port}`;
+        }
+        if (!bridgeOrigin || bridgeOrigin === window.location.origin) {
+          return null;
         }
         const bridgeUrl = new URL('/', bridgeOrigin);
         bridgeUrl.searchParams.set('attendus_worker_return', returnUrl);

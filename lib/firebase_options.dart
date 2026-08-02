@@ -15,7 +15,26 @@ import 'package:flutter/foundation.dart'
 /// );
 /// ```
 class DefaultFirebaseOptions {
+  static const String environment = String.fromEnvironment(
+    'ATTENDUS_FIREBASE_ENV',
+    defaultValue: 'production',
+  );
+
   static FirebaseOptions get currentPlatform {
+    if (environment == 'staging') {
+      if (kIsWeb) {
+        return stagingWeb;
+      }
+      throw UnsupportedError(
+        'The staging Firebase project is currently registered for web only. '
+        'Register a staging app for this platform before building it.',
+      );
+    }
+    if (environment != 'production') {
+      throw UnsupportedError(
+        'Unknown ATTENDUS_FIREBASE_ENV value: $environment',
+      );
+    }
     if (kIsWeb) {
       return web;
     }
@@ -53,6 +72,15 @@ class DefaultFirebaseOptions {
     // that partition third-party storage.
     authDomain: 'attendus.app',
     storageBucket: 'orgami-66nxok.appspot.com',
+  );
+
+  static const FirebaseOptions stagingWeb = FirebaseOptions(
+    apiKey: 'AIzaSyBCFt_7BJNVVzgAZ2Fa7S_5UMGYIVDQ-dg',
+    appId: '1:925344893088:web:3be71e809ba516e1d021c5',
+    messagingSenderId: '925344893088',
+    projectId: 'attendus-staging',
+    authDomain: 'attendus-staging.firebaseapp.com',
+    storageBucket: 'attendus-staging.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(

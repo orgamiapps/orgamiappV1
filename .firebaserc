@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "orgami-66nxok"
-  }
+    "default": "orgami-66nxok",
+    "staging": "attendus-staging"
+  },
+  "targets": {},
+  "etags": {}
 }

@@ -16,6 +16,35 @@ void main() {
     expect(index, isNot(contains('Promise.race')));
     expect(index, contains('migrationBridgeUrl(migrationUrl.toString())'));
     expect(index, contains("searchParams.get('attendus_worker_return')"));
+    expect(index, contains('__ATTENDUS_PRIMARY_ORIGIN__'));
+    expect(index, contains('__ATTENDUS_WORKER_BRIDGE_ENABLED__'));
+  });
+
+  test('web releases configure Firebase for the selected environment', () {
+    final options = File('lib/firebase_options.dart').readAsStringSync();
+    final worker = File('web/firebase-messaging-sw.js').readAsStringSync();
+    final configurationTool = File(
+      'tools/configure_web_environment.dart',
+    ).readAsStringSync();
+    final buildScript = File(
+      'scripts/build_web_release.ps1',
+    ).readAsStringSync();
+
+    expect(options, contains("'ATTENDUS_FIREBASE_ENV'"));
+    expect(options, contains("projectId: 'attendus-staging'"));
+    expect(worker, contains('__ATTENDUS_FIREBASE_PROJECT_ID__'));
+    expect(configurationTool, contains("'staging':"));
+    expect(configurationTool, contains("'attendus-staging'"));
+    expect(configurationTool, contains('_verifyFirebaseIsolation'));
+    expect(configurationTool, contains("'orgami-66nxok'"));
+    expect(
+      buildScript,
+      contains('dart run tools/configure_web_environment.dart'),
+    );
+    expect(
+      buildScript,
+      contains(r'"--dart-define=ATTENDUS_FIREBASE_ENV=$Environment"'),
+    );
   });
 
   test('legacy Flutter service worker retires itself and its app cache', () {

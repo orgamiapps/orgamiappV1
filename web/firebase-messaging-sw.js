@@ -5,12 +5,12 @@ importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
 
 firebase.initializeApp({
-  apiKey: "AIzaSyA-PFyqhP5aEVE6XwGku3jMe91G3efMaVw",
-  authDomain: "orgami-66nxok.firebaseapp.com",
-  projectId: "orgami-66nxok",
-  storageBucket: "orgami-66nxok.appspot.com",
-  messagingSenderId: "951311475019",
-  appId: "1:951311475019:web:65b1de24d2f3a8d289c8ce"
+  apiKey: "__ATTENDUS_FIREBASE_API_KEY__",
+  authDomain: "__ATTENDUS_FIREBASE_AUTH_DOMAIN__",
+  projectId: "__ATTENDUS_FIREBASE_PROJECT_ID__",
+  storageBucket: "__ATTENDUS_FIREBASE_STORAGE_BUCKET__",
+  messagingSenderId: "__ATTENDUS_FIREBASE_MESSAGING_SENDER_ID__",
+  appId: "__ATTENDUS_FIREBASE_APP_ID__"
 });
 
 const messaging = firebase.messaging();
