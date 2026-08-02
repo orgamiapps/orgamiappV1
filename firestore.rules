@@ -73,6 +73,7 @@ service cloud.firestore {
     match /admin_jobs/{doc} { allow read, write: if false; }
     match /admin_idempotency/{doc} { allow read, write: if false; }
     match /admin_rate_limits/{doc} { allow read, write: if false; }
+    match /service_rate_limits/{doc} { allow read, write: if false; }
     match /stripe_webhook_events/{doc} { allow read, write: if false; }
     match /account_deletion_jobs/{doc} { allow read, write: if false; }
     match /biometric_quarantine/{doc} { allow read, write: if false; }

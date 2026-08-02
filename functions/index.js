@@ -13,13 +13,16 @@ const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {onCall, onRequest, HttpsError} = require("firebase-functions/v2/https");
 const {defineSecret} = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
+const {
+  PLACES_RATE_LIMIT,
+  PLACES_RATE_WINDOW_MS,
+  enforceSharedPlacesRateLimit,
+} = require("./places/rate-limit");
 
 const GOOGLE_PLACES_API_KEY = defineSecret("GOOGLE_PLACES_API_KEY");
 const placesRateWindows = new Map();
-const PLACES_RATE_LIMIT = 60;
-const PLACES_RATE_WINDOW_MS = 60 * 1000;
 
-function requirePlacesCaller(req) {
+async function requirePlacesCaller(req) {
   const uid = req.auth?.uid;
   const provider = req.auth?.token?.firebase?.sign_in_provider;
   if (!uid || provider === "anonymous") {
@@ -29,19 +32,23 @@ function requirePlacesCaller(req) {
     );
   }
 
-  const now = Date.now();
-  const current = placesRateWindows.get(uid);
-  if (!current || now - current.startedAt >= PLACES_RATE_WINDOW_MS) {
-    placesRateWindows.set(uid, {startedAt: now, count: 1});
+  if (process.env.ATTENDUS_TEST_IN_MEMORY_RATE_LIMIT === "true") {
+    const now = Date.now();
+    const current = placesRateWindows.get(uid);
+    if (!current || now - current.startedAt >= PLACES_RATE_WINDOW_MS) {
+      placesRateWindows.set(uid, {startedAt: now, count: 1});
+      return uid;
+    }
+    if (current.count >= PLACES_RATE_LIMIT) {
+      throw new HttpsError(
+          "resource-exhausted",
+          "Too many location searches. Please wait a moment and try again.",
+      );
+    }
+    current.count += 1;
     return uid;
   }
-  if (current.count >= PLACES_RATE_LIMIT) {
-    throw new HttpsError(
-        "resource-exhausted",
-        "Too many location searches. Please wait a moment and try again.",
-    );
-  }
-  current.count += 1;
+  await enforceSharedPlacesRateLimit(admin.firestore(), uid);
   return uid;
 }
 
@@ -125,7 +132,7 @@ exports.placesAutocomplete = onCall(
       secrets: [GOOGLE_PLACES_API_KEY],
     },
     async (req) => {
-      requirePlacesCaller(req);
+      await requirePlacesCaller(req);
       const query = typeof req.data?.query === "string" ? req.data.query.trim() : "";
       const sessionToken = validateSessionToken(req.data?.sessionToken);
       const useCase = req.data?.useCase;
@@ -210,7 +217,7 @@ exports.placeDetails = onCall(
       secrets: [GOOGLE_PLACES_API_KEY],
     },
     async (req) => {
-      requirePlacesCaller(req);
+      await requirePlacesCaller(req);
       const placeId = typeof req.data?.placeId === "string" ? req.data.placeId.trim() : "";
       const sessionToken = validateSessionToken(req.data?.sessionToken);
       if (!placeId || placeId.length > 256) {
@@ -266,7 +273,7 @@ exports.reverseGeocode = onCall(
       secrets: [GOOGLE_PLACES_API_KEY],
     },
     async (req) => {
-      requirePlacesCaller(req);
+      await requirePlacesCaller(req);
       const latitude = Number(req.data?.latitude);
       const longitude = Number(req.data?.longitude);
       if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
@@ -889,8 +896,20 @@ exports.aggregateAttendanceData = onDocumentCreated("Attendance/{docId}",
       try {
         const attendanceData = event.data.data();
         const eventId = attendanceData.eventId;
-        const customerUid = attendanceData.customerUid;
-        const attendanceDateTime = attendanceData.attendanceDateTime.toDate();
+        if (typeof eventId !== "string" || eventId.trim().length === 0) {
+          logger.warn("Skipping malformed attendance without an eventId", {
+            attendanceId: event.params.docId,
+          });
+          return {skipped: true, reason: "missing_event_id"};
+        }
+
+        const customerUid = attendanceData.customerUid || attendanceData.userId;
+        const rawAttendanceTime = attendanceData.attendanceDateTime ||
+          attendanceData.checkedInAt || attendanceData.createdAt;
+        const parsedAttendanceTime = rawAttendanceTime?.toDate ?
+          rawAttendanceTime.toDate() : new Date(rawAttendanceTime || Date.now());
+        const attendanceDateTime = Number.isNaN(parsedAttendanceTime.getTime()) ?
+          new Date() : parsedAttendanceTime;
 
         logger.info("Processing attendance for event:", eventId);
 
@@ -899,8 +918,50 @@ exports.aggregateAttendanceData = onDocumentCreated("Attendance/{docId}",
         const hourStr = hour.toString().padStart(2, "0");
         const hourBucket = `${hourStr}:00`;
 
-        // Use a transaction to ensure atomic updates
         const db = admin.firestore();
+        let isRepeatAttendee = false;
+        if (customerUid && customerUid !== "manual" &&
+            customerUid !== "pre-registered") {
+          try {
+            const eventDocument = await db.collection("Events").doc(eventId).get();
+            const eventOwnerUid = eventDocument.get("customerUid") ||
+              eventDocument.get("ownerId") || eventDocument.get("createdBy");
+            if (eventOwnerUid) {
+              const hostEvents = await db.collection("Events")
+                  .where("customerUid", "==", eventOwnerUid)
+                  .get();
+              const previousEventIds = hostEvents.docs
+                  .map((document) => document.id)
+                  .filter((id) => id !== eventId);
+              for (let offset = 0; offset < previousEventIds.length;
+                offset += 30) {
+                const eventIds = previousEventIds.slice(offset, offset + 30);
+                const priorAttendance = await db.collection("Attendance")
+                    .where("customerUid", "==", customerUid)
+                    .where("eventId", "in", eventIds)
+                    .limit(1)
+                    .get();
+                if (!priorAttendance.empty) {
+                  isRepeatAttendee = true;
+                  break;
+                }
+              }
+            }
+          } catch (repeatError) {
+            logger.warn("Repeat-attendee calculation was skipped", {
+              eventId,
+              code: repeatError.code || "unknown",
+            });
+          }
+        }
+
+        const preRegisteredQuery = await db.collection("Attendance")
+            .where("eventId", "==", eventId)
+            .where("customerUid", "==", "pre-registered")
+            .get();
+        const preRegisteredCount = preRegisteredQuery.size;
+
+        // Use a transaction to ensure concurrent sign-ins cannot lose counts.
         await db.runTransaction(async (transaction) => {
           const analyticsRef = db.collection("event_analytics").doc(eventId);
           const analyticsDoc = await transaction.get(analyticsRef);
@@ -914,8 +975,9 @@ exports.aggregateAttendanceData = onDocumentCreated("Attendance/{docId}",
             lastUpdated: admin.firestore.Timestamp.now(),
           };
 
-          // Increment total attendees
-          analyticsData.totalAttendees += 1;
+          analyticsData.totalAttendees =
+            Number(analyticsData.totalAttendees || 0) + 1;
+          analyticsData.hourlySignIns = analyticsData.hourlySignIns || {};
 
           // Update hourly sign-ins
           if (!analyticsData.hourlySignIns[hourBucket]) {
@@ -923,46 +985,15 @@ exports.aggregateAttendanceData = onDocumentCreated("Attendance/{docId}",
           }
           analyticsData.hourlySignIns[hourBucket] += 1;
 
-          // Count repeat attendees (same customerUid across host's events)
-          if (customerUid && customerUid !== "manual") {
-            // Get all events by the same host
-            const eventsQuery = await db.collection("Events")
-                .where("customerUid", "==", attendanceData.customerUid)
-                .get();
-
-            const hostEventIds = eventsQuery.docs.map((doc) => doc.id);
-
-            // Count past sign-ins by this customerUid across host's events
-            const pastAttendancesQuery = await db.collection("Attendance")
-                .where("customerUid", "==", customerUid)
-                .where("eventId", "in", hostEventIds)
-                .get();
-
-            // Count unique events this customer has attended
-            // (excluding current event)
-            const attendedEvents = new Set();
-            pastAttendancesQuery.docs.forEach((doc) => {
-              const data = doc.data();
-              if (data.eventId !== eventId) {
-                attendedEvents.add(data.eventId);
-              }
-            });
-
-            analyticsData.repeatAttendees = attendedEvents.size;
+          if (isRepeatAttendee) {
+            analyticsData.repeatAttendees =
+              Number(analyticsData.repeatAttendees || 0) + 1;
           }
 
           // Calculate dropout rate
-          // Get pre-registered count for this event
-          const preRegisteredQuery = await db.collection("Attendance")
-              .where("eventId", "==", eventId)
-              .where("customerUid", "==", "pre-registered")
-              .get();
-
-          const preRegisteredCount = preRegisteredQuery.size;
-
           if (preRegisteredCount > 0) {
-            analyticsData.dropoutRate = ((preRegisteredCount -
-                analyticsData.totalAttendees) / preRegisteredCount) * 100;
+            analyticsData.dropoutRate = Math.max(0, ((preRegisteredCount -
+              analyticsData.totalAttendees) / preRegisteredCount) * 100);
           } else {
             analyticsData.dropoutRate = 0;
           }
@@ -4075,3 +4106,9 @@ exports.applyScheduledPlanChanges = onSchedule({
   );
   return {disabled: true};
 });
+
+// The final export replaces the legacy best-effort deletion handler above with
+// an idempotent erasure job that removes subcollections and Storage objects,
+// anonymizes financial records, and deletes Authentication last.
+const {createDeleteUserAccount} = require("./account/deletion");
+exports.deleteUserAccount = createDeleteUserAccount();

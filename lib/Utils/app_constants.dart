@@ -15,12 +15,6 @@ class AppConstants {
   static DateFormat dateFormat1 = DateFormat("dd MMM yyyy");
   static DateFormat dateFormat2 = DateFormat("dd-MM-yyyy");
 
-  // Google Places API key used for client-side autocomplete in signup.
-  // NOTE: Keep this key restricted to Places APIs only. This mirrors the key
-  // present in AndroidManifest for Maps SDK usage.
-  static const String googlePlacesApiKey =
-      'AIzaSyAf1t5cToh1UoF7R52vTSJxMajw8CvmVUA';
-
   // Browser-exposed keys are expected to be HTTP-referrer restricted. Supply
   // this with --dart-define=GOOGLE_MAPS_WEB_API_KEY=... for web builds.
   static const String googleMapsWebApiKey = String.fromEnvironment(

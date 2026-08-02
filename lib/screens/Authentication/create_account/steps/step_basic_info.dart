@@ -1,9 +1,5 @@
-import 'dart:async';
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:attendus/Utils/app_constants.dart';
 import 'package:attendus/Utils/router.dart';
@@ -47,13 +43,6 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
   // bool _usernameAvailable = false;
   DateTime? _selectedDob; // used to fill display; age may be computed later
 
-  // Places autocomplete
-  List<dynamic> _placeSuggestions = [];
-  Timer? _placesDebounce;
-  bool _locationSelectedFromSuggestions = false;
-  late final String _placesSessionToken = DateTime.now().millisecondsSinceEpoch
-      .toString();
-
   @override
   void dispose() {
     _firstNameController.dispose();
@@ -81,42 +70,6 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
         _dobController.text = DateFormat('MMM d, yyyy').format(picked);
       });
     }
-  }
-
-  void _onLocationChanged(String value) {
-    _locationSelectedFromSuggestions = false;
-    _placesDebounce?.cancel();
-    _placesDebounce = Timer(const Duration(milliseconds: 300), () async {
-      final query = value.trim();
-      if (query.length < 2) {
-        setState(() => _placeSuggestions = []);
-        return;
-      }
-      await _fetchPlaceSuggestions(query);
-    });
-  }
-
-  Future<void> _fetchPlaceSuggestions(String input) async {
-    try {
-      final uri = Uri.https(
-        'maps.googleapis.com',
-        '/maps/api/place/autocomplete/json',
-        {
-          'input': input,
-          'key': AppConstants.googlePlacesApiKey,
-          'sessiontoken': _placesSessionToken,
-          'types': '(regions)',
-        },
-      );
-      final response = await http.get(uri);
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final List predictions = (data['predictions'] as List?) ?? [];
-        setState(() {
-          _placeSuggestions = predictions;
-        });
-      }
-    } catch (_) {}
   }
 
   Future<void> _validateAndNext() async {
@@ -288,54 +241,12 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
     ),
   );
 
-  Widget _locationField() => Column(
-    children: [
-      _textField(
-        label: 'Location',
-        controller: _locationController,
-        icon: Icons.location_on_outlined,
-        hint: 'Enter your city, state, or country (optional)',
-        onChanged: _onLocationChanged,
-        validator: (v) {
-          if (v != null &&
-              v.trim().isNotEmpty &&
-              !_locationSelectedFromSuggestions) {
-            return 'Please select a location from suggestions';
-          }
-          return null;
-        },
-      ),
-      if (_placeSuggestions.isNotEmpty)
-        AttendUsCard(
-          padding: EdgeInsets.zero,
-          margin: const EdgeInsets.only(top: 8),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 220),
-            child: ListView.builder(
-              itemCount: _placeSuggestions.length,
-              shrinkWrap: true,
-              itemBuilder: (context, index) {
-                final suggestion = _placeSuggestions[index];
-                final description = suggestion['description'] as String? ?? '';
-                return ListTile(
-                  leading: Icon(
-                    Icons.location_on_outlined,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  title: Text(description),
-                  onTap: () {
-                    setState(() {
-                      _locationController.text = description;
-                      _locationSelectedFromSuggestions = true;
-                      _placeSuggestions = [];
-                    });
-                  },
-                );
-              },
-            ),
-          ),
-        ),
-    ],
+  Widget _locationField() => _textField(
+    label: 'Location',
+    controller: _locationController,
+    icon: Icons.location_on_outlined,
+    hint: 'City or region (optional; you can update this later)',
+    inputFormatters: [LengthLimitingTextInputFormatter(120)],
   );
 
   Widget _nextButton() {

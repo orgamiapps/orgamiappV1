@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 process.env.GOOGLE_PLACES_API_KEY = "test-server-key";
+process.env.ATTENDUS_TEST_IN_MEMORY_RATE_LIMIT = "true";
 const functions = require("../index.js");
 
 function request(uid, data, provider = "password") {

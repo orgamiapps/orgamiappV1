@@ -6,9 +6,9 @@
     "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",
     "start": "npm run shell",
-    "test": "node --test test/admin-unit.test.js test/places.test.js test/callable-security.test.js",
+    "test": "node --test test/admin-unit.test.js test/places.test.js test/places-rate-limit.test.js test/callable-security.test.js test/account-deletion.test.js",
     "test:rules": "firebase emulators:exec --config ../firebase.json --project demo-attendus-admin --only firestore,storage \"node --test --test-concurrency=1 test/firestore-rules.test.js test/storage-rules.test.js\"",
-    "test:integration": "firebase emulators:exec --config ../firebase.json --project demo-attendus-admin --only auth,firestore,functions \"node --test test/admin-emulator.test.js\"",
+    "test:integration": "firebase emulators:exec --config ../firebase.json --project demo-attendus-admin --only auth,firestore,storage,functions \"node --test --test-concurrency=1 test/admin-emulator.test.js\"",
     "bootstrap:super-admin": "node admin/bootstrap-super-admin.js",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log"
