@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/models/payment_model.dart';
@@ -23,7 +22,6 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
   bool _loading = false;
   final List<int> _tiers = [3, 7, 14];
   bool _untilEvent = false;
-  String? _currentPaymentIntentId;
   String? _clientSecret;
 
   // Animation controllers
@@ -893,7 +891,6 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
       );
 
       _clientSecret = paymentData['clientSecret'];
-      _currentPaymentIntentId = paymentData['paymentIntentId'];
 
       // Process payment with Stripe
       Logger.debug('Processing payment...');
@@ -936,38 +933,8 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
   }
 
   Future<void> _featureEventAfterPayment() async {
-    DateTime endDate;
-    if (_untilEvent) {
-      endDate = widget.eventModel.selectedDateTime;
-      if (endDate.isBefore(DateTime.now())) {
-        throw Exception('Event start time has already passed.');
-      }
-    } else {
-      endDate = DateTime.now().add(Duration(days: _selectedDays!));
-    }
-
-    // Update the event to featured status
-    await FirebaseFirestore.instance
-        .collection(EventModel.firebaseKey)
-        .doc(widget.eventModel.id)
-        .update({'isFeatured': true, 'featureEndDate': endDate});
-
-    // Confirm payment in backend
-    if (_currentPaymentIntentId != null) {
-      final durationDays = _untilEvent
-          ? FeaturePaymentModel.getPricingTierForDays(
-              widget.eventModel.selectedDateTime
-                  .difference(DateTime.now())
-                  .inDays,
-            )
-          : _selectedDays!;
-
-      await PaymentService.confirmFeaturePayment(
-        paymentIntentId: _currentPaymentIntentId!,
-        eventId: widget.eventModel.id,
-        durationDays: durationDays,
-        untilEvent: _untilEvent,
-      );
-    }
+    throw UnsupportedError(
+      'Client feature activation is disabled. Feature status is webhook-owned.',
+    );
   }
 }

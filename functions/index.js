@@ -4112,3 +4112,6 @@ exports.applyScheduledPlanChanges = onSchedule({
 // anonymizes financial records, and deletes Authentication last.
 const {createDeleteUserAccount} = require("./account/deletion");
 exports.deleteUserAccount = createDeleteUserAccount();
+
+const {createIssueFreeTicket} = require("./tickets/issuance");
+exports.issueFreeTicket = createIssueFreeTicket();

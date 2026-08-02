@@ -46,6 +46,7 @@ import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Services/ticket_payment_service.dart';
 import 'package:attendus/Services/face_recognition_service.dart';
+import 'package:attendus/Services/ticket_issuance_service.dart';
 import 'package:attendus/Services/live_quiz_service.dart';
 import 'package:attendus/config/safety_flags.dart';
 import 'package:attendus/screens/LiveQuiz/quiz_builder_screen.dart';
@@ -3423,12 +3424,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         await _purchaseTicket();
       } else {
         // Handle free ticket
-        await FirebaseFirestoreHelper().issueTicket(
-          customerUid: CustomerController.logeInCustomer!.uid,
-          eventId: eventModel.id,
-          customerName: CustomerController.logeInCustomer!.name,
-          eventModel: eventModel,
-        );
+        await TicketIssuanceService.issueFreeTicket(eventId: eventModel.id);
 
         if (mounted) {
           setState(() {

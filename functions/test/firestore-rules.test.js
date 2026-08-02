@@ -82,6 +82,10 @@ test("ticket purchasers cannot mark tickets paid, used, or upgraded", async () =
   await assertFails(ticket.update({isPaid: true}));
   await assertFails(ticket.update({isUsed: true}));
   await assertFails(ticket.update({isSkipTheLine: true}));
+  await assertFails(dbFor("buyer").collection("Tickets").doc("forged").set({
+    eventId: "event-a", customerUid: "buyer", isPaid: false, isUsed: false,
+    isSkipTheLine: false,
+  }));
 });
 
 test("private events and attendance are limited to owners and participants", async () => {

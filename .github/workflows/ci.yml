@@ -95,7 +95,7 @@ jobs:
         run: >-
           npx firebase-tools emulators:exec
           --config ../firebase.json
-          --project demo-attendus-ci
+          --project demo-attendus-admin
           --only firestore,storage
           "node --test --test-concurrency=1 test/firestore-rules.test.js test/storage-rules.test.js"
         working-directory: functions
@@ -103,7 +103,7 @@ jobs:
         run: >-
           npx firebase-tools emulators:exec
           --config ../firebase.json
-          --project demo-attendus-ci
+          --project demo-attendus-admin
           --only auth,firestore,storage,functions
           "node --test --test-concurrency=1 test/admin-emulator.test.js"
         working-directory: functions

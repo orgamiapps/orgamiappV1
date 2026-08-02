@@ -6,6 +6,7 @@ const {runAccountDeletion} = require("../account/deletion");
 
 const projectId = process.env.GCLOUD_PROJECT || "demo-attendus-admin";
 const api = `http://127.0.0.1:5001/${projectId}/us-central1/adminApi`;
+const freeTicketApi = `http://127.0.0.1:5001/${projectId}/us-central1/issueFreeTicket`;
 const authApi = "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1";
 async function auth(method, body) {
   const response = await fetch(`${authApi}/accounts:${method}?key=emulator-key`, {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify(body)});
@@ -79,4 +80,55 @@ test("account erasure is complete, auditable, and idempotent", async () => {
   assert.deepEqual(second, first);
   const job = await db.collection("account_deletion_jobs").doc(uid).get();
   assert.equal(job.get("status"), "complete");
+});
+
+test("free ticket issuance is atomic and idempotent", async () => {
+  const email = `ticket-${Date.now()}@example.test`;
+  const password = "ValidPassword123!";
+  const created = await auth("signUp", {email, password, returnSecureToken: true});
+  const uid = created.localId;
+  const eventId = `free-event-${Date.now()}`;
+  const db = admin.firestore();
+  await db.collection("Customers").doc(uid).set({name: "Ticket Tester", email});
+  await db.collection("Events").doc(eventId).set({
+    customerUid: "organizer",
+    title: "Free Event",
+    imageUrl: "",
+    location: "Test Hall",
+    private: false,
+    ticketsEnabled: true,
+    ticketPrice: 0,
+    maxTickets: 2,
+    issuedTickets: 0,
+    selectedDateTime: admin.firestore.Timestamp.fromDate(
+        new Date("2026-10-01T18:00:00Z"),
+    ),
+  });
+
+  const call = () => fetch(freeTicketApi, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${created.idToken}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({data: {eventId}}),
+  });
+  const firstResponse = await call();
+  const firstText = await firstResponse.text();
+  assert.equal(firstResponse.status, 200, firstText);
+  const first = JSON.parse(firstText).result;
+  const secondResponse = await call();
+  const secondText = await secondResponse.text();
+  assert.equal(secondResponse.status, 200, secondText);
+  const second = JSON.parse(secondText).result;
+
+  assert.equal(first.ticketId, second.ticketId);
+  assert.equal(first.created, true);
+  assert.equal(second.created, false);
+  assert.equal((await db.collection("Events").doc(eventId).get())
+      .get("issuedTickets"), 1);
+  assert.equal((await db.collection("Tickets")
+      .where("eventId", "==", eventId).get()).size, 1);
+  assert.equal((await db.collection("RegisterAttendance")
+      .where("eventId", "==", eventId).get()).size, 1);
 });
