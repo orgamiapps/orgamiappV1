@@ -1,0 +1,15 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Attendus legacy worker seed</title>
+<p>Preparing legacy worker migration test…</p>
+<script>
+  (async function seedLegacyWorker() {
+    await navigator.serviceWorker.register('/flutter_service_worker.js');
+    await navigator.serviceWorker.ready;
+    if (!navigator.serviceWorker.controller) {
+      window.location.reload();
+      return;
+    }
+    window.location.replace('/');
+  })();
+</script>

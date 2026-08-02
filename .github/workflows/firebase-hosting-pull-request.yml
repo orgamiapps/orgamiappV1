@@ -18,7 +18,8 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          flutter-version: '3.44.6'
+          cache: true
       
       # Get Flutter dependencies
       - name: Get dependencies
@@ -40,8 +41,14 @@ jobs:
       - name: Retire legacy Flutter service worker
         run: cp web/flutter_service_worker_retirement.js build/web/flutter_service_worker.js
 
-      - name: Fingerprint web entry point
-        run: dart run tools/fingerprint_web_release.dart
+      - name: Retain supported web releases
+        run: dart run tools/retain_web_releases.dart https://attendus.app/
+
+      - name: Package immutable web release
+        run: dart run tools/package_web_release.dart
+
+      - name: Validate deferred and retained assets
+        run: dart run tools/check_deferred_web_chunks.dart
 
       - name: Enforce initial bundle budget
         run: dart run tools/check_web_bundle_size.dart

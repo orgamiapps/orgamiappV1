@@ -1,84 +1,175 @@
+import 'dart:convert';
 import 'dart:io';
 
 Future<void> main(List<String> arguments) async {
   final webDirectory = Directory('build/web');
-  final bootstrap = File('${webDirectory.path}/flutter_bootstrap.js');
-  if (!bootstrap.existsSync()) {
-    _fail('Missing web build artifact: ${bootstrap.path}');
+  final manifestFile = File('${webDirectory.path}/release-manifest.json');
+  if (!manifestFile.existsSync()) {
+    _fail('Missing web release manifest: ${manifestFile.path}');
     return;
   }
 
-  final bootstrapSource = bootstrap.readAsStringSync();
-  final mainMatch = RegExp(
-    r'"mainJsPath":"([^"]+\.dart\.js)"',
-  ).firstMatch(bootstrapSource);
-  if (mainMatch == null) {
-    _fail('Could not find the generated mainJsPath in flutter_bootstrap.js.');
+  final manifest = _readManifest(manifestFile);
+  if (manifest == null) return;
+  final currentRelease = manifest['currentRelease']?.toString() ?? '';
+  final releases = (manifest['releases'] as List? ?? const [])
+      .whereType<Map>()
+      .map((release) => Map<String, dynamic>.from(release))
+      .toList();
+  final current = releases.cast<Map<String, dynamic>?>().firstWhere(
+    (release) => release?['id'] == currentRelease,
+    orElse: () => null,
+  );
+  if (current == null) {
+    _fail('Current release $currentRelease is absent from its manifest.');
     return;
   }
 
-  final mainName = mainMatch.group(1)!;
-  final mainBundle = File('${webDirectory.path}/$mainName');
+  var totalFiles = 0;
+  for (final release in releases) {
+    final files = (release['files'] as List? ?? const []).whereType<Map>();
+    for (final entry in files) {
+      final path = entry['path']?.toString() ?? '';
+      final expectedBytes = entry['bytes'];
+      final file = File('${webDirectory.path}/$path');
+      if (!file.existsSync() ||
+          expectedBytes is! int ||
+          file.lengthSync() != expectedBytes) {
+        _fail('Invalid local release asset: $path');
+        return;
+      }
+      totalFiles += 1;
+    }
+  }
+
+  final mainPath = 'releases/$currentRelease/main.dart.js';
+  final mainBundle = File('${webDirectory.path}/$mainPath');
   if (!mainBundle.existsSync()) {
-    _fail('Missing generated main bundle: ${mainBundle.path}');
+    _fail('Missing current main bundle: $mainPath');
     return;
   }
-
-  final mainSource = mainBundle.readAsStringSync();
   final chunkNames =
       RegExp(r'"(main\.dart\.js_\d+\.part\.js)"')
-          .allMatches(mainSource)
+          .allMatches(mainBundle.readAsStringSync())
           .map((match) => match.group(1)!)
           .toSet()
           .toList()
         ..sort();
   if (chunkNames.isEmpty) {
-    _fail('The generated main bundle did not declare deferred chunks.');
+    _fail('The current main bundle did not declare deferred chunks.');
     return;
   }
-
-  final missing = chunkNames
-      .where((name) => !File('${webDirectory.path}/$name').existsSync())
-      .toList();
-  if (missing.isNotEmpty) {
-    _fail('Missing deferred web chunks: ${missing.join(', ')}');
-    return;
+  for (final chunkName in chunkNames) {
+    final chunk = File(
+      '${webDirectory.path}/releases/$currentRelease/$chunkName',
+    );
+    if (!chunk.existsSync()) {
+      _fail('Missing deferred web chunk: ${chunk.path}');
+      return;
+    }
   }
-
   stdout.writeln(
-    'Deferred web chunks: ${chunkNames.length} local files verified.',
+    'Web releases: ${releases.length} release(s), $totalFiles local files, '
+    '${chunkNames.length} current deferred chunks verified.',
   );
 
   if (arguments.isEmpty) return;
   final baseUri = Uri.parse(arguments.first);
   final client = HttpClient();
   try {
-    for (final chunkName in chunkNames) {
-      final uri = baseUri.resolve(
-        '$chunkName?attendus_chunk_check=${DateTime.now().millisecondsSinceEpoch}',
-      );
-      final request = await client.getUrl(uri);
+    for (final rootPath in [
+      '',
+      'index.html',
+      'flutter_bootstrap.js',
+      'release-manifest.json',
+    ]) {
+      final request = await client.getUrl(baseUri.resolve(rootPath));
       request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
       final response = await request.close();
-      final contentType = response.headers.contentType?.mimeType ?? '';
       await response.drain<void>();
-      if (response.statusCode != HttpStatus.ok ||
-          !contentType.contains('javascript')) {
+      if (response.statusCode != HttpStatus.ok) {
         _fail(
-          'Invalid deployed deferred chunk $uri: '
-          'HTTP ${response.statusCode}, Content-Type $contentType',
+          'Invalid web bootstrap ${baseUri.resolve(rootPath)}: '
+          'HTTP ${response.statusCode}',
         );
+        return;
+      }
+    }
+
+    final allFiles = releases
+        .expand(
+          (release) => (release['files'] as List? ?? const []).whereType<Map>(),
+        )
+        .map((entry) => Map<String, dynamic>.from(entry))
+        .toList();
+    for (var offset = 0; offset < allFiles.length; offset += 12) {
+      final batch = allFiles.skip(offset).take(12);
+      final results = await Future.wait(
+        batch.map((entry) => _checkRemoteAsset(client, baseUri, entry)),
+      );
+      String? failure;
+      for (final result in results) {
+        if (result != null) {
+          failure = result;
+          break;
+        }
+      }
+      if (failure != null) {
+        _fail(failure);
         return;
       }
     }
   } finally {
     client.close(force: true);
   }
-
   stdout.writeln(
-    'Deferred web chunks: ${chunkNames.length} production files verified at '
+    'Web releases: $totalFiles immutable production assets verified at '
     '$baseUri.',
   );
+}
+
+Map<String, dynamic>? _readManifest(File file) {
+  try {
+    final decoded = jsonDecode(file.readAsStringSync());
+    if (decoded is! Map || decoded['releases'] is! List) {
+      throw const FormatException('Missing releases list.');
+    }
+    return Map<String, dynamic>.from(decoded);
+  } catch (error) {
+    _fail('Invalid web release manifest: $error');
+    return null;
+  }
+}
+
+Future<String?> _checkRemoteAsset(
+  HttpClient client,
+  Uri baseUri,
+  Map<String, dynamic> entry,
+) async {
+  final path = entry['path']?.toString() ?? '';
+  final expectedBytes = entry['bytes'];
+  final uri = baseUri.resolve(path);
+  final request = await client.openUrl('HEAD', uri);
+  request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
+  final response = await request.close();
+  await response.drain<void>();
+  final cacheControl =
+      response.headers.value(HttpHeaders.cacheControlHeader) ?? '';
+  final contentType = response.headers.contentType?.mimeType ?? '';
+  if (response.statusCode != HttpStatus.ok ||
+      expectedBytes is! int ||
+      response.contentLength != expectedBytes) {
+    return 'Invalid deployed release asset $uri: HTTP ${response.statusCode}, '
+        '${response.contentLength}/$expectedBytes bytes';
+  }
+  if (!cacheControl.contains('immutable') ||
+      !cacheControl.contains('max-age=31536000')) {
+    return 'Release asset is not immutable: $uri ($cacheControl)';
+  }
+  if (path.endsWith('.js') && !contentType.contains('javascript')) {
+    return 'Release script has invalid MIME type: $uri ($contentType)';
+  }
+  return null;
 }
 
 void _fail(String message) {

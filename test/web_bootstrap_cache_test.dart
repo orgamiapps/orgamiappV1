@@ -3,16 +3,19 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('legacy Flutter cache cleanup runs only once per browser', () {
+  test('legacy Flutter cache migration completes before app bootstrap', () {
     final index = File('web/index.html').readAsStringSync();
 
     expect(
       index,
-      contains("const cleanupKey = 'attendus-legacy-flutter-cache-cleanup-v2'"),
+      contains("const cleanupKey = 'attendus-legacy-flutter-cache-cleanup-v3'"),
     );
     expect(index, contains("localStorage.getItem(cleanupKey) !== 'done'"));
-    expect(index, contains('if (!needsCleanup) return;'));
     expect(index, contains("localStorage.setItem(cleanupKey, 'done')"));
+    expect(index, contains('await cleanupLegacyFlutterCache()'));
+    expect(index, isNot(contains('Promise.race')));
+    expect(index, contains('migrationBridgeUrl(migrationUrl.toString())'));
+    expect(index, contains("searchParams.get('attendus_worker_return')"));
   });
 
   test('legacy Flutter service worker retires itself and its app cache', () {
@@ -33,7 +36,11 @@ void main() {
 
       expect(
         deployScript,
-        contains('dart run tools/fingerprint_web_release.dart'),
+        contains('dart run tools/retain_web_releases.dart'),
+      );
+      expect(
+        deployScript,
+        contains('dart run tools/package_web_release.dart'),
       );
       expect(
         deployScript,

@@ -36,7 +36,8 @@ dart run tools/check_maps_web_key.dart
 flutter build web --release --pwa-strategy=none --no-wasm-dry-run \
   --dart-define=GOOGLE_MAPS_WEB_API_KEY="$GOOGLE_MAPS_WEB_API_KEY"
 cp web/flutter_service_worker_retirement.js build/web/flutter_service_worker.js
-dart run tools/fingerprint_web_release.dart
+dart run tools/retain_web_releases.dart https://attendus.app/
+dart run tools/package_web_release.dart
 dart run tools/check_deferred_web_chunks.dart
 dart run tools/check_web_bundle_size.dart
 

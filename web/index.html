@@ -182,11 +182,62 @@
       });
     }
 
-    // Remove the retired Flutter app-cache worker once. Repeating this on
-    // every visit discards the large engine/app cache and makes returning
-    // users download the application again.
+    // Complete legacy Flutter worker retirement before loading any release
+    // code. A controlled page must navigate once after unregistering so the
+    // next document is outside the old worker's cache-first lifecycle.
     (async function bootstrapAttendus() {
-      const cleanupKey = 'attendus-legacy-flutter-cache-cleanup-v2';
+      const cleanupKey = 'attendus-legacy-flutter-cache-cleanup-v3';
+      const reloadGuardKey = 'attendus-legacy-worker-reload-v3';
+      const currentUrl = new URL(window.location.href);
+      const returnTarget = currentUrl.searchParams.get('attendus_worker_return');
+      if (returnTarget) {
+        try {
+          const targetUrl = new URL(returnTarget);
+          const allowedOrigins = new Set([
+            'https://attendus.app',
+            'https://www.attendus.app',
+            'https://orgami-66nxok.web.app',
+            'https://orgami-66nxok.firebaseapp.com',
+            `http://127.0.0.1:${window.location.port}`,
+            `http://localhost:${window.location.port}`,
+          ]);
+          if (allowedOrigins.has(targetUrl.origin) &&
+              targetUrl.origin !== window.location.origin) {
+            window.location.replace(targetUrl.toString());
+            return;
+          }
+        } catch (error) {
+          console.warn('Invalid worker migration return URL:', error);
+        }
+        currentUrl.searchParams.delete('attendus_worker_return');
+        window.history.replaceState(null, '', currentUrl.toString());
+      }
+
+      function migrationBridgeUrl(returnUrl) {
+        let bridgeOrigin;
+        switch (window.location.hostname) {
+          case 'attendus.app':
+          case 'www.attendus.app':
+            bridgeOrigin = 'https://orgami-66nxok.web.app';
+            break;
+          case 'orgami-66nxok.web.app':
+          case 'orgami-66nxok.firebaseapp.com':
+            bridgeOrigin = 'https://attendus.app';
+            break;
+          case '127.0.0.1':
+            bridgeOrigin = `http://localhost:${window.location.port}`;
+            break;
+          case 'localhost':
+            bridgeOrigin = `http://127.0.0.1:${window.location.port}`;
+            break;
+          default:
+            return null;
+        }
+        const bridgeUrl = new URL('/', bridgeOrigin);
+        bridgeUrl.searchParams.set('attendus_worker_return', returnUrl);
+        return bridgeUrl;
+      }
+
       let needsCleanup = true;
       try {
         needsCleanup = window.localStorage.getItem(cleanupKey) !== 'done';
@@ -195,10 +246,15 @@
         // best-effort and is still capped below.
       }
 
-      const cleanup = (async function cleanupLegacyFlutterCache() {
-        if (!needsCleanup) return;
+      async function cleanupLegacyFlutterCache() {
+        let controlledByFlutterWorker = false;
         try {
           if ('serviceWorker' in navigator) {
+            controlledByFlutterWorker = Boolean(
+              navigator.serviceWorker.controller?.scriptURL.includes(
+                'flutter_service_worker.js',
+              ),
+            );
             const registrations = await navigator.serviceWorker.getRegistrations();
             await Promise.all(
               registrations
@@ -212,7 +268,7 @@
             );
           }
 
-          if ('caches' in window) {
+          if (needsCleanup && 'caches' in window) {
             const cacheNames = await caches.keys();
             await Promise.all(
               cacheNames
@@ -229,20 +285,48 @@
             // Persistent storage is optional; startup must still continue.
           }
         }
-      })();
+        return controlledByFlutterWorker;
+      }
 
       try {
-        await Promise.race([
-          cleanup,
-          new Promise((resolve) => window.setTimeout(resolve, 250)),
-        ]);
-      } finally {
-        const bootstrap = document.createElement('script');
-        bootstrap.src = 'flutter_bootstrap.js';
-        bootstrap.async = true;
-        bootstrap.onerror = window.attendusShowStartupError;
-        document.body.appendChild(bootstrap);
+        const controlledByFlutterWorker = await cleanupLegacyFlutterCache();
+        if (controlledByFlutterWorker) {
+          let alreadyReloaded = false;
+          try {
+            alreadyReloaded = window.sessionStorage.getItem(reloadGuardKey) === 'done';
+          } catch (_) {
+            // Private browsing may not expose sessionStorage.
+          }
+          if (!alreadyReloaded) {
+            try {
+              window.sessionStorage.setItem(reloadGuardKey, 'done');
+            } catch (_) {
+              // A URL marker below still prevents an automatic reload loop.
+            }
+            const migrationUrl = new URL(window.location.href);
+            if (!migrationUrl.searchParams.has('attendus_worker_migrated')) {
+              migrationUrl.searchParams.set('attendus_worker_migrated', '1');
+              const bridgeUrl = migrationBridgeUrl(migrationUrl.toString());
+              if (bridgeUrl) {
+                window.location.replace(bridgeUrl.toString());
+                return;
+              }
+            }
+          }
+          window.attendusShowStartupError(
+            new Error('Legacy Flutter worker still controls this page.'),
+          );
+          return;
+        }
+      } catch (error) {
+        console.warn('Legacy Flutter worker migration was skipped:', error);
       }
+
+      const bootstrap = document.createElement('script');
+      bootstrap.src = 'flutter_bootstrap.js';
+      bootstrap.async = true;
+      bootstrap.onerror = window.attendusShowStartupError;
+      document.body.appendChild(bootstrap);
     })();
   </script>
 </body>
