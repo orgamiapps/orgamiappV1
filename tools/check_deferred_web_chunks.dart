@@ -149,18 +149,21 @@ Future<String?> _checkRemoteAsset(
   final path = entry['path']?.toString() ?? '';
   final expectedBytes = entry['bytes'];
   final uri = baseUri.resolve(path);
-  final request = await client.openUrl('HEAD', uri);
+  final request = await client.getUrl(uri);
   request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
   final response = await request.close();
-  await response.drain<void>();
+  final body = await response.fold<List<int>>(
+    <int>[],
+    (buffer, chunk) => buffer..addAll(chunk),
+  );
   final cacheControl =
       response.headers.value(HttpHeaders.cacheControlHeader) ?? '';
   final contentType = response.headers.contentType?.mimeType ?? '';
   if (response.statusCode != HttpStatus.ok ||
       expectedBytes is! int ||
-      response.contentLength != expectedBytes) {
+      body.length != expectedBytes) {
     return 'Invalid deployed release asset $uri: HTTP ${response.statusCode}, '
-        '${response.contentLength}/$expectedBytes bytes';
+        '${body.length}/$expectedBytes bytes';
   }
   if (!cacheControl.contains('immutable') ||
       !cacheControl.contains('max-age=31536000')) {

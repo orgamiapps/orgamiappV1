@@ -26,7 +26,7 @@ void main(List<String> arguments) {
     }
   }
 
-  const releaseBasePlaceholder = '{{attendus_release_base}}';
+  const releaseBasePlaceholder = '__ATTENDUS_RELEASE_BASE__';
   final releaseBase = '/releases/$releaseId/';
   var bootstrapSource = bootstrap.readAsStringSync();
   if (!bootstrapSource.contains(releaseBasePlaceholder)) {

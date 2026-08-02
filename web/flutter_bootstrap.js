@@ -13,14 +13,14 @@ function completeAttendusStartup() {
 _flutter.loader
   .load({
     config: {
-      entrypointBaseUrl: "{{attendus_release_base}}",
-      canvasKitBaseUrl: "{{attendus_release_base}}canvaskit/",
+      entrypointBaseUrl: "__ATTENDUS_RELEASE_BASE__",
+      canvasKitBaseUrl: "__ATTENDUS_RELEASE_BASE__canvaskit/",
     },
     onEntrypointLoaded: async function (engineInitializer) {
       try {
         performance.mark('attendus-entrypoint-loaded');
         const appRunner = await engineInitializer.initializeEngine({
-          assetBase: "{{attendus_release_base}}",
+          assetBase: "__ATTENDUS_RELEASE_BASE__",
         });
         await appRunner.runApp();
         window.requestAnimationFrame(completeAttendusStartup);
