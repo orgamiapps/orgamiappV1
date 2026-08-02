@@ -7,9 +7,9 @@ const functions = require("../index.js");
 function request(uid, data, provider = "password") {
   return {
     data,
-    auth: uid
-      ? {uid, token: {firebase: {sign_in_provider: provider}}}
-      : null,
+    auth: uid ?
+      {uid, token: {firebase: {sign_in_provider: provider}}} :
+      null,
   };
 }
 
@@ -25,31 +25,31 @@ test("Places callables reject missing and anonymous authentication", async () =>
   };
   await expectCode(functions.placesAutocomplete.run(request(null, data)), "unauthenticated");
   await expectCode(
-    functions.placesAutocomplete.run(request("guest", data, "anonymous")),
-    "unauthenticated",
+      functions.placesAutocomplete.run(request("guest", data, "anonymous")),
+      "unauthenticated",
   );
 });
 
 test("autocomplete validates query and session token", async () => {
   await expectCode(
-    functions.placesAutocomplete.run(
-      request("validation-user", {
-        query: "ab",
-        sessionToken: "session-token-2",
-        useCase: "event",
-      }),
-    ),
-    "invalid-argument",
+      functions.placesAutocomplete.run(
+          request("validation-user", {
+            query: "ab",
+            sessionToken: "session-token-2",
+            useCase: "event",
+          }),
+      ),
+      "invalid-argument",
   );
   await expectCode(
-    functions.placesAutocomplete.run(
-      request("token-user", {
-        query: "Boston",
-        sessionToken: "short",
-        useCase: "event",
-      }),
-    ),
-    "invalid-argument",
+      functions.placesAutocomplete.run(
+          request("token-user", {
+            query: "Boston",
+            sessionToken: "short",
+            useCase: "event",
+          }),
+      ),
+      "invalid-argument",
   );
 });
 
@@ -76,11 +76,11 @@ test("city autocomplete sends the city restriction and returns at most eight nor
   };
 
   const result = await functions.placesAutocomplete.run(
-    request("city-user", {
-      query: "Bost",
-      sessionToken: "session-token-3",
-      useCase: "groupCity",
-    }),
+      request("city-user", {
+        query: "Bost",
+        sessionToken: "session-token-3",
+        useCase: "groupCity",
+      }),
   );
 
   assert.deepEqual(requestBody.includedPrimaryTypes, ["(cities)"]);
@@ -115,10 +115,10 @@ test("place details normalize city, region, address, and coordinates", async () 
   });
 
   const result = await functions.placeDetails.run(
-    request("details-user", {
-      placeId: "place-1",
-      sessionToken: "session-token-4",
-    }),
+      request("details-user", {
+        placeId: "place-1",
+        sessionToken: "session-token-4",
+      }),
   );
   assert.equal(result.city, "Boston");
   assert.equal(result.regionCode, "MA");
@@ -133,62 +133,62 @@ test("Google authorization failures map to a stable configuration error", async 
     json: async () => ({error: {message: "billing disabled"}}),
   });
   await expectCode(
-    functions.placesAutocomplete.run(
-      request("google-error-user", {
-        query: "Boston",
-        sessionToken: "session-token-5",
-        useCase: "event",
-      }),
-    ),
-    "failed-precondition",
+      functions.placesAutocomplete.run(
+          request("google-error-user", {
+            query: "Boston",
+            sessionToken: "session-token-5",
+            useCase: "event",
+          }),
+      ),
+      "failed-precondition",
   );
 });
 
 test("rate limiting applies per authenticated user", async () => {
   for (let index = 0; index < 60; index += 1) {
     await expectCode(
-      functions.placesAutocomplete.run(
-        request("rate-user", {
-          query: "ab",
-          sessionToken: "session-token-6",
-          useCase: "event",
-        }),
-      ),
-      "invalid-argument",
+        functions.placesAutocomplete.run(
+            request("rate-user", {
+              query: "ab",
+              sessionToken: "session-token-6",
+              useCase: "event",
+            }),
+        ),
+        "invalid-argument",
     );
   }
   await expectCode(
-    functions.placesAutocomplete.run(
-      request("rate-user", {
-        query: "ab",
-        sessionToken: "session-token-6",
-        useCase: "event",
-      }),
-    ),
-    "resource-exhausted",
+      functions.placesAutocomplete.run(
+          request("rate-user", {
+            query: "ab",
+            sessionToken: "session-token-6",
+            useCase: "event",
+          }),
+      ),
+      "resource-exhausted",
   );
 });
 
 test("missing server secret fails before a Google request", async () => {
   delete process.env.GOOGLE_PLACES_API_KEY;
   await expectCode(
-    functions.placesAutocomplete.run(
-      request("secret-user", {
-        query: "Boston",
-        sessionToken: "session-token-7",
-        useCase: "event",
-      }),
-    ),
-    "failed-precondition",
+      functions.placesAutocomplete.run(
+          request("secret-user", {
+            query: "Boston",
+            sessionToken: "session-token-7",
+            useCase: "event",
+          }),
+      ),
+      "failed-precondition",
   );
   process.env.GOOGLE_PLACES_API_KEY = "test-server-key";
 });
 
 test("reverse geocoding rejects out-of-range coordinates", async () => {
   await expectCode(
-    functions.reverseGeocode.run(
-      request("coordinate-user", {latitude: 95, longitude: -71}),
-    ),
-    "invalid-argument",
+      functions.reverseGeocode.run(
+          request("coordinate-user", {latitude: 95, longitude: -71}),
+      ),
+      "invalid-argument",
   );
 });

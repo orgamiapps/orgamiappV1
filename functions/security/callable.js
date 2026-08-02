@@ -7,8 +7,8 @@ function requireString(value, label, {min = 1, max = 500} = {}) {
   const normalized = typeof value === "string" ? value.trim() : "";
   if (normalized.length < min || normalized.length > max) {
     throw new HttpsError(
-      "invalid-argument",
-      `${label} must be between ${min} and ${max} characters.`,
+        "invalid-argument",
+        `${label} must be between ${min} and ${max} characters.`,
     );
   }
   return normalized;
@@ -17,16 +17,16 @@ function requireString(value, label, {min = 1, max = 500} = {}) {
 function requireConfirmedOperation(data) {
   if (data?.confirmation !== true) {
     throw new HttpsError(
-      "failed-precondition",
-      "Explicit confirmation is required for this operation.",
+        "failed-precondition",
+        "Explicit confirmation is required for this operation.",
     );
   }
   return {
     reason: requireString(data.reason, "Reason", {min: 10, max: 500}),
     idempotencyKey: requireString(
-      data.idempotencyKey,
-      "Idempotency key",
-      {min: 8, max: 128},
+        data.idempotencyKey,
+        "Idempotency key",
+        {min: 8, max: 128},
     ),
   };
 }
@@ -34,8 +34,8 @@ function requireConfirmedOperation(data) {
 function requireStringArray(value, label, {max, pattern} = {}) {
   if (!Array.isArray(value) || value.length === 0 || value.length > max) {
     throw new HttpsError(
-      "invalid-argument",
-      `${label} must contain between 1 and ${max} entries.`,
+        "invalid-argument",
+        `${label} must contain between 1 and ${max} entries.`,
     );
   }
   const normalized = [...new Set(value.map((entry) =>
@@ -59,8 +59,8 @@ function requireDataMap(value) {
     if (!/^[A-Za-z0-9_.-]{1,64}$/.test(key) ||
         !["string", "number", "boolean"].includes(typeof entry)) {
       throw new HttpsError(
-        "invalid-argument",
-        "Notification data contains an unsupported field.",
+          "invalid-argument",
+          "Notification data contains an unsupported field.",
       );
     }
     return [key, String(entry).slice(0, 500)];
@@ -97,8 +97,8 @@ async function enforceRateLimit(db, {uid, operation, limit, windowSeconds = 60})
     const count = Number(snap.data()?.count || 0);
     if (count >= limit) {
       throw new HttpsError(
-        "resource-exhausted",
-        "This administrative action has reached its rate limit.",
+          "resource-exhausted",
+          "This administrative action has reached its rate limit.",
       );
     }
     transaction.set(ref, {
@@ -117,7 +117,7 @@ function idempotencyDocumentId(operation, uid, key) {
 
 async function reserveIdempotencyKey(db, {operation, uid, key}) {
   const ref = db.collection("admin_idempotency")
-    .doc(idempotencyDocumentId(operation, uid, key));
+      .doc(idempotencyDocumentId(operation, uid, key));
   return db.runTransaction(async (transaction) => {
     const snap = await transaction.get(ref);
     if (snap.exists) {
