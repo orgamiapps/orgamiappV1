@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
-import 'package:attendus/Utils/cached_image.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class EventCard extends StatelessWidget {
   final Map<String, dynamic> data;
@@ -152,9 +152,10 @@ class EventCard extends StatelessWidget {
                 child: AspectRatio(
                   aspectRatio: 16 / 9,
                   child: imageUrl.isNotEmpty
-                      ? SafeNetworkImage(
+                      ? AttendUsEventImage(
                           imageUrl: imageUrl,
                           fit: BoxFit.cover,
+                          compact: true,
                         )
                       : Container(
                           decoration: BoxDecoration(
@@ -175,8 +176,9 @@ class EventCard extends StatelessWidget {
                                   width: 64,
                                   height: 64,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF667EEA)
-                                        .withValues(alpha: 0.15),
+                                    color: const Color(
+                                      0xFF667EEA,
+                                    ).withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(32),
                                   ),
                                   child: Image.asset(

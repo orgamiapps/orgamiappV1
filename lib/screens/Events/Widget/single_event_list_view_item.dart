@@ -4,7 +4,7 @@ import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/screens/Events/event_location_view_screen.dart';
 import 'package:attendus/Utils/router.dart';
-import 'package:attendus/Utils/cached_image.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/Utils/toast.dart';
@@ -176,11 +176,12 @@ class _SingleEventListViewItemState extends State<SingleEventListViewItem>
           AspectRatio(
             aspectRatio: 16 / 9,
             child: hasImage
-                ? SafeNetworkImage(
+                ? AttendUsEventImage(
                     imageUrl: widget.eventModel.imageUrl,
                     fit: BoxFit.cover,
-                    placeholder: Container(color: const Color(0xFFF5F7FA)),
-                    errorWidget: _buildPlaceholderContent(),
+                    loadingBuilder: (context) =>
+                        Container(color: const Color(0xFFF5F7FA)),
+                    compact: true,
                   )
                 : _buildPlaceholderContent(),
           ),

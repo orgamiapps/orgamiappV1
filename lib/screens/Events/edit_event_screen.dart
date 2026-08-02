@@ -1376,26 +1376,12 @@ class _EditEventScreenState extends State<EditEventScreen>
                     );
                   },
                 )
-              : Image.network(
-                  _currentImageUrl!,
+              : AttendUsEventImage(
+                  imageUrl: _currentImageUrl,
                   width: double.infinity,
                   height: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      width: double.infinity,
-                      height: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(
-                        Icons.broken_image,
-                        color: Colors.grey,
-                        size: 48,
-                      ),
-                    );
-                  },
+                  compact: true,
                 ),
         ),
         Positioned(
