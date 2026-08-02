@@ -37,6 +37,7 @@ jobs:
           --pwa-strategy=none
           --no-wasm-dry-run
           --dart-define=GOOGLE_MAPS_WEB_API_KEY=${{ secrets.GOOGLE_MAPS_WEB_API_KEY }}
+          --dart-define=ATTENDUS_RELEASE_ID=${{ github.sha }}
 
       - name: Retire legacy Flutter service worker
         run: cp web/flutter_service_worker_retirement.js build/web/flutter_service_worker.js

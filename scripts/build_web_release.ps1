@@ -37,11 +37,16 @@ if (-not $mapsKey) {
   throw "The dedicated Maps web key value was unavailable."
 }
 $env:GOOGLE_MAPS_WEB_API_KEY = $mapsKey
+$releaseId = (& git rev-parse HEAD).Trim()
+if (-not $releaseId) {
+  throw "Unable to determine the Git release identifier."
+}
 
 Invoke-Checked { dart run tools/check_maps_web_key.dart } "Maps key validation"
 Invoke-Checked {
   flutter build web --release --pwa-strategy=none --no-wasm-dry-run `
-    "--dart-define=GOOGLE_MAPS_WEB_API_KEY=$mapsKey"
+    "--dart-define=GOOGLE_MAPS_WEB_API_KEY=$mapsKey" `
+    "--dart-define=ATTENDUS_RELEASE_ID=$releaseId"
 } "Flutter web build"
 
 $requiredBuildFiles = @(

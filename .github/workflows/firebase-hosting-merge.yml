@@ -35,6 +35,7 @@ jobs:
           --pwa-strategy=none
           --no-wasm-dry-run
           --dart-define=GOOGLE_MAPS_WEB_API_KEY=${{ secrets.GOOGLE_MAPS_WEB_API_KEY }}
+          --dart-define=ATTENDUS_RELEASE_ID=${{ github.sha }}
 
       - name: Retire legacy Flutter service worker
         run: cp web/flutter_service_worker_retirement.js build/web/flutter_service_worker.js
@@ -50,6 +51,19 @@ jobs:
 
       - name: Enforce initial bundle budget
         run: dart run tools/check_web_bundle_size.dart
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ORGAMI_66NXOK }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Reject source/deployment function drift
+        run: |
+          npm install --global firebase-tools
+          node tools/check_function_manifest.js
       
       # Deploy to Firebase Hosting
       - uses: FirebaseExtended/action-hosting-deploy@v0
@@ -60,4 +74,6 @@ jobs:
           projectId: orgami-66nxok
 
       - name: Verify live release assets
-        run: dart run tools/check_deferred_web_chunks.dart https://attendus.app/
+        run: |
+          dart run tools/check_deferred_web_chunks.dart https://attendus.app/
+          dart run tools/check_deferred_web_chunks.dart https://orgami-66nxok.web.app/

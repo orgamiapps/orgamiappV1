@@ -49,6 +49,7 @@ jobs:
           --pwa-strategy=none
           --no-wasm-dry-run
           --dart-define=GOOGLE_MAPS_WEB_API_KEY=ci-placeholder-key
+          --dart-define=ATTENDUS_RELEASE_ID=${{ github.sha }}
       - name: Install retirement worker
         run: cp web/flutter_service_worker_retirement.js build/web/flutter_service_worker.js
       - name: Retain supported production releases
@@ -137,7 +138,9 @@ jobs:
           ATTENDUS_ANDROID_STORE_PASSWORD: ci-release-password
           ATTENDUS_ANDROID_KEY_ALIAS: attendus-ci-release
           ATTENDUS_ANDROID_KEY_PASSWORD: ci-release-password
-        run: flutter build apk --release --split-per-abi
+        run: >-
+          flutter build apk --release --split-per-abi
+          --dart-define=ATTENDUS_RELEASE_ID=${{ github.sha }}
       - name: Verify release signatures and supported ABIs
         shell: bash
         run: |
@@ -167,7 +170,9 @@ jobs:
       - name: Configure non-secret CI Maps placeholder
         run: echo 'GOOGLE_MAPS_IOS_API_KEY=ci-placeholder-key' > ios/Flutter/Maps.xcconfig
       - name: Compile unsigned iOS release
-        run: flutter build ios --release --no-codesign
+        run: >-
+          flutter build ios --release --no-codesign
+          --dart-define=ATTENDUS_RELEASE_ID=${{ github.sha }}
 
   secret-scan:
     runs-on: ubuntu-latest
