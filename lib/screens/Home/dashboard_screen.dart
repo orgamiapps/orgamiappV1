@@ -15,6 +15,7 @@ import 'package:attendus/widgets/attendus_scaffold.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Services/navigation_state_service.dart';
 import 'package:attendus/Utils/route_names.dart';
+import 'package:attendus/Utils/deferred_load_recovery.dart';
 import 'package:attendus/widgets/deferred_screen_loader.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -62,6 +63,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   late int _selectedIndex;
   final NavigationStateService _navStateService = NavigationStateService();
+  final DeferredLoadRecovery _deferredRecovery = createDeferredLoadRecovery();
 
   final Map<int, Widget> _screenCache = {};
   final Set<int> _visitedScreens = {};
@@ -121,6 +123,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       onProfilePressed: () => _selectTab(RouteNames.accountTab),
       profileName: authUser?.displayName ?? authUser?.email,
       profileImageUrl: authUser?.photoURL,
+      onBrandPressed: () => _selectTab(RouteNames.homeTab),
       onDestinationSelected: (index) {
         final normalizedIndex = _normalizeIndex(index);
         _selectTab(normalizedIndex);
@@ -146,11 +149,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _openNotifications() async {
     try {
       await notifications.loadLibrary();
+      _deferredRecovery.clearRecoveryGuard('notifications');
       if (!mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => notifications.NotificationsScreen()),
       );
     } catch (error) {
+      if (_scheduleDeferredRecovery('notifications', error)) return;
       _showDeferredRouteError('Notifications', _openNotifications);
     }
   }
@@ -158,13 +163,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _openNewMessage() async {
     try {
       await new_message.loadLibrary();
+      _deferredRecovery.clearRecoveryGuard('new-message');
       if (!mounted) return;
       Navigator.of(
         context,
       ).push(MaterialPageRoute(builder: (_) => new_message.NewMessageScreen()));
     } catch (error) {
+      if (_scheduleDeferredRecovery('new-message', error)) return;
       _showDeferredRouteError('New message', _openNewMessage);
     }
+  }
+
+  bool _scheduleDeferredRecovery(String recoveryKey, Object error) {
+    Logger.warning('Deferred route $recoveryKey failed to load: $error');
+    if (!mounted || !_deferredRecovery.claimAutomaticRefresh(recoveryKey)) {
+      return false;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Updating Attendus...')));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _deferredRecovery.refreshApp();
+    });
+    return true;
   }
 
   void _showDeferredRouteError(String label, VoidCallback retry) {
@@ -211,24 +233,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 1:
         return DeferredScreenLoader(
           loadLibrary: groups.loadLibrary,
+          recoveryKey: 'groups',
           loadingLabel: 'Loading groups',
           builder: () => groups.GroupsScreen(),
         );
       case 2:
         return DeferredScreenLoader(
           loadLibrary: messaging.loadLibrary,
+          recoveryKey: 'messages',
           loadingLabel: 'Loading messages',
           builder: () => messaging.MessagingScreen(showShellHeader: false),
         );
       case 3:
         return DeferredScreenLoader(
           loadLibrary: profile.loadLibrary,
+          recoveryKey: 'profile',
           loadingLabel: 'Loading profile',
           builder: () => profile.MyProfileScreen(showBackButton: false),
         );
       case 4:
         return DeferredScreenLoader(
           loadLibrary: account.loadLibrary,
+          recoveryKey: 'account',
           loadingLabel: 'Loading account',
           builder: () => account.AccountScreen(),
         );

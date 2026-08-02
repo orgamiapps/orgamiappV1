@@ -5,10 +5,12 @@ import 'package:attendus/screens/Home/dashboard_screen.dart'
 import 'package:attendus/main.dart' show appNavigatorKey;
 import 'package:attendus/screens/Splash/second_splash_screen.dart';
 import 'package:attendus/Utils/logger.dart';
+import 'package:attendus/Utils/deferred_load_recovery.dart';
 
 /// Optimized router class with faster transitions and better performance
 class RouterClass {
   static late BuildContext splashContext;
+  final DeferredLoadRecovery _deferredRecovery = createDeferredLoadRecovery();
 
   // Optimized transition duration constants
   static const Duration _transitionDuration = Duration(milliseconds: 180);
@@ -42,7 +44,17 @@ class RouterClass {
       );
 
   Future<T?> homeScreenRoute<T>({required BuildContext context}) async {
-    await dashboard.loadLibrary();
+    try {
+      await dashboard.loadLibrary();
+      _deferredRecovery.clearRecoveryGuard('dashboard');
+    } catch (error) {
+      Logger.warning('Deferred dashboard route failed to load: $error');
+      if (!_deferredRecovery.claimAutomaticRefresh('dashboard')) rethrow;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _deferredRecovery.refreshApp();
+      });
+      return null;
+    }
     final navigator =
         appNavigatorKey.currentState ??
         Navigator.of(context, rootNavigator: true);

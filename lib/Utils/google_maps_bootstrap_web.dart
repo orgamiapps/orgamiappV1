@@ -6,11 +6,16 @@ import 'package:web/web.dart' as web;
 class GoogleMapsBootstrap {
   static bool _isAvailable = false;
   static String? _errorMessage;
+  static Future<void>? _initialization;
 
   static bool get isAvailable => _isAvailable;
   static String? get errorMessage => _errorMessage;
 
-  static Future<void> initialize(String apiKey) async {
+  static Future<void> initialize(String apiKey) {
+    return _initialization ??= _initialize(apiKey);
+  }
+
+  static Future<void> _initialize(String apiKey) async {
     final normalizedKey = apiKey.trim();
     if (normalizedKey.isEmpty) {
       _errorMessage =
@@ -23,7 +28,8 @@ class GoogleMapsBootstrap {
       'script[data-attendus-google-maps]',
     );
     if (existing != null) {
-      _isAvailable = true;
+      _errorMessage =
+          'Google Maps is still loading. Refresh the page if this continues.';
       return;
     }
 

@@ -8,13 +8,13 @@ import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Authentication/create_account/create_account_screen.dart';
 import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 bool isEventEligibleForGlobalMap(EventModel event, DateTime now) {
   final status = event.status.toLowerCase();
@@ -366,12 +366,12 @@ class _GlobalEventsMapScreenState extends State<GlobalEventsMapScreen> {
               if (event.imageUrl.isNotEmpty)
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: CachedNetworkImage(
+                  child: AttendUsEventImage(
                     imageUrl: event.imageUrl,
                     height: 180,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorWidget: (_, _, _) => const SizedBox.shrink(),
+                    compact: true,
                   ),
                 ),
               const SizedBox(height: 12),

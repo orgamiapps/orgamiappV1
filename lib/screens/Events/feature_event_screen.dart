@@ -5,9 +5,9 @@ import 'package:intl/intl.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/models/payment_model.dart';
 import 'package:attendus/Services/payment_service.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Utils/app_app_bar_view.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
 
 class FeatureEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -269,38 +269,44 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
               topLeft: Radius.circular(20),
               topRight: Radius.circular(20),
             ),
-            child: CachedNetworkImage(
+            child: AttendUsEventImage(
               imageUrl: event.imageUrl,
               height: 160,
               width: double.infinity,
               fit: BoxFit.cover,
-              placeholder: (context, url) => Container(
+              loadingBuilder: (context) => Container(
                 height: 160,
                 color: const Color(0xFFF5F7FA),
-                child: const Center(
+                child: Center(
                   child: CircularProgressIndicator(color: Color(0xFF667EEA)),
                 ),
               ),
-              errorWidget: (context, url, error) => Container(
+              errorBuilder: (context, retry) => Container(
                 height: 160,
                 color: const Color(0xFFF5F7FA),
-                child: const Center(
+                child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.image_not_supported,
                         color: Color(0xFF667EEA),
                         size: 48,
                       ),
-                      SizedBox(height: 8),
-                      Text(
+                      const SizedBox(height: 8),
+                      const Text(
                         'Image not available',
                         style: TextStyle(
                           color: Color(0xFF667EEA),
                           fontSize: 14,
                           fontFamily: 'Roboto',
                         ),
+                      ),
+                      const SizedBox(height: 4),
+                      TextButton.icon(
+                        onPressed: retry,
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: const Text('Retry'),
                       ),
                     ],
                   ),

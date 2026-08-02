@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:attendus/Utils/attendus_theme.dart';
+import 'package:attendus/Utils/images.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
 
 class AttendUsNavDestination {
@@ -21,6 +22,7 @@ class AttendUsScaffold extends StatelessWidget {
   final int selectedIndex;
   final List<AttendUsNavDestination> destinations;
   final ValueChanged<int> onDestinationSelected;
+  final VoidCallback? onBrandPressed;
   final List<Widget> actions;
   final Widget? floatingActionButton;
   final VoidCallback? onNotificationsPressed;
@@ -37,6 +39,7 @@ class AttendUsScaffold extends StatelessWidget {
     required this.selectedIndex,
     required this.destinations,
     required this.onDestinationSelected,
+    this.onBrandPressed,
     this.actions = const [],
     this.floatingActionButton,
     this.onNotificationsPressed,
@@ -87,6 +90,7 @@ class AttendUsScaffold extends StatelessWidget {
                 destinations: destinations,
                 selectedIndex: selectedIndex,
                 onDestinationSelected: onDestinationSelected,
+                onBrandPressed: onBrandPressed,
                 expanded: useExpandedSidebar,
               ),
               Expanded(
@@ -142,12 +146,14 @@ class _AttendUsSidebar extends StatelessWidget {
   final int selectedIndex;
   final List<AttendUsNavDestination> destinations;
   final ValueChanged<int> onDestinationSelected;
+  final VoidCallback? onBrandPressed;
   final bool expanded;
 
   const _AttendUsSidebar({
     required this.selectedIndex,
     required this.destinations,
     required this.onDestinationSelected,
+    this.onBrandPressed,
     required this.expanded,
   });
 
@@ -166,29 +172,39 @@ class _AttendUsSidebar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: EdgeInsets.fromLTRB(16, 20, expanded ? 20 : 16, 16),
-            child: Row(
-              mainAxisAlignment: expanded
-                  ? MainAxisAlignment.start
-                  : MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.event_available,
-                    color: theme.colorScheme.onPrimary,
+            padding: EdgeInsets.fromLTRB(8, 12, expanded ? 12 : 8, 8),
+            child: Tooltip(
+              message: 'Go to Home',
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(AttendUsTokens.radiusMd),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(AttendUsTokens.radiusMd),
+                  onTap: onBrandPressed,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Row(
+                      mainAxisAlignment: expanded
+                          ? MainAxisAlignment.start
+                          : MainAxisAlignment.center,
+                      children: [
+                        Image.asset(
+                          Images.inAppLogoOnly,
+                          key: const ValueKey('attendus-brand-logo'),
+                          width: 38,
+                          height: 38,
+                          fit: BoxFit.contain,
+                          semanticLabel: 'Attendus logo',
+                        ),
+                        if (expanded) ...[
+                          const SizedBox(width: 12),
+                          Text('Attendus', style: theme.textTheme.titleLarge),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
-                if (expanded) ...[
-                  const SizedBox(width: 12),
-                  Text('Attendus', style: theme.textTheme.titleLarge),
-                ],
-              ],
+              ),
             ),
           ),
           const Divider(),

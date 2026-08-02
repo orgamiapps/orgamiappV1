@@ -167,6 +167,7 @@ class _AuthGateState extends State<AuthGate> {
 
     restoredScreen ??= DeferredScreenLoader(
       loadLibrary: dashboard.loadLibrary,
+      recoveryKey: 'dashboard',
       loadingLabel: 'Loading dashboard',
       builder: () =>
           dashboard.DashboardScreen(restoreSavedTab: restoreNavigation),

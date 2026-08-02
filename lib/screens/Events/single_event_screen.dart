@@ -58,7 +58,6 @@ import 'package:attendus/screens/Events/chose_location_in_map_screen.dart';
 import 'package:attendus/screens/Events/feature_event_screen.dart';
 import 'package:attendus/screens/Events/edit_event_screen.dart';
 import 'package:attendus/screens/Events/event_location_view_screen.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:attendus/screens/Events/Widget/qr_dialogue.dart';
 import 'package:attendus/screens/Events/Widget/access_list_management_widget.dart';
@@ -4272,12 +4271,12 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(24),
-                child: CachedNetworkImage(
+                child: AttendUsEventImage(
                   imageUrl: eventModel.imageUrl,
                   fit: BoxFit.cover,
                   width: double.infinity,
                   height: 220,
-                  placeholder: (context, url) => Container(
+                  loadingBuilder: (context) => Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
@@ -4307,7 +4306,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                       ),
                     ),
                   ),
-                  errorWidget: (context, url, error) => Container(
+                  errorBuilder: (context, retry) => Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
@@ -4350,6 +4349,12 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                               fontSize: 14,
                               fontFamily: 'Roboto',
                             ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton.icon(
+                            onPressed: retry,
+                            icon: const Icon(Icons.refresh, size: 18),
+                            label: const Text('Retry'),
                           ),
                         ],
                       ),

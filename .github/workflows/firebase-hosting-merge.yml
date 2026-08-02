@@ -25,7 +25,7 @@ jobs:
       - name: Validate map configuration
         env:
           GOOGLE_MAPS_WEB_API_KEY: ${{ secrets.GOOGLE_MAPS_WEB_API_KEY }}
-        run: test -n "$GOOGLE_MAPS_WEB_API_KEY"
+        run: dart run tools/check_maps_web_key.dart
       
       # Build Flutter web app
       - name: Build Flutter web
@@ -34,6 +34,12 @@ jobs:
           --pwa-strategy=none
           --no-wasm-dry-run
           --dart-define=GOOGLE_MAPS_WEB_API_KEY=${{ secrets.GOOGLE_MAPS_WEB_API_KEY }}
+
+      - name: Retire legacy Flutter service worker
+        run: cp web/flutter_service_worker_retirement.js build/web/flutter_service_worker.js
+
+      - name: Fingerprint web entry point
+        run: dart run tools/fingerprint_web_release.dart
 
       - name: Enforce initial bundle budget
         run: dart run tools/check_web_bundle_size.dart

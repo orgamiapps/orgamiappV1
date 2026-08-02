@@ -128,6 +128,19 @@ void main() {
     expect(find.text('Scan QR'), findsNothing);
     expect(find.text('Agenda'), findsNothing);
     expect(find.text('Organizer'), findsNothing);
+    for (final shortcutKey in [
+      'discover-shortcut-search',
+      'discover-shortcut-map',
+      'discover-shortcut-check-in',
+    ]) {
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey(shortcutKey)),
+          matching: find.byType(Icon),
+        ),
+        findsNothing,
+      );
+    }
 
     await tester.drag(rowFinder, const Offset(-300, 0));
     await tester.pump();
@@ -138,6 +151,18 @@ void main() {
       find.byKey(const ValueKey('discover-shortcut-create')),
       findsOneWidget,
     );
+    for (final shortcutKey in [
+      'discover-shortcut-calendar',
+      'discover-shortcut-create',
+    ]) {
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey(shortcutKey)),
+          matching: find.byType(Icon),
+        ),
+        findsNothing,
+      );
+    }
   });
 
   testWidgets('guest Discover banner joins the same continuous scroll', (

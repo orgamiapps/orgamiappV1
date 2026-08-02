@@ -19,7 +19,6 @@ import 'package:attendus/screens/Events/Widget/sign_in_security_tier_selector.da
 import 'package:attendus/screens/Events/location_picker_screen.dart';
 import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
-import 'dart:io';
 
 class EditEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -58,6 +57,7 @@ class _EditEventScreenState extends State<EditEventScreen>
       TextEditingController();
 
   String? _selectedImagePath;
+  Uint8List? _selectedImageBytes;
   String? _currentImageUrl;
 
   // Sign-in security tier
@@ -187,8 +187,11 @@ class _EditEventScreenState extends State<EditEventScreen>
         imageQuality: 85,
       );
       if (image != null) {
+        final imageBytes = await image.readAsBytes();
+        if (!mounted) return;
         setState(() {
           _selectedImagePath = image.path;
+          _selectedImageBytes = imageBytes;
           thumbnailUrlCtlr.text = image.path;
           _hasChanges = true;
         });
@@ -262,7 +265,8 @@ class _EditEventScreenState extends State<EditEventScreen>
     try {
       debugPrint('🔍 DEBUG: Starting image upload...');
       String? imageUrl;
-      Uint8List imageData = await XFile(_selectedImagePath!).readAsBytes();
+      final imageData =
+          _selectedImageBytes ?? await XFile(_selectedImagePath!).readAsBytes();
       debugPrint(
         '🔍 DEBUG: Image data loaded, size: ${imageData.length} bytes',
       );
@@ -720,6 +724,7 @@ class _EditEventScreenState extends State<EditEventScreen>
                   onTap: () {
                     setState(() {
                       _selectedImagePath = null;
+                      _selectedImageBytes = null;
                       _currentImageUrl = null;
                       thumbnailUrlCtlr.clear();
                     });
@@ -1349,11 +1354,12 @@ class _EditEventScreenState extends State<EditEventScreen>
         ClipRRect(
           borderRadius: BorderRadius.circular(14),
           child: _selectedImagePath != null
-              ? Image.file(
-                  File(_selectedImagePath!),
+              ? Image.memory(
+                  _selectedImageBytes!,
                   width: double.infinity,
                   height: double.infinity,
                   fit: BoxFit.cover,
+                  gaplessPlayback: true,
                   errorBuilder: (context, error, stackTrace) {
                     return Container(
                       width: double.infinity,

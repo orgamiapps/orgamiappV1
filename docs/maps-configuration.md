@@ -14,7 +14,9 @@ quotas, billing alerts, and usage monitoring before release.
 - Web: restrict to Maps JavaScript API and HTTP referrers for `attendus.app`,
   the Firebase Hosting domains, preview channels, and localhost. Add it as the
   GitHub Actions secret `GOOGLE_MAPS_WEB_API_KEY`, or pass it locally with
-  `--dart-define=GOOGLE_MAPS_WEB_API_KEY=...`.
+  `--dart-define=GOOGLE_MAPS_WEB_API_KEY=...`. This must be the dedicated
+  `Attendus Maps Web` key, not any Firebase-generated Android, iOS, or browser
+  client key. CI rejects keys reused from committed Firebase configuration.
 - Android: restrict to Maps SDK for Android, package
   `com.stormdeve.orgami`, and every release/debug SHA fingerprint. Put
   `GOOGLE_MAPS_ANDROID_API_KEY=...` in the uncommitted

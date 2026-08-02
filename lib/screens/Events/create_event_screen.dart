@@ -18,7 +18,6 @@ import 'package:attendus/Utils/router.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
-import 'dart:io';
 import 'package:attendus/firebase/organization_helper.dart'; // ignore: unused_import
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/firebase/firebase_messaging_helper.dart';
@@ -91,6 +90,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       TextEditingController();
 
   String? _selectedImagePath;
+  Uint8List? _selectedImageBytes;
 
   // Organization selection
   String? _selectedOrganizationId;
@@ -247,8 +247,11 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         imageQuality: 85,
       );
       if (image != null) {
+        final imageBytes = await image.readAsBytes();
+        if (!mounted) return;
         setState(() {
           _selectedImagePath = image.path;
+          _selectedImageBytes = imageBytes;
           thumbnailUrlCtlr.text = image.path;
         });
       }
@@ -266,7 +269,8 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   Future<String?> _uploadToFirebaseHosting() async {
     try {
       String? imageUrl;
-      Uint8List imageData = await XFile(_selectedImagePath!).readAsBytes();
+      final imageData =
+          _selectedImageBytes ?? await XFile(_selectedImagePath!).readAsBytes();
 
       // Generate unique filename with timestamp
       final String fileName =
@@ -394,6 +398,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           } else {
             setState(() {
               _selectedImagePath = null;
+              _selectedImageBytes = null;
               thumbnailUrlCtlr.clear();
             });
             _btnCtlr.reset();
@@ -2113,6 +2118,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                 onTap: () {
                   setState(() {
                     _selectedImagePath = null;
+                    _selectedImageBytes = null;
                     thumbnailUrlCtlr.clear();
                   });
                 },
@@ -2159,11 +2165,12 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(14),
-          child: Image.file(
-            File(_selectedImagePath!),
+          child: Image.memory(
+            _selectedImageBytes!,
             width: double.infinity,
             height: double.infinity,
             fit: BoxFit.cover,
+            gaplessPlayback: true,
             errorBuilder: (context, error, stackTrace) {
               return Container(
                 width: double.infinity,

@@ -225,9 +225,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
             ),
             child: NestedScrollView(
               headerSliverBuilder: (context, innerBoxIsScrolled) => [
-                SliverToBoxAdapter(
-                  child: _buildDiscoveryHeader(isGuestMode: isGuestMode),
-                ),
+                SliverToBoxAdapter(child: _buildDiscoveryHeader()),
                 if (isGuestMode) SliverToBoxAdapter(child: _buildGuestBanner()),
                 if (!isGuestMode)
                   SliverToBoxAdapter(child: _buildSegmentedTabs()),
@@ -276,7 +274,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
     );
   }
 
-  Widget _buildDiscoveryHeader({required bool isGuestMode}) {
+  Widget _buildDiscoveryHeader() {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
@@ -286,38 +284,16 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildQuickActionRow(),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  AttendUsStatusBadge(
-                    label: isGuestMode ? 'Guest discovery' : 'Signed in',
-                    tone: isGuestMode
-                        ? AttendUsStatusTone.warning
-                        : AttendUsStatusTone.success,
-                    icon: isGuestMode
-                        ? Icons.visibility_outlined
-                        : Icons.verified_user_outlined,
-                  ),
-                  AttendUsStatusBadge(
-                    label: _tabIndex == 0 || isGuestMode
-                        ? 'Public events'
-                        : 'Private groups',
-                    tone: AttendUsStatusTone.info,
-                    icon: _tabIndex == 0 || isGuestMode
-                        ? Icons.public
-                        : Icons.apartment_outlined,
-                  ),
-                  if (_discoverError != null)
-                    AttendUsStatusBadge(
-                      label: 'Discovery limited',
-                      tone: AttendUsStatusTone.danger,
-                      icon: Icons.cloud_off_outlined,
-                    ),
-                ],
-              ),
               if (_discoverError != null) ...[
+                const SizedBox(height: 12),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: AttendUsStatusBadge(
+                    label: 'Discovery limited',
+                    tone: AttendUsStatusTone.danger,
+                    icon: Icons.cloud_off_outlined,
+                  ),
+                ),
                 const SizedBox(height: 10),
                 Text(
                   _discoverError!,
@@ -337,45 +313,35 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
     final actions = [
       _DiscoveryQuickAction(
         key: const ValueKey('discover-shortcut-search'),
-        icon: Icons.search,
         title: 'Search',
-        tone: AttendUsStatusTone.info,
         onTap: () {
           RouterClass.nextScreenNormal(context, const SearchScreen());
         },
       ),
       _DiscoveryQuickAction(
         key: const ValueKey('discover-shortcut-map'),
-        icon: Icons.public,
         title: 'Map',
-        tone: AttendUsStatusTone.info,
         onTap: () {
           RouterClass.nextScreenNormal(context, const GlobalEventsMapScreen());
         },
       ),
       _DiscoveryQuickAction(
         key: const ValueKey('discover-shortcut-check-in'),
-        icon: Icons.fact_check_outlined,
         title: 'Check in',
-        tone: AttendUsStatusTone.success,
         onTap: () {
           RouterClass.nextScreenNormal(context, const QRScannerFlowScreen());
         },
       ),
       _DiscoveryQuickAction(
         key: const ValueKey('discover-shortcut-calendar'),
-        icon: Icons.calendar_month_outlined,
         title: 'Calendar',
-        tone: AttendUsStatusTone.warning,
         onTap: () {
           RouterClass.nextScreenNormal(context, const CalendarScreen());
         },
       ),
       _DiscoveryQuickAction(
         key: const ValueKey('discover-shortcut-create'),
-        icon: Icons.add_circle_outline,
         title: 'Create',
-        tone: AttendUsStatusTone.neutral,
         onTap: () {
           if (_isGuestMode) {
             _showGuestRestrictionDialog(GuestFeature.createEvent);
@@ -391,13 +357,12 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
 
     return SizedBox(
       key: const ValueKey('discover-shortcut-row'),
-      height: 76,
+      height: 48,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: actions.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 10),
-        itemBuilder: (context, index) =>
-            SizedBox(width: 112, child: actions[index]),
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) => actions[index],
       ),
     );
   }
@@ -794,16 +759,12 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
 }
 
 class _DiscoveryQuickAction extends StatelessWidget {
-  final IconData icon;
   final String title;
-  final AttendUsStatusTone tone;
   final VoidCallback onTap;
 
   const _DiscoveryQuickAction({
     super.key,
-    required this.icon,
     required this.title,
-    required this.tone,
     required this.onTap,
   });
 
@@ -811,20 +772,15 @@ class _DiscoveryQuickAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return AttendUsCard(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       onTap: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          AttendUsStatusBadge(label: '', icon: icon, tone: tone),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: theme.textTheme.labelLarge,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+      child: Center(
+        child: Text(
+          title,
+          style: theme.textTheme.labelLarge,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
     );
   }

@@ -41,13 +41,14 @@ Widget _wrap(Widget child, {required Size size}) {
   );
 }
 
-AttendUsScaffold _scaffold() {
+AttendUsScaffold _scaffold({VoidCallback? onBrandPressed}) {
   return AttendUsScaffold(
     title: 'Dashboard',
     subtitle: 'Operational shell',
     selectedIndex: 0,
     destinations: _destinations,
     onDestinationSelected: (_) {},
+    onBrandPressed: onBrandPressed,
     onNotificationsPressed: () {},
     onProfilePressed: () {},
     profileName: 'Alex Rivera',
@@ -73,7 +74,21 @@ void main() {
       expect(find.byType(NavigationBar), findsNothing);
       expect(find.text('Dashboard'), findsOneWidget);
       expect(find.text('Shell body'), findsOneWidget);
-      expect(find.byIcon(Icons.event_available), findsOneWidget);
+      expect(find.byKey(const ValueKey('attendus-brand-logo')), findsOneWidget);
     }
+  });
+
+  testWidgets('brand navigates to Home on desktop', (tester) async {
+    var brandPressed = false;
+    await tester.pumpWidget(
+      _wrap(
+        _scaffold(onBrandPressed: () => brandPressed = true),
+        size: const Size(1280, 900),
+      ),
+    );
+
+    await tester.tap(find.text('Attendus'));
+
+    expect(brandPressed, isTrue);
   });
 }

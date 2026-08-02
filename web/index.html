@@ -186,7 +186,7 @@
     // every visit discards the large engine/app cache and makes returning
     // users download the application again.
     (async function bootstrapAttendus() {
-      const cleanupKey = 'attendus-legacy-flutter-cache-cleanup-v1';
+      const cleanupKey = 'attendus-legacy-flutter-cache-cleanup-v2';
       let needsCleanup = true;
       try {
         needsCleanup = window.localStorage.getItem(cleanupKey) !== 'done';

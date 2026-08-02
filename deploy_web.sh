@@ -31,11 +31,19 @@ echo "📦 Cleaning previous build..."
 flutter clean
 
 echo "🔨 Building Flutter web app for production..."
-flutter build web --release --pwa-strategy=none --no-wasm-dry-run
+: "${GOOGLE_MAPS_WEB_API_KEY:?Set GOOGLE_MAPS_WEB_API_KEY to the restricted Attendus web Maps key}"
+dart run tools/check_maps_web_key.dart
+flutter build web --release --pwa-strategy=none --no-wasm-dry-run \
+  --dart-define=GOOGLE_MAPS_WEB_API_KEY="$GOOGLE_MAPS_WEB_API_KEY"
+cp web/flutter_service_worker_retirement.js build/web/flutter_service_worker.js
+dart run tools/fingerprint_web_release.dart
+dart run tools/check_deferred_web_chunks.dart
 dart run tools/check_web_bundle_size.dart
 
 echo "🌐 Deploying to Firebase Hosting..."
 firebase deploy --only hosting
+dart run tools/check_deferred_web_chunks.dart https://attendus.app/
+dart run tools/check_deferred_web_chunks.dart https://orgami-66nxok.web.app/
 
 echo ""
 echo "✅ Deployment complete! 🎉"

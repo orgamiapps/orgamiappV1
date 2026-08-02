@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:attendus/Utils/attendus_theme.dart';
+import 'package:attendus/Utils/images.dart';
 import 'package:attendus/Utils/route_names.dart';
 import 'package:attendus/screens/Home/dashboard_screen.dart';
 import 'package:attendus/widgets/app_bottom_navigation.dart';
@@ -190,29 +191,39 @@ class _CompatibilitySideNav extends StatelessWidget {
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-            child: Row(
-              mainAxisAlignment: expanded
-                  ? MainAxisAlignment.start
-                  : MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.event_available,
-                    color: theme.colorScheme.onPrimary,
+            padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+            child: Tooltip(
+              message: 'Go to Home',
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(AttendUsTokens.radiusMd),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(AttendUsTokens.radiusMd),
+                  onTap: () => onDestinationSelected(RouteNames.homeTab),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Row(
+                      mainAxisAlignment: expanded
+                          ? MainAxisAlignment.start
+                          : MainAxisAlignment.center,
+                      children: [
+                        Image.asset(
+                          Images.inAppLogoOnly,
+                          key: const ValueKey('attendus-brand-logo'),
+                          width: 38,
+                          height: 38,
+                          fit: BoxFit.contain,
+                          semanticLabel: 'Attendus logo',
+                        ),
+                        if (expanded) ...[
+                          const SizedBox(width: 12),
+                          Text('Attendus', style: theme.textTheme.titleLarge),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
-                if (expanded) ...[
-                  const SizedBox(width: 12),
-                  Text('Attendus', style: theme.textTheme.titleLarge),
-                ],
-              ],
+              ),
             ),
           ),
           const Divider(),

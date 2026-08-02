@@ -2487,12 +2487,12 @@ class _FeaturedEventCardState extends State<_FeaturedEventCard>
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: widget.event.imageUrl.isNotEmpty
-                        ? CachedNetworkImage(
+                        ? AttendUsEventImage(
                             imageUrl: widget.event.imageUrl,
                             fit: BoxFit.cover,
                             width: double.infinity,
                             height: 240,
-                            placeholder: (context, url) => Container(
+                            loadingBuilder: (context) => Container(
                               color: const Color(0xFFF5F7FA),
                               child: const Center(
                                 child: CircularProgressIndicator(
@@ -2500,8 +2500,7 @@ class _FeaturedEventCardState extends State<_FeaturedEventCard>
                                 ),
                               ),
                             ),
-                            errorWidget: (context, url, error) =>
-                                _buildFeaturedPlaceholder(),
+                            compact: true,
                           )
                         : _buildFeaturedPlaceholder(),
                   ),

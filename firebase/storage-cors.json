@@ -1,0 +1,20 @@
+[
+  {
+    "origin": [
+      "https://attendus.app",
+      "https://www.attendus.app",
+      "https://orgami-66nxok.web.app",
+      "https://orgami-66nxok.firebaseapp.com",
+      "http://localhost:*",
+      "http://127.0.0.1:*"
+    ],
+    "method": ["GET", "HEAD"],
+    "responseHeader": [
+      "Cache-Control",
+      "Content-Length",
+      "Content-Type",
+      "ETag"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]
