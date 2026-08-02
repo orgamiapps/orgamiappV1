@@ -425,6 +425,13 @@ class FaceRecognitionService {
     required Face detectedFace,
     required String eventId,
   }) async {
+    if (!SafetyFlags.biometricCheckInEnabled) {
+      return FaceMatchResult(
+        matched: false,
+        confidence: 0.0,
+        reason: SafetyFlags.biometricMaintenanceMessage,
+      );
+    }
     try {
       if (!isFaceSuitable(detectedFace)) {
         return FaceMatchResult(
@@ -581,6 +588,7 @@ class FaceRecognitionService {
     required String userId,
     required String eventId,
   }) async {
+    if (!SafetyFlags.biometricCheckInEnabled) return false;
     try {
       final enrollmentDocId = UserIdentityService.generateEnrollmentDocumentId(
         eventId,
