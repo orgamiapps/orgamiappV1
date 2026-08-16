@@ -115,7 +115,10 @@ void _replaceAll(File file, Map<String, String> replacements) {
   var source = file.readAsStringSync();
   for (final entry in replacements.entries) {
     if (!source.contains(entry.key)) {
-      _fail('Missing ${entry.key} in ${file.path}.');
+      if (!source.contains(entry.value)) {
+        _fail('Missing ${entry.key} in ${file.path}.');
+      }
+      continue;
     }
     source = source.replaceAll(entry.key, entry.value);
   }

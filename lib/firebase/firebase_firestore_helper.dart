@@ -553,7 +553,7 @@ class FirebaseFirestoreHelper {
       return AttendanceModel.fromJson(doc);
     }).toList();
     Logger.debug('list Data length is ${list.length}');
-    return list.isNotEmpty ? true : false;
+    return list.any((attendance) => attendance.status == 'checked_in');
   }
 
   Future<bool> checkIfUserIsRegistered(String eventId) async {
@@ -2649,33 +2649,16 @@ class FirebaseFirestoreHelper {
     required String eventId,
   }) async {
     try {
-      // Get current user data
-      final userDoc = await _firestore
+      await _firestore
           .collection(CustomerModel.firebaseKey)
           .doc(userId)
-          .get();
-
-      if (!userDoc.exists) {
-        Logger.debug('User not found: $userId');
-        return false;
-      }
-
-      final userData = userDoc.data()!;
-      List<String> favorites = List<String>.from(userData['favorites'] ?? []);
-
-      // Check if event is already saved
-      if (favorites.contains(eventId)) {
-        Logger.debug('Event already saved: $eventId');
-        return true; // Already saved, consider it successful
-      }
-
-      // Add event to saved events
-      favorites.add(eventId);
-
-      // Update user document
-      await _firestore.collection(CustomerModel.firebaseKey).doc(userId).update(
-        {'favorites': favorites},
-      );
+          .collection('SavedEvents')
+          .doc(eventId)
+          .set({
+            'eventId': eventId,
+            'userId': userId,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
 
       Logger.debug('Event added to saved events: $eventId for user: $userId');
       return true;
@@ -2690,33 +2673,12 @@ class FirebaseFirestoreHelper {
     required String eventId,
   }) async {
     try {
-      // Get current user data
-      final userDoc = await _firestore
+      await _firestore
           .collection(CustomerModel.firebaseKey)
           .doc(userId)
-          .get();
-
-      if (!userDoc.exists) {
-        Logger.debug('User not found: $userId');
-        return false;
-      }
-
-      final userData = userDoc.data()!;
-      List<String> favorites = List<String>.from(userData['favorites'] ?? []);
-
-      // Check if event is in saved events
-      if (!favorites.contains(eventId)) {
-        Logger.debug('Event not in saved events: $eventId');
-        return true; // Not in saved events, consider it successful
-      }
-
-      // Remove event from saved events
-      favorites.remove(eventId);
-
-      // Update user document
-      await _firestore.collection(CustomerModel.firebaseKey).doc(userId).update(
-        {'favorites': favorites},
-      );
+          .collection('SavedEvents')
+          .doc(eventId)
+          .delete();
 
       Logger.debug(
         'Event removed from saved events: $eventId for user: $userId',
@@ -2733,7 +2695,15 @@ class FirebaseFirestoreHelper {
     required String eventId,
   }) async {
     try {
-      // Get current user data
+      final saved = await _firestore
+          .collection(CustomerModel.firebaseKey)
+          .doc(userId)
+          .collection('SavedEvents')
+          .doc(eventId)
+          .get();
+      if (saved.exists) return true;
+
+      // Temporary dual-read for customers that have not been migrated yet.
       final userDoc = await _firestore
           .collection(CustomerModel.firebaseKey)
           .doc(userId)
@@ -2744,10 +2714,9 @@ class FirebaseFirestoreHelper {
         return false;
       }
 
-      final userData = userDoc.data()!;
-      List<String> favorites = List<String>.from(userData['favorites'] ?? []);
-
-      return favorites.contains(eventId);
+      return List<String>.from(
+        userDoc.data()?['favorites'] ?? const [],
+      ).contains(eventId);
     } catch (e) {
       Logger.debug('Error checking if event is saved: $e');
       return false;
@@ -3024,24 +2993,39 @@ class FirebaseFirestoreHelper {
     );
     try {
       final userDoc = await getSingleCustomer(customerId: userId);
-      if (userDoc == null || userDoc.favorites.isEmpty) {
-        return {'events': [], 'lastDoc': null};
-      }
-      final favoriteIds = userDoc.favorites;
+      final savedSnapshot = await _firestore
+          .collection(CustomerModel.firebaseKey)
+          .doc(userId)
+          .collection('SavedEvents')
+          .orderBy('createdAt', descending: true)
+          .get();
+      final favoriteIds = <String>{
+        ...savedSnapshot.docs.map((document) => document.id),
+        ...?userDoc?.favorites,
+      }.toList(growable: false);
 
       if (favoriteIds.isEmpty) {
         return {'events': [], 'lastDoc': null};
       }
 
-      Query query = _firestore
-          .collection(EventModel.firebaseKey)
-          .where(FieldPath.documentId, whereIn: favoriteIds);
+      final eventDocuments = <QueryDocumentSnapshot>[];
+      for (var offset = 0; offset < favoriteIds.length; offset += 30) {
+        final chunk = favoriteIds.skip(offset).take(30).toList();
+        final snapshot = await _firestore
+            .collection(EventModel.firebaseKey)
+            .where(FieldPath.documentId, whereIn: chunk)
+            .get();
+        eventDocuments.addAll(snapshot.docs);
+      }
+      final byId = {
+        for (final document in eventDocuments) document.id: document,
+      };
+      final orderedDocuments = favoriteIds
+          .map((id) => byId[id])
+          .whereType<QueryDocumentSnapshot>()
+          .toList(growable: false);
 
-      // Similar to attended events, paginating `whereIn` is tricky.
-      // Fetching all matching IDs then paginating manually.
-      final querySnapshot = await query.get();
-
-      final List<EventModel> events = querySnapshot.docs.map((doc) {
+      final List<EventModel> events = orderedDocuments.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
         data['id'] = data['id'] ?? doc.id; // Ensure ID is set
         return EventModel.fromJson(data);
@@ -3057,9 +3041,7 @@ class FirebaseFirestoreHelper {
       DocumentSnapshot? newLastDoc;
       if (paginatedEvents.isNotEmpty) {
         final lastId = paginatedEvents.last.id;
-        final originalDoc = querySnapshot.docs.firstWhere(
-          (d) => d.id == lastId,
-        );
+        final originalDoc = orderedDocuments.firstWhere((d) => d.id == lastId);
         newLastDoc = originalDoc;
       }
 
@@ -3080,33 +3062,16 @@ class FirebaseFirestoreHelper {
     required String eventId,
   }) async {
     try {
-      // Get current user data
-      final userDoc = await _firestore
+      await _firestore
           .collection(CustomerModel.firebaseKey)
           .doc(userId)
-          .get();
-
-      if (!userDoc.exists) {
-        Logger.debug('User not found: $userId');
-        return;
-      }
-
-      final userData = userDoc.data()!;
-      List<String> favorites = List<String>.from(userData['favorites'] ?? []);
-
-      // Check if event is already saved
-      if (favorites.contains(eventId)) {
-        Logger.debug('Event already saved: $eventId');
-        return;
-      }
-
-      // Add event to saved events
-      favorites.add(eventId);
-
-      // Update user document
-      await _firestore.collection(CustomerModel.firebaseKey).doc(userId).update(
-        {'favorites': favorites},
-      );
+          .collection('SavedEvents')
+          .doc(eventId)
+          .set({
+            'eventId': eventId,
+            'userId': userId,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
 
       Logger.debug('Event added to saved events: $eventId for user: $userId');
     } catch (e) {

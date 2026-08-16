@@ -32,6 +32,9 @@ import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:attendus/Utils/images.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
+import 'package:attendus/Services/guest_mode_service.dart';
+import 'package:attendus/Services/public_events_repository.dart';
+import 'package:attendus/widgets/public_events_error_state.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -50,11 +53,13 @@ enum SearchType { events, users }
 class HomeScreen extends StatefulWidget {
   final bool showHeader;
   final bool coordinateWithParentScroll;
+  final PublicEventsDataSource? publicEventsDataSource;
 
   const HomeScreen({
     super.key,
     this.showHeader = true,
     this.coordinateWithParentScroll = false,
+    this.publicEventsDataSource,
   });
 
   @override
@@ -62,6 +67,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+  late final PublicEventsDataSource _publicEventsDataSource;
+  final PublicEventsFeedState _publicEventsFeedState = PublicEventsFeedState();
+
   double radiusInMiles = 0;
   // Slider control value in range 0..1 for non-linear distance mapping
   double _distanceSlider = 1.0; // 1.0 => Global
@@ -222,6 +230,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _publicEventsDataSource =
+        widget.publicEventsDataSource ?? PublicEventsRepository();
     selectedCategories =
         []; // Start with no category filters to show all events
     // Defer location lookup until after first frame to avoid jank on navigation
@@ -287,7 +297,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) {
         _loadDefaultEvents();
-        _loadDefaultUsers();
+        if (!GuestModeService().isGuestMode) _loadDefaultUsers();
       }
     });
 
@@ -331,6 +341,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _performSearch() async {
+    if (GuestModeService().isGuestMode &&
+        _currentSearchType == SearchType.users) {
+      setState(() => _currentSearchType = SearchType.events);
+    }
     if (_searchValue.isEmpty) {
       setState(() {
         _searchUsers.clear();
@@ -1066,87 +1080,35 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildFirestoreStreamContent() {
-    // Create a stream for the Firestore query
-    // Start with the simplest possible query
-    Stream<QuerySnapshot> eventsStream;
-
-    try {
-      // Query for events that might still be active
-      // Use a generous window (last 48 hours) to account for long-duration events
-      // Post-processing will filter based on actual end times (start + duration)
-      final generousWindow = DateTime.now().subtract(const Duration(hours: 48));
-
-      eventsStream = FirebaseFirestore.instance
-          .collection(EventModel.firebaseKey)
-          .where('private', isEqualTo: false) // Filter out private events
-          .where(
-            'selectedDateTime',
-            isGreaterThan: Timestamp.fromDate(generousWindow),
-          ) // Query wider window, actual filtering happens in post-processing
-          .snapshots();
-    } catch (e) {
-      // Fallback: return simple error widget if stream creation fails
-      if (kDebugMode) {
-        debugPrint('Failed to create Firestore stream: $e');
-      }
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error, size: 48, color: Colors.red),
-            const SizedBox(height: 16),
-            Text('Failed to connect to database: $e'),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => setState(() {}),
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return StreamBuilder<QuerySnapshot>(
-      stream: eventsStream,
+    return StreamBuilder<List<EventModel>>(
+      stream: _publicEventsDataSource.watchActiveEvents(),
       builder: (context, snapshot) {
         // Show loading state
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !_publicEventsFeedState.hasLastSuccessfulEvents) {
           return _buildSkeletonLoading();
         }
 
-        // Show error state
+        var isShowingLastKnownEvents = false;
         if (snapshot.hasError) {
-          return _buildDetailedErrorState(snapshot.error.toString());
+          final failure = _publicEventsFeedState.recordFailure(snapshot.error!);
+          if (!_publicEventsFeedState.hasLastSuccessfulEvents) {
+            return _buildDetailedErrorState(failure);
+          }
+          isShowingLastKnownEvents = true;
+        } else if (snapshot.hasData) {
+          _publicEventsFeedState.recordSuccess(snapshot.data!);
         }
 
-        // Show empty state
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        final availableEvents = snapshot.hasData && !snapshot.hasError
+            ? snapshot.data!
+            : _publicEventsFeedState.lastSuccessfulEvents;
+
+        if (availableEvents.isEmpty) {
           return _buildEmptyState();
         }
 
-        // Process events data with error handling and performance optimization
-        List<EventModel> eventsList = [];
-        try {
-          // Limit processing to prevent overwhelming the main thread
-          final limitedDocs = snapshot.data!.docs.take(50).toList();
-
-          for (var doc in limitedDocs) {
-            try {
-              final data = doc.data() as Map<String, dynamic>?;
-              if (data != null) {
-                // Ensure the document ID is included in the data
-                data['id'] = doc.id;
-                eventsList.add(EventModel.fromJson(data));
-              }
-            } catch (e) {
-              Logger.error('Error parsing event document: $e');
-              continue; // Skip this document and continue processing
-            }
-          }
-        } catch (e) {
-          Logger.error('Error processing events data: $e');
-          return _buildDetailedErrorState('Error processing events: $e');
-        }
+        final eventsList = List<EventModel>.from(availableEvents);
 
         List<EventModel> neededEventList = [];
         final now = DateTime.now();
@@ -1170,7 +1132,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           }
         } catch (e) {
           Logger.error('Error filtering events: $e');
-          return _buildDetailedErrorState('Error processing events: $e');
+          return _buildDetailedErrorState(PublicEventsFailure.classify(e));
         }
 
         List<EventModel> filtered = [];
@@ -1180,7 +1142,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           filtered = _sortEvents(filtered);
         } catch (e) {
           Logger.error('Error filtering/sorting events: $e');
-          return _buildDetailedErrorState('Error processing events: $e');
+          return _buildDetailedErrorState(PublicEventsFailure.classify(e));
         }
 
         // Separate featured and non-featured events for carousel display
@@ -1210,6 +1172,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
         return Column(
           children: [
+            if (isShowingLastKnownEvents) _buildLastKnownEventsNotice(),
             // Featured Events Carousel - show if there are featured events (regardless of filter)
             if (featuredEvents.isNotEmpty)
               _buildFeaturedCarousel(featuredEvents),
@@ -1966,6 +1929,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // Full Screen Search
   Widget _buildFullScreenSearch() {
+    final isGuest = GuestModeService().isGuestMode;
     return Container(
       color: Theme.of(context).scaffoldBackgroundColor,
       child: SafeArea(
@@ -2030,55 +1994,58 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                     child: Row(
                       children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _currentSearchType = SearchType.events;
-                                _searchUsers.clear();
-                                _searchEvents.clear();
-                                _searchValue = '';
-                                _searchController.clear();
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
-                                color: _currentSearchType == SearchType.events
-                                    ? Colors.white.withValues(alpha: 0.3)
-                                    : Colors.transparent,
-                                borderRadius: const BorderRadius.only(
-                                  topLeft: Radius.circular(12),
-                                  bottomLeft: Radius.circular(12),
+                        if (!isGuest)
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _currentSearchType = SearchType.events;
+                                  _searchUsers.clear();
+                                  _searchEvents.clear();
+                                  _searchValue = '';
+                                  _searchController.clear();
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
                                 ),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.event,
-                                    color: Colors.white,
-                                    size: 18,
+                                decoration: BoxDecoration(
+                                  color: _currentSearchType == SearchType.events
+                                      ? Colors.white.withValues(alpha: 0.3)
+                                      : Colors.transparent,
+                                  borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(12),
+                                    bottomLeft: Radius.circular(12),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Events',
-                                    style: TextStyle(
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.event,
                                       color: Colors.white,
-                                      fontWeight:
-                                          _currentSearchType ==
-                                              SearchType.events
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                      fontSize: 14,
-                                      fontFamily: 'Roboto',
+                                      size: 18,
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Events',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight:
+                                            _currentSearchType ==
+                                                SearchType.events
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
+                                        fontSize: 14,
+                                        fontFamily: 'Roboto',
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
                         Expanded(
                           child: GestureDetector(
                             onTap: () async {
@@ -2216,57 +2183,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildDetailedErrorState(String error) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            const Text(
-              'Firestore Connection Error',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Error Details:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    error.length > 200
-                        ? '${error.substring(0, 200)}...'
-                        : error,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                if (mounted) setState(() {});
-              },
-              child: const Text('Retry Connection'),
-            ),
-          ],
-        ),
-      ),
+  Widget _buildLastKnownEventsNotice() {
+    return const PublicEventsLastKnownNotice();
+  }
+
+  Widget _buildDetailedErrorState(PublicEventsFailure failure) {
+    return PublicEventsErrorState(
+      failure: failure,
+      onRetry: () {
+        if (mounted) setState(() {});
+      },
     );
   }
 }

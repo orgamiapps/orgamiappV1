@@ -1,7 +1,7 @@
 import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/Utils/theme_provider.dart';
 import 'package:attendus/Services/subscription_service.dart';
-import 'package:attendus/screens/Home/account_screen.dart';
+import 'package:attendus/screens/Home/settings_screen.dart';
 import 'package:attendus/screens/MyProfile/my_tickets_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,7 +25,10 @@ void main() {
     );
   });
 
-  testWidgets('account screen renders modern account shell', (tester) async {
+  testWidgets('settings screen renders modern settings shell', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
     await tester.pumpWidget(
       ChangeNotifierProvider(
         create: (_) => ThemeProvider(),
@@ -33,16 +36,32 @@ void main() {
           create: (_) => SubscriptionService(),
           child: MaterialApp(
             theme: AttendUsTheme.light,
-            home: const AccountScreen(),
+            home: const SettingsScreen(),
           ),
         ),
       ),
     );
 
-    expect(find.text('Account'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
     expect(
-      find.text('Profile, subscription, privacy, and support.'),
+      find.text('Manage your profile, plan, preferences, and privacy.'),
       findsOneWidget,
+    );
+    expect(find.text('Membership'), findsOneWidget);
+    expect(find.text('Preferences'), findsOneWidget);
+    expect(find.text('Support & Information'), findsOneWidget);
+    expect(find.text('Account & Legal'), findsOneWidget);
+
+    await tester.binding.setSurfaceSize(const Size(390, 800));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
+  test('settings shell header remains opt-out for embedded routes', () {
+    expect(const SettingsScreen().showShellHeader, isTrue);
+    expect(
+      const SettingsScreen(showShellHeader: false).showShellHeader,
+      isFalse,
     );
   });
 }

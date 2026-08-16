@@ -1,0 +1,145 @@
+name: Deploy and Verify Cloud Functions
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: firebase-functions-release
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: 22
+  WIF_PROVIDER: projects/951311475019/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+  DEPLOYER_SERVICE_ACCOUNT: sa-deployer@orgami-66nxok.iam.gserviceaccount.com
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+        working-directory: functions
+      - run: npm run lint
+        working-directory: functions
+      - run: npm test
+        working-directory: functions
+      - run: node tools/check_firestore_query_contracts.js
+      - run: >-
+          node --test tools/check_firestore_query_contracts.test.js
+          tools/verify_firestore_indexes.test.js
+      - run: npm run test:rules
+        working-directory: functions
+      - run: npm run test:integration
+        working-directory: functions
+      - run: node --test tools/check_function_manifest.test.js
+
+  staging:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v3
+        with:
+          project_id: attendus-staging
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: npm ci
+        working-directory: functions
+      - name: Verify staging function secrets
+        run: node tools/check_function_secrets.js attendus-staging
+      - name: Verify staging collection-group queries
+        run: >-
+          node functions/tools/canary-firestore-query-contracts.js
+          --project attendus-staging
+      - name: Record deployment start
+        run: echo "DEPLOY_STARTED_AT=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
+      - name: Deploy complete staging function manifest
+        run: >-
+          ./functions/node_modules/.bin/firebase deploy --only functions --force
+          --project attendus-staging --non-interactive
+      - name: Verify staging function manifest
+        run: node tools/check_function_manifest.js attendus-staging
+      - name: Run staging analytics canary
+        run: >-
+          node functions/tools/canary-user-analytics.js
+          --project attendus-staging --apply
+      - name: Run staging reminder canary
+        run: >-
+          node functions/tools/canary-scheduled-reminders.js
+          --project attendus-staging --apply
+      - name: Reject new staging function errors
+        run: >-
+          test -z "$(gcloud logging read
+          'resource.type="cloud_run_revision" AND severity>=ERROR AND timestamp>="'"$DEPLOY_STARTED_AT"'"'
+          --project attendus-staging --limit=1 --format='value(timestamp)')"
+
+  production:
+    needs: staging
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v3
+        with:
+          project_id: orgami-66nxok
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: npm ci
+        working-directory: functions
+      - name: Verify production function secrets
+        run: node tools/check_function_secrets.js orgami-66nxok
+      - name: Verify production collection-group queries
+        run: >-
+          node functions/tools/canary-firestore-query-contracts.js
+          --project orgami-66nxok
+      - name: Record deployment start
+        run: echo "DEPLOY_STARTED_AT=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
+      - name: Deploy complete production function manifest
+        run: >-
+          ./functions/node_modules/.bin/firebase deploy --only functions --force
+          --project orgami-66nxok --non-interactive
+      - name: Verify production function manifest
+        run: node tools/check_function_manifest.js orgami-66nxok
+      - name: Run production analytics canary
+        run: >-
+          node functions/tools/canary-user-analytics.js
+          --project orgami-66nxok --apply
+      - name: Run production reminder canary
+        run: >-
+          node functions/tools/canary-scheduled-reminders.js
+          --project orgami-66nxok --apply
+      - name: Reject new production function errors
+        run: >-
+          test -z "$(gcloud logging read
+          'resource.type="cloud_run_revision" AND severity>=ERROR AND timestamp>="'"$DEPLOY_STARTED_AT"'"'
+          --project orgami-66nxok --limit=1 --format='value(timestamp)')"

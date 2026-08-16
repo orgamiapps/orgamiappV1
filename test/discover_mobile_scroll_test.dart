@@ -25,11 +25,6 @@ const _destinations = [
     icon: Icons.person_outline,
     selectedIcon: Icons.person,
   ),
-  AttendUsNavDestination(
-    label: 'Account',
-    icon: Icons.menu_outlined,
-    selectedIcon: Icons.menu,
-  ),
 ];
 
 class _TestScrollContent extends StatelessWidget {
@@ -60,7 +55,6 @@ Widget _app({required bool isGuestMode}) {
     theme: AttendUsTheme.light,
     home: AttendUsScaffold(
       title: 'Discover',
-      subtitle: 'Find events, check in, and manage what is next.',
       selectedIndex: 0,
       destinations: _destinations,
       onDestinationSelected: (_) {},
@@ -84,28 +78,28 @@ void main() {
     await tester.pumpWidget(_app(isGuestMode: false));
 
     final titleFinder = find.text('Discover');
-    final searchFinder = find.byKey(const ValueKey('discover-shortcut-search'));
     final bottomNavFinder = find.byType(NavigationBar);
     final titleY = tester.getTopLeft(titleFinder).dy;
     final bottomNavY = tester.getTopLeft(bottomNavFinder).dy;
 
-    await tester.drag(find.byType(NestedScrollView), const Offset(0, -450));
+    await tester.drag(
+      find.byType(CustomScrollView).first,
+      const Offset(0, -450),
+    );
     await tester.pump();
 
     expect(tester.getTopLeft(titleFinder).dy, titleY);
     expect(tester.getTopLeft(bottomNavFinder).dy, bottomNavY);
-    expect(searchFinder, findsNothing);
+    expect(find.byKey(const ValueKey('discover-shortcut-row')), findsNothing);
     expect(find.text('Discover events'), findsOneWidget);
 
-    await tester.drag(find.byType(NestedScrollView), const Offset(0, 450));
-    await tester.pump();
     await tester.tap(find.text('Private groups'));
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Private group events'), findsOneWidget);
   });
 
-  testWidgets('Discover shortcuts form one horizontally scrollable row', (
+  testWidgets('Discovery removes the legacy equal-weight shortcut row', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -114,58 +108,13 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(_app(isGuestMode: false));
 
-    final rowFinder = find.byKey(const ValueKey('discover-shortcut-row'));
-
-    expect(rowFinder, findsOneWidget);
-    expect(find.text('Search'), findsOneWidget);
-    expect(find.text('Map'), findsOneWidget);
-    expect(find.text('Check in'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('discover-shortcut-create')),
-      findsNothing,
-    );
-    expect(find.text('Global view'), findsNothing);
-    expect(find.text('Scan QR'), findsNothing);
-    expect(find.text('Agenda'), findsNothing);
-    expect(find.text('Organizer'), findsNothing);
-    for (final shortcutKey in [
-      'discover-shortcut-search',
-      'discover-shortcut-map',
-      'discover-shortcut-check-in',
-    ]) {
-      expect(
-        find.descendant(
-          of: find.byKey(ValueKey(shortcutKey)),
-          matching: find.byType(Icon),
-        ),
-        findsNothing,
-      );
-    }
-
-    await tester.drag(rowFinder, const Offset(-300, 0));
-    await tester.pump();
-
-    expect(find.text('Calendar'), findsOneWidget);
-    expect(find.text('Create'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('discover-shortcut-create')),
-      findsOneWidget,
-    );
-    for (final shortcutKey in [
-      'discover-shortcut-calendar',
-      'discover-shortcut-create',
-    ]) {
-      expect(
-        find.descendant(
-          of: find.byKey(ValueKey(shortcutKey)),
-          matching: find.byType(Icon),
-        ),
-        findsNothing,
-      );
-    }
+    expect(find.byKey(const ValueKey('discover-shortcut-row')), findsNothing);
+    expect(find.text('Discover events'), findsOneWidget);
+    expect(find.text('Public events'), findsOneWidget);
+    expect(find.text('Private groups'), findsOneWidget);
   });
 
-  testWidgets('guest Discover banner joins the same continuous scroll', (
+  testWidgets('guest Discovery stays focused on browseable public content', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -174,21 +123,17 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(_app(isGuestMode: true));
 
-    const guestMessage =
-        'Create an account to create events, join groups, and access private attendance tools.';
     final titleFinder = find.text('Discover');
-    final guestFinder = find.text(guestMessage);
     final titleY = tester.getTopLeft(titleFinder).dy;
-    final guestY = tester.getTopLeft(guestFinder).dy;
 
     expect(find.text('Private groups'), findsNothing);
-    expect(find.text('Sign up'), findsOneWidget);
+    expect(find.text('Get more from Attendus'), findsNothing);
+    expect(find.text('Discover events'), findsOneWidget);
 
-    await tester.drag(find.byType(NestedScrollView), const Offset(0, -450));
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -450));
     await tester.pump();
 
     expect(tester.getTopLeft(titleFinder).dy, titleY);
-    expect(tester.getTopLeft(guestFinder).dy, lessThan(guestY));
     expect(find.text('Discover events'), findsOneWidget);
   });
 }

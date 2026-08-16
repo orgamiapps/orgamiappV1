@@ -6,6 +6,7 @@ import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:provider/provider.dart';
 import 'package:attendus/screens/Authentication/create_account/create_account_view_model.dart';
+import 'package:attendus/screens/Authentication/create_account/dob_input.dart';
 import 'package:attendus/firebase/firebase_google_auth_helper.dart';
 import 'package:attendus/Services/auth_service.dart';
 import 'package:attendus/widgets/attendus_auth_layout.dart';
@@ -67,13 +68,17 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
     if (picked != null) {
       setState(() {
         _selectedDob = picked;
-        _dobController.text = DateFormat('MMM d, yyyy').format(picked);
+        _dobController.text = DateFormat('MM/dd/yyyy').format(picked);
       });
     }
   }
 
   Future<void> _validateAndNext() async {
     if (!_formKey.currentState!.validate()) return;
+
+    _selectedDob = _dobController.text.trim().isEmpty
+        ? null
+        : parseDateOfBirth(_dobController.text.trim());
 
     // Persist basic info to view model for later account creation
     context.read<CreateAccountViewModel>().setBasicInfo(
@@ -228,17 +233,40 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
     keyboard: TextInputType.emailAddress,
   );
 
-  Widget _dobField() => GestureDetector(
-    onTap: _pickDob,
-    child: AbsorbPointer(
-      child: _textField(
-        label: 'Date of birth',
-        controller: _dobController,
-        icon: Icons.cake_outlined,
-        hint: 'MM/DD/YYYY',
-        validator: (_) => null,
-      ),
+  Widget _dobField() => _textField(
+    label: 'Date of birth',
+    controller: _dobController,
+    icon: Icons.cake_outlined,
+    hint: 'MM/DD/YYYY',
+    keyboard: TextInputType.number,
+    inputFormatters: const [DateOfBirthInputFormatter()],
+    suffixIcon: IconButton(
+      tooltip: 'Choose date of birth',
+      icon: const Icon(Icons.calendar_today_outlined),
+      onPressed: _pickDob,
     ),
+    onChanged: (value) {
+      _selectedDob = parseDateOfBirth(value);
+    },
+    validator: (value) {
+      final text = value?.trim() ?? '';
+      if (text.isEmpty) return null;
+      if (text.length < 10) return 'Enter the complete date as MM/DD/YYYY';
+
+      final parsed = parseDateOfBirth(text);
+      if (parsed == null) return 'Enter a valid date of birth';
+
+      final now = DateTime.now();
+      final earliest = DateTime(1900);
+      final latest = DateTime(now.year - 13, now.month, now.day);
+      if (parsed.isBefore(earliest)) {
+        return 'Date of birth must be on or after 01/01/1900';
+      }
+      if (parsed.isAfter(latest)) {
+        return 'You must be at least 13 years old';
+      }
+      return null;
+    },
   );
 
   Widget _locationField() => _textField(
@@ -380,6 +408,7 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
     TextInputType? keyboard,
     TextCapitalization capitalization = TextCapitalization.none,
     ValueChanged<String>? onChanged,
+    Widget? suffixIcon,
   }) {
     return AttendUsFormTextField(
       controller: controller,
@@ -391,6 +420,7 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
       prefixIcon: icon,
       validator: validator,
       onChanged: onChanged,
+      suffixIcon: suffixIcon,
     );
   }
 }

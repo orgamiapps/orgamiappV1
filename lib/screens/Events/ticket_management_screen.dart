@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/models/ticket_model.dart';
@@ -15,6 +16,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:attendus/Utils/app_app_bar_view.dart';
+import 'package:attendus/models/check_in_policy.dart';
 
 class TicketManagementScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -133,6 +135,28 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
       }
     }
 
+    final useRecommendedArrival = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Use Staff Entry for tickets?'),
+        content: const Text(
+          'Staff Entry is recommended for ticketed events. Staff scan each '
+          'personal pass, and the ticket is validated and redeemed on the server.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep current arrival setup'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Use Staff Entry'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+
     setState(() {
       isLoading = true;
     });
@@ -145,6 +169,24 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
         ticketUpgradeEnabled: isUpgradeEnabled,
         ticketUpgradePrice: upgradePriceInput,
       );
+      if (useRecommendedArrival != false) {
+        final policy = widget.eventModel.checkInPolicy.copyWith(
+          profile: CheckInProfile.staffEntry,
+          eligibility: CheckInEligibility.ticketRequired,
+          needsOrganizerReview: false,
+        );
+        await FirebaseFirestore.instance
+            .collection(EventModel.firebaseKey)
+            .doc(widget.eventModel.id)
+            .update({
+              'checkInPolicy': policy.toJson(),
+              'signInSecurityTier': 'regular',
+              'signInMethods': ['personal_pass', 'staff_roster'],
+            });
+        widget.eventModel.checkInPolicy = policy;
+        widget.eventModel.signInSecurityTier = 'regular';
+        widget.eventModel.signInMethods = ['personal_pass', 'staff_roster'];
+      }
 
       if (mounted) {
         setState(() {

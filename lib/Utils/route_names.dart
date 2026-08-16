@@ -4,7 +4,7 @@ class RouteNames {
   static const int groupsTab = 1;
   static const int messagesTab = 2;
   static const int profileTab = 3;
-  static const int accountTab = 4;
+  static const int legacyAccountTab = 4;
   static const int legacyNotificationsTab = 5;
 
   // Dashboard and main tabs
@@ -14,7 +14,8 @@ class RouteNames {
   static const String messaging = 'messaging';
   static const String myProfile = 'my_profile';
   static const String notifications = 'notifications';
-  static const String account = 'account';
+  static const String settings = 'settings';
+  static const String legacyAccount = 'account';
 
   // Event screens
   static const String singleEvent = 'single_event';
@@ -98,25 +99,26 @@ class RouteNames {
       case myTickets:
         return 3; // Profile tab
       case notifications:
-      case account:
+      case settings:
+      case legacyAccount:
       case analyticsDashboard:
       case premiumFeatures:
       case premiumUpgrade:
-        return 4; // Account tab
+        return profileTab;
       default:
         return null;
     }
   }
 
-  /// Normalize historical dashboard tab indexes to the current 5-tab shell.
+  /// Normalize historical dashboard tab indexes to the current 4-tab shell.
   ///
   /// Older code used index 5 for notifications/account-adjacent screens. The
-  /// modern shell keeps notifications in the top bar, so that legacy index now
-  /// lands on Account.
+  /// Settings now lives under Profile, so legacy Account and Notifications
+  /// indexes land on Profile.
   static int normalizeDashboardTabIndex(int index) {
     if (index < homeTab) return homeTab;
-    if (index >= legacyNotificationsTab) return accountTab;
-    if (index > accountTab) return accountTab;
+    if (index >= legacyAccountTab) return profileTab;
+    if (index > profileTab) return profileTab;
     return index;
   }
 }

@@ -165,7 +165,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
 
     if (currentUser == null) {
       return AppScaffoldWrapper(
-        selectedBottomNavIndex: 4,
+        selectedBottomNavIndex: 3,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
           child: AttendUsEmptyState(
@@ -379,7 +379,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
 
   Widget _buildLoadingSkeleton() {
     return AppScaffoldWrapper(
-      selectedBottomNavIndex: 4,
+      selectedBottomNavIndex: 3,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
@@ -401,7 +401,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
 
   Widget _buildErrorView(String error) {
     return AppScaffoldWrapper(
-      selectedBottomNavIndex: 4,
+      selectedBottomNavIndex: 3,
       backgroundColor: AppThemeColor.backGroundColor,
       body: SafeArea(
         child: Center(
@@ -439,7 +439,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
 
   Widget _buildEmptyState() {
     return AppScaffoldWrapper(
-      selectedBottomNavIndex: 4,
+      selectedBottomNavIndex: 3,
       backgroundColor: AppThemeColor.backGroundColor,
       body: SafeArea(
         child: Center(
@@ -539,7 +539,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     bool isFromCache = false,
   }) {
     return AppScaffoldWrapper(
-      selectedBottomNavIndex: 4,
+      selectedBottomNavIndex: 3,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(

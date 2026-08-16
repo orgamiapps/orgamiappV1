@@ -1,13 +1,13 @@
 package com.stormdeve.orgami
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import android.os.Bundle
 // import com.attendus.app.OnnxNlpPlugin // Temporarily disabled
 // import com.facebook.FacebookSdk
 // import com.facebook.appevents.AppEventsLogger
 
-class MainActivity: FlutterActivity() {
+class MainActivity: FlutterFragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         

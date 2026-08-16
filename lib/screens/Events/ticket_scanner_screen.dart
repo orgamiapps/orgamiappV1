@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/models/ticket_model.dart';
-import 'package:attendus/models/attendance_model.dart';
+import 'package:attendus/Services/attendance_check_in_service.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/qr_debug_helper.dart';
 import 'package:intl/intl.dart';
@@ -16,11 +18,13 @@ import 'package:attendus/Utils/app_app_bar_view.dart';
 class TicketScannerScreen extends StatefulWidget {
   final String eventId;
   final String eventTitle;
+  final String? sessionId;
 
   const TicketScannerScreen({
     super.key,
     required this.eventId,
     required this.eventTitle,
+    this.sessionId,
   });
 
   @override
@@ -30,6 +34,8 @@ class TicketScannerScreen extends StatefulWidget {
 class _TicketScannerScreenState extends State<TicketScannerScreen> {
   final TextEditingController _ticketCodeController = TextEditingController();
   final NFCBadgeService _nfcService = NFCBadgeService();
+  final AttendanceCheckInService _attendanceService =
+      AttendanceCheckInService();
 
   bool isLoading = false;
   TicketModel? scannedTicket;
@@ -213,15 +219,133 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
         _showScanResult(
           success: false,
           title: 'Scan Error',
           message: 'Error scanning ticket. Please try again. ($e)',
         );
       }
+    }
+  }
+
+  Future<List<String>?> _collectRequiredAnswers() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('Events')
+        .doc(widget.eventId)
+        .collection('EventQuestions')
+        .get();
+    if (snapshot.docs.isEmpty) return const [];
+    if (!mounted) return null;
+    final controllers = {
+      for (final doc in snapshot.docs) doc.id: TextEditingController(),
+    };
+    final answers = await showDialog<List<String>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Attendee questions'),
+        content: SizedBox(
+          width: 480,
+          child: ListView(
+            shrinkWrap: true,
+            children: snapshot.docs.map((doc) {
+              final data = doc.data();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: TextField(
+                  controller: controllers[doc.id],
+                  decoration: InputDecoration(
+                    labelText:
+                        '${data['questionTitle']}${data['required'] == true ? ' *' : ''}',
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (snapshot.docs.any(
+                (doc) =>
+                    doc.data()['required'] == true &&
+                    controllers[doc.id]!.text.trim().isEmpty,
+              )) {
+                return;
+              }
+              Navigator.pop(
+                context,
+                snapshot.docs
+                    .map(
+                      (doc) =>
+                          '${doc.data()['questionTitle']}--ans--${controllers[doc.id]!.text.trim()}',
+                    )
+                    .toList(),
+              );
+            },
+            child: const Text('Validate'),
+          ),
+        ],
+      ),
+    );
+    for (final controller in controllers.values) {
+      controller.dispose();
+    }
+    return answers;
+  }
+
+  Future<String> _activeSessionId() async {
+    if (widget.sessionId != null && widget.sessionId!.isNotEmpty) {
+      return widget.sessionId!;
+    }
+    final session = await _attendanceService.findActiveSession(widget.eventId);
+    if (session == null) {
+      throw StateError('Start check-in before scanning passes.');
+    }
+    return session.id;
+  }
+
+  Future<void> _validatePersonalPass(String qrData) async {
+    if (isLoading) return;
+    setState(() {
+      isLoading = true;
+      isScanning = false;
+    });
+    try {
+      final answers = await _collectRequiredAnswers();
+      if (answers == null) return;
+      final sessionId = await _activeSessionId();
+      final receipt = await _attendanceService.submitCheckIn(
+        eventId: widget.eventId,
+        sessionId: sessionId,
+        credential: {'type': 'personal_pass', 'value': qrData},
+        answers: answers,
+        allowOfflineQueue: true,
+      );
+      if (!mounted) return;
+      _showScanResult(
+        success: true,
+        title: receipt.queuedOffline ? 'Saved Offline' : 'Checked In',
+        message: receipt.queuedOffline
+            ? 'The scan will reconcile when this device reconnects.'
+            : '${receipt.attendeeName} was checked in successfully.',
+      );
+    } catch (error) {
+      if (!mounted) return;
+      final message = error is FirebaseFunctionsException
+          ? error.message
+          : error.toString();
+      _showScanResult(
+        success: false,
+        title: 'Pass Rejected',
+        message: message ?? 'This pass could not be validated.',
+      );
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -255,15 +379,14 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
         _showScanResult(
           success: false,
           title: 'Scan Error',
           message: 'Error scanning badge. Please try again. ($e)',
         );
       }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -563,57 +686,36 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
     });
 
     try {
-      // First, check if user is already signed in to attendance
-      final existingAttendance = await FirebaseFirestoreHelper()
-          .getAttendanceByUserAndEvent(
-            customerUid: ticket.customerUid,
-            eventId: ticket.eventId,
-          );
-
-      // Validate the ticket
-      await FirebaseFirestoreHelper().useTicket(
-        ticketId: ticket.id,
-        usedBy: 'Event Host',
+      final answers = await _collectRequiredAnswers();
+      if (answers == null) return;
+      final sessionId = await _activeSessionId();
+      final receipt = await _attendanceService.submitCheckIn(
+        eventId: widget.eventId,
+        sessionId: sessionId,
+        credential: {'type': 'personal_pass', 'ticketCode': ticket.ticketCode},
+        answers: answers,
+        allowOfflineQueue: true,
       );
 
-      // If user is not already signed in to attendance, add them
-      if (existingAttendance == null) {
-        final attendanceId = '${ticket.eventId}-${ticket.customerUid}';
-        final attendanceModel = AttendanceModel(
-          id: attendanceId,
-          eventId: ticket.eventId,
-          userName: ticket.customerName,
-          customerUid: ticket.customerUid,
-          attendanceDateTime: DateTime.now(),
-          answers: [],
-        );
-
-        await FirebaseFirestoreHelper().addAttendance(attendanceModel);
-      }
-
       if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
         _showScanResult(
           success: true,
-          title: 'Ticket Activated',
-          message: existingAttendance == null
-              ? 'Ticket validated and attendee signed in successfully.'
-              : 'Ticket validated successfully.',
+          title: receipt.queuedOffline ? 'Saved Offline' : 'Ticket Checked In',
+          message: receipt.queuedOffline
+              ? 'The scan will reconcile when this device reconnects.'
+              : '${receipt.attendeeName} was checked in successfully.',
         );
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
         _showScanResult(
           success: false,
           title: 'Activation Failed',
           message: 'Failed to validate ticket. Please try again. ($e)',
         );
       }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -825,6 +927,11 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
 
                         // Use debug helper to log scan results
                         QRDebugHelper.logQRScanResult(raw);
+
+                        if (raw.startsWith('attendus_pass:v1:')) {
+                          _validatePersonalPass(raw);
+                          return;
+                        }
 
                         // Try ticket QR first
                         final qrData = TicketModel.parseQRCodeData(raw);

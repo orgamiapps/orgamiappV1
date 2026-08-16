@@ -5,8 +5,6 @@ class NavigationHelper {
   static const int groupsTabIndex = 1;
   static const int messagesTabIndex = 2;
   static const int profileTabIndex = 3;
-  static const int notificationsTabIndex = 4;
-  static const int accountTabIndex = 5;
 
   /// Get the appropriate bottom navigation index based on screen context
   ///
@@ -56,7 +54,7 @@ class NavigationHelper {
       // Notification-related screens
       case 'notifications':
       case 'notification_settings':
-        return notificationsTabIndex;
+        return profileTabIndex;
 
       // Account/Settings-related screens
       case 'account':
@@ -64,7 +62,7 @@ class NavigationHelper {
       case 'analytics_dashboard':
       case 'blocked_users':
       case 'about':
-        return accountTabIndex;
+        return profileTabIndex;
 
       // Screens with no clear association
       default:
@@ -78,7 +76,5 @@ class NavigationHelper {
     'Groups', // 1
     'Messages', // 2
     'Profile', // 3
-    'Alerts', // 4
-    'Account', // 5
   ];
 }

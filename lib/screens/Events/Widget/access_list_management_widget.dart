@@ -6,7 +6,7 @@ import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:attendus/Utils/app_constants.dart';
+import 'package:attendus/Services/event_share_service.dart';
 
 class AccessListManagementWidget extends StatefulWidget {
   final EventModel eventModel;
@@ -86,29 +86,13 @@ class _AccessListManagementWidgetState
   }
 
   void _shareInviteLink() async {
-    // Build a long dynamic link (no SDK) as fallback; Firebase will handle routing if configured
-    final deepLink = AppConstants.buildInviteUri(
-      widget.eventModel.id,
-    ).toString();
-    final dynamicLink = Uri.parse(AppConstants.dynamicLinksDomain)
-        .replace(
-          queryParameters: {
-            'link': deepLink,
-            'apn': AppConstants.androidPackageName,
-            'ibi': AppConstants.iosBundleId,
-            // Optional social tags (non-shortened):
-            'st': widget.eventModel.title,
-            'sd': widget.eventModel.description,
-          },
-        )
-        .toString();
-
-    // Prefer the dynamic link domain if configured; otherwise use the direct invite link
-    final toShare = (AppConstants.dynamicLinksDomain.isNotEmpty)
-        ? dynamicLink
-        : deepLink;
+    final toShare = EventShareService.eventUri(widget.eventModel.id);
     await SharePlus.instance.share(
-      ShareParams(text: 'Join my private event: $toShare'),
+      ShareParams(
+        title: widget.eventModel.title,
+        subject: 'Private event invitation: ${widget.eventModel.title}',
+        text: 'Request access to my private event: $toShare',
+      ),
     );
   }
 

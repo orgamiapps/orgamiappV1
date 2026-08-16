@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/models/event_model.dart';
+import 'package:attendus/Services/event_share_service.dart';
 import 'dart:typed_data';
 
 class EventFlyerGenerator {
@@ -75,7 +76,7 @@ class EventFlyerWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final eventUrl = 'attendus://event/${event.id}';
+    final eventUrl = EventShareService.eventUri(event.id).toString();
     final dateFormat = DateFormat('MMM d, yyyy');
     final timeFormat = DateFormat('h:mm a');
 

@@ -18,13 +18,14 @@ import 'package:attendus/Utils/geocoding_compat.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/Utils/location_helper.dart';
-import 'package:attendus/firebase/dwell_time_tracker.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/models/attendance_model.dart';
 
 import 'package:attendus/models/event_model.dart';
+import 'package:attendus/models/check_in_policy.dart';
 import 'package:attendus/models/event_question_model.dart';
-import 'package:attendus/screens/Events/Attendance/attendance_sheet_screen.dart';
+import 'package:attendus/screens/Events/Attendance/check_in_console_screen.dart';
+import 'package:attendus/screens/Events/Attendance/personal_attendance_pass_screen.dart';
 
 import 'package:attendus/screens/Events/Widget/comments_section.dart';
 
@@ -39,7 +40,6 @@ import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 
 // import 'package:attendus/screens/QRScanner/QrScannerScreenForLogedIn.dart';
 import 'package:attendus/screens/QRScanner/qr_scanner_flow_screen.dart';
-import 'package:attendus/screens/QRScanner/ans_questions_to_sign_in_event_screen.dart';
 import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
@@ -70,8 +70,15 @@ import 'package:attendus/screens/FaceRecognition/picture_face_enrollment_screen.
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 import 'package:attendus/screens/Events/Widget/delete_event_dialogue.dart';
 import 'package:attendus/Services/event_flyer_generator.dart';
+import 'package:attendus/Services/event_share_service.dart';
 import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
+import 'package:attendus/Services/guest_mode_service.dart';
+import 'package:attendus/Services/guest_attendance_service.dart';
+import 'package:attendus/Services/account_access_service.dart';
+import 'package:attendus/Services/product_funnel_service.dart';
+import 'package:attendus/Services/attendance_check_in_service.dart';
+import 'package:attendus/widgets/account_required_sheet.dart';
 import 'dart:io';
 
 class SingleEventScreen extends StatefulWidget {
@@ -99,8 +106,6 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   bool _isGettingTicket = false;
   bool _hasTicket = false;
   bool _isCheckingTicket = false;
-  bool _justSignedIn =
-      false; // Flag to prevent showing sign-in dialog immediately after sign-in
   bool _isFacialRecognitionInProgress =
       false; // Flag to prevent repeated facial recognition dialogs
   // Tab index removed - no longer using tabs
@@ -113,11 +118,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
   // _isLoading removed - no longer needed after removing manual code input
 
-  // Dwell time tracking variables
-  // ignore: unused_field
-  bool _isDwellTrackingActive = false;
-  // ignore: unused_field
-  String _dwellStatusMessage = '';
+  final AttendanceCheckInService _attendanceCheckInService =
+      AttendanceCheckInService();
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -277,6 +279,13 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
   Future<void> _rsvpForEvent() async {
     if (_isRsvpLoading) return;
+    if (AccountAccessService.isGuest) {
+      await showAccountRequiredSheet(
+        context: context,
+        feature: AccountFeature.registration,
+      );
+      return;
+    }
     final currentUser = CustomerController.logeInCustomer;
     if (currentUser == null) {
       ShowToast().showSnackBar('Please sign in to RSVP', context);
@@ -293,6 +302,13 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         await _unrsvpFromEvent();
       } else {
         // User wants to RSVP
+        ProductFunnelService().record(
+          'discovery_registration_start',
+          dimensions: {
+            'accessMode': 'rsvp',
+            'category': eventModel.categories.firstOrNull ?? 'uncategorized',
+          },
+        );
         // Avoid duplicate RSVP
         final already = await FirebaseFirestoreHelper().checkIfUserIsRegistered(
           eventModel.id,
@@ -327,6 +343,13 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         if (mounted) {
           ShowToast().showSnackBar("You've RSVP'd", context);
         }
+        ProductFunnelService().record(
+          'discovery_registration_complete',
+          dimensions: {
+            'accessMode': 'rsvp',
+            'category': eventModel.categories.firstOrNull ?? 'uncategorized',
+          },
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -377,8 +400,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     }
   }
 
-  bool isInInRadius(LatLng center, double radiusInFeet, LatLng point) {
-    double radiusInMeters = radiusInFeet * 0.3048; // Convert feet to meters
+  bool isInInRadius(LatLng center, double radiusInMeters, LatLng point) {
     double earthRadius = 6378137; // Earth's radius in meters
 
     double dLat = radians(point.latitude - center.latitude);
@@ -407,54 +429,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       setState(() {
         signedIn = value;
       });
-
-      // Only show sign-in dialog if user is not signed in and meets all conditions
-      // and hasn't just signed in (to prevent showing dialog immediately after sign-in)
-      if (!signedIn! &&
-          !_justSignedIn &&
-          eventModel.getLocation &&
-          eventModel.customerUid != CustomerController.logeInCustomer!.uid &&
-          isInEventInTime()) {
-        _getCurrentLocation();
-      }
-
-      // Check dwell tracking status if user is signed in
-      if (signedIn! && CustomerController.logeInCustomer != null) {
-        _checkDwellTrackingStatus();
-      }
     });
-  }
-
-  /// Checks if dwell tracking is active for the current user
-  Future<void> _checkDwellTrackingStatus() async {
-    if (CustomerController.logeInCustomer == null) return;
-
-    try {
-      final attendanceList = await FirebaseFirestoreHelper().getAttendance(
-        eventId: eventModel.id,
-      );
-
-      final userAttendance = attendanceList.firstWhere(
-        (attendance) =>
-            attendance.customerUid == CustomerController.logeInCustomer!.uid,
-        orElse: () => AttendanceModel(
-          id: '',
-          userName: '',
-          eventId: '',
-          customerUid: '',
-          attendanceDateTime: DateTime.now(),
-          answers: [],
-        ),
-      );
-
-      if (mounted) {
-        setState(() {
-          _isDwellTrackingActive = userAttendance.isDwellActive;
-        });
-      }
-    } catch (e) {
-      Logger.error('Error checking dwell tracking status: $e');
-    }
   }
 
   bool isInEventInTime() {
@@ -489,6 +464,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     return answer;
   }
 
+  // ignore: unused_element
   Future<void> _getCurrentLocation() async {
     bool serviceEnabled;
     LocationPermission permission;
@@ -840,51 +816,11 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   }
 
   Future<void> _performSignIn(AttendanceModel attendanceModel) async {
-    try {
-      Logger.debug('Saving attendance to Firestore...');
-      await FirebaseFirestore.instance
-          .collection(AttendanceModel.firebaseKey)
-          .doc(attendanceModel.id)
-          .set(attendanceModel.toJson());
-
-      Logger.debug('Attendance saved successfully!');
-      _btnCtlr.success();
-      ShowToast().showNormalToast(msg: 'Signed In Successfully!');
-
-      // Pop the sign-in dialog
-      if (!mounted) return;
-      if (Navigator.canPop(context)) {
-        Navigator.of(context).pop();
-      }
-
-      // Refresh event details to update UI
-
-      setState(() {
-        _justSignedIn = true;
-      });
-
-      // Reset the button and the flag after a delay
-      Future.delayed(const Duration(seconds: 2), () {
-        if (!mounted) return;
-        _btnCtlr.reset();
-        setState(() {
-          _justSignedIn = false;
-        });
-      });
-
-      // Automatically start dwell tracking if event has location enabled
-      // Since user has already granted location permission to sign in
-      if (eventModel.getLocation && !_isDwellTrackingActive) {
-        _startDwellTracking();
-      }
-    } catch (firestoreError) {
-      Logger.error('Firestore error during sign-in: $firestoreError');
-      _btnCtlr.error();
-      ShowToast().showNormalToast(
-        msg: 'Failed to save attendance: $firestoreError. Please try again.',
-      );
-      Future.delayed(const Duration(seconds: 2), () => _btnCtlr.reset());
-    }
+    _btnCtlr.reset();
+    ShowToast().showNormalToast(
+      msg:
+          'This older check-in path has expired. Scan the live venue QR or ask event staff for help.',
+    );
   }
 
   void _showSignInQuestionsModal(
@@ -1461,7 +1397,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
   Future<void> _toggleFavorite() async {
     if (CustomerController.logeInCustomer == null) {
-      ShowToast().showNormalToast(msg: 'Please log in to save events');
+      await showAccountRequiredSheet(
+        context: context,
+        feature: AccountFeature.favorites,
+      );
       return;
     }
 
@@ -1695,6 +1634,14 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       return;
     }
 
+    ProductFunnelService().record(
+      'discovery_registration_start',
+      dimensions: {
+        'accessMode': 'ticket',
+        'category': eventModel.categories.firstOrNull ?? 'uncategorized',
+      },
+    );
+
     if (updateUI) {
       setState(() {
         _isCheckingTicket = true;
@@ -1861,25 +1808,24 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                           ),
                           _CompactAction(
                             icon: Icons.people,
-                            title: 'Attendance',
-                            subtitle: 'View Records',
+                            title: 'Check-in',
+                            subtitle: 'Live Console',
                             color: const Color(0xFFEC4899),
                             onTap: () {
                               Navigator.pop(context);
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => AttendanceSheetScreen(
-                                    eventModel: eventModel,
-                                  ),
+                                  builder: (context) =>
+                                      CheckInConsoleScreen(event: eventModel),
                                 ),
                               ).then((_) => _showEventManagementModal());
                             },
                           ),
                           _CompactAction(
                             icon: Icons.qr_code,
-                            title: 'Sign-In QR',
-                            subtitle: 'Share Code',
+                            title: 'Event Share QR',
+                            subtitle: 'Event Page',
                             color: const Color(0xFFFF9800),
                             onTap: () {
                               Navigator.pop(context);
@@ -2391,6 +2337,60 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   }
 
   Future<void> _shareEventDetails() async {
+    await showAttendUsBottomSheet<void>(
+      context: context,
+      title: 'Share event',
+      subtitle: 'Send a link that opens this event in Attendus.',
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.share_outlined),
+            title: const Text('Share event link'),
+            subtitle: const Text(
+              'Send through Messages, email, or another app',
+            ),
+            onTap: () async {
+              Navigator.of(context).pop();
+              try {
+                await EventShareService.shareLink(eventModel);
+              } catch (error) {
+                Logger.error('Unable to share event link', error);
+                if (!mounted) return;
+                ShowToast().showNormalToast(
+                  msg: 'Unable to open sharing. You can copy the link instead.',
+                );
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.link),
+            title: const Text('Copy link'),
+            subtitle: Text(
+              EventShareService.eventUri(eventModel.id).toString(),
+            ),
+            onTap: () async {
+              await EventShareService.copyLink(eventModel);
+              if (!mounted) return;
+              Navigator.of(context).pop();
+              ShowToast().showNormalToast(msg: 'Event link copied');
+            },
+          ),
+          if (!kIsWeb)
+            ListTile(
+              leading: const Icon(Icons.image_outlined),
+              title: const Text('Share flyer'),
+              subtitle: const Text('Generate an image with an event QR code'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _shareEventFlyerPreview();
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _shareEventFlyerPreview() async {
     final GlobalKey flyerKey = GlobalKey();
 
     try {
@@ -2518,8 +2518,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(flyerFile.path)],
-          text:
-              '${eventModel.title}\n\nJoin us at: https://attendus.app/event/${eventModel.id}',
+          text: EventShareService.shareText(eventModel),
         ),
       );
 
@@ -2552,7 +2551,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       }
 
       // Fallback to text sharing
-      final eventUrl = 'https://attendus.app/event/${eventModel.id}';
+      final eventUrl = EventShareService.eventUri(eventModel.id).toString();
       final shareText =
           '''
 ${eventModel.title}
@@ -2571,18 +2570,84 @@ Join us at: $eventUrl
   }
 
   void _handleSignIn() {
-    // Check if already signed in
-    if (signedIn == null || signedIn!) {
+    if (signedIn == null) {
+      ShowToast().showNormalToast(msg: 'Checking your attendance statusâ€¦');
+      return;
+    }
+    if (signedIn!) {
+      if (eventModel.checkInPolicy.checkoutEnabled) {
+        _handleAttendeeCheckout();
+        return;
+      }
       ShowToast().showNormalToast(
         msg: 'You\'re already signed in for this event.',
       );
       return;
     }
 
-    // Show sign-in method selector
-    _showSignInMethodSelector();
+    if (eventModel.checkInPolicy.needsOrganizerReview) {
+      ShowToast().showNormalToast(
+        msg: 'The organizer must review this event’s arrival settings.',
+      );
+      return;
+    }
+    if (eventModel.checkInPolicy.profile == CheckInProfile.staffEntry) {
+      if (GuestModeService().isGuestMode ||
+          FirebaseAuth.instance.currentUser?.isAnonymous == true) {
+        ShowToast().showNormalToast(
+          msg: 'Ask event staff to check you in from the roster.',
+        );
+        return;
+      }
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PersonalAttendancePassScreen(event: eventModel),
+        ),
+      );
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const QRScannerFlowScreen()),
+    );
   }
 
+  Future<void> _handleAttendeeCheckout() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.isAnonymous) {
+      ShowToast().showNormalToast(msg: 'Ask event staff to check you out.');
+      return;
+    }
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('Attendance')
+          .where('eventId', isEqualTo: eventModel.id)
+          .where('customerUid', isEqualTo: user.uid)
+          .limit(1)
+          .get();
+      if (snapshot.docs.isEmpty) {
+        throw StateError('Your active attendance record was not found.');
+      }
+      final sessionId = snapshot.docs.first.data()['sessionId']?.toString();
+      if (sessionId == null || sessionId.isEmpty) {
+        throw StateError('This older attendance record cannot be checked out.');
+      }
+      await _attendanceCheckInService.checkout(
+        eventId: eventModel.id,
+        sessionId: sessionId,
+      );
+      if (!mounted) return;
+      setState(() => signedIn = false);
+      ShowToast().showNormalToast(msg: 'Checked out successfully.');
+    } catch (error) {
+      ShowToast().showNormalToast(msg: error.toString());
+    }
+  }
+
+  // Retained only for reading legacy attendance records; Attendance 2.0 no
+  // longer presents a technical method-selection sheet to attendees.
+  // ignore: unused_element
   void _showSignInMethodSelector() {
     final availableMethods = eventModel.getAvailableSignInMethods();
 
@@ -2777,12 +2842,44 @@ Join us at: $eventUrl
         );
         break;
       case 'geofence':
-        // Geofence is handled automatically by location services
-        ShowToast().showNormalToast(
-          msg:
-              'Geofence sign-in is automatic when you\'re near the event location.',
-        );
+        _handleGuestGeofenceSignIn();
         break;
+    }
+  }
+
+  Future<void> _handleGuestGeofenceSignIn() async {
+    if (!GuestModeService().isGuestMode) {
+      ShowToast().showNormalToast(
+        msg: 'Geofence check-in starts automatically near the event location.',
+      );
+      return;
+    }
+    try {
+      final position = await LocationHelper.getCurrentLocation(
+        context: context,
+        showErrorDialog: true,
+      );
+      if (position == null || !mounted) return;
+      final fullName = await GuestAttendanceService().promptForFullName(
+        context,
+      );
+      if (fullName == null || !mounted) return;
+      await GuestAttendanceService().submit(
+        eventId: eventModel.id,
+        method: 'geofence',
+        fullName: fullName,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        accuracyMeters: position.accuracy,
+      );
+      ShowToast().showNormalToast(msg: 'Signed in successfully!');
+    } on GuestAttendanceException catch (error) {
+      ShowToast().showNormalToast(msg: error.message);
+    } catch (error) {
+      Logger.error('Guest geofence check-in failed', error);
+      ShowToast().showNormalToast(
+        msg: 'Location check-in is temporarily unavailable.',
+      );
     }
   }
 
@@ -2991,88 +3088,7 @@ Join us at: $eventUrl
 
   /// Complete the sign-in after successful facial recognition
   Future<void> _completeFacialRecognitionSignIn() async {
-    try {
-      if (CustomerController.logeInCustomer == null) {
-        ShowToast().showNormalToast(msg: 'Please log in to sign in.');
-        return;
-      }
-
-      // Create attendance record
-      final docId =
-          '${eventModel.id}-${CustomerController.logeInCustomer!.uid}';
-
-      final attendanceModel = AttendanceModel(
-        id: docId,
-        eventId: eventModel.id,
-        userName: _isAnonymousSignIn
-            ? 'Anonymous'
-            : CustomerController.logeInCustomer!.name,
-        customerUid: CustomerController.logeInCustomer!.uid,
-        attendanceDateTime: DateTime.now(),
-        answers: [],
-        isAnonymous: _isAnonymousSignIn,
-        signInMethod: 'location_facial_recognition',
-        realName: _isAnonymousSignIn
-            ? CustomerController.logeInCustomer!.name
-            : null,
-        dwellNotes: 'Geofence + Facial Recognition sign-in',
-        entryTimestamp: eventModel.getLocation ? DateTime.now() : null,
-        dwellStatus: eventModel.getLocation ? 'active' : null,
-      );
-
-      // Check for sign-in questions first
-      final eventQuestions = await FirebaseFirestoreHelper().getEventQuestions(
-        eventId: eventModel.id,
-      );
-
-      if (eventQuestions.isNotEmpty) {
-        // Navigate to questions screen
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => AnsQuestionsToSignInEventScreen(
-                eventModel: eventModel,
-                newAttendance: attendanceModel,
-                nextPageRoute: 'event_details',
-              ),
-            ),
-          );
-        }
-      } else {
-        // Direct sign-in without questions
-        await FirebaseFirestore.instance
-            .collection(AttendanceModel.firebaseKey)
-            .doc(docId)
-            .set(attendanceModel.toJson());
-
-        ShowToast().showNormalToast(
-          msg: 'Successfully signed in with location + facial recognition!',
-        );
-
-        // Set flag to prevent showing dialog again immediately
-        setState(() {
-          _justSignedIn = true;
-        });
-
-        // Refresh attendance status
-        await getAttendance();
-
-        // Clear the flag after a delay
-        Future.delayed(const Duration(seconds: 3), () {
-          if (mounted) {
-            setState(() {
-              _justSignedIn = false;
-            });
-          }
-        });
-      }
-    } catch (e) {
-      Logger.error('Error completing facial recognition sign-in: $e');
-      ShowToast().showNormalToast(
-        msg: 'Failed to complete sign-in. Please try again.',
-      );
-    }
+    ShowToast().showNormalToast(msg: SafetyFlags.biometricMaintenanceMessage);
   }
 
   /// Show face enrollment dialog for geofence sign-in
@@ -3394,7 +3410,10 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
 
   Future<void> _getTicket() async {
     if (CustomerController.logeInCustomer == null) {
-      ShowToast().showNormalToast(msg: 'Please log in to get a ticket');
+      await showAccountRequiredSheet(
+        context: context,
+        feature: AccountFeature.tickets,
+      );
       return;
     }
 
@@ -3432,6 +3451,13 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
           });
 
           ShowToast().showNormalToast(msg: 'Ticket obtained successfully!');
+          ProductFunnelService().record(
+            'discovery_registration_complete',
+            dimensions: {
+              'accessMode': 'ticket',
+              'category': eventModel.categories.firstOrNull ?? 'uncategorized',
+            },
+          );
           // Refresh ticket status
           checkUserTicket(updateUI: true);
         }
@@ -3483,6 +3509,13 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       );
 
       if (paymentSuccess) {
+        ProductFunnelService().record(
+          'discovery_registration_complete',
+          dimensions: {
+            'accessMode': 'ticket',
+            'category': eventModel.categories.firstOrNull ?? 'uncategorized',
+          },
+        );
         if (mounted) {
           setState(() {
             _isGettingTicket = false;
@@ -3622,7 +3655,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       selectedBottomNavIndex: 1, // Groups tab
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       floatingActionButton:
-          eventModel.hasManagementPermissions(
+          eventModel.hasCheckInPermissions(
             FirebaseAuth.instance.currentUser!.uid,
           )
           ? _buildFloatingActionButton()
@@ -3634,10 +3667,19 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
   }
 
   Widget _buildFloatingActionButton() {
+    final userId = FirebaseAuth.instance.currentUser!.uid;
+    final organizer = eventModel.hasManagementPermissions(userId);
     return FloatingActionButton.extended(
-      onPressed: _showEventManagementModal,
-      icon: const Icon(Icons.dashboard_outlined),
-      label: const Text('Manage event'),
+      onPressed: organizer
+          ? _showEventManagementModal
+          : () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CheckInConsoleScreen(event: eventModel),
+              ),
+            ),
+      icon: Icon(organizer ? Icons.dashboard_outlined : Icons.qr_code_scanner),
+      label: Text(organizer ? 'Manage event' : 'Door console'),
     );
   }
 
@@ -3691,9 +3733,17 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                 ),
                 if (!isManager)
                   IconButton(
-                    tooltip: 'Check in',
+                    tooltip:
+                        signedIn == true &&
+                            eventModel.checkInPolicy.checkoutEnabled
+                        ? 'Check out'
+                        : 'Check in',
                     onPressed: _handleSignIn,
-                    icon: const Icon(Icons.fact_check_outlined),
+                    icon:
+                        signedIn == true &&
+                            eventModel.checkInPolicy.checkoutEnabled
+                        ? const Icon(Icons.logout)
+                        : const Icon(Icons.fact_check_outlined),
                   ),
                 IconButton(
                   tooltip: 'Add to calendar',
@@ -4009,6 +4059,8 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             FirebaseAuth.instance.currentUser!.uid,
           )) ...[
             const SizedBox(height: 14),
+            _buildAttendancePrimaryAction(),
+            const SizedBox(height: 14),
             _buildTabbedContentSection(),
           ],
           if (eventModel.hasManagementPermissions(
@@ -4023,6 +4075,33 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildAttendancePrimaryAction() {
+    final isGuest =
+        GuestModeService().isGuestMode ||
+        FirebaseAuth.instance.currentUser?.isAnonymous == true;
+    final String label;
+    final IconData icon;
+    if (signedIn == true) {
+      label = eventModel.checkInPolicy.checkoutEnabled
+          ? 'Check out'
+          : 'Checked in';
+      icon = eventModel.checkInPolicy.checkoutEnabled
+          ? Icons.logout
+          : Icons.check_circle;
+    } else if (eventModel.checkInPolicy.profile == CheckInProfile.staffEntry) {
+      label = isGuest ? 'Ask staff to check you in' : 'Show my pass';
+      icon = isGuest ? Icons.support_agent : Icons.badge_outlined;
+    } else {
+      label = 'Check in';
+      icon = Icons.fact_check_outlined;
+    }
+    return AttendUsButton.primary(
+      label: label,
+      icon: icon,
+      onPressed: _handleSignIn,
     );
   }
 
@@ -4176,51 +4255,6 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         ],
       ),
     );
-  }
-
-  Future<void> _startDwellTracking() async {
-    if (CustomerController.logeInCustomer == null) {
-      ShowToast().showNormalToast(
-        msg: 'Please log in to enable dwell tracking',
-      );
-      return;
-    }
-
-    try {
-      await DwellTimeTracker.startDwellTracking(eventModel.id);
-      // Start monitoring location to track exit/away automatically
-      DwellTimeTracker.startLocationMonitoring(eventModel.id);
-
-      if (mounted) {
-        setState(() {
-          _isDwellTrackingActive = true;
-        });
-      }
-
-      ShowToast().showNormalToast(msg: 'Dwell tracking started');
-    } catch (e) {
-      ShowToast().showNormalToast(msg: 'Failed to start dwell tracking: $e');
-    }
-  }
-
-  // ignore: unused_element
-  Future<void> _stopDwellTracking() async {
-    if (CustomerController.logeInCustomer == null) return;
-
-    try {
-      await DwellTimeTracker.stopDwellTracking(eventModel.id);
-
-      if (mounted) {
-        setState(() {
-          _isDwellTrackingActive = false;
-          _dwellStatusMessage = '';
-        });
-      }
-
-      ShowToast().showNormalToast(msg: 'Dwell tracking stopped');
-    } catch (e) {
-      ShowToast().showNormalToast(msg: 'Failed to stop dwell tracking: $e');
-    }
   }
 
   Widget _buildEventImage() {
@@ -4980,7 +5014,14 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         return GestureDetector(
           onTap: hasSubmittedFeedback
               ? null
-              : () {
+              : () async {
+                  if (AccountAccessService.isGuest) {
+                    await showAccountRequiredSheet(
+                      context: context,
+                      feature: AccountFeature.feedback,
+                    );
+                    return;
+                  }
                   RouterClass.nextScreenNormal(
                     context,
                     EventFeedbackScreen(eventModel: eventModel),
@@ -6507,6 +6548,14 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             icon: const Icon(Icons.lock_open),
             label: const Text('Request Access'),
             onPressed: () async {
+              if (AccountAccessService.isGuest) {
+                await showAccountRequiredSheet(
+                  context: context,
+                  feature: AccountFeature.accessRequest,
+                  sharedEventId: eventModel.id,
+                );
+                return;
+              }
               await FirebaseFirestoreHelper().requestEventAccess(
                 eventId: eventModel.id,
               );

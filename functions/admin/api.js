@@ -122,6 +122,113 @@ function createAdminApi(adminSdk) {
     return {actor: result.actor, data: result.data.daily, nextPageToken: null};
   }
 
+  async function guestFunnel(req) {
+    const actor = await authorize(req, adminSdk, db, "analytics.read");
+    const from = String(req.query.from || "0000-00-00");
+    const to = String(req.query.to || "9999-99-99");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to) {
+      fail(400, "INVALID_DATE_RANGE", "Use a valid from/to date range.");
+    }
+    const snapshot = await db.collection("admin_funnel_daily")
+        .where("__name__", ">=", from).where("__name__", "<=", to)
+        .orderBy("__name__").limit(366).get();
+    const totals = {};
+    const byEntryPoint = {};
+    const byCheckInMethod = {};
+    const byFeature = {};
+    let sessions = 0;
+    const merge = (target, values) => Object.entries(values || {}).forEach(([key, value]) => {
+      target[key] = Number(target[key] || 0) + Number(value || 0);
+    });
+    const daily = snapshot.docs.map((doc) => {
+      const row = doc.data();
+      merge(totals, row.counts);
+      merge(byEntryPoint, row.byEntryPoint);
+      merge(byCheckInMethod, row.byCheckInMethod);
+      merge(byFeature, row.byFeature);
+      sessions += Number(row.sessions || 0);
+      return {date: doc.id, ...row, updatedAt: asIso(row.updatedAt)};
+    });
+    const rate = (numerator, denominator) => denominator > 0 ? numerator / denominator : 0;
+    return {actor, data: {
+      totals,
+      sessions,
+      conversion: {
+        auth: rate(totals.guest_auth_completed || 0, totals.guest_auth_started || 0),
+        checkIn: rate(totals.guest_checkin_completed || 0, totals.guest_checkin_started || 0),
+      },
+      byEntryPoint,
+      byCheckInMethod,
+      byFeature,
+      daily,
+    }};
+  }
+
+  async function discoveryMarketHealth(req) {
+    const actor = await authorize(req, adminSdk, db, "analytics.read");
+    const now = new Date();
+    const end = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const [events, funnel] = await Promise.all([
+      db.collection("Events")
+          .where("selectedDateTime", ">=", adminSdk.firestore.Timestamp.fromDate(now))
+          .where("selectedDateTime", "<", adminSdk.firestore.Timestamp.fromDate(end))
+          .orderBy("selectedDateTime").limit(5000).get(),
+      db.collection("product_funnel_events")
+          .where("occurredAt", ">=", adminSdk.firestore.Timestamp.fromDate(
+              new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
+          )).limit(5000).get(),
+    ]);
+    const markets = new Map();
+    const market = (key, city = "Unknown", regionCode = "") => {
+      if (!markets.has(key)) markets.set(key, {metro: key, city, regionCode,
+        upcomingInventory: 0, organizers: new Set(), categories: {},
+        searches: 0, noResults: 0, cardOpens: 0, registrations: 0,
+        missingCategories: {}});
+      return markets.get(key);
+    };
+    for (const document of events.docs) {
+      const data = document.data();
+      const status = String(data.status || "").toLowerCase();
+      if (data.private === true || ["draft", "pending", "pending_approval",
+        "unpublished", "cancelled", "canceled", "declined"].includes(status)) continue;
+      const city = String(data.city || "Unknown");
+      const region = String(data.regionCode || "");
+      const key = `${city}-${region}`.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+      const row = market(key, city, region);
+      row.upcomingInventory += 1;
+      if (data.customerUid) row.organizers.add(String(data.customerUid));
+      for (const category of data.categories || []) {
+        row.categories[category] = Number(row.categories[category] || 0) + 1;
+      }
+    }
+    for (const document of funnel.docs) {
+      const data = document.data();
+      const dimensions = data.dimensions || {};
+      if (!dimensions.metro) continue;
+      const row = market(dimensions.metro);
+      if (data.event === "discovery_search_results" || data.event === "discovery_search_no_result") row.searches += 1;
+      if (data.event === "discovery_search_no_result") {
+        row.noResults += 1;
+        if (dimensions.category) row.missingCategories[dimensions.category] =
+          Number(row.missingCategories[dimensions.category] || 0) + 1;
+      }
+      if (data.event === "discovery_card_open") row.cardOpens += 1;
+      if (data.event === "discovery_registration_complete") row.registrations += 1;
+    }
+    const data = [...markets.values()].map((row) => ({
+      ...row,
+      activeOrganizers: row.organizers.size,
+      organizers: undefined,
+      healthy: row.upcomingInventory >= 10 && row.organizers.size >= 3,
+      noResultRate: row.searches ? row.noResults / row.searches : 0,
+      topMissingCategories: Object.entries(row.missingCategories)
+          .sort((a, b) => b[1] - a[1]).slice(0, 5)
+          .map(([category, count]) => ({category, count})),
+      missingCategories: undefined,
+    })).sort((a, b) => b.upcomingInventory - a.upcomingInventory);
+    return {actor, data};
+  }
+
   async function moderationMutation(req, collection, id, action, permission) {
     const actor = await authorize(req, adminSdk, db, permission);
     return mutate(req, actor, {action: `${collection}.${action}`, targetType: collection, targetId: id}, async () => {
@@ -248,6 +355,8 @@ function createAdminApi(adminSdk) {
         const parts = path.split("/"); result = {data: await subscriptionMutation(req, parts[3], parts[4])};
       } else if (path === "/v1/metrics" && req.method === "GET") result = await metrics(req);
       else if (path === "/v1/metrics/daily" && req.method === "GET") result = await dailyMetrics(req);
+      else if (path === "/v1/guest-funnel" && req.method === "GET") result = await guestFunnel(req);
+      else if (path === "/v1/discovery/market-health" && req.method === "GET") result = await discoveryMarketHealth(req);
       else if (path === "/v1/reports" && req.method === "GET") result = await listCollection(req, "reports", "moderation.read", ["type", "reason", "details", "status", "reporterUid", "targetUid", "eventId", "createdAt"], "createdAt");
       else if (/^\/v1\/reports\/[^/]+\/(resolve|dismiss)$/.test(path) && req.method === "POST") {
         const parts = path.split("/"); result = {data: await moderationMutation(req, "reports", parts[3], parts[4], "moderation.mutate")};

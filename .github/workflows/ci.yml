@@ -26,7 +26,17 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
       - run: flutter pub get
+      - name: Validate Firestore deployment verifier
+        run: node --check tools/verify_firestore_indexes.js
+      - name: Validate Firestore query contracts
+        run: >-
+          node --test tools/check_firestore_query_contracts.test.js
+          tools/verify_firestore_indexes.test.js
+      - run: node tools/check_firestore_query_contracts.js
       - name: Check formatting
         run: dart format --output=none --set-exit-if-changed lib test tools
       - run: flutter analyze
@@ -73,6 +83,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
+      - run: node ../tools/check_firestore_query_contracts.js
+      - run: node --test ../tools/check_function_manifest.test.js
       - name: Reject critical and high production vulnerabilities
         run: npm audit --omit=dev --audit-level=high
 
@@ -92,20 +104,10 @@ jobs:
       - run: npm ci
         working-directory: functions
       - name: Adversarial Firestore and Storage rules tests
-        run: >-
-          npx firebase-tools emulators:exec
-          --config ../firebase.json
-          --project demo-attendus-admin
-          --only firestore,storage
-          "node --test --test-concurrency=1 test/firestore-rules.test.js test/storage-rules.test.js"
+        run: npm run test:rules
         working-directory: functions
-      - name: Auth, Functions, and account-erasure integration tests
-        run: >-
-          npx firebase-tools emulators:exec
-          --config ../firebase.json
-          --project demo-attendus-admin
-          --only auth,firestore,storage,functions
-          "node --test --test-concurrency=1 test/admin-emulator.test.js"
+      - name: Isolated Functions integration suites
+        run: npm run test:integration
         working-directory: functions
 
   android-release:

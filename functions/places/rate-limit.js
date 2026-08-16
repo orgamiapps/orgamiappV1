@@ -18,13 +18,22 @@ function nextRateState(existing, nowMs, limit = PLACES_RATE_LIMIT) {
   };
 }
 
-async function enforceSharedPlacesRateLimit(db, uid, nowMs = Date.now()) {
+async function enforceSharedPlacesRateLimit(
+    db,
+    uid,
+    nowMs = Date.now(),
+    limit = PLACES_RATE_LIMIT,
+) {
   const id = createHash("sha256").update(uid).digest("hex").slice(0, 32);
   const reference = db.collection("service_rate_limits").doc(`places_${id}`);
   let allowed = false;
   await db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(reference);
-    const next = nextRateState(snapshot.exists ? snapshot.data() : null, nowMs);
+    const next = nextRateState(
+        snapshot.exists ? snapshot.data() : null,
+        nowMs,
+        limit,
+    );
     if (!next) return;
     allowed = true;
     transaction.set(reference, {

@@ -31,6 +31,29 @@ test("Places callables reject missing and anonymous authentication", async () =>
   );
 });
 
+test("anonymous users may only use U.S. discovery city lookup", async () => {
+  global.fetch = async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({suggestions: []}),
+  });
+  const result = await functions.placesAutocomplete.run(
+      request("discovery-guest", {
+        query: "Boston",
+        sessionToken: "discovery-session-token",
+        useCase: "discoveryCity",
+      }, "anonymous"),
+  );
+  assert.deepEqual(result.predictions, []);
+  await expectCode(functions.placesAutocomplete.run(
+      request("event-guest", {
+        query: "Boston",
+        sessionToken: "event-session-token",
+        useCase: "event",
+      }, "anonymous"),
+  ), "unauthenticated");
+});
+
 test("autocomplete validates query and session token", async () => {
   await expectCode(
       functions.placesAutocomplete.run(

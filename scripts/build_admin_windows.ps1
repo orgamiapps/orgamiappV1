@@ -13,8 +13,8 @@ $distRoot = Join-Path $repoRoot "dist"
 if ([string]::IsNullOrWhiteSpace($env:ATTENDUS_FIREBASE_API_KEY)) {
   throw "Set ATTENDUS_FIREBASE_API_KEY to the Firebase web API key after restricting it to required Firebase APIs and the distributed application."
 }
-if ([string]::IsNullOrWhiteSpace($env:ATTENDUS_GOOGLE_OAUTH_CLIENT_ID) -or $env:ATTENDUS_GOOGLE_OAUTH_CLIENT_ID -notmatch '^[A-Za-z0-9-]+\.apps\.googleusercontent\.com$') {
-  throw "Set ATTENDUS_GOOGLE_OAUTH_CLIENT_ID to a Google OAuth 2.0 Desktop app client ID for orgami-66nxok."
+if (-not [string]::IsNullOrWhiteSpace($env:ATTENDUS_GOOGLE_OAUTH_CLIENT_ID) -and $env:ATTENDUS_GOOGLE_OAUTH_CLIENT_ID -notmatch '^[A-Za-z0-9-]+\.apps\.googleusercontent\.com$') {
+  throw "ATTENDUS_GOOGLE_OAUTH_CLIENT_ID must be a valid Google OAuth 2.0 Desktop app client ID."
 }
 if (-not (Get-Command flutter -ErrorAction SilentlyContinue)) { throw "Flutter is required on the build machine." }
 

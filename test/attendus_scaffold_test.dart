@@ -24,11 +24,6 @@ const _destinations = [
     icon: Icons.person_outline,
     selectedIcon: Icons.person,
   ),
-  AttendUsNavDestination(
-    label: 'Account',
-    icon: Icons.menu_outlined,
-    selectedIcon: Icons.menu,
-  ),
 ];
 
 Widget _wrap(Widget child, {required Size size}) {

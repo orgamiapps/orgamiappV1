@@ -25,6 +25,7 @@ import 'package:attendus/screens/Home/help_screen.dart';
 import 'package:attendus/screens/Premium/premium_upgrade_screen_v2.dart';
 import 'package:attendus/screens/Premium/subscription_management_screen.dart';
 import 'package:attendus/screens/Premium/premium_features_screen.dart';
+import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/models/subscription_model.dart';
 import 'package:attendus/Services/subscription_service.dart';
 import 'package:attendus/Utils/logger.dart';
@@ -34,14 +35,16 @@ import 'package:attendus/Utils/cached_image.dart';
 import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
 
-class AccountScreen extends StatefulWidget {
-  const AccountScreen({super.key});
+class SettingsScreen extends StatefulWidget {
+  final bool showShellHeader;
+
+  const SettingsScreen({super.key, this.showShellHeader = true});
 
   @override
-  State<AccountScreen> createState() => _AccountScreenState();
+  State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _AccountScreenState extends State<AccountScreen> {
+class _SettingsScreenState extends State<SettingsScreen> {
   bool _isLoadingUserData = false;
   bool _isLoadingSubscription = false;
 
@@ -72,7 +75,7 @@ class _AccountScreenState extends State<AccountScreen> {
 
       if (Firebase.apps.isEmpty) {
         Logger.debug(
-          'AccountScreen: Firebase unavailable; skipping subscription load',
+          'SettingsScreen: Firebase unavailable; skipping subscription load',
         );
         return;
       }
@@ -90,10 +93,10 @@ class _AccountScreenState extends State<AccountScreen> {
       await subscriptionService.refresh();
 
       Logger.info(
-        'AccountScreen: Subscription loaded - hasPremium: ${subscriptionService.hasPremium}',
+        'SettingsScreen: Subscription loaded - hasPremium: ${subscriptionService.hasPremium}',
       );
     } catch (e) {
-      Logger.error('AccountScreen: Failed to load subscription data', e);
+      Logger.error('SettingsScreen: Failed to load subscription data', e);
     } finally {
       if (mounted) {
         setState(() => _isLoadingSubscription = false);
@@ -106,7 +109,7 @@ class _AccountScreenState extends State<AccountScreen> {
     // Check if user data needs to be loaded/refreshed
     final user = CustomerController.logeInCustomer;
     if (user == null) {
-      Logger.warning('AccountScreen: No logged in user found');
+      Logger.warning('SettingsScreen: No logged in user found');
       return;
     }
 
@@ -128,7 +131,7 @@ class _AccountScreenState extends State<AccountScreen> {
       }
 
       try {
-        Logger.info('AccountScreen: Refreshing user data...');
+        Logger.info('SettingsScreen: Refreshing user data...');
         final authService = AuthService();
         await authService.refreshUserData();
 
@@ -148,7 +151,7 @@ class _AccountScreenState extends State<AccountScreen> {
           await authService.refreshUserData();
         }
       } catch (e) {
-        Logger.warning('AccountScreen: Failed to refresh user data: $e');
+        Logger.warning('SettingsScreen: Failed to refresh user data: $e');
       } finally {
         if (mounted) {
           setState(() => _isLoadingUserData = false);
@@ -168,10 +171,16 @@ class _AccountScreenState extends State<AccountScreen> {
   Widget _bodyView() {
     return Column(
       children: [
-        const AttendUsTopBar(
-          title: 'Account',
-          subtitle: 'Profile, subscription, privacy, and support.',
-        ),
+        if (widget.showShellHeader)
+          AttendUsTopBar(
+            title: 'Settings',
+            subtitle: 'Manage your profile, plan, preferences, and privacy.',
+            leading: IconButton(
+              tooltip: 'Back to Profile',
+              onPressed: () => Navigator.of(context).maybePop(),
+              icon: const Icon(Icons.arrow_back),
+            ),
+          ),
         Expanded(
           child: Align(
             alignment: Alignment.topCenter,
@@ -184,7 +193,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 child: Column(
                   children: [
                     _buildProfileHeader(),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
                     _buildSettingsSection(),
                   ],
                 ),
@@ -198,6 +207,7 @@ class _AccountScreenState extends State<AccountScreen> {
 
   Widget _buildProfileHeader() {
     final user = CustomerController.logeInCustomer;
+    final isCompact = MediaQuery.sizeOf(context).width < 600;
     final displayName = user?.name.trim().isNotEmpty == true
         ? user!.name.trim()
         : _currentAuthDisplayName() ?? 'Attendus member';
@@ -205,16 +215,16 @@ class _AccountScreenState extends State<AccountScreen> {
 
     // Show loading indicator if user data is being refreshed
     if (_isLoadingUserData && user != null) {
-      Logger.debug('AccountScreen: Still loading user data...');
+      Logger.debug('SettingsScreen: Still loading user data...');
     }
 
     return AttendUsCard(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       child: Row(
         children: [
           Container(
-            width: 64,
-            height: 64,
+            width: 56,
+            height: 56,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(color: Theme.of(context).dividerColor),
@@ -225,8 +235,8 @@ class _AccountScreenState extends State<AccountScreen> {
                 if (imageUrl != null && imageUrl.isNotEmpty) {
                   return SafeNetworkImage(
                     imageUrl: imageUrl,
-                    width: 64,
-                    height: 64,
+                    width: 56,
+                    height: 56,
                     fit: BoxFit.cover,
                     errorWidget: _buildDefaultProfilePicture(),
                   );
@@ -258,31 +268,39 @@ class _AccountScreenState extends State<AccountScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          AttendUsButton.secondary(
-            label: 'View profile',
-            icon: Icons.person_outline,
-            onPressed: () {
-              if (user == null) {
-                ShowToast().showNormalToast(msg: 'User data not available');
-                return;
-              }
-
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      UserProfileScreen(user: user, isOwnProfile: true),
-                ),
-              ).then((_) {
-                if (mounted) {
-                  _ensureUserDataLoaded();
-                }
-              });
-            },
-          ),
+          if (isCompact)
+            IconButton.outlined(
+              tooltip: 'View profile',
+              icon: const Icon(Icons.person_outline),
+              onPressed: () => _openProfile(user),
+            )
+          else
+            AttendUsButton.secondary(
+              label: 'View profile',
+              icon: Icons.person_outline,
+              onPressed: () => _openProfile(user),
+            ),
         ],
       ),
     );
+  }
+
+  void _openProfile(CustomerModel? user) {
+    if (user == null) {
+      ShowToast().showNormalToast(msg: 'User data not available');
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserProfileScreen(user: user, isOwnProfile: true),
+      ),
+    ).then((_) {
+      if (mounted) {
+        _ensureUserDataLoaded();
+      }
+    });
   }
 
   Widget _buildDefaultProfilePicture() {
@@ -354,7 +372,7 @@ class _AccountScreenState extends State<AccountScreen> {
     try {
       subscriptionService = Provider.of<SubscriptionService>(context);
     } catch (e) {
-      Logger.warning('AccountScreen: Subscription provider unavailable: $e');
+      Logger.warning('SettingsScreen: Subscription provider unavailable: $e');
     }
 
     final isLoading =
@@ -362,138 +380,192 @@ class _AccountScreenState extends State<AccountScreen> {
     final hasPremium = subscriptionService?.hasPremium ?? false;
 
     if (isLoading) {
-      Logger.debug('AccountScreen: Loading subscription data...');
+      Logger.debug('SettingsScreen: Loading subscription data...');
     } else {
-      Logger.debug('AccountScreen: hasPremium = $hasPremium');
+      Logger.debug('SettingsScreen: hasPremium = $hasPremium');
     }
 
-    return AttendUsPageSection(
-      title: 'Settings',
-      subtitle: 'Manage your plan, privacy, preferences, and account.',
-      icon: Icons.settings_outlined,
-      framed: false,
-      child: Column(
-        children: [
-          // Show loading indicator while fetching subscription data
-          if (isLoading) ...[
-            _buildPremiumLoadingItem(),
-            _buildDivider(),
-          ]
-          // Premium upgrade button at top (only show if not premium and not loading)
-          else if (!hasPremium) ...[
-            subscriptionService == null
-                ? _buildPremiumUnavailableItem()
-                : _buildPremiumUpgradeItem(),
-            _buildDivider(),
-          ]
-          // If user has premium, show premium management
-          else if (hasPremium && subscriptionService != null) ...[
-            _buildPremiumManageItem(subscriptionService),
-            _buildDivider(),
-          ],
-          // Premium Features (only show if user has premium)
-          if (hasPremium) ...[
-            _buildSettingsItem(
-              icon: Icons.workspace_premium,
-              title: 'Premium Features',
-              subtitle: 'Access analytics and advanced tools',
-              onTap: () => RouterClass.nextScreenNormal(
-                context,
-                const PremiumFeaturesScreen(),
+    final membershipPanel = _buildSettingsPanel(
+      title: 'Membership',
+      icon: Icons.workspace_premium_outlined,
+      children: [
+        if (isLoading)
+          _buildPremiumLoadingItem()
+        else if (!hasPremium)
+          subscriptionService == null
+              ? _buildPremiumUnavailableItem()
+              : _buildPremiumUpgradeItem()
+        else if (subscriptionService != null)
+          _buildPremiumManageItem(subscriptionService),
+        if (hasPremium)
+          _buildSettingsItem(
+            icon: Icons.auto_awesome_outlined,
+            title: 'Premium features',
+            onTap: () => RouterClass.nextScreenNormal(
+              context,
+              const PremiumFeaturesScreen(),
+            ),
+          ),
+      ],
+    );
+
+    final preferencesPanel = _buildSettingsPanel(
+      title: 'Preferences',
+      icon: Icons.tune_outlined,
+      children: [
+        _buildDarkModeToggle(),
+        _buildSettingsItem(
+          icon: Icons.block_outlined,
+          title: 'Blocked users',
+          onTap: () =>
+              RouterClass.nextScreenNormal(context, const BlockedUsersScreen()),
+        ),
+      ],
+    );
+
+    final supportPanel = _buildSettingsPanel(
+      title: 'Support & Information',
+      icon: Icons.help_outline,
+      children: [
+        _buildSettingsItem(
+          icon: Icons.help_outline,
+          title: 'Help',
+          onTap: () =>
+              RouterClass.nextScreenNormal(context, const HelpScreen()),
+        ),
+        _buildSettingsItem(
+          icon: Icons.feedback_outlined,
+          title: 'Feedback',
+          onTap: () => RouterClass.nextScreenNormal(context, FeedbackScreen()),
+        ),
+        _buildSettingsItem(
+          icon: CupertinoIcons.info,
+          title: 'About Attendus',
+          onTap: () =>
+              RouterClass.nextScreenNormal(context, const AboutUsScreen()),
+        ),
+      ],
+    );
+
+    final accountPanel = _buildSettingsPanel(
+      title: 'Account & Legal',
+      icon: Icons.manage_accounts_outlined,
+      children: [
+        _buildSettingsItem(
+          icon: Icons.privacy_tip_outlined,
+          title: 'Privacy policy',
+          onTap: () => RouterClass.nextScreenNormal(
+            context,
+            const PrivacyPolicyScreen(),
+          ),
+        ),
+        _buildSettingsItem(
+          icon: CupertinoIcons.question_diamond,
+          title: 'Terms & conditions',
+          onTap: () => RouterClass.nextScreenNormal(
+            context,
+            const TermsConditionsScreen(),
+          ),
+        ),
+        _buildSettingsItem(
+          icon: Icons.logout,
+          title: 'Sign out',
+          onTap: _signOut,
+        ),
+        _buildSettingsItem(
+          icon: Icons.delete_forever_outlined,
+          title: 'Delete account',
+          subtitle: 'Permanently delete your account',
+          onTap: () => RouterClass.nextScreenNormal(
+            context,
+            const DeleteAccountScreen(),
+          ),
+          isDestructive: true,
+        ),
+      ],
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 840) {
+          return Column(
+            children: [
+              membershipPanel,
+              const SizedBox(height: 16),
+              preferencesPanel,
+              const SizedBox(height: 16),
+              supportPanel,
+              const SizedBox(height: 16),
+              accountPanel,
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                children: [
+                  membershipPanel,
+                  const SizedBox(height: 16),
+                  preferencesPanel,
+                ],
               ),
             ),
-            _buildDivider(),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                children: [
+                  supportPanel,
+                  const SizedBox(height: 16),
+                  accountPanel,
+                ],
+              ),
+            ),
           ],
-          // Feedback
-          _buildSettingsItem(
-            icon: Icons.feedback,
-            title: 'Feedback',
-            subtitle: 'Share your thoughts with us',
-            onTap: () =>
-                RouterClass.nextScreenNormal(context, FeedbackScreen()),
-          ),
-          _buildDivider(),
-          _buildSettingsItem(
-            icon: Icons.block,
-            title: 'Blocked Users',
-            subtitle: 'Manage your blocked list',
-            onTap: () => RouterClass.nextScreenNormal(
-              context,
-              const BlockedUsersScreen(),
-            ),
-          ),
-          _buildDivider(),
+        );
+      },
+    );
+  }
 
-          _buildSettingsItem(
-            icon: CupertinoIcons.info,
-            title: 'About Us',
-            subtitle: 'Learn more about our app',
-            onTap: () =>
-                RouterClass.nextScreenNormal(context, const AboutUsScreen()),
-          ),
-          _buildDivider(),
-          _buildSettingsItem(
-            icon: Icons.help,
-            title: 'Help',
-            subtitle: 'Get help and support',
-            onTap: () =>
-                RouterClass.nextScreenNormal(context, const HelpScreen()),
-          ),
-          _buildDivider(),
-          _buildDarkModeToggle(),
-          _buildDivider(),
-
-          _buildSettingsItem(
-            icon: Icons.delete_forever,
-            title: 'Delete Account',
-            subtitle: 'Permanently delete your account',
-            onTap: () => RouterClass.nextScreenNormal(
-              context,
-              const DeleteAccountScreen(),
+  Widget _buildSettingsPanel({
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    return AttendUsCard(
+      padding: EdgeInsets.zero,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AttendUsTokens.radiusMd),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+              child: AttendUsSectionHeader(title: title, icon: icon),
             ),
-          ),
-          _buildDivider(),
-          _buildSettingsItem(
-            icon: Icons.privacy_tip,
-            title: 'Privacy Policy',
-            subtitle: 'Read our privacy policy',
-            onTap: () => RouterClass.nextScreenNormal(
-              context,
-              const PrivacyPolicyScreen(),
-            ),
-          ),
-          _buildDivider(),
-          _buildSettingsItem(
-            icon: CupertinoIcons.question_diamond,
-            title: 'Terms & Conditions',
-            subtitle: 'Read our terms of service',
-            onTap: () => RouterClass.nextScreenNormal(
-              context,
-              const TermsConditionsScreen(),
-            ),
-          ),
-          _buildDivider(),
-          _buildSettingsItem(
-            icon: Icons.logout,
-            title: 'Logout',
-            subtitle: 'Sign out of your account',
-            onTap: () async {
-              try {
-                await AuthService().signOut();
-                if (mounted) {
-                  RouterClass().appRest(context: context);
-                }
-              } catch (e) {
-                ShowToast().showNormalToast(
-                  msg: 'Error signing out. Please try again.',
-                );
-              }
-            },
-            isDestructive: true,
-          ),
-        ],
+            for (var i = 0; i < children.length; i++) ...[
+              if (i > 0) _buildDivider(),
+              children[i],
+            ],
+          ],
+        ),
       ),
     );
+  }
+
+  Future<void> _signOut() async {
+    try {
+      await AuthService().signOut();
+      if (mounted) {
+        RouterClass().appRest(context: context);
+      }
+    } catch (e) {
+      ShowToast().showNormalToast(msg: 'Error signing out. Please try again.');
+    }
   }
 
   Widget _buildPremiumUnavailableItem() {
@@ -767,15 +839,15 @@ class _AccountScreenState extends State<AccountScreen> {
   Widget _buildSettingsItem({
     required IconData icon,
     required String title,
-    required String subtitle,
+    String? subtitle,
     required VoidCallback onTap,
     bool isDestructive = false,
   }) {
     return ListTile(
       onTap: onTap,
       leading: Container(
-        width: 40,
-        height: 40,
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
           color: isDestructive
               ? Theme.of(context).colorScheme.error.withValues(alpha: 0.1)
@@ -797,30 +869,32 @@ class _AccountScreenState extends State<AccountScreen> {
               ? Theme.of(context).colorScheme.error
               : Theme.of(context).textTheme.titleMedium?.color,
           fontWeight: FontWeight.w600,
-          fontSize: 16,
+          fontSize: 15,
           fontFamily: 'Roboto',
         ),
       ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(
-          color: Theme.of(context).textTheme.bodyMedium?.color,
-          fontSize: 14,
-          fontFamily: 'Roboto',
-        ),
-      ),
+      subtitle: subtitle == null
+          ? null
+          : Text(
+              subtitle,
+              style: TextStyle(
+                color: Theme.of(context).textTheme.bodyMedium?.color,
+                fontSize: 13,
+                fontFamily: 'Roboto',
+              ),
+            ),
       trailing: Icon(
-        Icons.arrow_forward_ios,
+        Icons.chevron_right,
         color: Theme.of(context).colorScheme.onSurfaceVariant,
         size: 16,
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     );
   }
 
   Widget _buildDivider() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
+      margin: const EdgeInsets.symmetric(horizontal: 16),
       height: 1,
       color: Theme.of(context).dividerColor,
     );
@@ -831,8 +905,8 @@ class _AccountScreenState extends State<AccountScreen> {
       builder: (context, themeProvider, child) {
         return ListTile(
           leading: Container(
-            width: 40,
-            height: 40,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
               color: Theme.of(
                 context,
@@ -850,7 +924,7 @@ class _AccountScreenState extends State<AccountScreen> {
             style: TextStyle(
               color: Theme.of(context).textTheme.titleMedium?.color,
               fontWeight: FontWeight.w600,
-              fontSize: 16,
+              fontSize: 15,
               fontFamily: 'Roboto',
             ),
           ),
@@ -865,7 +939,7 @@ class _AccountScreenState extends State<AccountScreen> {
             ),
           ),
           trailing: Icon(
-            Icons.arrow_forward_ios,
+            Icons.chevron_right,
             color: Theme.of(
               context,
             ).colorScheme.onSurface.withValues(alpha: 0.6),
@@ -873,8 +947,8 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
           onTap: () => _showThemeSelector(context, themeProvider),
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 8,
+            horizontal: 16,
+            vertical: 4,
           ),
         );
       },

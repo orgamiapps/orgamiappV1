@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/models/event_model.dart';
+import 'package:attendus/models/check_in_policy.dart';
 import 'package:attendus/models/event_question_model.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/screens/Home/dashboard_screen.dart';
@@ -22,7 +23,7 @@ import 'package:attendus/firebase/organization_helper.dart'; // ignore: unused_i
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/firebase/firebase_messaging_helper.dart';
 import 'package:attendus/screens/Events/location_picker_screen.dart';
-import 'package:attendus/screens/Events/Widget/sign_in_security_tier_selector.dart';
+import 'package:attendus/screens/Events/Widget/arrival_profile_selector.dart';
 import 'package:attendus/Services/creation_limit_service.dart';
 import 'package:attendus/widgets/limit_reached_dialog.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
@@ -44,9 +45,9 @@ class CreateEventScreen extends StatefulWidget {
     this.selectedDateTime,
     this.eventDurationHours,
     this.selectedLocation = const LatLng(0, 0),
-    this.radios = 10,
+    this.radios = 30,
     this.selectedSignInMethods,
-    this.selectedSignInTier = 'regular',
+    this.selectedSignInTier,
     this.manualCode,
     this.questions,
     this.preselectedOrganizationId,
@@ -100,6 +101,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   String _selectedSignInTier =
       'regular'; // 'most_secure', 'geofence_only', 'regular', or 'all'
   late List<String> _selectedSignInMethods; // Legacy support
+  CheckInPolicy _checkInPolicy = const CheckInPolicy();
   String? _manualCode;
 
   // Animation controllers
@@ -162,6 +164,9 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   String _locationType = 'in_person';
   String? _selectedPlaceId;
   String? _selectedPlaceName;
+  String _selectedCity = '';
+  String _selectedRegionCode = '';
+  String _selectedCountryCode = 'US';
   bool _isResolvingAddress = false;
 
   Future<void> _pickLocation() async {
@@ -183,6 +188,11 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         _selectedPlaceId = picked.placeId;
         _selectedPlaceName = picked.displayName;
         _resolvedAddress = picked.formattedAddress;
+        _selectedCity = picked.city;
+        _selectedRegionCode = picked.regionCode;
+        _selectedCountryCode = picked.countryCode.isEmpty
+            ? 'US'
+            : picked.countryCode;
         locationEdtController.text = picked.formattedAddress;
         locationNameEdtController.text = picked.displayName.isNotEmpty
             ? picked.displayName
@@ -200,11 +210,12 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         _selectedRadius = null;
         _selectedPlaceId = null;
         _selectedPlaceName = null;
+        _selectedCity = '';
+        _selectedRegionCode = '';
+        _selectedCountryCode = 'US';
         _resolvedAddress = null;
         locationEdtController.clear();
         locationNameEdtController.clear();
-        _selectedSignInTier = 'regular';
-        _selectedSignInMethods = _methodsForSecurityTier('regular');
       } else {
         locationNameEdtController.clear();
       }
@@ -335,23 +346,6 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           ),
         );
         return;
-      }
-      // If geofence sign-in is selected, require a map location
-      if (_selectedSignInMethods.contains('geofence') ||
-          _selectedSignInTier == 'most_secure' ||
-          _selectedSignInTier == 'all') {
-        if (!hasLocation) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Please pick the event location to enable geofence sign-in',
-              ),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return;
-        }
       }
       if (!_hasDateTime) {
         if (!mounted) return;
@@ -547,6 +541,9 @@ class _CreateEventScreenState extends State<CreateEventScreen>
               : null,
           locationType: _locationType,
           placeId: hasLocation ? _selectedPlaceId : null,
+          city: hasLocation ? _selectedCity : '',
+          regionCode: hasLocation ? _selectedRegionCode : '',
+          countryCode: hasLocation ? _selectedCountryCode : '',
           customerUid: currentUser.uid,
           imageUrl: thumbnailUrlCtlr.text,
           selectedDateTime: _startDateTime,
@@ -563,6 +560,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           accessList: privateEvent ? [currentUser.uid] : const [],
           signInMethods: _selectedSignInMethods,
           signInSecurityTier: _selectedSignInTier, // Add security tier
+          checkInPolicy: _checkInPolicy,
           manualCode: _manualCode,
         );
 
@@ -666,12 +664,11 @@ class _CreateEventScreenState extends State<CreateEventScreen>
     _selectedRadius = widget.radios;
 
     // Initialize sign-in tier and methods
-    _selectedSignInTier = widget.selectedSignInTier ?? 'regular';
-    final List<String>? suppliedMethods = widget.selectedSignInMethods;
-    _selectedSignInMethods =
-        suppliedMethods != null && suppliedMethods.isNotEmpty
-        ? List<String>.from(suppliedMethods)
-        : _methodsForSecurityTier(_selectedSignInTier);
+    _selectedSignInTier = widget.selectedSignInTier ?? 'all';
+    _checkInPolicy = widget.selectedSignInTier == null
+        ? const CheckInPolicy()
+        : CheckInPolicy.fromLegacyTier(widget.selectedSignInTier);
+    _selectedSignInMethods = _methodsForPolicy(_checkInPolicy.profile);
     _manualCode = widget.manualCode;
 
     // Load user's organizations (lightweight)
@@ -857,6 +854,11 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         _buildOrganizationSelector(),
         const SizedBox(height: 16),
         _buildFormFields(),
+        const SizedBox(height: 16),
+        ArrivalProfileSelector(
+          policy: _checkInPolicy,
+          onChanged: _updateCheckInPolicy,
+        ),
         const SizedBox(height: 16),
         _buildAdvancedOptions(),
         const SizedBox(height: 100),
@@ -1425,20 +1427,23 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           ),
           const SizedBox(height: 12),
           if (_userOrganizations.isEmpty)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const CircleAvatar(child: Icon(Icons.person_outline)),
-              title: Text(
-                widget.forceOrganizationEvent
-                    ? 'Loading group...'
-                    : (groupNameEdtController.text.isEmpty
-                          ? 'Personal event'
-                          : groupNameEdtController.text),
-              ),
-              subtitle: Text(
-                widget.forceOrganizationEvent
-                    ? 'This event must be hosted by the selected group'
-                    : 'Personal event - Public by default',
+            Material(
+              color: Colors.transparent,
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                title: Text(
+                  widget.forceOrganizationEvent
+                      ? 'Loading group...'
+                      : (groupNameEdtController.text.isEmpty
+                            ? 'Personal event'
+                            : groupNameEdtController.text),
+                ),
+                subtitle: Text(
+                  widget.forceOrganizationEvent
+                      ? 'This event must be hosted by the selected group'
+                      : 'Personal event - Public by default',
+                ),
               ),
             )
           else
@@ -1500,11 +1505,6 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   }
 
   Widget _buildAdvancedOptions() {
-    final bool needsMapPin =
-        _locationType == 'in_person' && _selectedSignInTier == 'most_secure' ||
-        (_locationType == 'in_person' &&
-            (_selectedSignInTier == 'geofence_only' ||
-                _selectedSignInTier == 'all'));
     return Material(
       color: Colors.white,
       shape: RoundedRectangleBorder(
@@ -1525,7 +1525,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
         subtitle: const Text(
-          'Description, image, categories, visibility, and check-in settings',
+          'Description, image, categories, visibility, and questions',
         ),
         children: [
           const Divider(),
@@ -1545,57 +1545,30 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           const SizedBox(height: 20),
           _buildVisibilityToggle(),
           const SizedBox(height: 20),
-          SignInSecurityTierSelector(
-            selectedTier: _selectedSignInTier,
-            onTierChanged: _updateSecurityTier,
-          ),
-          if (needsMapPin) ...[
-            const SizedBox(height: 20),
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'A precise map pin is required for the selected security mode.',
-                style: TextStyle(
-                  color: Color(0xFFB45309),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(height: 20),
           _buildQuestionsSection(),
         ],
       ),
     );
   }
 
-  List<String> _methodsForSecurityTier(String tier) {
-    switch (tier) {
-      case 'most_secure':
-        return ['geofence', 'facial_recognition'];
-      case 'geofence_only':
-        return ['geofence'];
-      case 'all':
-        return ['geofence', 'facial_recognition', 'qr_code', 'manual_code'];
-      case 'regular':
-      default:
-        return ['qr_code', 'manual_code'];
-    }
-  }
+  List<String> _methodsForPolicy(CheckInProfile profile) => switch (profile) {
+    CheckInProfile.selfCheckIn => ['qr_code', 'manual_code'],
+    CheckInProfile.staffEntry => ['personal_pass', 'staff_roster'],
+    CheckInProfile.hybrid => [
+      'qr_code',
+      'manual_code',
+      'personal_pass',
+      'staff_roster',
+    ],
+  };
 
-  void _updateSecurityTier(String tier) {
-    if (_locationType == 'online' &&
-        (tier == 'most_secure' || tier == 'geofence_only' || tier == 'all')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Geofence sign-in is unavailable for online events'),
-        ),
-      );
-      return;
-    }
+  void _updateCheckInPolicy(CheckInPolicy policy) {
     setState(() {
-      _selectedSignInTier = tier;
-      _selectedSignInMethods = _methodsForSecurityTier(tier);
+      _checkInPolicy = policy;
+      _selectedSignInTier = policy.profile == CheckInProfile.hybrid
+          ? 'all'
+          : 'regular';
+      _selectedSignInMethods = _methodsForPolicy(policy.profile);
     });
   }
 
@@ -1639,19 +1612,22 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           if (_questions.isNotEmpty) ...[
             const SizedBox(height: 8),
             for (var index = 0; index < _questions.length; index++)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.help_outline),
-                title: Text(_questions[index].questionTitle),
-                subtitle: Text(
-                  _questions[index].required ? 'Required' : 'Optional',
-                ),
-                trailing: IconButton(
-                  tooltip: 'Remove question',
-                  onPressed: () {
-                    setState(() => _questions.removeAt(index));
-                  },
-                  icon: const Icon(Icons.close),
+              Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.help_outline),
+                  title: Text(_questions[index].questionTitle),
+                  subtitle: Text(
+                    _questions[index].required ? 'Required' : 'Optional',
+                  ),
+                  trailing: IconButton(
+                    tooltip: 'Remove question',
+                    onPressed: () {
+                      setState(() => _questions.removeAt(index));
+                    },
+                    icon: const Icon(Icons.close),
+                  ),
                 ),
               ),
           ],
@@ -1683,13 +1659,16 @@ class _CreateEventScreenState extends State<CreateEventScreen>
                     ),
                   ),
                   const SizedBox(height: 12),
-                  SwitchListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Required answer'),
-                    value: isRequired,
-                    onChanged: (value) {
-                      setDialogState(() => isRequired = value);
-                    },
+                  Material(
+                    color: Colors.transparent,
+                    child: SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Required answer'),
+                      value: isRequired,
+                      onChanged: (value) {
+                        setDialogState(() => isRequired = value);
+                      },
+                    ),
                   ),
                 ],
               ),

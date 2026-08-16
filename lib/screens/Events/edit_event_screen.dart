@@ -8,6 +8,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:attendus/models/event_model.dart';
+import 'package:attendus/models/check_in_policy.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/screens/Events/Widget/delete_event_dialogue.dart';
 
@@ -15,7 +16,7 @@ import 'package:attendus/Utils/text_fields.dart';
 import 'package:attendus/Utils/toast.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
-import 'package:attendus/screens/Events/Widget/sign_in_security_tier_selector.dart';
+import 'package:attendus/screens/Events/Widget/arrival_profile_selector.dart';
 import 'package:attendus/screens/Events/location_picker_screen.dart';
 import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
@@ -64,6 +65,7 @@ class _EditEventScreenState extends State<EditEventScreen>
   String _selectedSignInTier =
       'regular'; // 'most_secure', 'geofence_only', 'regular', or 'all'
   List<String> _selectedSignInMethods = ['qr_code', 'manual_code'];
+  CheckInPolicy _checkInPolicy = const CheckInPolicy();
   String? _manualCode;
 
   // Location selection
@@ -73,6 +75,9 @@ class _EditEventScreenState extends State<EditEventScreen>
   String _locationType = 'in_person';
   String? _selectedPlaceId;
   String? _selectedPlaceName;
+  String _selectedCity = '';
+  String _selectedRegionCode = '';
+  String _selectedCountryCode = 'US';
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -142,11 +147,15 @@ class _EditEventScreenState extends State<EditEventScreen>
     _selectedCategories = List.from(event.categories);
     privateEvent = event.private;
     _selectedSignInTier = event.signInSecurityTier ?? 'regular';
-    _selectedSignInMethods = List.from(event.signInMethods);
+    _checkInPolicy = event.checkInPolicy;
+    _syncLegacyAttendanceFields();
     _manualCode = event.manualCode;
     _locationType = event.locationType;
     _selectedPlaceId = event.placeId;
     _selectedPlaceName = event.locationName;
+    _selectedCity = event.city;
+    _selectedRegionCode = event.regionCode;
+    _selectedCountryCode = event.countryCode;
     _resolvedAddress = event.location;
 
     // Initialize location and radius
@@ -157,8 +166,6 @@ class _EditEventScreenState extends State<EditEventScreen>
         : const LatLng(0, 0);
     _selectedRadius = event.radius;
     if (_locationType == 'online') {
-      _selectedSignInTier = 'regular';
-      _selectedSignInMethods = const ['qr_code', 'manual_code'];
       _selectedPlaceId = null;
       _selectedPlaceName = null;
       _selectedRadius = null;
@@ -226,6 +233,11 @@ class _EditEventScreenState extends State<EditEventScreen>
         _selectedPlaceId = picked.placeId;
         _selectedPlaceName = picked.displayName;
         _resolvedAddress = picked.formattedAddress;
+        _selectedCity = picked.city;
+        _selectedRegionCode = picked.regionCode;
+        _selectedCountryCode = picked.countryCode.isEmpty
+            ? 'US'
+            : picked.countryCode;
         locationEdtController.text = picked.formattedAddress;
         _hasChanges = true;
       });
@@ -241,12 +253,11 @@ class _EditEventScreenState extends State<EditEventScreen>
       _selectedRadius = value == 'in_person' ? 100 : null;
       _selectedPlaceId = null;
       _selectedPlaceName = null;
+      _selectedCity = '';
+      _selectedRegionCode = '';
+      _selectedCountryCode = 'US';
       _resolvedAddress = null;
       locationEdtController.clear();
-      if (value == 'online') {
-        _selectedSignInTier = 'regular';
-        _selectedSignInMethods = const ['qr_code', 'manual_code'];
-      }
     });
   }
 
@@ -369,6 +380,10 @@ class _EditEventScreenState extends State<EditEventScreen>
           locationName: hasPhysicalLocation ? _selectedPlaceName : null,
           locationType: _locationType,
           placeId: hasPhysicalLocation ? _selectedPlaceId : null,
+          geohash: widget.eventModel.geohash,
+          city: hasPhysicalLocation ? _selectedCity : '',
+          regionCode: hasPhysicalLocation ? _selectedRegionCode : '',
+          countryCode: hasPhysicalLocation ? _selectedCountryCode : '',
           groupName: groupNameEdtController.text.trim(),
           imageUrl: imageUrl ?? '', // Use empty string if no image
           selectedDateTime: widget.eventModel.selectedDateTime,
@@ -382,6 +397,7 @@ class _EditEventScreenState extends State<EditEventScreen>
           ticketsEnabled: widget.eventModel.ticketsEnabled,
           maxTickets: widget.eventModel.maxTickets,
           issuedTickets: widget.eventModel.issuedTickets,
+          saveCount: widget.eventModel.saveCount,
           isFeatured: widget.eventModel.isFeatured,
           status: widget.eventModel.status,
           eventGenerateTime: widget.eventModel.eventGenerateTime,
@@ -393,6 +409,7 @@ class _EditEventScreenState extends State<EditEventScreen>
               : 0,
           eventDuration: widget.eventModel.eventDuration,
           coHosts: widget.eventModel.coHosts,
+          checkInStaff: widget.eventModel.checkInStaff,
           ticketPrice: widget.eventModel.ticketPrice,
           ticketUpgradeEnabled: widget.eventModel.ticketUpgradeEnabled,
           ticketUpgradePrice: widget.eventModel.ticketUpgradePrice,
@@ -400,6 +417,7 @@ class _EditEventScreenState extends State<EditEventScreen>
           accessList: widget.eventModel.accessList,
           signInMethods: _selectedSignInMethods,
           signInSecurityTier: _selectedSignInTier, // Add security tier
+          checkInPolicy: _checkInPolicy,
           manualCode: _manualCode,
           hasLiveQuiz: widget.eventModel.hasLiveQuiz,
           liveQuizId: widget.eventModel.liveQuizId,
@@ -409,10 +427,14 @@ class _EditEventScreenState extends State<EditEventScreen>
           '🔍 DEBUG: Updating Firestore document: ${widget.eventModel.id}',
         );
         // Update in Firestore
+        final updateData = updatedEvent.toJson()
+          ..remove('geohash')
+          ..remove('countryCode')
+          ..remove('saveCount');
         await FirebaseFirestore.instance
             .collection(EventModel.firebaseKey)
             .doc(widget.eventModel.id)
-            .update(updatedEvent.toJson());
+            .update(updateData);
 
         debugPrint('✅ SUCCESS: Event updated in Firestore');
         _btnCtlr.success();
@@ -1102,50 +1124,32 @@ class _EditEventScreenState extends State<EditEventScreen>
   }
 
   Widget _buildSignInMethodsSection() {
-    return SignInSecurityTierSelector(
-      selectedTier: _selectedSignInTier,
-      onTierChanged: (tier) {
-        if (_locationType == 'online' &&
-            (tier == 'most_secure' ||
-                tier == 'geofence_only' ||
-                tier == 'all')) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Geofence sign-in is unavailable for online events',
-              ),
-            ),
-          );
-          return;
-        }
+    return ArrivalProfileSelector(
+      policy: _checkInPolicy,
+      onChanged: (policy) {
         setState(() {
-          _selectedSignInTier = tier;
+          _checkInPolicy = policy;
+          _syncLegacyAttendanceFields();
           _hasChanges = true;
-
-          // Update legacy methods list based on tier
-          switch (tier) {
-            case 'most_secure':
-              _selectedSignInMethods = ['geofence', 'facial_recognition'];
-              break;
-            case 'geofence_only':
-              _selectedSignInMethods = ['geofence'];
-              break;
-            case 'regular':
-              _selectedSignInMethods = ['qr_code', 'manual_code'];
-              break;
-            case 'all':
-              _selectedSignInMethods = [
-                'geofence',
-                'facial_recognition',
-                'qr_code',
-                'manual_code',
-              ];
-              break;
-          }
         });
       },
-      isEditing: true,
     );
+  }
+
+  void _syncLegacyAttendanceFields() {
+    _selectedSignInTier = _checkInPolicy.profile == CheckInProfile.hybrid
+        ? 'all'
+        : 'regular';
+    _selectedSignInMethods = switch (_checkInPolicy.profile) {
+      CheckInProfile.selfCheckIn => ['qr_code', 'manual_code'],
+      CheckInProfile.staffEntry => ['personal_pass', 'staff_roster'],
+      CheckInProfile.hybrid => [
+        'qr_code',
+        'manual_code',
+        'personal_pass',
+        'staff_roster',
+      ],
+    };
   }
 
   Widget _buildPrivacySection() {

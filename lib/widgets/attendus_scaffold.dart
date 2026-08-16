@@ -7,11 +7,13 @@ class AttendUsNavDestination {
   final String label;
   final IconData icon;
   final IconData selectedIcon;
+  final bool requiresAccount;
 
   const AttendUsNavDestination({
     required this.label,
     required this.icon,
     required this.selectedIcon,
+    this.requiresAccount = false,
   });
 }
 
@@ -132,8 +134,14 @@ class AttendUsScaffold extends StatelessWidget {
         destinations: [
           for (final destination in destinations)
             NavigationDestination(
-              icon: Icon(destination.icon),
-              selectedIcon: Icon(destination.selectedIcon),
+              icon: _DestinationIcon(
+                icon: destination.icon,
+                locked: destination.requiresAccount,
+              ),
+              selectedIcon: _DestinationIcon(
+                icon: destination.selectedIcon,
+                locked: destination.requiresAccount,
+              ),
               label: destination.label,
             ),
         ],
@@ -244,6 +252,8 @@ class _AttendUsSidebar extends StatelessWidget {
                                 ? theme.colorScheme.primary
                                 : theme.colorScheme.onSurfaceVariant,
                           ),
+                          if (!expanded && destination.requiresAccount)
+                            const _LockDot(),
                           if (expanded) ...[
                             const SizedBox(width: 12),
                             Expanded(
@@ -258,6 +268,14 @@ class _AttendUsSidebar extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            if (destination.requiresAccount) ...[
+                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.lock_outline,
+                                size: 16,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ],
                           ],
                         ],
                       ),
@@ -279,6 +297,39 @@ class _AttendUsSidebar extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DestinationIcon extends StatelessWidget {
+  final IconData icon;
+  final bool locked;
+
+  const _DestinationIcon({required this.icon, required this.locked});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!locked) return Icon(icon);
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(icon),
+        const Positioned(right: -7, top: -5, child: _LockDot()),
+      ],
+    );
+  }
+}
+
+class _LockDot extends StatelessWidget {
+  const _LockDot();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(2),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      shape: BoxShape.circle,
+    ),
+    child: const Icon(Icons.lock, size: 10),
+  );
 }
 
 class _NotificationButton extends StatelessWidget {
@@ -346,7 +397,7 @@ class _ProfileButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final displayName = (name == null || name!.trim().isEmpty)
-        ? 'Account'
+        ? 'Profile'
         : name!.trim();
     return Tooltip(
       message: displayName,

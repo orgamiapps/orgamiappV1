@@ -32,6 +32,7 @@ class PlaceDetails {
   final String formattedAddress;
   final String city;
   final String regionCode;
+  final String countryCode;
   final LatLng location;
 
   const PlaceDetails({
@@ -41,6 +42,7 @@ class PlaceDetails {
     required this.location,
     this.city = '',
     this.regionCode = '',
+    this.countryCode = '',
   });
 
   factory PlaceDetails.fromMap(Map<String, dynamic> data) {
@@ -50,6 +52,7 @@ class PlaceDetails {
       formattedAddress: data['formattedAddress']?.toString() ?? '',
       city: data['city']?.toString() ?? '',
       regionCode: data['regionCode']?.toString() ?? '',
+      countryCode: data['countryCode']?.toString() ?? '',
       location: LatLng(
         (data['latitude'] as num).toDouble(),
         (data['longitude'] as num).toDouble(),
@@ -100,12 +103,17 @@ class PlacesService {
     required String sessionToken,
     bool citiesOnly = false,
     LatLng? locationBias,
+    bool discoveryOnly = false,
   }) async {
     try {
       final result = await _functions.httpsCallable('placesAutocomplete').call({
         'query': query,
         'sessionToken': sessionToken,
-        'useCase': citiesOnly ? 'groupCity' : 'event',
+        'useCase': discoveryOnly
+            ? 'discoveryCity'
+            : citiesOnly
+            ? 'groupCity'
+            : 'event',
         if (locationBias != null)
           'locationBias': {
             'latitude': locationBias.latitude,
@@ -133,11 +141,13 @@ class PlacesService {
   Future<PlaceDetails> details({
     required String placeId,
     required String sessionToken,
+    bool discoveryOnly = false,
   }) async {
     try {
       final result = await _functions.httpsCallable('placeDetails').call({
         'placeId': placeId,
         'sessionToken': sessionToken,
+        'useCase': discoveryOnly ? 'discoveryCity' : 'event',
       });
       return PlaceDetails.fromMap(
         Map<String, dynamic>.from(result.data as Map),
@@ -151,17 +161,24 @@ class PlacesService {
     }
   }
 
-  Future<PlaceDetails> reverseGeocode(LatLng location) async {
+  Future<PlaceDetails> reverseGeocode(
+    LatLng location, {
+    bool discoveryOnly = false,
+  }) async {
     try {
       final result = await _functions.httpsCallable('reverseGeocode').call({
         'latitude': location.latitude,
         'longitude': location.longitude,
+        'useCase': discoveryOnly ? 'discoveryCity' : 'event',
       });
       final data = Map<String, dynamic>.from(result.data as Map);
       return PlaceDetails(
         placeId: data['placeId']?.toString(),
         displayName: '',
         formattedAddress: data['formattedAddress']?.toString() ?? '',
+        city: data['city']?.toString() ?? '',
+        regionCode: data['regionCode']?.toString() ?? '',
+        countryCode: data['countryCode']?.toString() ?? '',
         location: location,
       );
     } on FirebaseFunctionsException catch (error) {

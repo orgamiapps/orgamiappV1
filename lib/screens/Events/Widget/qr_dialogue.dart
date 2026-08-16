@@ -37,8 +37,7 @@ class _ShareQRDialogState extends State<ShareQRDialog>
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
 
-  String get qrData =>
-      'orgami_app_code_${singleEvent.isSignInMethodEnabled('manual_code') ? singleEvent.getManualCode() : singleEvent.id}';
+  String get qrData => 'attendus_event:v1:${singleEvent.id}';
   String get uniqueId => singleEvent.displayId;
   String get rawUniqueId => singleEvent.rawId;
   String get eventTitle => singleEvent.title;
@@ -144,7 +143,7 @@ class _ShareQRDialogState extends State<ShareQRDialog>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Share QR Code & Event ID',
+                  'Event Share QR',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -322,7 +321,7 @@ class _ShareQRDialogState extends State<ShareQRDialog>
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Scan this QR code or use the Event ID to join the event',
+                    'This permanent QR opens event details. It never records attendance.',
                     style: TextStyle(
                       fontSize: 13,
                       color: AppThemeColor.darkBlueColor.withValues(alpha: 0.8),

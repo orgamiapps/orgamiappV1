@@ -1,20 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:attendus/controller/customer_controller.dart';
-import 'package:attendus/firebase/firebase_firestore_helper.dart';
-import 'package:attendus/models/attendance_model.dart';
-import 'package:attendus/models/event_model.dart';
 import 'package:attendus/Permissions/permissions_helper.dart';
-import 'package:attendus/screens/QRScanner/ans_questions_to_sign_in_event_screen.dart';
 import 'package:attendus/Utils/colors.dart';
-import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/dimensions.dart';
 import 'package:attendus/Utils/qr_debug_helper.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:attendus/screens/Events/single_event_screen.dart';
 
 class ModernQRScannerScreen extends StatefulWidget {
   const ModernQRScannerScreen({super.key});
@@ -31,10 +23,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
   Future<bool>? _cameraInitFuture;
 
   final TextEditingController _codeController = TextEditingController();
-  final TextEditingController _nameController = TextEditingController();
 
-  bool _isAnonymousSignIn = false;
-  bool _isLoading = false;
   bool _isManualEntry = false;
   bool _isFlashOn = false;
   bool _isCameraPermissionGranted = false;
@@ -396,7 +385,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
   Widget _buildManualEntrySection() {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      height: _isManualEntry ? 200 : 60,
+      height: _isManualEntry ? 135 : 60,
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
         color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.1),
@@ -460,19 +449,9 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
                   const SizedBox(height: 10),
                   _buildTextField(
                     controller: _codeController,
-                    hintText: 'Enter event code',
+                    hintText: 'Enter six-character venue code',
                     icon: Icons.qr_code,
                   ),
-                  const SizedBox(height: 15),
-                  if (CustomerController.logeInCustomer == null) ...[
-                    _buildTextField(
-                      controller: _nameController,
-                      hintText: 'Enter your name',
-                      icon: Icons.person,
-                    ),
-                    const SizedBox(height: 15),
-                  ],
-                  _buildAnonymousToggle(),
                 ],
               ),
             ),
@@ -523,47 +502,6 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
           filled: true,
           fillColor: AppThemeColor.pureWhiteColor,
         ),
-      ),
-    );
-  }
-
-  Widget _buildAnonymousToggle() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Transform.scale(
-            scale: 0.8,
-            child: Checkbox(
-              value: _isAnonymousSignIn,
-              onChanged: (value) {
-                setState(() {
-                  _isAnonymousSignIn = value ?? false;
-                });
-              },
-              activeColor: AppThemeColor.darkGreenColor,
-              side: BorderSide(
-                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.5),
-                width: 2,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Sign in anonymously',
-              style: TextStyle(
-                color: AppThemeColor.pureWhiteColor,
-                fontSize: Dimensions.fontSizeSmall,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -640,7 +578,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
 
   Widget _buildSignInButton() {
     return GestureDetector(
-      onTap: _isLoading ? null : _handleSignIn,
+      onTap: _handleSignIn,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 15),
         decoration: BoxDecoration(
@@ -657,21 +595,8 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (_isLoading) ...[
-              SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    AppThemeColor.pureWhiteColor,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-            ],
             Text(
-              _isLoading ? 'Signing In...' : 'Sign In',
+              'Continue',
               style: TextStyle(
                 color: AppThemeColor.pureWhiteColor,
                 fontSize: Dimensions.fontSizeDefault,
@@ -760,17 +685,29 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
         // Handle different QR code formats
         String? eventCode;
 
-        // Check for event QR code format
-        if (scannedCode.contains('orgami_app_code_')) {
-          eventCode = scannedCode.split('orgami_app_code_').last;
-          debugPrint('Event QR detected, event code: $eventCode');
+        // Attendance 2.0 keeps venue credentials and event-share links
+        // distinct. Only the rotating venue credential can record attendance.
+        if (scannedCode.startsWith('attendus_checkin:v1:')) {
+          eventCode = scannedCode;
+          debugPrint('Rotating venue credential detected');
+        } else if (scannedCode.startsWith('attendus_event:v1:')) {
+          eventCode = scannedCode;
+          debugPrint('Permanent event-share QR detected');
+        }
+        // Legacy static event QRs now open event details and never check in.
+        else if (scannedCode.contains('orgami_app_code_')) {
+          final legacyId = scannedCode.split('orgami_app_code_').last;
+          eventCode = 'attendus_event:v1:$legacyId';
+          debugPrint('Legacy event-share QR detected: $legacyId');
         }
         // Check for ticket QR code format
         else if (scannedCode.startsWith('orgami_ticket_')) {
           final parts = scannedCode.split('_');
           if (parts.length >= 4) {
-            eventCode = parts[3]; // eventId from ticket QR
-            debugPrint('Ticket QR detected, extracted event code: $eventCode');
+            ShowToast().showNormalToast(
+              msg: 'Show this personal ticket to event staff for scanning.',
+            );
+            return;
           }
         }
         // Check for user badge QR code format
@@ -804,108 +741,18 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
 
   Future<void> _handleSignIn() async {
     if (_codeController.text.isEmpty) {
-      ShowToast().showNormalToast(msg: 'Please enter an event code!');
+      ShowToast().showNormalToast(msg: 'Enter the six-character venue code.');
       return;
     }
-
-    if (CustomerController.logeInCustomer == null &&
-        _nameController.text.isEmpty &&
-        !_isAnonymousSignIn) {
-      ShowToast().showNormalToast(msg: 'Please enter your name!');
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      String docId;
-      if (CustomerController.logeInCustomer != null) {
-        docId =
-            '${_codeController.text}-${CustomerController.logeInCustomer!.uid}';
-      } else {
-        docId = FirebaseFirestore.instance
-            .collection(AttendanceModel.firebaseKey)
-            .doc()
-            .id;
-      }
-
-      AttendanceModel newAttendanceModel = AttendanceModel(
-        id: docId,
-        eventId: _codeController.text,
-        userName: _isAnonymousSignIn
-            ? 'Anonymous'
-            : (CustomerController.logeInCustomer?.name ?? _nameController.text),
-        customerUid: CustomerController.logeInCustomer?.uid ?? 'without_login',
-        attendanceDateTime: DateTime.now(),
-        answers: [],
-        isAnonymous: _isAnonymousSignIn,
-        realName: _isAnonymousSignIn
-            ? (CustomerController.logeInCustomer?.name ?? _nameController.text)
-            : null,
-      );
-
-      // Try to find event by ID or manual code
-      EventModel? eventExist = await FirebaseFirestoreHelper().getSingleEvent(
-        newAttendanceModel.eventId,
-      );
-
-      // If not found by ID, try to find by manual code
-      eventExist ??= await _findEventByManualCode(newAttendanceModel.eventId);
-
-      if (eventExist != null) {
-        // Check for sign-in prompts
-        final questions = await FirebaseFirestoreHelper().getEventQuestions(
-          eventId: eventExist.id,
-        );
-
-        if (questions.isNotEmpty) {
-          _codeController.text = '';
-          if (!mounted) return;
-          RouterClass.nextScreenAndReplacement(
-            context,
-            AnsQuestionsToSignInEventScreen(
-              eventModel: eventExist,
-              newAttendance: newAttendanceModel,
-              nextPageRoute: 'modernQrScanner',
-            ),
-          );
-        } else {
-          // No prompts, sign in directly
-          await FirebaseFirestore.instance
-              .collection(AttendanceModel.firebaseKey)
-              .doc(newAttendanceModel.id)
-              .set(newAttendanceModel.toJson());
-
-          ShowToast().showNormalToast(msg: 'Signed In Successfully!');
-
-          // Navigate to event details after a short delay
-          Future.delayed(const Duration(seconds: 1), () {
-            if (!mounted) return;
-            RouterClass.nextScreenAndReplacement(
-              context,
-              SingleEventScreen(eventModel: eventExist!),
-            );
-          });
-        }
-      } else {
-        ShowToast().showNormalToast(msg: 'Entered an incorrect code!');
-      }
-    } catch (e) {
-      debugPrint('Error signing in: $e');
-      ShowToast().showNormalToast(msg: 'Failed to sign in. Please try again.');
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    HapticFeedback.lightImpact();
+    Navigator.of(context).pop(_codeController.text.trim().toUpperCase());
   }
 
   @override
   void dispose() {
     _animationController.dispose();
     _pulseController.dispose();
+    _codeController.dispose();
     super.dispose();
   }
 
@@ -924,22 +771,5 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
       controller?.pauseCamera();
     }
     controller?.resumeCamera();
-  }
-
-  Future<EventModel?> _findEventByManualCode(String manualCode) async {
-    try {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection(EventModel.firebaseKey)
-          .where('manualCode', isEqualTo: manualCode)
-          .get();
-
-      if (querySnapshot.docs.isNotEmpty) {
-        return EventModel.fromJson(querySnapshot.docs.first.data());
-      }
-      return null;
-    } catch (e) {
-      debugPrint('Error finding event by manual code: $e');
-      return null;
-    }
   }
 }

@@ -23,9 +23,26 @@ for (const role of ["ordinary", "super_admin", "support", "billing_admin", "anal
   test(`${role} client cannot write server-only collections`, async () => {
     const token = role === "ordinary" ? {} : {admin: true, role};
     const db = env.authenticatedContext(`${role}-uid`, token).firestore();
-    for (const collection of ["admin_roles", "admin_audit_logs", "admin_metrics_daily", "admin_metrics_current", "admin_jobs", "subscriptions"]) await assertFails(db.collection(collection).doc("target").set({roles: ["super_admin"], tier: "premium"}));
+    for (const collection of [
+      "admin_roles", "admin_audit_logs", "admin_metrics_daily",
+      "admin_metrics_current", "admin_jobs", "subscriptions",
+      "CheckInSessions", "CheckInAudit", "check_in_session_secrets",
+      "check_in_idempotency", "check_in_event_state", "service_rate_limits",
+      "scheduledNotifications", "_user_analytics_recompute",
+    ]) await assertFails(db.collection(collection).doc("target").set({roles: ["super_admin"], tier: "premium"}));
   });
 }
+test("analytics recompute coordination is inaccessible to clients", async () => {
+  await seed(async (db) => db.collection("_user_analytics_recompute")
+      .doc("user-a").set({
+        requestedGeneration: 2,
+        processedGeneration: 1,
+      }));
+  const owner = dbFor("user-a").collection("_user_analytics_recompute")
+      .doc("user-a");
+  await assertFails(owner.get());
+  await assertFails(owner.update({processedGeneration: 2}));
+});
 test("ordinary user can read only their own subscription", async () => {
   await seed(async (db) => db.collection("subscriptions").doc("user-a").set({tier: "basic"}));
   const db = dbFor("user-a");
@@ -58,6 +75,45 @@ test("organization administrators can manage another member role", async () => {
   });
   const target = dbFor("owner").collection("Organizations").doc("org-a").collection("Members").doc("member");
   await assertSucceeds(target.update({role: "admin"}));
+});
+
+test("saved events, discovery preferences, and group follows require full accounts", async () => {
+  await seed(async (db) => {
+    await db.collection("Customers").doc("user-a").set({uid: "user-a"});
+    await db.collection("Organizations").doc("org-a").set({createdBy: "owner"});
+  });
+  const full = dbFor("user-a");
+  await assertSucceeds(full.collection("Customers").doc("user-a")
+      .collection("SavedEvents").doc("event-a").set({
+        eventId: "event-a", userId: "user-a",
+      }));
+  await assertSucceeds(full.collection("Customers").doc("user-a")
+      .collection("Discovery").doc("preferences").set({chosenCity: "Boston"}));
+  await assertSucceeds(full.collection("Organizations").doc("org-a")
+      .collection("Followers").doc("user-a").set({
+        userId: "user-a", organizationId: "org-a",
+      }));
+  const anonymous = env.authenticatedContext("guest", {
+    firebase: {sign_in_provider: "anonymous"},
+  }).firestore();
+  await assertFails(anonymous.collection("Customers").doc("guest")
+      .collection("SavedEvents").doc("event-a").set({
+        eventId: "event-a", userId: "guest",
+      }));
+  await assertFails(anonymous.collection("Customers").doc("guest")
+      .collection("Discovery").doc("preferences").set({chosenCity: "Boston"}));
+  await assertFails(anonymous.collection("Organizations").doc("org-a")
+      .collection("Followers").doc("guest").set({
+        userId: "guest", organizationId: "org-a",
+      }));
+});
+
+test("signed clients can read but cannot alter the Discovery rollback switch", async () => {
+  await seed(async (db) => db.collection("AppConfig").doc("discovery")
+      .set({useLegacyFeed: false}));
+  const config = dbFor("user-a").collection("AppConfig").doc("discovery");
+  await assertSucceeds(config.get());
+  await assertFails(config.update({useLegacyFeed: true}));
 });
 
 test("event owners cannot grant themselves paid or featured entitlements", async () => {
@@ -102,6 +158,55 @@ test("private events and attendance are limited to owners and participants", asy
   await assertFails(dbFor("stranger").collection("Attendance").doc("attendance-a").get());
   await assertSucceeds(dbFor("invited").collection("Attendance").doc("attendance-a").get());
   await assertSucceeds(dbFor("owner").collection("Attendance").doc("attendance-a").get());
+});
+
+test("private event access requests require a full account", async () => {
+  await seed(async (db) => db.collection("Events").doc("private-event").set({
+    customerUid: "owner", private: true, accessList: [],
+  }));
+  const request = {userId: "requester", status: "pending"};
+  await assertSucceeds(dbFor("requester").collection("Events")
+      .doc("private-event").collection("AccessRequests").doc("requester").set(request));
+  const anonymousDb = env.authenticatedContext("anonymous-user", {
+    firebase: {sign_in_provider: "anonymous"},
+  }).firestore();
+  await assertFails(anonymousDb.collection("Events").doc("private-event")
+      .collection("AccessRequests").doc("anonymous-user").set({
+        userId: "anonymous-user", status: "pending",
+      }));
+});
+
+test("attendance writes are server-only and event staff can operate the console", async () => {
+  await seed(async (db) => {
+    await db.collection("Events").doc("event-a").set({
+      customerUid: "owner", private: false, coHosts: ["cohost"],
+      checkInStaff: ["door-staff"],
+    });
+    await db.collection("Attendance").doc("attendance-a").set({
+      eventId: "event-a", customerUid: "attendee", status: "checked_in",
+    });
+    await db.collection("CheckInSessions").doc("session-a").set({
+      eventId: "event-a", status: "active",
+    });
+    await db.collection("CheckInAudit").doc("audit-a").set({
+      eventId: "event-a", action: "checked_in",
+    });
+  });
+
+  for (const uid of ["owner", "cohost", "door-staff"]) {
+    const db = dbFor(uid);
+    await assertSucceeds(db.collection("Attendance").doc("attendance-a").get());
+    await assertSucceeds(db.collection("CheckInSessions").doc("session-a").get());
+    await assertSucceeds(db.collection("CheckInAudit").doc("audit-a").get());
+    await assertFails(db.collection("Attendance").doc(`${uid}-forged`).set({
+      eventId: "event-a", customerUid: uid,
+    }));
+  }
+
+  await assertFails(dbFor("stranger").collection("CheckInSessions")
+      .doc("session-a").get());
+  await assertFails(dbFor("stranger").collection("CheckInAudit")
+      .doc("audit-a").get());
 });
 
 test("messages require conversation participation and authenticated sender identity", async () => {

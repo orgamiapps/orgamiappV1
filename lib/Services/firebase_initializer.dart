@@ -55,15 +55,17 @@ class FirebaseInitializer {
 
       try {
         if (kIsWeb) {
-          final siteKey = AppConstants.appCheckWebRecaptchaSiteKey.trim();
+          final siteKey = AppConstants.appCheckWebRecaptchaEnterpriseSiteKey
+              .trim();
           if (!AppConstants.enableWebAppCheck || siteKey.isEmpty) {
             Logger.info(
-              'Web App Check skipped. Configure ATTENDUS_RECAPTCHA_V3_SITE_KEY '
+              'Web App Check skipped. Configure '
+              'ATTENDUS_RECAPTCHA_ENTERPRISE_SITE_KEY '
               'and ATTENDUS_ENABLE_WEB_APP_CHECK=true before enabling enforcement.',
             );
           } else {
             await FirebaseAppCheck.instance
-                .activate(providerWeb: ReCaptchaV3Provider(siteKey))
+                .activate(providerWeb: ReCaptchaEnterpriseProvider(siteKey))
                 .timeout(const Duration(seconds: 3));
             Logger.info('Firebase App Check activated for web');
           }

@@ -3,37 +3,45 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const admin = require("../firebase-admin-compat");
 const {runAccountDeletion} = require("../account/deletion");
+const {
+  fetchWithTimeout,
+  uniqueId,
+} = require("./emulator-test-helpers");
 
-const projectId = process.env.GCLOUD_PROJECT || "demo-attendus-admin";
+const projectId = process.env.GCLOUD_PROJECT;
+assert.equal(projectId, "demo-attendus-admin");
 const api = `http://127.0.0.1:5001/${projectId}/us-central1/adminApi`;
 const freeTicketApi = `http://127.0.0.1:5001/${projectId}/us-central1/issueFreeTicket`;
 const authApi = "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1";
 async function auth(method, body) {
-  const response = await fetch(`${authApi}/accounts:${method}?key=emulator-key`, {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify(body)});
+  const response = await fetchWithTimeout(
+      `${authApi}/accounts:${method}?key=emulator-key`,
+      {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify(body)},
+  );
   const responseText = await response.text();
   assert.equal(response.ok, true, responseText);
   return JSON.parse(responseText);
 }
 
 test("emulator rejects non-admin and audited mutation creates record", async () => {
-  const email = `support-${Date.now()}@example.test`; const password = "ValidPassword123!";
+  const email = `${uniqueId("support")}@example.test`; const password = "ValidPassword123!";
   const created = await auth("signUp", {email, password, returnSecureToken: true});
-  const denied = await fetch(`${api}/v1/accounts`, {headers: {authorization: `Bearer ${created.idToken}`}});
+  const denied = await fetchWithTimeout(`${api}/v1/accounts`, {headers: {authorization: `Bearer ${created.idToken}`}});
   assert.equal(denied.status, 403); assert.equal((await denied.json()).error.code, "ADMIN_CLAIM_REQUIRED");
 
   await admin.auth().setCustomUserClaims(created.localId, {admin: true});
   await admin.firestore().collection("admin_roles").doc(created.localId).set({active: true, roles: ["support"]});
   const signedIn = await auth("signInWithPassword", {email, password, returnSecureToken: true});
-  const target = await auth("signUp", {email: `target-${Date.now()}@example.test`, password, returnSecureToken: true});
-  const requestId = `integration-${Date.now()}`;
-  const changed = await fetch(`${api}/v1/accounts/${target.localId}/disable`, {method: "POST", headers: {"authorization": `Bearer ${signedIn.idToken}`, "content-type": "application/json", "idempotency-key": `integration-key-${Date.now()}`, "x-request-id": requestId}, body: JSON.stringify({reason: "Verified emulator support case", confirmed: true})});
+  const target = await auth("signUp", {email: `${uniqueId("target")}@example.test`, password, returnSecureToken: true});
+  const requestId = uniqueId("integration");
+  const changed = await fetchWithTimeout(`${api}/v1/accounts/${target.localId}/disable`, {method: "POST", headers: {"authorization": `Bearer ${signedIn.idToken}`, "content-type": "application/json", "idempotency-key": uniqueId("integration-key"), "x-request-id": requestId}, body: JSON.stringify({reason: "Verified emulator support case", confirmed: true})});
   assert.equal(changed.status, 200, await changed.text());
   const audit = await admin.firestore().collection("admin_audit_logs").where("requestId", "==", requestId).get();
   assert.equal(audit.size, 1); assert.equal(audit.docs[0].get("action"), "account.disable");
 });
 
 test("account erasure is complete, auditable, and idempotent", async () => {
-  const email = `erase-${Date.now()}@example.test`;
+  const email = `${uniqueId("erase")}@example.test`;
   const password = "ValidPassword123!";
   const created = await auth("signUp", {email, password, returnSecureToken: true});
   const uid = created.localId;
@@ -83,11 +91,11 @@ test("account erasure is complete, auditable, and idempotent", async () => {
 });
 
 test("free ticket issuance is atomic and idempotent", async () => {
-  const email = `ticket-${Date.now()}@example.test`;
+  const email = `${uniqueId("ticket")}@example.test`;
   const password = "ValidPassword123!";
   const created = await auth("signUp", {email, password, returnSecureToken: true});
   const uid = created.localId;
-  const eventId = `free-event-${Date.now()}`;
+  const eventId = uniqueId("free-event");
   const db = admin.firestore();
   await db.collection("Customers").doc(uid).set({name: "Ticket Tester", email});
   await db.collection("Events").doc(eventId).set({
@@ -105,7 +113,7 @@ test("free ticket issuance is atomic and idempotent", async () => {
     ),
   });
 
-  const call = () => fetch(freeTicketApi, {
+  const call = () => fetchWithTimeout(freeTicketApi, {
     method: "POST",
     headers: {
       authorization: `Bearer ${created.idToken}`,

@@ -1,5 +1,7 @@
 import 'package:attendus/screens/Events/create_event_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:attendus/Services/account_access_service.dart';
+import 'package:attendus/widgets/account_required_sheet.dart';
 
 /// Entry point for event creation.
 ///
@@ -22,11 +24,14 @@ class PremiumEventCreationWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CreateEventScreen(
-      selectedDateTime: selectedDateTime,
-      eventDurationHours: eventDurationHours,
-      preselectedOrganizationId: preselectedOrganizationId,
-      forceOrganizationEvent: forceOrganizationEvent,
+    return AccountRequiredGate(
+      feature: AccountFeature.createEvent,
+      child: CreateEventScreen(
+        selectedDateTime: selectedDateTime,
+        eventDurationHours: eventDurationHours,
+        preselectedOrganizationId: preselectedOrganizationId,
+        forceOrganizationEvent: forceOrganizationEvent,
+      ),
     );
   }
 }

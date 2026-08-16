@@ -23,6 +23,7 @@ analyzer:
     - "macos/**"
     - "web/**"
     - ".dart_tool/**"
+    - "functions/node_modules/**"
   errors:
     # Treat these as warnings instead of errors to not block builds
     deprecated_member_use: warning

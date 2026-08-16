@@ -1,14 +1,17 @@
-import 'package:flutter/foundation.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'dart:async';
+
 import 'package:attendus/Utils/logger.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// Service to manage guest mode functionality
-/// Allows users to explore the app without creating an account
-/// with limited features and access
+enum AccessMode { guest, authenticated }
+
+/// The single source of truth for anonymous-versus-full account access.
 class GuestModeService extends ChangeNotifier {
   static final GuestModeService _instance = GuestModeService._internal();
   factory GuestModeService() => _instance;
+
   GuestModeService._internal();
 
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage(
@@ -17,154 +20,158 @@ class GuestModeService extends ChangeNotifier {
       accessibility: KeychainAccessibility.first_unlock_this_device,
     ),
   );
+  FirebaseAuth get _auth => FirebaseAuth.instance;
 
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  // Storage keys
   static const String _keyIsGuestMode = 'is_guest_mode';
   static const String _keyGuestSessionId = 'guest_session_id';
+  static const String _keyGuestDisplayName = 'guest_display_name';
 
-  bool _isGuestMode = false;
+  bool _isGuestMode = true;
+  bool _isInitialized = false;
+  bool _isEnsuringGuestSession = false;
   String? _guestSessionId;
+  String? _guestDisplayName;
+  Object? _guestSessionError;
+  StreamSubscription<User?>? _authSubscription;
 
   bool get isGuestMode => _isGuestMode;
+  bool get isInitialized => _isInitialized;
+  bool get isEnsuringGuestSession => _isEnsuringGuestSession;
   String? get guestSessionId => _guestSessionId;
+  String? get guestDisplayName => _guestDisplayName;
+  Object? get guestSessionError => _guestSessionError;
+  AccessMode get accessMode =>
+      _isGuestMode ? AccessMode.guest : AccessMode.authenticated;
 
-  /// Initialize guest mode service
   Future<void> initialize() async {
     try {
-      final storedGuestMode = await _secureStorage.read(key: _keyIsGuestMode);
-      final storedSessionId = await _secureStorage.read(
-        key: _keyGuestSessionId,
-      );
-
-      _isGuestMode = storedGuestMode == 'true';
-      _guestSessionId = storedSessionId;
-
-      Logger.info('Guest mode initialized: $_isGuestMode');
-    } catch (e) {
-      Logger.error('Error initializing guest mode service', e);
-      _isGuestMode = false;
-      _guestSessionId = null;
+      _authSubscription ??= _auth.authStateChanges().listen(_syncFromAuthUser);
+      _guestSessionId = await _secureStorage.read(key: _keyGuestSessionId);
+      final storedName = await _secureStorage.read(key: _keyGuestDisplayName);
+      _guestDisplayName = storedName?.trim().isEmpty == true
+          ? null
+          : storedName?.trim();
+      _syncFromAuthUser(_auth.currentUser, notify: false);
+    } catch (error) {
+      Logger.error('Error initializing guest mode service', error);
+      _syncFromAuthUser(_auth.currentUser, notify: false);
+    } finally {
+      _isInitialized = true;
+      notifyListeners();
     }
   }
 
-  /// Enable guest mode
-  /// Creates a temporary session for the guest user
-  /// Signs in anonymously to Firebase to allow Firestore access
-  Future<void> enableGuestMode() async {
+  /// Reuses an anonymous user, creates one when signed out, and never replaces
+  /// a fully authenticated account.
+  Future<User?> ensureGuestSession() async {
+    final current = _auth.currentUser;
+    if (current != null) {
+      _syncFromAuthUser(current);
+      return current;
+    }
+    if (_isEnsuringGuestSession) {
+      return _auth.authStateChanges().firstWhere((user) => user != null);
+    }
+
+    _isEnsuringGuestSession = true;
+    _isGuestMode = true;
+    _guestSessionError = null;
+    notifyListeners();
     try {
-      _isGuestMode = true;
-      _guestSessionId = 'guest_${DateTime.now().millisecondsSinceEpoch}';
-
-      // Sign in anonymously to Firebase to allow Firestore access
-      // This is required because Firestore security rules require authentication
-      Logger.info('Signing in anonymously to Firebase for guest mode...');
-      final userCredential = await _auth.signInAnonymously();
-      Logger.info('Anonymous sign-in successful: ${userCredential.user?.uid}');
-
-      await _secureStorage.write(key: _keyIsGuestMode, value: 'true');
-      await _secureStorage.write(
-        key: _keyGuestSessionId,
-        value: _guestSessionId,
-      );
-
-      Logger.info('Guest mode enabled with session: $_guestSessionId');
-      notifyListeners();
-    } catch (e) {
-      Logger.error('Error enabling guest mode', e);
-
-      // Check if this is the anonymous auth not enabled error
-      final errorMessage = e.toString();
-      if (errorMessage.contains('admin-restricted-operation')) {
-        Logger.error(
-          '🚨 CRITICAL: Anonymous Authentication is NOT enabled in Firebase Console!',
-        );
-        Logger.error(
-          '📝 TO FIX: Go to Firebase Console → Authentication → Sign-in method → Enable "Anonymous"',
-        );
+      final credential = await _auth.signInAnonymously();
+      final user = credential.user;
+      if (user != null) {
+        _guestSessionId = user.uid;
+        await _secureStorage.write(key: _keyIsGuestMode, value: 'true');
+        await _secureStorage.write(key: _keyGuestSessionId, value: user.uid);
       }
-
-      // Even if anonymous sign-in fails, set guest mode flag
-      // This allows the app to show guest UI, but Firestore access will be limited
-      _isGuestMode = true;
-      _guestSessionId = 'guest_${DateTime.now().millisecondsSinceEpoch}';
-      await _secureStorage.write(key: _keyIsGuestMode, value: 'true');
-      await _secureStorage.write(
-        key: _keyGuestSessionId,
-        value: _guestSessionId,
-      );
-      notifyListeners();
-
-      // Rethrow to let the caller know there was an issue
+      _syncFromAuthUser(user, notify: false);
+      return user;
+    } catch (error) {
+      _guestSessionError = error;
+      Logger.error('Unable to establish anonymous guest session', error);
       rethrow;
-    }
-  }
-
-  /// Disable guest mode
-  /// Called when user creates an account or logs in
-  /// Note: We don't sign out the anonymous user here because the user
-  /// is likely already signing in with a real account, which will replace
-  /// the anonymous session
-  Future<void> disableGuestMode() async {
-    try {
-      _isGuestMode = false;
-      _guestSessionId = null;
-
-      await _secureStorage.delete(key: _keyIsGuestMode);
-      await _secureStorage.delete(key: _keyGuestSessionId);
-
-      Logger.info('Guest mode disabled');
+    } finally {
+      _isEnsuringGuestSession = false;
       notifyListeners();
-    } catch (e) {
-      Logger.error('Error disabling guest mode', e);
     }
   }
 
-  /// Check if a feature is available in guest mode
+  /// Backward-compatible entry point used by older guest flows.
+  Future<void> enableGuestMode() async {
+    await ensureGuestSession();
+  }
+
+  Future<void> disableGuestMode() async {
+    _isGuestMode = false;
+    _guestSessionId = null;
+    await _secureStorage.delete(key: _keyIsGuestMode);
+    await _secureStorage.delete(key: _keyGuestSessionId);
+    notifyListeners();
+  }
+
+  Future<void> saveGuestDisplayName(String name) async {
+    final normalized = name.trim();
+    if (normalized.isEmpty) return;
+    _guestDisplayName = normalized;
+    await _secureStorage.write(key: _keyGuestDisplayName, value: normalized);
+    notifyListeners();
+  }
+
+  Future<void> clearGuestDisplayName() async {
+    _guestDisplayName = null;
+    await _secureStorage.delete(key: _keyGuestDisplayName);
+    notifyListeners();
+  }
+
   bool isFeatureAvailable(GuestFeature feature) {
-    if (!_isGuestMode) {
-      return true; // All features available for logged-in users
-    }
-
-    switch (feature) {
-      case GuestFeature.viewEvents:
-      case GuestFeature.searchEvents:
-      case GuestFeature.viewGlobalMap:
-      case GuestFeature.viewCalendar:
-      case GuestFeature.eventSignIn:
-        return true;
-      case GuestFeature.createEvent:
-      case GuestFeature.createGroup:
-      case GuestFeature.editProfile:
-      case GuestFeature.viewMyGroups:
-      case GuestFeature.viewMyEvents:
-      case GuestFeature.analytics:
-        return false;
-    }
+    if (!_isGuestMode) return true;
+    return switch (feature) {
+      GuestFeature.viewEvents ||
+      GuestFeature.searchEvents ||
+      GuestFeature.viewGlobalMap ||
+      GuestFeature.viewCalendar ||
+      GuestFeature.eventSignIn => true,
+      _ => false,
+    };
   }
 
-  /// Get a friendly message explaining why a feature is restricted
   String getFeatureRestrictionMessage(GuestFeature feature) {
-    switch (feature) {
-      case GuestFeature.createEvent:
-        return 'Create an account to start creating events and organizing your community!';
-      case GuestFeature.createGroup:
-        return 'Create an account to create and manage groups!';
-      case GuestFeature.editProfile:
-        return 'Create an account to customize your profile!';
-      case GuestFeature.viewMyGroups:
-      case GuestFeature.viewMyEvents:
-        return 'Create an account to view your personalized content!';
-      case GuestFeature.analytics:
-        return 'Create an account to access analytics and insights!';
-      default:
-        return 'Create an account to access this feature!';
+    return switch (feature) {
+      GuestFeature.createEvent =>
+        'Create an account to start creating events and organizing your community.',
+      GuestFeature.createGroup =>
+        'Create an account to create and manage groups.',
+      GuestFeature.editProfile =>
+        'Create an account to customize your profile.',
+      GuestFeature.viewMyGroups || GuestFeature.viewMyEvents =>
+        'Create an account to view your personalized content.',
+      GuestFeature.analytics =>
+        'Create an account to access analytics and insights.',
+      _ => 'Create an account to access this feature.',
+    };
+  }
+
+  void _syncFromAuthUser(User? user, {bool notify = true}) {
+    final previousMode = _isGuestMode;
+    _isGuestMode = user == null || user.isAnonymous;
+    if (user?.isAnonymous == true) {
+      _guestSessionId = user!.uid;
+      _guestSessionError = null;
+    } else if (user != null) {
+      _guestSessionId = null;
+      _guestSessionError = null;
     }
+    if (notify && previousMode != _isGuestMode) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 }
 
-/// Enum defining features that can be restricted in guest mode
 enum GuestFeature {
   viewEvents,
   searchEvents,

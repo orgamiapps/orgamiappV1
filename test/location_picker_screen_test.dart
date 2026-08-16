@@ -21,6 +21,7 @@ class FakePlacesService extends PlacesService {
     required String query,
     required String sessionToken,
     bool citiesOnly = false,
+    bool discoveryOnly = false,
     LatLng? locationBias,
   }) {
     ++autocompleteCalls;
@@ -31,6 +32,7 @@ class FakePlacesService extends PlacesService {
   Future<PlaceDetails> details({
     required String placeId,
     required String sessionToken,
+    bool discoveryOnly = false,
   }) {
     return onDetails?.call(placeId) ??
         Future.value(
@@ -44,7 +46,10 @@ class FakePlacesService extends PlacesService {
   }
 
   @override
-  Future<PlaceDetails> reverseGeocode(LatLng location) {
+  Future<PlaceDetails> reverseGeocode(
+    LatLng location, {
+    bool discoveryOnly = false,
+  }) {
     return onReverseGeocode?.call(location) ??
         Future.value(
           PlaceDetails(

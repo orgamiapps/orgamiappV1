@@ -214,7 +214,7 @@ class _AttendeeNotificationScreenState extends State<AttendeeNotificationScreen>
   @override
   Widget build(BuildContext context) {
     return AppScaffoldWrapper(
-      selectedBottomNavIndex: 4, // Account tab
+      selectedBottomNavIndex: 3, // Profile tab
       backgroundColor: AppThemeColor.backGroundColor,
       body: SafeArea(
         child: Column(

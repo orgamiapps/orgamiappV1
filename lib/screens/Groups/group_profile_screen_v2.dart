@@ -14,6 +14,10 @@ import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
+import 'package:attendus/Services/account_access_service.dart';
+import 'package:attendus/widgets/account_required_sheet.dart';
+import 'package:attendus/Services/discovery_marketplace_service.dart';
+import 'package:attendus/Services/product_funnel_service.dart';
 
 class GroupProfileScreenV2 extends StatefulWidget {
   final String organizationId;
@@ -30,6 +34,7 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
   bool _isMember = false;
   bool _hasRequestedJoin = false;
   bool _checkingMembership = true;
+  bool _isFollowing = false;
   String _memberRole = '';
   // Reference to the FAB widget key for direct animation control
   final GlobalKey<_AdminFabState> _fabKey = GlobalKey<_AdminFabState>();
@@ -39,7 +44,47 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
   void initState() {
     super.initState();
     _checkMembershipStatus();
+    _checkFollowing();
     _tabController = TabController(length: 3, vsync: this);
+  }
+
+  Future<void> _checkFollowing() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.isAnonymous) return;
+    final snapshot = await _db
+        .collection('Organizations')
+        .doc(widget.organizationId)
+        .collection('Followers')
+        .doc(user.uid)
+        .get();
+    if (mounted) setState(() => _isFollowing = snapshot.exists);
+  }
+
+  Future<void> _toggleFollow() async {
+    if (AccountAccessService.isGuest) {
+      await showAccountRequiredSheet(
+        context: context,
+        feature: AccountFeature.groups,
+      );
+      return;
+    }
+    final next = !_isFollowing;
+    setState(() => _isFollowing = next);
+    try {
+      await DiscoveryMarketplaceService().setOrganizationFollow(
+        widget.organizationId,
+        next,
+      );
+      ProductFunnelService().record(
+        'discovery_follow',
+        dimensions: {
+          'result': next ? 'followed' : 'unfollowed',
+          'targetType': 'organization',
+        },
+      );
+    } catch (_) {
+      if (mounted) setState(() => _isFollowing = !next);
+    }
   }
 
   @override
@@ -115,6 +160,13 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
   }
 
   Future<void> _requestToJoin() async {
+    if (AccountAccessService.isGuest) {
+      await showAccountRequiredSheet(
+        context: context,
+        feature: AccountFeature.joinGroup,
+      );
+      return;
+    }
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -239,6 +291,15 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
                   title: name.isEmpty ? 'Group' : name,
                   subtitle: '$category community',
                   actions: [
+                    IconButton(
+                      tooltip: _isFollowing ? 'Unfollow group' : 'Follow group',
+                      icon: Icon(
+                        _isFollowing
+                            ? Icons.notifications_active
+                            : Icons.notifications_none,
+                      ),
+                      onPressed: _toggleFollow,
+                    ),
                     IconButton(
                       tooltip: 'Share group',
                       icon: const Icon(Icons.ios_share_rounded),

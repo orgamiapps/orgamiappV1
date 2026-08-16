@@ -60,11 +60,6 @@ class _AppScaffoldWrapperState extends State<AppScaffoldWrapper> {
       icon: Icons.person_outline,
       selectedIcon: Icons.person,
     ),
-    AttendUsNavDestination(
-      label: 'Account',
-      icon: Icons.menu_outlined,
-      selectedIcon: Icons.menu,
-    ),
   ];
 
   int get _selectedIndex => RouteNames.normalizeDashboardTabIndex(

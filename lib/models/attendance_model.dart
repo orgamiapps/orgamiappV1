@@ -22,6 +22,17 @@ class AttendanceModel {
   // Sign-in method tracking
   String?
   signInMethod; // 'facial_recognition', 'qr_code', 'manual_code', 'geofence'
+  String? sessionId;
+  String? subjectKey;
+  DateTime? checkedInAt;
+  DateTime? checkedOutAt;
+  String? source;
+  String? verificationLevel;
+  String? actorUid;
+  String status;
+  int reentryCount;
+  String? overrideReason;
+  bool offlineReconciled;
 
   AttendanceModel({
     required this.id,
@@ -38,6 +49,17 @@ class AttendanceModel {
     this.dwellStatus,
     this.dwellNotes,
     this.signInMethod,
+    this.sessionId,
+    this.subjectKey,
+    this.checkedInAt,
+    this.checkedOutAt,
+    this.source,
+    this.verificationLevel,
+    this.actorUid,
+    this.status = 'checked_in',
+    this.reentryCount = 0,
+    this.overrideReason,
+    this.offlineReconciled = false,
   });
 
   factory AttendanceModel.fromJson(dynamic parsedJson) {
@@ -46,13 +68,25 @@ class AttendanceModel {
         ? parsedJson
         : (parsedJson.data() as Map<String, dynamic>);
 
+    DateTime? optionalDate(dynamic value) {
+      if (value is Timestamp) return value.toDate();
+      return DateTime.tryParse(value?.toString() ?? '');
+    }
+
+    final checkedIn = optionalDate(
+      data['checkedInAt'] ?? data['attendanceDateTime'],
+    );
     return AttendanceModel(
-      id: data['id'],
-      userName: data['userName'],
-      eventId: data['eventId'],
-      customerUid: data['customerUid'],
-      attendanceDateTime: (data['attendanceDateTime'] as Timestamp).toDate(),
-      answers: List<String>.from(data['answers']),
+      id:
+          data['id']?.toString() ??
+          (parsedJson is DocumentSnapshot ? parsedJson.id : ''),
+      userName: data['userName']?.toString() ?? 'Attendee',
+      eventId: data['eventId']?.toString() ?? '',
+      customerUid: data['customerUid']?.toString() ?? '',
+      attendanceDateTime: checkedIn ?? DateTime.now(),
+      answers: data['answers'] is Iterable
+          ? List<String>.from(data['answers'])
+          : const [],
       isAnonymous: data['isAnonymous'] ?? false,
       realName: data['realName'],
       entryTimestamp: data['entryTimestamp'] != null
@@ -67,6 +101,17 @@ class AttendanceModel {
       dwellStatus: data['dwellStatus'],
       dwellNotes: data['dwellNotes'],
       signInMethod: data['signInMethod'],
+      sessionId: data['sessionId']?.toString(),
+      subjectKey: data['subjectKey']?.toString(),
+      checkedInAt: checkedIn,
+      checkedOutAt: optionalDate(data['checkedOutAt']),
+      source: data['source']?.toString(),
+      verificationLevel: data['verificationLevel']?.toString(),
+      actorUid: data['actorUid']?.toString(),
+      status: data['status']?.toString() ?? 'checked_in',
+      reentryCount: (data['reentryCount'] as num?)?.toInt() ?? 0,
+      overrideReason: data['overrideReason']?.toString(),
+      offlineReconciled: data['offlineReconciled'] == true,
     );
   }
 
@@ -93,6 +138,19 @@ class AttendanceModel {
     if (dwellStatus != null) data['dwellStatus'] = dwellStatus;
     if (dwellNotes != null) data['dwellNotes'] = dwellNotes;
     if (signInMethod != null) data['signInMethod'] = signInMethod;
+    if (sessionId != null) data['sessionId'] = sessionId;
+    if (subjectKey != null) data['subjectKey'] = subjectKey;
+    if (checkedInAt != null) data['checkedInAt'] = checkedInAt;
+    if (checkedOutAt != null) data['checkedOutAt'] = checkedOutAt;
+    if (source != null) data['source'] = source;
+    if (verificationLevel != null) {
+      data['verificationLevel'] = verificationLevel;
+    }
+    if (actorUid != null) data['actorUid'] = actorUid;
+    data['status'] = status;
+    data['reentryCount'] = reentryCount;
+    if (overrideReason != null) data['overrideReason'] = overrideReason;
+    data['offlineReconciled'] = offlineReconciled;
 
     return data;
   }

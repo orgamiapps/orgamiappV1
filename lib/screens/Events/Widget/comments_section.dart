@@ -7,6 +7,8 @@ import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/logger.dart';
+import 'package:attendus/Services/account_access_service.dart';
+import 'package:attendus/widgets/account_required_sheet.dart';
 
 class CommentsSection extends StatefulWidget {
   final EventModel eventModel;
@@ -73,6 +75,13 @@ class _CommentsSectionState extends State<CommentsSection> {
   }
 
   void _showCommentsModal() async {
+    if (AccountAccessService.isGuest) {
+      await showAccountRequiredSheet(
+        context: context,
+        feature: AccountFeature.comments,
+      );
+      return;
+    }
     // Refresh comments before opening modal
     await _loadComments();
 

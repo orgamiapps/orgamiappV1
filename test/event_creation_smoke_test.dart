@@ -47,7 +47,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Description (optional)'), findsOneWidget);
-    expect(find.text('Regular'), findsOneWidget);
+    expect(find.text('Categories'), findsOneWidget);
     expect(find.text('Attendee questions'), findsOneWidget);
   });
 

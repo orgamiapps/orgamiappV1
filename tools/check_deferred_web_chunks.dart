@@ -74,58 +74,61 @@ Future<void> main(List<String> arguments) async {
   );
 
   if (arguments.isEmpty) return;
-  final baseUri = Uri.parse(arguments.first);
   final client = HttpClient();
   try {
-    for (final rootPath in [
-      '',
-      'index.html',
-      'flutter_bootstrap.js',
-      'release-manifest.json',
-    ]) {
-      final request = await client.getUrl(baseUri.resolve(rootPath));
-      request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
-      final response = await request.close();
-      await response.drain<void>();
-      if (response.statusCode != HttpStatus.ok) {
-        _fail(
-          'Invalid web bootstrap ${baseUri.resolve(rootPath)}: '
-          'HTTP ${response.statusCode}',
-        );
-        return;
-      }
-    }
-
-    final allFiles = releases
-        .expand(
-          (release) => (release['files'] as List? ?? const []).whereType<Map>(),
-        )
-        .map((entry) => Map<String, dynamic>.from(entry))
-        .toList();
-    for (var offset = 0; offset < allFiles.length; offset += 12) {
-      final batch = allFiles.skip(offset).take(12);
-      final results = await Future.wait(
-        batch.map((entry) => _checkRemoteAsset(client, baseUri, entry)),
-      );
-      String? failure;
-      for (final result in results) {
-        if (result != null) {
-          failure = result;
-          break;
+    for (final argument in arguments) {
+      final baseUri = Uri.parse(argument);
+      for (final rootPath in [
+        '',
+        'index.html',
+        'flutter_bootstrap.js',
+        'release-manifest.json',
+      ]) {
+        final request = await client.getUrl(baseUri.resolve(rootPath));
+        request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
+        final response = await request.close();
+        await response.drain<void>();
+        if (response.statusCode != HttpStatus.ok) {
+          _fail(
+            'Invalid web bootstrap ${baseUri.resolve(rootPath)}: '
+            'HTTP ${response.statusCode}',
+          );
+          return;
         }
       }
-      if (failure != null) {
-        _fail(failure);
-        return;
+
+      final allFiles = releases
+          .expand(
+            (release) =>
+                (release['files'] as List? ?? const []).whereType<Map>(),
+          )
+          .map((entry) => Map<String, dynamic>.from(entry))
+          .toList();
+      for (var offset = 0; offset < allFiles.length; offset += 12) {
+        final batch = allFiles.skip(offset).take(12);
+        final results = await Future.wait(
+          batch.map((entry) => _checkRemoteAsset(client, baseUri, entry)),
+        );
+        String? failure;
+        for (final result in results) {
+          if (result != null) {
+            failure = result;
+            break;
+          }
+        }
+        if (failure != null) {
+          _fail(failure);
+          return;
+        }
       }
+      stdout.writeln(
+        'Web releases: $totalFiles immutable production assets verified at '
+        '$baseUri.',
+      );
     }
   } finally {
     client.close(force: true);
   }
-  stdout.writeln(
-    'Web releases: $totalFiles immutable production assets verified at '
-    '$baseUri.',
-  );
 }
 
 Map<String, dynamic>? _readManifest(File file) {

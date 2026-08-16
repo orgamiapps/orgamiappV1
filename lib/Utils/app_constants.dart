@@ -24,9 +24,6 @@ class AppConstants {
 
   // Public web/deep-link configuration.
   static const String publicWebDomain = 'https://attendus.app';
-  static const String dynamicLinksDomain = 'https://attendus.app';
-  static const String androidPackageName = 'com.stormdeve.orgami';
-  static const String iosBundleId = 'com.stormdeve.orgami';
   static const String stripeReturnUrl = 'attendus://callback';
   static const String stripeMerchantDisplayName = 'Attendus';
   static const String applePayMerchantIdentifier = 'merchant.app.attendus';
@@ -36,16 +33,17 @@ class AppConstants {
   // and Firebase provider settings are configured for AttendUs.
   static const bool enableAppleSignIn = false;
 
-  // Web App Check is intentionally opt-in until a real reCAPTCHA v3 key is
-  // configured in Firebase Console for attendus.app.
+  // Web App Check is enabled in production builds with the score-based
+  // reCAPTCHA Enterprise key registered for attendus.app.
   static const bool enableWebAppCheck = bool.fromEnvironment(
     'ATTENDUS_ENABLE_WEB_APP_CHECK',
     defaultValue: false,
   );
-  static const String appCheckWebRecaptchaSiteKey = String.fromEnvironment(
-    'ATTENDUS_RECAPTCHA_V3_SITE_KEY',
-    defaultValue: '',
-  );
+  static const String appCheckWebRecaptchaEnterpriseSiteKey =
+      String.fromEnvironment(
+        'ATTENDUS_RECAPTCHA_ENTERPRISE_SITE_KEY',
+        defaultValue: '',
+      );
   static const String appleServiceId = String.fromEnvironment(
     'ATTENDUS_APPLE_SERVICE_ID',
     defaultValue: '',
@@ -55,8 +53,9 @@ class AppConstants {
     defaultValue: '',
   );
 
-  static Uri buildInviteUri(String eventId) {
-    return Uri.parse('$publicWebDomain/invite?eventId=$eventId');
+  static Uri buildEventUri(String eventId) {
+    final encodedId = Uri.encodeComponent(eventId.trim());
+    return Uri.parse('$publicWebDomain/event/$encodedId');
   }
 
   static String getMilesSliderLabel(double value) {

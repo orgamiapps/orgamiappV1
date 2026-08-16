@@ -22,6 +22,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xcel;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:attendus/screens/Events/Attendance/check_in_console_screen.dart';
 
 class AttendanceSheetScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -803,7 +804,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
   Widget _modernSignInDetailsView() {
     return Column(
       children: [
-        // Header with only Add Name button
+        // Attendance mutations live in the real-time, server-authoritative console.
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -828,9 +829,13 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                   ),
                   elevation: 0,
                 ),
-                icon: const Icon(Icons.add, color: Colors.white, size: 18),
+                icon: const Icon(
+                  Icons.monitor_heart_outlined,
+                  color: Colors.white,
+                  size: 18,
+                ),
                 label: const Text(
-                  'Add Name',
+                  'Live Console',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -838,11 +843,13 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
                     fontFamily: 'Roboto',
                   ),
                 ),
-                onPressed: () async {
-                  final name = await _showAddNameDialog();
-                  if (name != null && name.isNotEmpty) {
-                    await _addManualAttendance(name);
-                  }
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CheckInConsoleScreen(event: eventModel),
+                    ),
+                  );
                 },
               ),
             ],
@@ -1348,6 +1355,7 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
     );
   }
 
+  // ignore: unused_element
   Future<String?> _showAddNameDialog() async {
     return await showDialog<String>(
       context: context,
@@ -1506,24 +1514,6 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
     }
 
     return answer;
-  }
-
-  Future<void> _addManualAttendance(String name) async {
-    final attendanceDateTime = DateTime.now();
-    final id =
-        '${eventModel.id}-manual-${DateTime.now().millisecondsSinceEpoch}';
-    final attendanceModel = AttendanceModel(
-      id: id,
-      eventId: eventModel.id,
-      userName: name,
-      customerUid: 'manual',
-      attendanceDateTime: attendanceDateTime,
-      answers: [],
-    );
-
-    await FirebaseFirestoreHelper().addAttendance(attendanceModel);
-    getAttendanceList(); // Refresh the list
-    ShowToast().showNormalToast(msg: '$name added to attendance.');
   }
 
   // Removed deprecated excel export example that depended on the 'excel' package.

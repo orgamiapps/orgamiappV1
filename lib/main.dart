@@ -13,17 +13,22 @@ import 'package:attendus/Services/creation_limit_service.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:attendus/Utils/error_handler.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:attendus/Utils/emulator_config.dart';
 import 'package:attendus/Services/firebase_initializer.dart';
 import 'package:attendus/Services/navigation_state_service.dart';
+import 'package:attendus/Services/guest_mode_service.dart';
 import 'package:attendus/widgets/app_startup_gate.dart';
+import 'package:attendus/Services/event_share_service.dart';
+import 'package:attendus/widgets/deferred_shared_event_screen.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  usePathUrlStrategy();
   // Initialize global error handling with better crash reporting
   ErrorHandler.initialize();
 
@@ -73,6 +78,7 @@ void main() {
   final Widget appWidget = MultiProvider(
     providers: [
       ChangeNotifierProvider.value(value: themeProvider),
+      ChangeNotifierProvider.value(value: GuestModeService()),
       ChangeNotifierProvider(
         create: (context) => SubscriptionService(),
         lazy: true, // Lazy load - only initialize when first accessed
@@ -171,6 +177,9 @@ void _configureFirestore() {
     // Reduced cache size for faster startup and less memory pressure
     FirebaseFirestore.instance.settings = Settings(
       persistenceEnabled: true,
+      webPersistentTabManager: kIsWeb
+          ? const WebPersistentMultipleTabManager()
+          : null,
       // OPTIMIZATION: Further reduced cache sizes for even faster app startup
       cacheSizeBytes: kDebugMode
           ? 10 *
@@ -309,6 +318,16 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           darkTheme: AttendUsTheme.dark,
           themeMode: themeProvider.themeMode,
           navigatorKey: appNavigatorKey,
+          onGenerateRoute: (settings) {
+            final name = settings.name;
+            if (name == null) return null;
+            final eventId = EventShareService.eventIdFromUri(Uri.parse(name));
+            if (eventId == null) return null;
+            return MaterialPageRoute<void>(
+              settings: settings,
+              builder: (_) => DeferredSharedEventScreen(eventId: eventId),
+            );
+          },
           // Localization scaffolding removed until ARB/gen is configured
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,

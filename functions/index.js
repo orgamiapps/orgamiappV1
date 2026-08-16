@@ -8,7 +8,12 @@
  */
 
 const {setGlobalOptions} = require("firebase-functions");
-const {onDocumentCreated, onDocumentUpdated, onDocumentWritten} = require("firebase-functions/v2/firestore");
+const {
+  onDocumentCreated,
+  onDocumentDeleted,
+  onDocumentUpdated,
+  onDocumentWritten,
+} = require("firebase-functions/v2/firestore");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {onCall, onRequest, HttpsError} = require("firebase-functions/v2/https");
 const {defineSecret} = require("firebase-functions/params");
@@ -22,10 +27,10 @@ const {
 const GOOGLE_PLACES_API_KEY = defineSecret("GOOGLE_PLACES_API_KEY");
 const placesRateWindows = new Map();
 
-async function requirePlacesCaller(req) {
+async function requirePlacesCaller(req, {allowAnonymous = false} = {}) {
   const uid = req.auth?.uid;
   const provider = req.auth?.token?.firebase?.sign_in_provider;
-  if (!uid || provider === "anonymous") {
+  if (!uid || (provider === "anonymous" && !allowAnonymous)) {
     throw new HttpsError(
         "unauthenticated",
         "A signed-in account is required to search for locations.",
@@ -48,7 +53,12 @@ async function requirePlacesCaller(req) {
     current.count += 1;
     return uid;
   }
-  await enforceSharedPlacesRateLimit(admin.firestore(), uid);
+  await enforceSharedPlacesRateLimit(
+      admin.firestore(),
+      uid,
+      Date.now(),
+      provider === "anonymous" ? 20 : PLACES_RATE_LIMIT,
+  );
   return uid;
 }
 
@@ -129,19 +139,21 @@ exports.placesAutocomplete = onCall(
       region: "us-central1",
       timeoutSeconds: 15,
       invoker: "public",
+      enforceAppCheck: process.env.FUNCTIONS_EMULATOR !== "true",
       secrets: [GOOGLE_PLACES_API_KEY],
     },
     async (req) => {
-      await requirePlacesCaller(req);
       const query = typeof req.data?.query === "string" ? req.data.query.trim() : "";
       const sessionToken = validateSessionToken(req.data?.sessionToken);
       const useCase = req.data?.useCase;
-      if (useCase !== "event" && useCase !== "groupCity") {
+      if (useCase !== "event" && useCase !== "groupCity" &&
+          useCase !== "discoveryCity") {
         throw new HttpsError(
             "invalid-argument",
             "A valid location search use case is required.",
         );
       }
+      await requirePlacesCaller(req, {allowAnonymous: useCase === "discoveryCity"});
       if (query.length < 3 || query.length > 200) {
         throw new HttpsError(
             "invalid-argument",
@@ -155,8 +167,9 @@ exports.placesAutocomplete = onCall(
         includeQueryPredictions: false,
         languageCode: "en",
       };
-      if (useCase === "groupCity") {
-        requestBody.includedPrimaryTypes = ["(cities)"];
+      if (useCase === "groupCity" || useCase === "discoveryCity") {
+        requestBody.includedPrimaryTypes = useCase === "discoveryCity" && /\d/.test(query) ?
+          ["postal_code"] : ["(cities)"];
         requestBody.includedRegionCodes = ["us"];
       } else {
         const bias = req.data?.locationBias;
@@ -214,10 +227,15 @@ exports.placeDetails = onCall(
       region: "us-central1",
       timeoutSeconds: 15,
       invoker: "public",
+      enforceAppCheck: process.env.FUNCTIONS_EMULATOR !== "true",
       secrets: [GOOGLE_PLACES_API_KEY],
     },
     async (req) => {
-      await requirePlacesCaller(req);
+      const useCase = req.data?.useCase || "event";
+      if (!["event", "groupCity", "discoveryCity"].includes(useCase)) {
+        throw new HttpsError("invalid-argument", "Invalid location use case.");
+      }
+      await requirePlacesCaller(req, {allowAnonymous: useCase === "discoveryCity"});
       const placeId = typeof req.data?.placeId === "string" ? req.data.placeId.trim() : "";
       const sessionToken = validateSessionToken(req.data?.sessionToken);
       if (!placeId || placeId.length > 256) {
@@ -242,6 +260,7 @@ exports.placeDetails = onCall(
 
       let city = "";
       let regionCode = "";
+      let countryCode = "";
       for (const component of body.addressComponents || []) {
         const types = component.types || [];
         if (!city && ["locality", "postal_town", "administrative_area_level_2"]
@@ -251,6 +270,12 @@ exports.placeDetails = onCall(
         if (types.includes("administrative_area_level_1")) {
           regionCode = String(component.shortText || component.longText || "");
         }
+        if (types.includes("country")) {
+          countryCode = String(component.shortText || component.longText || "");
+        }
+      }
+      if (useCase === "discoveryCity" && countryCode !== "US") {
+        throw new HttpsError("invalid-argument", "Choose a location in the United States.");
       }
       return {
         placeId: String(body.id || placeId),
@@ -258,6 +283,7 @@ exports.placeDetails = onCall(
         formattedAddress: String(body.formattedAddress || ""),
         city,
         regionCode,
+        countryCode,
         latitude,
         longitude,
       };
@@ -270,10 +296,15 @@ exports.reverseGeocode = onCall(
       region: "us-central1",
       timeoutSeconds: 15,
       invoker: "public",
+      enforceAppCheck: process.env.FUNCTIONS_EMULATOR !== "true",
       secrets: [GOOGLE_PLACES_API_KEY],
     },
     async (req) => {
-      await requirePlacesCaller(req);
+      const useCase = req.data?.useCase || "event";
+      if (!["event", "discoveryCity"].includes(useCase)) {
+        throw new HttpsError("invalid-argument", "Invalid location use case.");
+      }
+      await requirePlacesCaller(req, {allowAnonymous: useCase === "discoveryCity"});
       const latitude = Number(req.data?.latitude);
       const longitude = Number(req.data?.longitude);
       if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
@@ -300,9 +331,31 @@ exports.reverseGeocode = onCall(
             "Address lookup is not configured or unavailable.",
         );
       }
+      let city = "";
+      let regionCode = "";
+      let countryCode = "";
+      for (const component of body.results[0].address_components || []) {
+        const types = component.types || [];
+        if (!city && ["locality", "postal_town", "administrative_area_level_2"]
+            .some((type) => types.includes(type))) {
+          city = String(component.long_name || component.short_name || "");
+        }
+        if (types.includes("administrative_area_level_1")) {
+          regionCode = String(component.short_name || component.long_name || "");
+        }
+        if (types.includes("country")) {
+          countryCode = String(component.short_name || component.long_name || "");
+        }
+      }
+      if (useCase === "discoveryCity" && countryCode !== "US") {
+        throw new HttpsError("invalid-argument", "Discovery is currently available in the United States.");
+      }
       return {
         placeId: String(body.results[0].place_id || ""),
         formattedAddress: String(body.results[0].formatted_address || ""),
+        city,
+        regionCode,
+        countryCode,
         latitude,
         longitude,
       };
@@ -311,6 +364,13 @@ exports.reverseGeocode = onCall(
 
 // Initialize Firebase Admin SDK
 const admin = require("./firebase-admin-compat");
+const {
+  createProcessUserAnalyticsRecompute,
+  processUserAnalyticsRecompute,
+  requestUserAnalyticsRecompute,
+} = require("./analytics/user-analytics");
+exports.processUserAnalyticsRecomputeV2 =
+  createProcessUserAnalyticsRecompute(admin);
 
 // Separate, secured Windows administrator API. The desktop client uses Firebase
 // Auth ID tokens over HTTPS and never receives Admin SDK or Stripe credentials.
@@ -1384,295 +1444,113 @@ function analyzeRepeatAttendees(analyticsData) {
  * This maintains a single user_analytics/{userId} document with all aggregated data
  * Dramatically reduces client-side queries from N+1 to 1
  */
-exports.aggregateUserAnalytics = onDocumentWritten("event_analytics/{eventId}",
-    async (event) => {
-      try {
-        const eventId = event.params.eventId;
-        const db = admin.firestore();
-
-        // Get the event to find the creator
-        const eventDoc = await db.collection("Events").doc(eventId).get();
-        if (!eventDoc.exists) {
-          logger.info("Event not found, skipping user analytics update:", eventId);
-          return;
-        }
-
-        const eventData = eventDoc.data();
-        const userId = eventData.customerUid;
-        if (!userId) {
-          logger.info("No userId found for event:", eventId);
-          return;
-        }
-
-        logger.info("Updating user analytics for user:", userId);
-
-        // Get all events by this user
-        const userEventsQuery = await db.collection("Events")
-            .where("customerUid", "==", userId)
-            .get();
-
-        const userEvents = userEventsQuery.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-
-        // Get analytics for all user events in parallel
-        const eventAnalyticsPromises = userEvents.map((evt) =>
-          db.collection("event_analytics").doc(evt.id).get(),
-        );
-        const eventAnalyticsDocs = await Promise.all(eventAnalyticsPromises);
-
-        // Build aggregated analytics
-        let totalAttendees = 0;
-        let topPerformingEvent = null;
-        let maxAttendees = -1;
-        const eventCategories = {};
-        const monthlyTrends = {};
-        const eventAnalytics = {};
-
-        userEvents.forEach((evt, index) => {
-          const analyticsDoc = eventAnalyticsDocs[index];
-          const analytics = analyticsDoc.exists ? analyticsDoc.data() : {};
-
-          const attendees = analytics.totalAttendees || 0;
-          const repeatAttendees = analytics.repeatAttendees || 0;
-
-          totalAttendees += attendees;
-
-          // Store individual event analytics
-          eventAnalytics[evt.id] = {
-            attendees: attendees,
-            repeatAttendees: repeatAttendees,
-          };
-
-          // Track top performing event
-          if (attendees > maxAttendees) {
-            maxAttendees = attendees;
-            topPerformingEvent = {
-              id: evt.id,
-              title: evt.title || "Untitled Event",
-              attendees: attendees,
-              date: evt.selectedDateTime || null,
-            };
-          }
-
-          // Track event categories
-          const category = (evt.categories && evt.categories.length > 0) ?
-              evt.categories[0] :
-              "Other";
-          eventCategories[category] = (eventCategories[category] || 0) + 1;
-
-          // Track monthly trends
-          if (evt.selectedDateTime) {
-            const date = evt.selectedDateTime.toDate ? evt.selectedDateTime.toDate() : new Date(evt.selectedDateTime);
-            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-            monthlyTrends[monthKey] = (monthlyTrends[monthKey] || 0) + attendees;
-          }
-        });
-
-        // Calculate retention rate across all user's events
-        let retentionRate = 0;
-        try {
-          // Get attendance records for up to 60 most recent events
-          const recentEvents = userEvents
-              .sort((a, b) => {
-                const dateA = a.selectedDateTime?.toDate ? a.selectedDateTime.toDate() : new Date(a.selectedDateTime);
-                const dateB = b.selectedDateTime?.toDate ? b.selectedDateTime.toDate() : new Date(b.selectedDateTime);
-                return dateB - dateA;
-              })
-              .slice(0, 60);
-
-          const eventIds = recentEvents.map((evt) => evt.id);
-
-          if (eventIds.length > 0) {
-            // Use batched queries (Firestore allows 10 items per 'in' query)
-            const batchSize = 10;
-            const attendanceSnapshots = [];
-
-            for (let i = 0; i < eventIds.length; i += batchSize) {
-              const batch = eventIds.slice(i, i + batchSize);
-              const snapshot = await db.collection("Attendance")
-                  .where("eventId", "in", batch)
-                  .get();
-              attendanceSnapshots.push(...snapshot.docs);
-            }
-
-            // Count unique attendees and repeat attendees
-            const attendeeCountsByUser = {};
-            attendanceSnapshots.forEach((doc) => {
-              const data = doc.data();
-              const uid = data.customerUid;
-              if (uid && uid !== "manual") {
-                attendeeCountsByUser[uid] = (attendeeCountsByUser[uid] || 0) + 1;
-              }
-            });
-
-            const uniqueAttendeeCount = Object.keys(attendeeCountsByUser).length;
-            const repeatAttendeeCount = Object.values(attendeeCountsByUser)
-                .filter((count) => count > 1)
-                .length;
-
-            retentionRate = uniqueAttendeeCount > 0 ?
-                (repeatAttendeeCount / uniqueAttendeeCount) * 100.0 :
-                0.0;
-          }
-        } catch (retentionError) {
-          logger.error("Error calculating retention rate:", retentionError);
-          retentionRate = 0;
-        }
-
-        // Calculate average attendance
-        const averageAttendance = userEvents.length > 0 ?
-            totalAttendees / userEvents.length :
-            0;
-
-        // Build the user analytics document
-        const userAnalytics = {
-          totalEvents: userEvents.length,
-          totalAttendees: totalAttendees,
-          averageAttendance: averageAttendance,
-          topPerformingEvent: topPerformingEvent,
-          eventCategories: eventCategories,
-          monthlyTrends: monthlyTrends,
-          retentionRate: retentionRate,
-          eventAnalytics: eventAnalytics,
-          lastUpdated: admin.firestore.Timestamp.now(),
-        };
-
-        // Save to user_analytics collection
-        await db.collection("user_analytics").doc(userId).set(userAnalytics);
-
-        logger.info("User analytics updated successfully for user:", userId);
-      } catch (error) {
-        logger.error("Error in aggregateUserAnalytics:", error);
-        // Don't throw - we don't want to fail the triggering write
-      }
+exports.aggregateUserAnalyticsV2 = onDocumentWritten({
+  document: "event_analytics/{eventId}",
+  region: "us-central1",
+  retry: true,
+}, async (event) => {
+  try {
+    const eventId = event.params.eventId;
+    const eventDocument = await admin.firestore()
+        .collection("Events").doc(eventId).get();
+    if (!eventDocument.exists) {
+      logger.info("Event not found, skipping user analytics request", {eventId});
+      return {skipped: true, reason: "event_not_found"};
+    }
+    const userId = eventDocument.get("customerUid");
+    if (!userId) {
+      logger.info("Event has no analytics owner", {eventId});
+      return {skipped: true, reason: "missing_owner"};
+    }
+    const generation = await requestUserAnalyticsRecompute(
+        admin,
+        userId,
+        "event_analytics_write",
+    );
+    return {requested: true, generation};
+  } catch (error) {
+    logger.error("Error requesting aggregate user analytics", {
+      eventId: event.params.eventId,
+      error: String(error),
     });
+    throw error;
+  }
+});
 
 /**
  * Initialize user analytics when a new event is created
  */
-exports.updateUserAnalyticsOnEventCreate = onDocumentCreated("Events/{eventId}",
-    async (event) => {
-      try {
-        const eventData = event.data.data();
-        const userId = eventData.customerUid;
+exports.updateUserAnalyticsOnEventCreateV2 = onDocumentCreated({
+  document: "Events/{eventId}",
+  region: "us-central1",
+  retry: true,
+}, async (event) => {
+  const eventData = event.data.data();
+  const userId = eventData.customerUid;
+  if (!userId) return {skipped: true, reason: "missing_owner"};
 
-        if (!userId) {
-          return;
-        }
-
-        logger.info("Initializing user analytics for new event, user:", userId);
-
-        const db = admin.firestore();
-
-        // Check if user analytics already exists
-        const userAnalyticsDoc = await db.collection("user_analytics").doc(userId).get();
-
-        if (!userAnalyticsDoc.exists) {
-          // Initialize with minimal data
-          const eventId = event.params.eventId;
-          const category = (eventData.categories && eventData.categories.length > 0) ?
-              eventData.categories[0] :
-              "Other";
-
-          const monthKey = eventData.selectedDateTime ?
-              (() => {
-                const date = eventData.selectedDateTime.toDate ? eventData.selectedDateTime.toDate() : new Date(eventData.selectedDateTime);
-                return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-              })() :
-              null;
-
-          const initialAnalytics = {
-            totalEvents: 1,
-            totalAttendees: 0,
-            averageAttendance: 0,
-            topPerformingEvent: {
-              id: eventId,
-              title: eventData.title || "Untitled Event",
-              attendees: 0,
-              date: eventData.selectedDateTime || null,
-            },
-            eventCategories: {[category]: 1},
-            monthlyTrends: monthKey ? {[monthKey]: 0} : {},
-            retentionRate: 0,
-            eventAnalytics: {
-              [eventId]: {
-                attendees: 0,
-                repeatAttendees: 0,
-              },
-            },
-            lastUpdated: admin.firestore.Timestamp.now(),
-          };
-
-          await db.collection("user_analytics").doc(userId).set(initialAnalytics);
-          logger.info("User analytics initialized for user:", userId);
-        } else {
-          // User analytics exists, trigger a full recalculation
-          // Create a temporary event_analytics document to trigger aggregation
-          await db.collection("event_analytics").doc(event.params.eventId).set({
-            totalAttendees: 0,
-            lastUpdated: admin.firestore.Timestamp.now(),
-          }, {merge: true});
-        }
-      } catch (error) {
-        logger.error("Error in updateUserAnalyticsOnEventCreate:", error);
-        // Don't throw - we don't want to fail event creation
+  try {
+    const db = admin.firestore();
+    const eventAnalyticsReference = db.collection("event_analytics")
+        .doc(event.params.eventId);
+    await db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(eventAnalyticsReference);
+      if (!snapshot.exists) {
+        transaction.create(eventAnalyticsReference, {
+          totalAttendees: 0,
+          lastUpdated: admin.firestore.Timestamp.now(),
+        });
       }
     });
+    const generation = await requestUserAnalyticsRecompute(
+        admin,
+        userId,
+        "event_create",
+    );
+    return {requested: true, generation};
+  } catch (error) {
+    logger.error("Error initializing analytics for new event", {
+      eventId: event.params.eventId,
+      userId,
+      error: String(error),
+    });
+    throw error;
+  }
+});
 
 /**
  * Update user analytics when an event is deleted
  */
-exports.updateUserAnalyticsOnEventDelete = onDocumentWritten("Events/{eventId}",
-    async (event) => {
-      try {
-        // Only handle deletions
-        if (event.data.after.exists) {
-          return;
-        }
+exports.updateUserAnalyticsOnEventDeleteV2 = onDocumentDeleted({
+  document: "Events/{eventId}",
+  region: "us-central1",
+  retry: true,
+}, async (event) => {
+  const eventData = event.data.data();
+  const userId = eventData.customerUid;
+  const eventId = event.params.eventId;
+  if (!userId) return {skipped: true, reason: "missing_owner"};
 
-        const eventData = event.data.before.data();
-        const userId = eventData.customerUid;
-        const eventId = event.params.eventId;
-
-        if (!userId) {
-          return;
-        }
-
-        logger.info("Updating user analytics after event deletion, user:", userId);
-
-        const db = admin.firestore();
-
-        // Delete the event analytics document
-        await db.collection("event_analytics").doc(eventId).delete().catch(() => {
-          // Ignore if doesn't exist
+  try {
+    await admin.firestore().collection("event_analytics").doc(eventId)
+        .delete().catch((error) => {
+          if (error.code !== 5 && error.code !== "not-found") throw error;
         });
-
-        // Recalculate user analytics
-        const userEventsQuery = await db.collection("Events")
-            .where("customerUid", "==", userId)
-            .get();
-
-        if (userEventsQuery.empty) {
-          // No more events, delete user analytics
-          await db.collection("user_analytics").doc(userId).delete();
-          logger.info("User analytics deleted (no events remaining) for user:", userId);
-          return;
-        }
-
-        // Trigger recalculation by updating one of the remaining event analytics
-        const firstEventId = userEventsQuery.docs[0].id;
-        await db.collection("event_analytics").doc(firstEventId).set({
-          lastUpdated: admin.firestore.Timestamp.now(),
-        }, {merge: true});
-
-        logger.info("User analytics update triggered after event deletion");
-      } catch (error) {
-        logger.error("Error in updateUserAnalyticsOnEventDelete:", error);
-        // Don't throw
-      }
+    const generation = await requestUserAnalyticsRecompute(
+        admin,
+        userId,
+        "event_delete",
+    );
+    return {requested: true, generation};
+  } catch (error) {
+    logger.error("Error requesting analytics after event deletion", {
+      eventId,
+      userId,
+      error: String(error),
     });
+    throw error;
+  }
+});
 
 /**
  * Send scheduled notifications
@@ -1887,91 +1765,6 @@ exports.deleteUserAccount = onCall({region: "us-central1"}, async (request) => {
 });
 
 /**
- * Send event reminder notifications
- * Triggered when a new event is created or updated
- */
-exports.sendEventReminders = onDocumentCreated("Events/{eventId}", async (event) => {
-  try {
-    const eventData = event.data.data();
-    const eventId = event.data.id;
-
-    if (!eventData || !eventData.eventDateTime) {
-      return;
-    }
-
-    const eventTime = eventData.eventDateTime.toDate();
-    const now = new Date();
-
-    // Only schedule reminders for future events
-    if (eventTime <= now) {
-      return;
-    }
-
-    logger.info(`Scheduling reminders for event ${eventId}`);
-
-    const db = admin.firestore();
-
-    // Get all users who should receive notifications
-    const usersSnapshot = await db.collection("users").get();
-
-    for (const userDoc of usersSnapshot.docs) {
-      const userId = userDoc.id;
-
-      // Check user's notification settings
-      const settingsDoc = await db.collection("users")
-          .doc(userId)
-          .collection("notificationSettings")
-          .doc("settings")
-          .get();
-
-      let shouldSendReminder = true;
-      let reminderTime = 60; // Default 1 hour
-
-      if (settingsDoc.exists) {
-        const settings = settingsDoc.data();
-        shouldSendReminder = settings.eventReminders !== false;
-        reminderTime = settings.reminderTime || 60;
-      }
-
-      if (!shouldSendReminder) {
-        continue;
-      }
-
-      // Check if user has a ticket for this event or is the creator
-      const hasTicket = await checkUserHasTicket(userId, eventId, db);
-      const isCreator = eventData.customerUid === userId;
-
-      if (!hasTicket && !isCreator) {
-        continue; // Skip if user has no ticket and is not the creator
-      }
-
-      // Calculate reminder time
-      const reminderDateTime = new Date(eventTime.getTime() - (reminderTime * 60 * 1000));
-
-      // Only schedule if reminder time is in the future
-      if (reminderDateTime > now) {
-        await db.collection("scheduledNotifications").add({
-          type: "event_reminder",
-          eventId: eventId,
-          eventTitle: eventData.eventTitle || "Event",
-          eventTime: eventData.eventDateTime,
-          scheduledTime: admin.firestore.Timestamp.fromDate(reminderDateTime),
-          title: "Event Reminder",
-          body: `Your event "${eventData.eventTitle || "Event"}" starts in ${reminderTime} minutes`,
-          userId: userId,
-          createdAt: admin.firestore.Timestamp.now(),
-          sent: false,
-        });
-      }
-    }
-
-    logger.info(`Scheduled reminders for event ${eventId}`);
-  } catch (error) {
-    logger.error("Error scheduling event reminders:", error);
-  }
-});
-
-/**
  * Send new event notifications to users within specified distance and group members
  * Triggered when a new event is created
  */
@@ -2111,16 +1904,23 @@ exports.sendEventUpdateNotifications = onDocumentUpdated("Events/{eventId}", asy
   try {
     const beforeData = event.data.before.data();
     const afterData = event.data.after.data();
-    const eventId = event.data.id;
+    const eventId = event.params.eventId;
 
     if (!beforeData || !afterData) {
       return;
     }
 
     // Check if important fields have changed
-    const hasLocationChanged = JSON.stringify(beforeData.eventLocation) !== JSON.stringify(afterData.eventLocation);
-    const hasDateTimeChanged = beforeData.eventDateTime.toDate().getTime() !== afterData.eventDateTime.toDate().getTime();
-    const hasTitleChanged = beforeData.eventTitle !== afterData.eventTitle;
+    const beforeLocation = beforeData.location || beforeData.eventLocation;
+    const afterLocation = afterData.location || afterData.eventLocation;
+    const beforeDateTime = beforeData.selectedDateTime || beforeData.eventDateTime;
+    const afterDateTime = afterData.selectedDateTime || afterData.eventDateTime;
+    const beforeTitle = beforeData.title || beforeData.eventTitle;
+    const afterTitle = afterData.title || afterData.eventTitle;
+    const hasLocationChanged = JSON.stringify(beforeLocation) !== JSON.stringify(afterLocation);
+    const hasDateTimeChanged = beforeDateTime?.toDate().getTime() !==
+      afterDateTime?.toDate().getTime();
+    const hasTitleChanged = beforeTitle !== afterTitle;
 
     if (!hasLocationChanged && !hasDateTimeChanged && !hasTitleChanged) {
       return; // No important changes
@@ -2163,9 +1963,9 @@ exports.sendEventUpdateNotifications = onDocumentUpdated("Events/{eventId}", asy
       await sendNotificationToUser(userId, {
         type: "event_changes",
         title: "Event Updated",
-        body: `${updateMessage}: "${afterData.eventTitle || "Event"}"`,
+        body: `${updateMessage}: "${afterTitle || "Event"}"`,
         eventId: eventId,
-        eventTitle: afterData.eventTitle || "Event",
+        eventTitle: afterTitle || "Event",
       }, db);
     }
 
@@ -2331,24 +2131,6 @@ exports.sendMentionNotifications = onDocumentCreated("Messages/{messageId}", asy
     logger.error("Error sending mention notifications:", error);
   }
 });
-
-/**
- * Helper function to check if user has a ticket for an event
- */
-async function checkUserHasTicket(userId, eventId, db) {
-  try {
-    const ticketQuery = await db.collection("Tickets")
-        .where("customerUid", "==", userId)
-        .where("eventId", "==", eventId)
-        .limit(1)
-        .get();
-
-    return !ticketQuery.empty;
-  } catch (error) {
-    logger.error("Error checking user ticket:", error);
-    return false;
-  }
-}
 
 /**
  * Helper function to notify group members of new event
@@ -3820,7 +3602,7 @@ exports.sendBasicTierUsageReminder = onSchedule({
  * Callable function to migrate existing users to the new user_analytics system
  * Run once to populate user_analytics for all users with events
  */
-exports.backfillUserAnalytics = onCall({region: "us-central1"}, async (req) => {
+exports.backfillUserAnalyticsV2 = onCall({region: "us-central1"}, async (req) => {
   try {
     // Require admin auth (check if caller has admin custom claim)
     if (!req.auth || req.auth.token.admin !== true) {
@@ -3876,146 +3658,16 @@ exports.backfillUserAnalytics = onCall({region: "us-central1"}, async (req) => {
     for (const userId of userIds) {
       try {
         logger.info(`Processing user: ${userId}`);
-
-        // Get all events by this user
-        const userEventsQuery = await db.collection("Events")
-            .where("customerUid", "==", userId)
-            .get();
-
-        const userEvents = userEventsQuery.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-
-        if (userEvents.length === 0) {
-          logger.info(`User ${userId} has no events, skipping`);
-          continue;
-        }
-
-        // Get analytics for all user events in parallel
-        const eventAnalyticsPromises = userEvents.map((evt) =>
-          db.collection("event_analytics").doc(evt.id).get(),
+        await requestUserAnalyticsRecompute(admin, userId, "admin_backfill");
+        const processingResult = await processUserAnalyticsRecompute(
+            admin,
+            userId,
         );
-        const eventAnalyticsDocs = await Promise.all(eventAnalyticsPromises);
-
-        // Build aggregated analytics
-        let totalAttendees = 0;
-        let topPerformingEvent = null;
-        let maxAttendees = -1;
-        const eventCategories = {};
-        const monthlyTrends = {};
-        const eventAnalytics = {};
-
-        userEvents.forEach((evt, index) => {
-          const analyticsDoc = eventAnalyticsDocs[index];
-          const analytics = analyticsDoc.exists ? analyticsDoc.data() : {};
-
-          const attendees = analytics.totalAttendees || 0;
-          const repeatAttendees = analytics.repeatAttendees || 0;
-
-          totalAttendees += attendees;
-
-          // Store individual event analytics
-          eventAnalytics[evt.id] = {
-            attendees: attendees,
-            repeatAttendees: repeatAttendees,
-          };
-
-          // Track top performing event
-          if (attendees > maxAttendees) {
-            maxAttendees = attendees;
-            topPerformingEvent = {
-              id: evt.id,
-              title: evt.title || "Untitled Event",
-              attendees: attendees,
-              date: evt.selectedDateTime || null,
-            };
-          }
-
-          // Track event categories
-          const category = (evt.categories && evt.categories.length > 0) ?
-              evt.categories[0] :
-              "Other";
-          eventCategories[category] = (eventCategories[category] || 0) + 1;
-
-          // Track monthly trends
-          if (evt.selectedDateTime) {
-            const date = evt.selectedDateTime.toDate ? evt.selectedDateTime.toDate() : new Date(evt.selectedDateTime);
-            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-            monthlyTrends[monthKey] = (monthlyTrends[monthKey] || 0) + attendees;
-          }
+        logger.info("Backfilled analytics for user", {
+          userId,
+          ...processingResult,
         });
 
-        // Calculate retention rate
-        let retentionRate = 0;
-        try {
-          const recentEvents = userEvents
-              .sort((a, b) => {
-                const dateA = a.selectedDateTime?.toDate ? a.selectedDateTime.toDate() : new Date(a.selectedDateTime);
-                const dateB = b.selectedDateTime?.toDate ? b.selectedDateTime.toDate() : new Date(b.selectedDateTime);
-                return dateB - dateA;
-              })
-              .slice(0, 60);
-
-          const eventIds = recentEvents.map((evt) => evt.id);
-
-          if (eventIds.length > 0) {
-            const batchSize = 10;
-            const attendanceSnapshots = [];
-
-            for (let i = 0; i < eventIds.length; i += batchSize) {
-              const batch = eventIds.slice(i, i + batchSize);
-              const snapshot = await db.collection("Attendance")
-                  .where("eventId", "in", batch)
-                  .get();
-              attendanceSnapshots.push(...snapshot.docs);
-            }
-
-            const attendeeCountsByUser = {};
-            attendanceSnapshots.forEach((doc) => {
-              const data = doc.data();
-              const uid = data.customerUid;
-              if (uid && uid !== "manual") {
-                attendeeCountsByUser[uid] = (attendeeCountsByUser[uid] || 0) + 1;
-              }
-            });
-
-            const uniqueAttendeeCount = Object.keys(attendeeCountsByUser).length;
-            const repeatAttendeeCount = Object.values(attendeeCountsByUser)
-                .filter((count) => count > 1)
-                .length;
-
-            retentionRate = uniqueAttendeeCount > 0 ?
-                (repeatAttendeeCount / uniqueAttendeeCount) * 100.0 :
-                0.0;
-          }
-        } catch (retentionError) {
-          logger.error(`Error calculating retention for user ${userId}:`, retentionError);
-        }
-
-        // Calculate average attendance
-        const averageAttendance = userEvents.length > 0 ?
-            totalAttendees / userEvents.length :
-            0;
-
-        // Build the user analytics document
-        const userAnalytics = {
-          totalEvents: userEvents.length,
-          totalAttendees: totalAttendees,
-          averageAttendance: averageAttendance,
-          topPerformingEvent: topPerformingEvent,
-          eventCategories: eventCategories,
-          monthlyTrends: monthlyTrends,
-          retentionRate: retentionRate,
-          eventAnalytics: eventAnalytics,
-          lastUpdated: admin.firestore.Timestamp.now(),
-          backfilled: true,
-        };
-
-        // Save to user_analytics collection
-        await db.collection("user_analytics").doc(userId).set(userAnalytics);
-
-        logger.info(`✓ Backfilled analytics for user ${userId}: ${userEvents.length} events`);
         successCount++;
       } catch (userError) {
         logger.error(`Error processing user ${userId}:`, userError);
@@ -4115,3 +3767,64 @@ exports.deleteUserAccount = createDeleteUserAccount();
 
 const {createIssueFreeTicket} = require("./tickets/issuance");
 exports.issueFreeTicket = createIssueFreeTicket();
+
+const {createSubmitGuestAttendance} = require("./guest/attendance");
+exports.submitGuestAttendance = createSubmitGuestAttendance(admin);
+
+const {
+  createAggregateProductFunnelDaily,
+  createRecordProductFunnelEvent,
+} = require("./product/funnel");
+exports.recordProductFunnelEvent = createRecordProductFunnelEvent(admin);
+exports.aggregateProductFunnelDaily = createAggregateProductFunnelDaily(admin);
+
+const {
+  createGetDiscoveryHome,
+  createMaintainDiscoveryMetadata,
+  createSavedEventCounter,
+  createSearchDiscoveryEvents,
+} = require("./discovery/marketplace");
+exports.getDiscoveryHomeV1 = createGetDiscoveryHome(admin);
+exports.searchDiscoveryEventsV1 = createSearchDiscoveryEvents(admin);
+exports.maintainDiscoveryMetadataV1 = createMaintainDiscoveryMetadata(admin);
+exports.updateDiscoverySaveCountV1 = createSavedEventCounter(admin);
+
+const {
+  createDeliverDiscoveryNotifications,
+  createQueueDiscoveryNotifications,
+} = require("./discovery/notifications");
+exports.queueDiscoveryNotificationsV1 = createQueueDiscoveryNotifications(admin);
+exports.deliverDiscoveryNotificationsV1 = createDeliverDiscoveryNotifications(admin);
+
+const {
+  createEndCheckInSession,
+  createGetPersonalPass,
+  createMintVenueCredential,
+  createResolveCheckInCredential,
+  createStartCheckInSession,
+  createSubmitCheckIn,
+  createVoidAttendance,
+} = require("./attendance/v2");
+exports.startCheckInSession = createStartCheckInSession(admin);
+exports.endCheckInSession = createEndCheckInSession(admin);
+exports.mintVenueCredential = createMintVenueCredential(admin);
+exports.resolveCheckInCredential = createResolveCheckInCredential(admin);
+exports.submitCheckIn = createSubmitCheckIn(admin);
+exports.voidAttendance = createVoidAttendance(admin);
+exports.getPersonalAttendancePass = createGetPersonalPass(admin);
+
+// The scheduled-reminder V2 implementation intentionally overrides the
+// legacy minute worker above while its versioned reconciliation triggers are
+// verified independently in production.
+const {
+  createScheduledReminderFunctions,
+} = require("./notifications/scheduled-reminders");
+const scheduledReminderFunctions = createScheduledReminderFunctions(admin);
+exports.sendScheduledNotifications =
+  scheduledReminderFunctions.sendScheduledNotifications;
+exports.reconcileEventRemindersV2 =
+  scheduledReminderFunctions.reconcileEventRemindersV2;
+exports.reconcileTicketRemindersV2 =
+  scheduledReminderFunctions.reconcileTicketRemindersV2;
+exports.reconcileReminderSettingsV2 =
+  scheduledReminderFunctions.reconcileReminderSettingsV2;

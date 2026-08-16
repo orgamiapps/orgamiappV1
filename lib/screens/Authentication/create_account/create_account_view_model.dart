@@ -5,6 +5,8 @@ import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/Services/guest_mode_service.dart';
+import 'package:attendus/Services/product_funnel_service.dart';
 
 class CreateAccountViewModel extends ChangeNotifier {
   String? firstName;
@@ -139,6 +141,13 @@ class CreateAccountViewModel extends ChangeNotifier {
       );
 
       CustomerController.logeInCustomer = newCustomerModel;
+      await GuestModeService().disableGuestMode();
+      await GuestModeService().clearGuestDisplayName();
+      await ProductFunnelService().record(
+        'guest_auth_completed',
+        dimensions: {'authChoice': 'create_account', 'result': 'success'},
+      );
+      await ProductFunnelService().rotateSession();
 
       isCreating = false;
       notifyListeners();

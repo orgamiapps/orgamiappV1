@@ -1113,12 +1113,14 @@ class _IconBadge extends StatelessWidget {
 class AttendUsTopBar extends StatelessWidget {
   final String title;
   final String? subtitle;
+  final Widget? leading;
   final List<Widget> actions;
 
   const AttendUsTopBar({
     super.key,
     required this.title,
     this.subtitle,
+    this.leading,
     this.actions = const [],
   });
 
@@ -1135,6 +1137,7 @@ class AttendUsTopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
+          if (leading != null) ...[leading!, const SizedBox(width: 12)],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1704,6 +1707,12 @@ class AttendUsEventSummaryCard extends StatelessWidget {
   final String dateLabel;
   final String locationLabel;
   final String? statusLabel;
+  final String? organizerLabel;
+  final String? distanceLabel;
+  final String? priceLabel;
+  final String? availabilityLabel;
+  final bool isSaved;
+  final VoidCallback? onSave;
   final VoidCallback? onTap;
 
   const AttendUsEventSummaryCard({
@@ -1714,6 +1723,12 @@ class AttendUsEventSummaryCard extends StatelessWidget {
     required this.dateLabel,
     required this.locationLabel,
     this.statusLabel,
+    this.organizerLabel,
+    this.distanceLabel,
+    this.priceLabel,
+    this.availabilityLabel,
+    this.isSaved = false,
+    this.onSave,
     this.onTap,
   });
 
@@ -1745,21 +1760,70 @@ class AttendUsEventSummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AspectRatio(
-            aspectRatio: 16 / 8,
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(AttendUsTokens.radiusMd),
+          Stack(
+            children: [
+              AspectRatio(
+                aspectRatio: 16 / 8,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(AttendUsTokens.radiusMd),
+                  ),
+                  child: AttendUsEventImage(
+                    imageUrl: imageUrl,
+                    fit: BoxFit.cover,
+                    compact: true,
+                    emptyBuilder: _imageFallback,
+                    loadingBuilder: (context) =>
+                        _imageFallback(context, isLoading: true),
+                  ),
+                ),
               ),
-              child: AttendUsEventImage(
-                imageUrl: imageUrl,
-                fit: BoxFit.cover,
-                compact: true,
-                emptyBuilder: _imageFallback,
-                loadingBuilder: (context) =>
-                    _imageFallback(context, isLoading: true),
+              Positioned(
+                left: 10,
+                top: 10,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface.withValues(alpha: .94),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 6,
+                    ),
+                    child: Text(
+                      dateLabel,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
+              if (onSave != null)
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Semantics(
+                    button: true,
+                    label: isSaved
+                        ? 'Remove $title from saved events'
+                        : 'Save $title',
+                    child: IconButton.filledTonal(
+                      tooltip: isSaved ? 'Saved' : 'Save event',
+                      constraints: const BoxConstraints(
+                        minWidth: 44,
+                        minHeight: 44,
+                      ),
+                      onPressed: onSave,
+                      icon: Icon(
+                        isSaved ? Icons.bookmark : Icons.bookmark_border,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
           Padding(
             padding: const EdgeInsets.all(14),
@@ -1795,13 +1859,35 @@ class AttendUsEventSummaryCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
+                if (organizerLabel != null && organizerLabel!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'By $organizerLabel',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 10,
                   runSpacing: 8,
                   children: [
-                    _Meta(icon: Icons.schedule, label: dateLabel),
-                    _Meta(icon: Icons.place_outlined, label: locationLabel),
+                    _Meta(
+                      icon: Icons.place_outlined,
+                      label: distanceLabel == null
+                          ? locationLabel
+                          : '$locationLabel · $distanceLabel',
+                    ),
+                    if (priceLabel != null)
+                      _Meta(icon: Icons.sell_outlined, label: priceLabel!),
+                    if (availabilityLabel != null)
+                      _Meta(
+                        icon: Icons.confirmation_number_outlined,
+                        label: availabilityLabel!,
+                      ),
                   ],
                 ),
               ],

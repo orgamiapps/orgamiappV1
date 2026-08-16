@@ -14,12 +14,18 @@ class PlaceSelection {
   final String? placeId;
   final String displayName;
   final String formattedAddress;
+  final String city;
+  final String regionCode;
+  final String countryCode;
 
   const PlaceSelection({
     required this.location,
     required this.displayName,
     required this.formattedAddress,
     this.placeId,
+    this.city = '',
+    this.regionCode = '',
+    this.countryCode = 'US',
   });
 }
 
@@ -33,6 +39,9 @@ class LocationPickerResult {
   String? get placeId => selection.placeId;
   String get displayName => selection.displayName;
   String get formattedAddress => selection.formattedAddress;
+  String get city => selection.city;
+  String get regionCode => selection.regionCode;
+  String get countryCode => selection.countryCode;
 }
 
 class LocationPickerScreen extends StatefulWidget {
@@ -79,7 +88,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   LatLng? _locationBias;
   PlaceSelection? _selection;
   List<PlaceSuggestion> _suggestions = const [];
-  double _radius = 100;
+  double _radius = 30;
   Set<Marker> _markers = const {};
   Set<Circle> _circles = const {};
 
@@ -98,7 +107,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     super.initState();
     _places = widget.placesService ?? PlacesService();
     _sessionToken = _places.createSessionToken();
-    _radius = widget.initialRadius ?? 100;
+    _radius = widget.initialRadius ?? 30;
     final initial = widget.initialLocation;
     if (initial != null && !(initial.latitude == 0 && initial.longitude == 0)) {
       _selection = PlaceSelection(
@@ -129,7 +138,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       Circle(
         circleId: const CircleId('radius-circle'),
         center: location,
-        radius: _radius * 0.3048,
+        radius: _radius,
         fillColor: const Color(0xFF667EEA).withValues(alpha: 0.18),
         strokeColor: const Color(0xFF667EEA),
         strokeWidth: 2,
@@ -219,6 +228,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         formattedAddress: details.formattedAddress.isNotEmpty
             ? details.formattedAddress
             : suggestion.description,
+        city: details.city,
+        regionCode: details.regionCode,
+        countryCode: details.countryCode,
       );
       setState(() {
         _selection = selection;
@@ -268,6 +280,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           formattedAddress: details.formattedAddress.isEmpty
               ? coordinateLabel
               : details.formattedAddress,
+          city: details.city,
+          regionCode: details.regionCode,
+          countryCode: details.countryCode,
         );
         _searchController.text = _selection!.formattedAddress;
       });
@@ -571,13 +586,13 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
               children: [
                 const Text('Geofence radius'),
                 const Spacer(),
-                Text('${_radius.round()} ft'),
+                Text('${_radius.round()} m'),
               ],
             ),
             Slider(
               value: _radius,
-              min: 10,
-              max: 1000,
+              min: 5,
+              max: 500,
               divisions: 99,
               onChanged: _updateRadius,
             ),

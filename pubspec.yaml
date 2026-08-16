@@ -14,7 +14,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.8.1 <4.0.0'
+  sdk: '>=3.10.0 <4.0.0'
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -26,6 +26,8 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_localizations:
+    sdk: flutter
+  flutter_web_plugins:
     sdk: flutter
 
   # iOS-style icon glyphs (required for CupertinoIcons to render correctly)
@@ -94,6 +96,8 @@ dependencies:
   mobile_scanner: ^7.0.1
   calendar_view: 2.0.0
   connectivity_plus: ^7.0.0
+  local_auth: ^3.0.2
+  cryptography: ^2.9.0
   # Payment processing
   flutter_stripe: 13.0.0
   

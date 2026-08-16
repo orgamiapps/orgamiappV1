@@ -9,7 +9,9 @@ import 'package:attendus/widgets/attendus_design_system.dart';
 import 'dart:async';
 
 class GroupsScreen extends StatefulWidget {
-  const GroupsScreen({super.key});
+  final bool showShellHeader;
+
+  const GroupsScreen({super.key, this.showShellHeader = true});
 
   @override
   State<GroupsScreen> createState() => _GroupsScreenState();
@@ -187,17 +189,18 @@ class _GroupsScreenState extends State<GroupsScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            AttendUsTopBar(
-              title: 'Groups',
-              subtitle: 'Manage communities and discover organizer spaces.',
-              actions: [
-                AttendUsButton.primary(
-                  label: 'Create group',
-                  icon: Icons.add,
-                  onPressed: _goToCreate,
-                ),
-              ],
-            ),
+            if (widget.showShellHeader)
+              AttendUsTopBar(
+                title: 'Groups',
+                subtitle: 'Manage your communities and discover new ones.',
+                actions: [
+                  AttendUsButton.primary(
+                    label: 'Create group',
+                    icon: Icons.add,
+                    onPressed: _goToCreate,
+                  ),
+                ],
+              ),
             Expanded(
               child: Align(
                 alignment: Alignment.topCenter,
@@ -213,10 +216,8 @@ class _GroupsScreenState extends State<GroupsScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildSearchAndFilters(),
-                              const SizedBox(height: 18),
                               _buildMyGroupsSection(),
-                              const SizedBox(height: 18),
+                              const SizedBox(height: 24),
                               AttendUsSectionHeader(
                                 title: 'Discover Groups',
                                 subtitle:
@@ -229,7 +230,9 @@ class _GroupsScreenState extends State<GroupsScreen> {
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 14),
+                              const SizedBox(height: 12),
+                              _buildSearchAndFilters(),
+                              const SizedBox(height: 16),
                             ],
                           ),
                         ),
@@ -249,11 +252,8 @@ class _GroupsScreenState extends State<GroupsScreen> {
   }
 
   Widget _buildSearchAndFilters() {
-    return AttendUsPageSection(
-      title: 'Community Directory',
-      subtitle: 'Search across your groups and discover new communities.',
-      icon: Icons.groups_2_outlined,
-      framed: true,
+    return AttendUsCard(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -284,17 +284,24 @@ class _GroupsScreenState extends State<GroupsScreen> {
       title: 'My Groups',
       subtitle: 'Groups where you are a member or organizer.',
       icon: Icons.account_tree_outlined,
-      framed: true,
+      framed: false,
+      padding: EdgeInsets.zero,
       actions: [
         AttendUsStatusBadge(
           label: '${_myOrgs.length}',
           tone: AttendUsStatusTone.info,
         ),
+        if (!widget.showShellHeader)
+          AttendUsButton.primary(
+            label: 'Create group',
+            icon: Icons.add,
+            onPressed: _goToCreate,
+          ),
       ],
       child: _myOrgs.isEmpty
-          ? _EmptyStateCard(onCreate: _goToCreate)
+          ? const _EmptyGroupsPrompt()
           : SizedBox(
-              height: 112,
+              height: 64,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: _myOrgs.length,
@@ -470,24 +477,21 @@ class _GroupsScreenState extends State<GroupsScreen> {
   }
 }
 
-class _EmptyStateCard extends StatelessWidget {
-  final VoidCallback onCreate;
-  const _EmptyStateCard({required this.onCreate});
+class _EmptyGroupsPrompt extends StatelessWidget {
+  const _EmptyGroupsPrompt();
 
   @override
   Widget build(BuildContext context) {
     return AttendUsCard(
-      padding: const EdgeInsets.all(16),
-      child: Row(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: const Row(
         children: [
-          const Icon(Icons.info_outline),
-          const SizedBox(width: 12),
-          const Expanded(child: Text('You have not joined any groups yet.')),
-          const SizedBox(width: 12),
-          AttendUsButton.secondary(
-            label: 'Create',
-            icon: Icons.add,
-            onPressed: onCreate,
+          Icon(Icons.info_outline),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'You have not joined any groups yet. Create one or explore public groups below.',
+            ),
           ),
         ],
       ),

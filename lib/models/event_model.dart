@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:attendus/models/check_in_policy.dart';
 
 class EventModel {
   static String firebaseKey = 'Events';
@@ -8,6 +9,10 @@ class EventModel {
   String? locationName; // Optional display name for the venue/location
   String locationType; // 'in_person' or 'online'
   String? placeId;
+  String? geohash;
+  String city;
+  String regionCode;
+  String countryCode;
 
   DateTime selectedDateTime, eventGenerateTime;
 
@@ -22,11 +27,13 @@ class EventModel {
   bool ticketsEnabled;
   int maxTickets;
   int issuedTickets;
+  int saveCount;
   double? ticketPrice; // Price per ticket in USD
   bool ticketUpgradeEnabled; // Whether skip-the-line upgrades are available
   double? ticketUpgradePrice; // Total skip-the-line upgrade price
   int eventDuration; // Duration in hours
   List<String> coHosts; // Array of user IDs who are co-hosts
+  List<String> checkInStaff; // User IDs with event-day console access
   String? organizationId; // Optional organization context for the event
   List<String> accessList; // Private-event invitees outside the organization
 
@@ -39,6 +46,7 @@ class EventModel {
   String? signInSecurityTier;
 
   String? manualCode; // Custom manual code for the event
+  CheckInPolicy checkInPolicy;
 
   // Live Quiz configuration
   bool hasLiveQuiz; // Whether this event has a live quiz
@@ -67,17 +75,23 @@ class EventModel {
     this.locationName,
     this.locationType = 'in_person',
     this.placeId,
+    this.geohash,
+    this.city = '',
+    this.regionCode = '',
+    this.countryCode = 'US',
     this.categories = const [],
     this.isFeatured = false,
     this.featureEndDate,
     this.ticketsEnabled = false,
     this.maxTickets = 0,
     this.issuedTickets = 0,
+    this.saveCount = 0,
     this.ticketPrice,
     this.ticketUpgradeEnabled = false,
     this.ticketUpgradePrice,
     this.eventDuration = 2, // Default 2 hours
     this.coHosts = const [],
+    this.checkInStaff = const [],
     this.organizationId,
     this.accessList = const [],
     this.signInMethods = const [
@@ -86,6 +100,7 @@ class EventModel {
     ], // Default methods (legacy support)
     this.signInSecurityTier = 'regular', // Default to regular tier
     this.manualCode,
+    this.checkInPolicy = const CheckInPolicy(),
     this.hasLiveQuiz = false,
     this.liveQuizId,
   });
@@ -104,6 +119,10 @@ class EventModel {
       locationName: data['locationName'],
       locationType: data['locationType'] == 'online' ? 'online' : 'in_person',
       placeId: data['placeId'],
+      geohash: data['geohash'],
+      city: data['city']?.toString() ?? '',
+      regionCode: data['regionCode']?.toString() ?? '',
+      countryCode: data['countryCode']?.toString() ?? 'US',
       imageUrl: data['imageUrl'],
       customerUid: data['customerUid'],
       status: data['status'],
@@ -119,7 +138,9 @@ class EventModel {
       getLocation: data['getLocation'] ?? false,
       latitude: (data['latitude'] as num?)?.toDouble() ?? 0.0,
       longitude: (data['longitude'] as num?)?.toDouble() ?? 0.0,
-      radius: (data['radius'] as num?)?.toDouble() ?? 1.0,
+      radius: data['radiusUnit'] == 'meters'
+          ? (data['radius'] as num?)?.toDouble() ?? 1.0
+          : ((data['radius'] as num?)?.toDouble() ?? 1.0) * 0.3048,
       categories: (data.containsKey('categories') && data['categories'] != null)
           ? List<String>.from(data['categories'])
           : [],
@@ -132,12 +153,17 @@ class EventModel {
       ticketsEnabled: data['ticketsEnabled'] ?? false,
       maxTickets: data['maxTickets'] ?? 0,
       issuedTickets: data['issuedTickets'] ?? 0,
+      saveCount: data['saveCount'] ?? 0,
       ticketPrice: data['ticketPrice']?.toDouble(),
       ticketUpgradeEnabled: data['ticketUpgradeEnabled'] ?? false,
       ticketUpgradePrice: data['ticketUpgradePrice']?.toDouble(),
       eventDuration: data['eventDuration'] ?? 2,
       coHosts: (data.containsKey('coHosts') && data['coHosts'] != null)
           ? List<String>.from(data['coHosts'])
+          : [],
+      checkInStaff:
+          (data.containsKey('checkInStaff') && data['checkInStaff'] != null)
+          ? List<String>.from(data['checkInStaff'])
           : [],
       organizationId: data['organizationId'],
       accessList: (data.containsKey('accessList') && data['accessList'] != null)
@@ -149,6 +175,12 @@ class EventModel {
           : ['qr_code', 'manual_code'], // Default to regular methods
       signInSecurityTier: data['signInSecurityTier'] ?? 'regular',
       manualCode: data['manualCode'],
+      checkInPolicy: CheckInPolicy.fromJson(
+        data['checkInPolicy'] is Map
+            ? Map<String, dynamic>.from(data['checkInPolicy'])
+            : null,
+        legacyTier: data['signInSecurityTier']?.toString(),
+      ),
       hasLiveQuiz: data['hasLiveQuiz'] ?? false,
       liveQuizId: data['liveQuizId'],
     );
@@ -197,8 +229,24 @@ class EventModel {
     return customerUid == userId || coHosts.contains(userId);
   }
 
+  /// Door staff can use attendance tools without receiving event-edit access.
+  bool hasCheckInPermissions(String userId) {
+    return hasManagementPermissions(userId) || checkInStaff.contains(userId);
+  }
+
   /// Check if a specific sign-in method is enabled
   bool isSignInMethodEnabled(String method) {
+    if (method == 'venue_token' ||
+        method == 'qr_code' ||
+        method == 'manual_code') {
+      return checkInPolicy.attendeeSelfCheckInEnabled;
+    }
+    if (method == 'personal_pass' || method == 'staff_roster') {
+      return checkInPolicy.staffEntryEnabled || checkInPolicy.staffFallback;
+    }
+    if (method == 'facial_recognition' || method == 'geofence') {
+      return false;
+    }
     // For new security tier system
     if (signInSecurityTier != null) {
       switch (signInSecurityTier) {
@@ -225,6 +273,17 @@ class EventModel {
 
   /// Get available sign-in methods based on security tier
   List<String> getAvailableSignInMethods() {
+    if (checkInPolicy.needsOrganizerReview) return const [];
+    return switch (checkInPolicy.profile) {
+      CheckInProfile.selfCheckIn => const ['venue_token'],
+      CheckInProfile.staffEntry => const ['personal_pass', 'staff_roster'],
+      CheckInProfile.hybrid => const [
+        'venue_token',
+        'personal_pass',
+        'staff_roster',
+      ],
+    };
+    /* Legacy implementation retained below for source compatibility.
     if (signInSecurityTier != null) {
       switch (signInSecurityTier) {
         case 'most_secure':
@@ -244,15 +303,11 @@ class EventModel {
 
     // Legacy support
     return signInMethods;
+    */
   }
 
   /// Check if the event requires geofence-based sign-in
-  bool get requiresGeofence {
-    return signInSecurityTier == 'most_secure' ||
-        signInSecurityTier == 'geofence_only' ||
-        signInSecurityTier == 'all' ||
-        signInMethods.contains('geofence');
-  }
+  bool get requiresGeofence => checkInPolicy.proximityAssist;
 
   /// Get the manual code for the event (generates one if not set)
   String getManualCode() {
@@ -287,6 +342,10 @@ class EventModel {
     data['locationName'] = isOnline ? null : locationName;
     data['locationType'] = locationType;
     data['placeId'] = isOnline || placeId?.isEmpty == true ? null : placeId;
+    data['geohash'] = isOnline ? null : geohash;
+    data['city'] = isOnline ? '' : city;
+    data['regionCode'] = isOnline ? '' : regionCode;
+    data['countryCode'] = isOnline ? '' : countryCode;
     data['imageUrl'] = imageUrl;
     data['customerUid'] = customerUid;
     data['status'] = status;
@@ -295,6 +354,7 @@ class EventModel {
     data['private'] = private;
     data['getLocation'] = isOnline ? false : getLocation;
     data['radius'] = isOnline ? 0.0 : radius;
+    data['radiusUnit'] = 'meters';
     data['longitude'] = isOnline ? 0.0 : longitude;
     data['latitude'] = isOnline ? 0.0 : latitude;
     data['categories'] = categories;
@@ -303,6 +363,7 @@ class EventModel {
     data['ticketsEnabled'] = ticketsEnabled;
     data['maxTickets'] = maxTickets;
     data['issuedTickets'] = issuedTickets;
+    data['saveCount'] = saveCount;
     if (ticketPrice != null) data['ticketPrice'] = ticketPrice;
     data['ticketUpgradeEnabled'] = ticketUpgradeEnabled;
     if (ticketUpgradePrice != null) {
@@ -310,9 +371,11 @@ class EventModel {
     }
     data['eventDuration'] = eventDuration;
     data['coHosts'] = coHosts;
+    data['checkInStaff'] = checkInStaff;
     if (organizationId != null) data['organizationId'] = organizationId;
     data['accessList'] = accessList;
     data['signInMethods'] = normalizedSignInMethods;
+    data['checkInPolicy'] = checkInPolicy.toJson();
     if (normalizedSecurityTier != null) {
       data['signInSecurityTier'] = normalizedSecurityTier;
     }

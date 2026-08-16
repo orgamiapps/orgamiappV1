@@ -22,9 +22,17 @@ service cloud.firestore {
       return fullUser() && eventData(eventId).customerUid == request.auth.uid;
     }
 
-    function eventParticipant(eventId) {
+    function eventManager(eventId) {
       return fullUser() && (
         eventOwner(eventId) ||
+        request.auth.uid in eventData(eventId).get('coHosts', []) ||
+        request.auth.uid in eventData(eventId).get('checkInStaff', [])
+      );
+    }
+
+    function eventParticipant(eventId) {
+      return fullUser() && (
+        eventManager(eventId) ||
         request.auth.uid in eventData(eventId).get('accessList', []) ||
         exists(/databases/$(database)/documents/Events/$(eventId)/Attendees/$(request.auth.uid))
       );
@@ -70,6 +78,8 @@ service cloud.firestore {
     match /admin_audit_logs/{doc} { allow read, write: if false; }
     match /admin_metrics_daily/{doc} { allow read, write: if false; }
     match /admin_metrics_current/{doc} { allow read, write: if false; }
+    match /admin_funnel_daily/{doc} { allow read, write: if false; }
+    match /product_funnel_events/{doc} { allow read, write: if false; }
     match /admin_jobs/{doc} { allow read, write: if false; }
     match /admin_idempotency/{doc} { allow read, write: if false; }
     match /admin_rate_limits/{doc} { allow read, write: if false; }
@@ -91,6 +101,9 @@ service cloud.firestore {
       allow read: if self(uid);
       allow write: if false;
     }
+    match /_user_analytics_recompute/{uid} {
+      allow read, write: if false;
+    }
     match /TicketPayments/{doc} {
       allow read: if fullUser() && resource.data.customerUid == request.auth.uid;
       allow write: if false;
@@ -101,6 +114,11 @@ service cloud.firestore {
     }
     match /FeaturePayments/{doc} {
       allow read: if fullUser() && resource.data.customerUid == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /AppConfig/{document} {
+      allow read: if signedIn();
       allow write: if false;
     }
 
@@ -126,8 +144,21 @@ service cloud.firestore {
         allow create, delete: if self(uid);
         allow update: if false;
       }
+      match /SavedEvents/{eventId} {
+        allow read: if fullUser() && self(uid);
+        allow create: if fullUser() && self(uid) &&
+          request.resource.data.eventId == eventId &&
+          request.resource.data.userId == request.auth.uid;
+        allow delete: if fullUser() && self(uid);
+        allow update: if false;
+      }
+      match /Discovery/{document} {
+        allow read, create, update, delete: if fullUser() && self(uid);
+      }
       match /{subcollection}/{document} {
-        allow read, write: if self(uid);
+        allow read, write: if self(uid)
+          && subcollection != 'SavedEvents'
+          && subcollection != 'Discovery';
       }
     }
 
@@ -146,6 +177,7 @@ service cloud.firestore {
     match /Events/{eventId} {
       allow read: if signedIn() && (
         resource.data.get('private', false) == false ||
+        eventManager(eventId) ||
         resource.data.customerUid == request.auth.uid ||
         request.auth.uid in resource.data.get('accessList', [])
       );
@@ -157,12 +189,14 @@ service cloud.firestore {
         request.resource.data.customerUid == resource.data.customerUid &&
         !changedKeys().hasAny([
           'isFeatured', 'featureEndDate', 'issuedTickets', 'paidTicketCount',
-          'grossRevenue', 'netRevenue', 'attendanceCount', 'commentCount'
+          'grossRevenue', 'netRevenue', 'attendanceCount', 'commentCount',
+          'saveCount', 'geohash', 'countryCode', 'discoveryLocationValid',
+          'discoveryMetadataUpdatedAt'
         ]);
       allow delete: if eventOwner(eventId);
 
       match /Attendees/{uid} {
-        allow read: if self(uid) || eventOwner(eventId);
+        allow read: if self(uid) || eventManager(eventId);
         allow create: if self(uid) && request.resource.data.customerUid == request.auth.uid;
         allow update, delete: if false;
       }
@@ -224,6 +258,14 @@ service cloud.firestore {
         allow read, delete: if self(uid) || orgAdmin(orgId);
         allow update: if orgAdmin(orgId);
       }
+      match /Followers/{uid} {
+        allow read: if fullUser();
+        allow create: if fullUser() && self(uid) &&
+          request.resource.data.userId == request.auth.uid &&
+          request.resource.data.organizationId == orgId;
+        allow delete: if fullUser() && self(uid);
+        allow update: if false;
+      }
       match /{subcollection}/{document} {
         allow read: if orgMember(orgId);
         allow write: if orgAdmin(orgId);
@@ -239,15 +281,14 @@ service cloud.firestore {
 
     match /Attendance/{id} {
       allow read: if fullUser() &&
-        (resource.data.customerUid == request.auth.uid || eventOwner(resource.data.eventId));
-      allow create: if fullUser() &&
-        request.resource.data.customerUid == request.auth.uid &&
-        canReadEvent(request.resource.data.eventId);
-      allow update, delete: if false;
+        (resource.data.customerUid == request.auth.uid ||
+          eventManager(resource.data.eventId));
+      allow create, update, delete: if false;
     }
     match /RegisterAttendance/{id} {
       allow read: if fullUser() &&
-        (resource.data.customerUid == request.auth.uid || eventOwner(resource.data.eventId));
+        (resource.data.customerUid == request.auth.uid ||
+          eventManager(resource.data.eventId));
       allow create: if fullUser() &&
         request.resource.data.customerUid == request.auth.uid &&
         canReadEvent(request.resource.data.eventId);
@@ -256,12 +297,24 @@ service cloud.firestore {
 
     match /Tickets/{id} {
       allow read: if fullUser() &&
-        (resource.data.customerUid == request.auth.uid || eventOwner(resource.data.eventId));
+        (resource.data.customerUid == request.auth.uid ||
+          eventManager(resource.data.eventId));
       allow create: if false;
-      allow update: if eventOwner(resource.data.eventId) &&
-        changedKeys().hasOnly(['isUsed', 'usedDateTime', 'usedBy']);
-      allow delete: if false;
+      allow update, delete: if false;
     }
+
+    match /CheckInSessions/{id} {
+      allow read: if eventManager(resource.data.eventId);
+      allow write: if false;
+    }
+    match /CheckInAudit/{id} {
+      allow read: if eventManager(resource.data.eventId);
+      allow write: if false;
+    }
+    match /check_in_session_secrets/{id} { allow read, write: if false; }
+    match /check_in_idempotency/{id} { allow read, write: if false; }
+    match /check_in_event_state/{id} { allow read, write: if false; }
+    match /dwell_times/{id} { allow read, write: if false; }
 
     match /Conversations/{id} {
       allow read: if fullUser() && request.auth.uid in resource.data.participantIds;

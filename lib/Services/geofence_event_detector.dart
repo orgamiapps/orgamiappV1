@@ -112,12 +112,11 @@ class GeofenceEventDetector {
           );
 
           Logger.debug(
-            'Event ${event.title}: distance=${distance.toStringAsFixed(1)}m, radius=${event.radius}ft (${(event.radius * 0.3048).toStringAsFixed(1)}m)',
+            'Event ${event.title}: distance=${distance.toStringAsFixed(1)}m, radius=${event.radius.toStringAsFixed(1)}m',
           );
 
           // Check if user is within geofence
-          final radiusInMeters =
-              event.radius * 0.3048; // Convert feet to meters
+          final radiusInMeters = event.radius;
           if (distance <= radiusInMeters) {
             Logger.success(
               '✓ User is within geofence of event: ${event.title} (${distance.toStringAsFixed(1)}m away, within ${radiusInMeters.toStringAsFixed(1)}m radius)',
@@ -211,7 +210,7 @@ class GeofenceEventDetector {
       );
 
       // Check if within radius
-      final radiusInMeters = event.radius * 0.3048; // Convert feet to meters
+      final radiusInMeters = event.radius;
       final isWithin = distance <= radiusInMeters;
 
       Logger.debug(

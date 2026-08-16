@@ -88,7 +88,7 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
   @override
   Widget build(BuildContext context) {
     return AppScaffoldWrapper(
-      selectedBottomNavIndex: 4, // Account tab
+      selectedBottomNavIndex: 3, // Profile tab
       body: SafeArea(
         child: Column(
           children: [

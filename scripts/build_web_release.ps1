@@ -3,6 +3,7 @@ param(
   [string]$Environment = "production",
   [string]$ProjectId = "",
   [string]$MapsKeyDisplayName = "",
+  [switch]$SkipClean,
   [switch]$Deploy
 )
 
@@ -52,7 +53,9 @@ function Invoke-Checked {
   }
 }
 
-Invoke-Checked { flutter clean } "Flutter clean"
+if (-not $SkipClean) {
+  Invoke-Checked { flutter clean } "Flutter clean"
+}
 Invoke-Checked { flutter pub get } "Flutter dependency restore"
 
 $keyResource = (& gcloud services api-keys list `
@@ -67,14 +70,41 @@ $mapsKey = (& gcloud services api-keys get-key-string $keyResource `
 if (-not $mapsKey) {
   throw "The dedicated Maps web key value was unavailable."
 }
+$appCheckKey = (& gcloud recaptcha keys list `
+  --project=$ProjectId `
+  --filter="displayName='Attendus App Check Web'" `
+  --format="value(name.basename())").Trim()
+if (-not $appCheckKey) {
+  throw "The Attendus App Check Web reCAPTCHA Enterprise key was not found."
+}
 $env:GOOGLE_MAPS_WEB_API_KEY = $mapsKey
 $releaseId = (& git rev-parse HEAD).Trim()
 if (-not $releaseId) {
   throw "Unable to determine the Git release identifier."
 }
 $artifactReleaseId = $releaseId
+$worktreeState = (& git status --porcelain=v1 --untracked-files=all) -join "`n"
+if ($worktreeState) {
+  # Never reuse the immutable URL associated with HEAD for a dirty build.
+  # A nonce avoids walking and hashing a potentially large untracked tree.
+  $dirtyIdentity = "$releaseId`:$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())`:$([Guid]::NewGuid())"
+  $hashBytes = [System.Text.Encoding]::UTF8.GetBytes(
+    $dirtyIdentity
+  )
+  $sha256 = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    $artifactReleaseId = ([System.BitConverter]::ToString(
+      $sha256.ComputeHash($hashBytes)
+    ) -replace "-", "").ToLowerInvariant()
+  } finally {
+    $sha256.Dispose()
+  }
+  Write-Warning "Dirty worktree detected; using unique immutable release ID $artifactReleaseId."
+}
 if ($Environment -eq "staging") {
-  $hashBytes = [System.Text.Encoding]::UTF8.GetBytes("$releaseId`:staging")
+  $hashBytes = [System.Text.Encoding]::UTF8.GetBytes(
+    "$artifactReleaseId`:staging"
+  )
   $sha256 = [System.Security.Cryptography.SHA256]::Create()
   try {
     $artifactReleaseId = ([System.BitConverter]::ToString(
@@ -85,10 +115,32 @@ if ($Environment -eq "staging") {
   }
 }
 
+if ($SkipClean) {
+  $webBuildRoot = Join-Path $projectRoot "build\web"
+  $retainedReleases = Join-Path $webBuildRoot "releases"
+  if (Test-Path -LiteralPath $retainedReleases) {
+    $resolvedReleases = (Resolve-Path -LiteralPath $retainedReleases).Path
+    $resolvedWebRoot = (Resolve-Path -LiteralPath $webBuildRoot).Path
+    if (-not $resolvedReleases.StartsWith(
+        "$resolvedWebRoot$([IO.Path]::DirectorySeparatorChar)",
+        [StringComparison]::OrdinalIgnoreCase
+      )) {
+      throw "Refusing to move retained releases outside the web build root."
+    }
+    $archiveRoot = Join-Path $projectRoot "build\stale-web-releases"
+    New-Item -ItemType Directory -Path $archiveRoot -Force | Out-Null
+    $archivePath = Join-Path $archiveRoot ([Guid]::NewGuid().ToString("N"))
+    Move-Item -LiteralPath $resolvedReleases -Destination $archivePath
+    Write-Warning "Moved stale retained web releases to $archivePath."
+  }
+}
+
 Invoke-Checked { dart run tools/check_maps_web_key.dart } "Maps key validation"
 Invoke-Checked {
   flutter build web --release --pwa-strategy=none --no-wasm-dry-run `
     "--dart-define=GOOGLE_MAPS_WEB_API_KEY=$mapsKey" `
+    "--dart-define=ATTENDUS_ENABLE_WEB_APP_CHECK=true" `
+    "--dart-define=ATTENDUS_RECAPTCHA_ENTERPRISE_SITE_KEY=$appCheckKey" `
     "--dart-define=ATTENDUS_RELEASE_ID=$artifactReleaseId" `
     "--dart-define=ATTENDUS_FIREBASE_ENV=$Environment"
 } "Flutter web build"
@@ -124,14 +176,17 @@ Invoke-Checked {
 Invoke-Checked { dart run tools/check_web_bundle_size.dart } "Bundle budget"
 
 if ($Deploy) {
-  Invoke-Checked {
-    firebase deploy --project $ProjectId --only hosting
-  } "Firebase Hosting deployment"
-  foreach ($validationUrl in $environmentConfig.ValidationUrls) {
-    Invoke-Checked {
-      dart run tools/check_deferred_web_chunks.dart $validationUrl
-    } "Release validation for $validationUrl"
+  $firebaseCli = Join-Path $projectRoot "functions\node_modules\.bin\firebase.cmd"
+  if (-not (Test-Path -LiteralPath $firebaseCli)) {
+    throw "Project-local Firebase CLI is unavailable at $firebaseCli."
   }
+  Invoke-Checked {
+    & $firebaseCli deploy --project $ProjectId --only hosting --non-interactive
+  } "Firebase Hosting deployment"
+  $validationUrls = $environmentConfig.ValidationUrls
+  Invoke-Checked {
+    dart run tools/check_deferred_web_chunks.dart $validationUrls
+  } "Production release validation"
 }
 
 Write-Output "Attendus $Environment web release pipeline completed."

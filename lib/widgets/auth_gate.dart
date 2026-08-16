@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:attendus/screens/Splash/second_splash_screen.dart';
 import 'package:attendus/screens/Home/dashboard_screen.dart'
     deferred as dashboard;
 import 'package:attendus/controller/customer_controller.dart';
@@ -14,6 +13,10 @@ import 'package:attendus/firebase/firebase_google_auth_helper.dart';
 import 'package:attendus/Utils/route_builder.dart' deferred as route_builder;
 import 'package:attendus/widgets/deferred_screen_loader.dart';
 import 'package:provider/provider.dart';
+import 'package:attendus/Services/guest_mode_service.dart';
+import 'package:attendus/Services/pending_auth_intent_service.dart';
+import 'package:attendus/widgets/deferred_premium_event_creation.dart';
+import 'package:attendus/widgets/deferred_shared_event_screen.dart';
 
 /// AuthGate determines the initial screen based on Firebase Auth state
 /// This ensures persistent login works immediately after force-close
@@ -26,7 +29,6 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   bool _isChecking = true;
-  bool _isLoggedIn = false;
   Widget? _restoredWidget;
   final NavigationStateService _navStateService = NavigationStateService();
 
@@ -44,6 +46,7 @@ class _AuthGateState extends State<AuthGate> {
 
   Future<void> _checkAuthState() async {
     try {
+      await GuestModeService().initialize();
       Logger.debug('🔄 AuthGate: Checking Firebase Auth state...');
 
       // Mobile web Google OAuth returns by reloading Attendus. Consume the
@@ -82,7 +85,11 @@ class _AuthGateState extends State<AuthGate> {
         Logger.debug(
           '✅ AuthGate: Firebase user found immediately: ${firebaseUser.uid}',
         );
-        _setUserAndNavigate(firebaseUser);
+        if (firebaseUser.isAnonymous) {
+          _setGuestAndNavigate();
+        } else {
+          _setUserAndNavigate(firebaseUser);
+        }
         return;
       }
 
@@ -109,22 +116,41 @@ class _AuthGateState extends State<AuthGate> {
         '🔍 AuthGate: Initial auth state: ${restoredUser?.uid ?? 'null'}',
       );
       if (restoredUser != null) {
-        _setUserAndNavigate(restoredUser);
+        if (restoredUser.isAnonymous) {
+          _setGuestAndNavigate();
+        } else {
+          _setUserAndNavigate(restoredUser);
+        }
         return;
       }
 
-      setState(() {
-        _isLoggedIn = false;
-        _isChecking = false;
-      });
+      try {
+        await GuestModeService().ensureGuestSession();
+      } catch (error) {
+        Logger.warning(
+          'AuthGate: Guest session will retry from Discover: $error',
+        );
+      }
+      _setGuestAndNavigate();
     } catch (e) {
       Logger.error('AuthGate: Error checking auth state', e);
       if (!mounted) return;
-      setState(() {
-        _isLoggedIn = false;
-        _isChecking = false;
-      });
+      _setGuestAndNavigate();
     }
+  }
+
+  void _setGuestAndNavigate() {
+    if (!mounted || !_isChecking) return;
+    CustomerController.logeInCustomer = null;
+    setState(() {
+      _isChecking = false;
+      _restoredWidget = DeferredScreenLoader(
+        loadLibrary: dashboard.loadLibrary,
+        recoveryKey: 'dashboard',
+        loadingLabel: 'Loading Discover',
+        builder: () => dashboard.DashboardScreen(restoreSavedTab: false),
+      );
+    });
   }
 
   void _setUserAndNavigate(User user, {bool restoreNavigation = true}) async {
@@ -138,6 +164,9 @@ class _AuthGateState extends State<AuthGate> {
       createdAt: DateTime.now(),
       profilePictureUrl: user.photoURL,
     );
+
+    final pendingIntent = await PendingAuthIntentService.consume();
+    if (pendingIntent != null) restoreNavigation = false;
 
     // Try to restore navigation state
     Widget? restoredScreen;
@@ -169,17 +198,44 @@ class _AuthGateState extends State<AuthGate> {
       loadLibrary: dashboard.loadLibrary,
       recoveryKey: 'dashboard',
       loadingLabel: 'Loading dashboard',
-      builder: () =>
-          dashboard.DashboardScreen(restoreSavedTab: restoreNavigation),
+      builder: () => dashboard.DashboardScreen(
+        initialIndex: pendingIntent?.dashboardTab ?? 0,
+        restoreSavedTab: restoreNavigation,
+      ),
     );
 
     if (!mounted) return;
 
     setState(() {
-      _isLoggedIn = true;
       _isChecking = false;
       _restoredWidget = restoredScreen;
     });
+
+    if (pendingIntent?.action == PendingAuthAction.createEvent) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future<void>.delayed(const Duration(milliseconds: 250), () {
+          if (!mounted) return;
+          Navigator.of(context, rootNavigator: true).push(
+            MaterialPageRoute(
+              builder: (_) => const DeferredPremiumEventCreation(),
+            ),
+          );
+        });
+      });
+    } else if (pendingIntent?.action == PendingAuthAction.sharedEvent &&
+        pendingIntent?.eventId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future<void>.delayed(const Duration(milliseconds: 250), () {
+          if (!mounted) return;
+          Navigator.of(context, rootNavigator: true).push(
+            MaterialPageRoute(
+              builder: (_) =>
+                  DeferredSharedEventScreen(eventId: pendingIntent!.eventId!),
+            ),
+          );
+        });
+      });
+    }
 
     // Initialize AuthService and SubscriptionService in background for full functionality
     Future.microtask(() async {
@@ -241,12 +297,7 @@ class _AuthGateState extends State<AuthGate> {
       );
     }
 
-    if (_isLoggedIn) {
-      Logger.debug('AuthGate: Returning authenticated destination');
-      return _restoredWidget!;
-    } else {
-      Logger.debug('AuthGate: Navigating directly to onboarding');
-      return const SecondSplashScreen();
-    }
+    Logger.debug('AuthGate: Returning resolved destination');
+    return _restoredWidget!;
   }
 }

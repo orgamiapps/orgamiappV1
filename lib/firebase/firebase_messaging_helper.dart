@@ -1056,37 +1056,6 @@ class FirebaseMessagingHelper {
     _pendingFeedbackEvent = null;
   }
 
-  Future<void> sendEventReminder(
-    String eventId,
-    String eventTitle,
-    DateTime eventTime,
-  ) async {
-    if (_settings?.eventReminders == true) {
-      try {
-        final reminderTime = DateTime.now().add(
-          Duration(minutes: _settings!.reminderTime),
-        );
-
-        await _firestore.collection('scheduledNotifications').add({
-          'type': 'event_reminder',
-          'eventId': eventId,
-          'eventTitle': eventTitle,
-          'eventTime': Timestamp.fromDate(eventTime),
-          'scheduledTime': Timestamp.fromDate(reminderTime),
-          'title': 'Event Reminder',
-          'body':
-              'Your event "$eventTitle" starts in ${_settings!.reminderTime} minutes',
-          'userId': _auth.currentUser?.uid,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      } catch (e) {
-        if (kDebugMode) {
-          Logger.error('❌ Error scheduling event reminder: $e');
-        }
-      }
-    }
-  }
-
   Future<void> markNotificationAsRead(String notificationId) async {
     try {
       final user = _auth.currentUser;

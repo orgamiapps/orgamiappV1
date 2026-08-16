@@ -14,6 +14,7 @@ import 'package:attendus/screens/MyProfile/Widgets/professional_badge_widget.dar
 import 'package:attendus/models/badge_model.dart';
 import 'package:attendus/Services/badge_service.dart';
 import 'package:attendus/screens/Home/account_details_screen_v2.dart';
+import 'package:attendus/screens/Home/settings_screen.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -586,29 +587,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                         fontFamily: 'Roboto',
                       ),
                     ),
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                const AccountDetailsScreenV2(),
-                          ),
-                        );
-                      },
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: Color(0xFFF3F4F6),
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: const Icon(
-                          Icons.edit,
-                          color: Colors.black87,
-                          size: 18,
-                        ),
-                      ),
-                    ),
+                    _buildProfileActions(),
                   ],
                 ),
               if (widget.showBackButton || isSelectionMode)
@@ -766,34 +745,48 @@ class _MyProfileScreenState extends State<MyProfileScreen>
 
           // Overlay edit button when no back button
           if (!widget.showBackButton && !isSelectionMode)
-            Positioned(
-              top: 8,
-              right: 16,
-              child: GestureDetector(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const AccountDetailsScreenV2(),
-                    ),
-                  );
-                },
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: const Icon(
-                    Icons.edit,
-                    color: Colors.black87,
-                    size: 18,
-                  ),
-                ),
-              ),
-            ),
+            Positioned(top: 8, right: 16, child: _buildProfileActions()),
         ],
       ),
+    );
+  }
+
+  Widget _buildProfileActions() {
+    final showSettingsLabel = MediaQuery.sizeOf(context).width >= 600;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (showSettingsLabel)
+          OutlinedButton.icon(
+            onPressed: _openSettings,
+            icon: const Icon(Icons.settings_outlined, size: 18),
+            label: const Text('Settings'),
+          )
+        else
+          IconButton.outlined(
+            tooltip: 'Settings',
+            onPressed: _openSettings,
+            icon: const Icon(Icons.settings_outlined, size: 18),
+          ),
+        const SizedBox(width: 8),
+        IconButton.outlined(
+          tooltip: 'Edit profile',
+          onPressed: _openAccountDetails,
+          icon: const Icon(Icons.edit_outlined, size: 18),
+        ),
+      ],
+    );
+  }
+
+  void _openSettings() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const SettingsScreen()));
+  }
+
+  void _openAccountDetails() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const AccountDetailsScreenV2()),
     );
   }
 

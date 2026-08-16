@@ -11,6 +11,7 @@ import 'package:attendus/Services/firebase_initializer.dart';
 import 'package:attendus/firebase/firebase_google_auth_helper.dart';
 import 'package:attendus/Utils/firebase_retry_helper.dart';
 import 'package:attendus/Services/guest_mode_service.dart';
+import 'package:attendus/Services/product_funnel_service.dart';
 import 'package:attendus/Services/navigation_state_service.dart';
 
 /// Authentication service that handles persistent login functionality
@@ -341,6 +342,12 @@ class AuthService extends ChangeNotifier {
 
       // Disable guest mode when user logs in
       await GuestModeService().disableGuestMode();
+      await GuestModeService().clearGuestDisplayName();
+      await ProductFunnelService().record(
+        'guest_auth_completed',
+        dimensions: {'result': 'success'},
+      );
+      await ProductFunnelService().rotateSession();
 
       Logger.info('User session saved');
     } catch (e) {

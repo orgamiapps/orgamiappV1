@@ -193,20 +193,36 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
         }
       } catch (_) {}
 
-      // Load notification preferences from Firestore if present
+      // Notification settings have one canonical location shared with the
+      // server-side reminder worker. Fall back to the legacy customer fields
+      // only for accounts that have not saved the canonical settings yet.
       try {
-        final doc = await FirebaseFirestore.instance
-            .collection(CustomerModel.firebaseKey)
+        final settingsDoc = await FirebaseFirestore.instance
+            .collection('users')
             .doc(customer.uid)
+            .collection('settings')
+            .doc('notifications')
             .get();
-        final data = doc.data();
-        if (data != null && data['notificationPreferences'] is Map) {
-          final prefs = Map<String, dynamic>.from(
-            data['notificationPreferences'],
-          );
+        if (settingsDoc.exists) {
+          final prefs = settingsDoc.data()!;
           _notifyEventReminders = (prefs['eventReminders'] ?? true) == true;
-          _notifyMessages = (prefs['messages'] ?? true) == true;
-          _notifyAnnouncements = (prefs['announcements'] ?? true) == true;
+          _notifyMessages = (prefs['messagesAll'] ?? true) == true;
+          _notifyAnnouncements =
+              (prefs['generalNotifications'] ?? true) == true;
+        } else {
+          final customerDoc = await FirebaseFirestore.instance
+              .collection(CustomerModel.firebaseKey)
+              .doc(customer.uid)
+              .get();
+          final data = customerDoc.data();
+          if (data != null && data['notificationPreferences'] is Map) {
+            final prefs = Map<String, dynamic>.from(
+              data['notificationPreferences'],
+            );
+            _notifyEventReminders = (prefs['eventReminders'] ?? true) == true;
+            _notifyMessages = (prefs['messages'] ?? true) == true;
+            _notifyAnnouncements = (prefs['announcements'] ?? true) == true;
+          }
         }
       } catch (_) {}
 
@@ -267,19 +283,29 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
       putIfNotEmpty('tiktok', _tiktokController.text);
       customer.socialMediaLinks = social.isEmpty ? null : json.encode(social);
 
-      // Prepare update map (merge in notification preferences)
+      // Keep profile data and canonical notification settings in one atomic
+      // write so the UI cannot report success after only one side is saved.
       final Map<String, dynamic> updateData = CustomerModel.getMap(customer);
-      updateData['notificationPreferences'] = {
-        'eventReminders': _notifyEventReminders,
-        'messages': _notifyMessages,
-        'announcements': _notifyAnnouncements,
-      };
-
-      // Update in Firestore
-      await FirebaseFirestore.instance
-          .collection(CustomerModel.firebaseKey)
-          .doc(customer.uid)
-          .update(updateData);
+      final firestore = FirebaseFirestore.instance;
+      final batch = firestore.batch();
+      batch.update(
+        firestore.collection(CustomerModel.firebaseKey).doc(customer.uid),
+        updateData,
+      );
+      batch.set(
+        firestore
+            .collection('users')
+            .doc(customer.uid)
+            .collection('settings')
+            .doc('notifications'),
+        {
+          'eventReminders': _notifyEventReminders,
+          'messagesAll': _notifyMessages,
+          'generalNotifications': _notifyAnnouncements,
+        },
+        SetOptions(merge: true),
+      );
+      await batch.commit();
 
       _btnCtlr.success();
       // Haptic + snackbar style feedback

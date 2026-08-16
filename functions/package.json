@@ -6,13 +6,20 @@
     "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",
     "start": "npm run shell",
-    "test": "node --test test/admin-unit.test.js test/places.test.js test/places-rate-limit.test.js test/callable-security.test.js test/account-deletion.test.js test/biometric-retention.test.js test/ticket-issuance.test.js",
+    "test": "node --test test/admin-unit.test.js test/places.test.js test/places-rate-limit.test.js test/callable-security.test.js test/account-deletion.test.js test/biometric-retention.test.js test/ticket-issuance.test.js test/guest-experience.test.js test/attendance-v2.test.js test/scheduled-reminders.test.js test/discovery-marketplace.test.js",
     "test:rules": "firebase emulators:exec --config ../firebase.json --project demo-attendus-admin --only firestore,storage \"node --test --test-concurrency=1 test/firestore-rules.test.js test/storage-rules.test.js\"",
-    "test:integration": "firebase emulators:exec --config ../firebase.json --project demo-attendus-admin --only auth,firestore,storage,functions \"node --test --test-concurrency=1 test/admin-emulator.test.js\"",
+    "test:integration": "node tools/run-integration-tests.js --project demo-attendus-admin",
+    "test:integration:repeat": "node tools/run-integration-tests.js --project demo-attendus-admin --repeat 3",
     "bootstrap:super-admin": "node admin/bootstrap-super-admin.js",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "biometrics:inventory": "node tools/biometric-retention.js"
+    "biometrics:inventory": "node tools/biometric-retention.js",
+    "attendance:migrate": "node tools/migrate-attendance-v2.js",
+    "reminders:reconcile": "node tools/reconcile-scheduled-reminders.js",
+    "reminders:canary": "node tools/canary-scheduled-reminders.js",
+    "discovery:backfill": "node tools/backfill-discovery-marketplace.js",
+    "discovery:migrate-saves": "node tools/migrate-saved-events.js",
+    "discovery:validate-release": "node tools/validate-discovery-release.js"
   },
   "engines": {
     "node": "22"
@@ -22,6 +29,7 @@
     "archiver": "^8.0.0",
     "firebase-admin": "^14.2.0",
     "firebase-functions": "^7.3.2",
+    "geofire-common": "^6.0.0",
     "google-auth-library": "^11.0.0",
     "googleapis": "^173.0.0",
     "jsonwebtoken": "^9.0.3",
@@ -32,7 +40,8 @@
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",
     "eslint": "^8.15.0",
-    "firebase": "^11.10.0"
+    "firebase": "^11.10.0",
+    "firebase-tools": "15.25.1"
   },
   "private": true
 }
