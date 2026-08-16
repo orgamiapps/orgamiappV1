@@ -6,6 +6,7 @@ const {
   communityEligibility,
   escapeHtml,
   eventEligibility,
+  eventDescription,
   eventJsonLd,
   eventState,
   isoInTimeZone,
@@ -82,4 +83,10 @@ test("time zones fail closed to UTC", () => {
 test("communities require explicit public-page opt in", () => {
   assert.equal(communityEligibility({name: "Group", publicPageEnabled: true}), true);
   assert.equal(communityEligibility({name: "Group"}), false);
+});
+
+test("missing archive descriptions receive a truthful visible metadata fallback", () => {
+  const value = eventDescription({...future, description: ""}, null);
+  assert.match(value, /Summer Social/);
+  assert.match(value, /Miami Neighbors/);
 });

@@ -204,6 +204,19 @@ function organizerFor(event, organization) {
   return {name: text(event.groupName || event.authorName || "Attendus organizer")};
 }
 
+function eventDescription(data, organization) {
+  const supplied = description(data.description, 5000);
+  if (supplied) return supplied;
+  const organizer = organizerFor(data, organization);
+  return `View date, location, and attendance details for ${text(data.title)}, ` +
+    `organized by ${organizer.name} on Attendus.`;
+}
+
+function categoryLabel(value) {
+  return text(value).split(/[-_]/).filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" & ");
+}
+
 function eventJsonLd(id, data, organization, now = new Date()) {
   const start = asDate(data.selectedDateTime);
   const end = eventEnd(data);
@@ -231,7 +244,7 @@ function eventJsonLd(id, data, organization, now = new Date()) {
     "@context": "https://schema.org",
     "@type": "Event",
     "name": text(data.title),
-    "description": description(data.description, 5000),
+    "description": eventDescription(data, organization),
     "url": canonical,
     "image": [safeUrl(data.imageUrl, FALLBACK_IMAGE)],
     "startDate": isoInTimeZone(start, zone),
@@ -266,7 +279,7 @@ function eventBody(id, data, organization, config, now = new Date()) {
   const location = data.locationType === "online" ? "Online event" :
     text(data.locationName || data.location || [data.city, data.regionCode]
         .filter(Boolean).join(", "));
-  const category = text(data.primaryDiscoveryCategoryId ||
+  const category = categoryLabel(data.primaryDiscoveryCategoryId ||
     (Array.isArray(data.categories) ? data.categories[0] : ""));
   const disabled = !ticket.action;
   const actionAttrs = disabled ? "aria-disabled=\"true\"" :
@@ -280,7 +293,7 @@ function eventBody(id, data, organization, config, now = new Date()) {
   return `<main id="main" class="page"><article class="event-layout">
 <section class="event-content"><div class="hero"><img src="${escapeHtml(safeUrl(data.imageUrl, FALLBACK_IMAGE))}" alt="${escapeHtml(text(data.title))}" width="1200" height="800" fetchpriority="high"></div>
 <div class="eyebrow">${escapeHtml(category || "Event")}</div><h1>${escapeHtml(data.title)}</h1>
-<p class="lead">${escapeHtml(data.description)}</p><section aria-labelledby="details-heading"><h2 id="details-heading">Event details</h2>
+<p class="lead">${escapeHtml(eventDescription(data, organization))}</p><section aria-labelledby="details-heading"><h2 id="details-heading">Event details</h2>
 <dl class="details"><div><dt>Date and time</dt><dd><time datetime="${escapeHtml(isoInTimeZone(start, zone))}">${escapeHtml(formatDate(start, zone))}</time></dd></div>
 <div><dt>Location</dt><dd>${data.locationType === "online" ? escapeHtml(location) : `<address>${escapeHtml(location)}</address>`}</dd></div>
 <div><dt>Organizer</dt><dd>${organizerMarkup}</dd></div></dl></section></section>
@@ -339,7 +352,7 @@ async function renderEvent(db, req, res, id, flags, nonce) {
   const action = ticketState(data);
   const html = shell({
     title: text(data.title) || "Event",
-    summary: data.description || `View ${text(data.title)} on Attendus.`,
+    summary: eventDescription(data, organization),
     canonical,
     image: data.imageUrl,
     body: eventBody(id, data, organization, flags),
@@ -505,6 +518,7 @@ module.exports = {
   createPublicWeb,
   escapeHtml,
   eventEligibility,
+  eventDescription,
   eventJsonLd,
   eventState,
   isoInTimeZone,
