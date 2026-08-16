@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/models/event_model.dart';
+import 'package:attendus/models/discovery_category.dart';
 import 'package:attendus/models/check_in_policy.dart';
 import 'package:attendus/models/event_question_model.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
@@ -67,17 +68,9 @@ class _CreateEventScreenState extends State<CreateEventScreen>
 
   bool privateEvent =
       false; // Public by default (no group), private when group is selected
-  final List<String> _allCategories = [
-    'Social & Networking',
-    'Entertainment',
-    'Sports & Fitness',
-    'Education & Learning',
-    'Arts & Culture',
-    'Food & Dining',
-    'Technology',
-    'Community & Charity',
-  ];
   final List<String> _selectedCategories = [];
+  final List<String> _selectedDiscoveryCategoryIds = [];
+  String? _primaryDiscoveryCategoryId;
   final List<EventQuestionModel> _questions = [];
   bool _advancedOptionsExpanded = false;
 
@@ -357,6 +350,16 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         );
         return;
       }
+      if (!privateEvent && _primaryDiscoveryCategoryId == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Choose a primary attendee category'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
       if (widget.forceOrganizationEvent &&
           (_selectedOrganizationId == null ||
               _selectedOrganizationId!.isEmpty)) {
@@ -555,6 +558,10 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           latitude: hasLocation ? _selectedLocationInternal!.latitude : 0.0,
           private: privateEvent,
           categories: _selectedCategories,
+          primaryDiscoveryCategoryId: _primaryDiscoveryCategoryId,
+          discoveryCategoryIds: _selectedDiscoveryCategoryIds,
+          discoveryCategorySource: 'organizer',
+          discoveryCategoryVersion: 1,
           eventDuration: _durationHours,
           organizationId: _selectedOrganizationId,
           accessList: privateEvent ? [currentUser.uid] : const [],
@@ -1327,7 +1334,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
               ),
               const SizedBox(width: 16),
               const Text(
-                'Categories',
+                'Attendee categories',
                 style: TextStyle(
                   color: Color(0xFF1A1A1A),
                   fontWeight: FontWeight.w600,
@@ -1338,23 +1345,57 @@ class _CreateEventScreenState extends State<CreateEventScreen>
             ],
           ),
           const SizedBox(height: 16),
+          Text(
+            'Choose one primary category and up to two more. The first selection is primary.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 8, // Reduced spacing to fit more categories
             runSpacing: 10,
-            children: _allCategories.map((category) {
-              final isSelected = _selectedCategories.contains(category);
+            children: DiscoveryCategory.all.map((category) {
+              final isSelected = _selectedDiscoveryCategoryIds.contains(
+                category.id,
+              );
               return _buildCategoryChip(category, isSelected);
             }).toList(),
           ),
+          if (_selectedDiscoveryCategoryIds.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              key: ValueKey(
+                '${_selectedDiscoveryCategoryIds.join(',')}:$_primaryDiscoveryCategoryId',
+              ),
+              initialValue: _primaryDiscoveryCategoryId,
+              decoration: const InputDecoration(
+                labelText: 'Primary category',
+                helperText: 'This is the main category attendees will see.',
+              ),
+              items: _selectedDiscoveryCategoryIds
+                  .map(DiscoveryCategory.fromId)
+                  .whereType<DiscoveryCategory>()
+                  .map(
+                    (category) => DropdownMenuItem(
+                      value: category.id,
+                      child: Text(category.label),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                setState(() => _primaryDiscoveryCategoryId = value);
+              },
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildCategoryChip(String category, bool isSelected) {
+  Widget _buildCategoryChip(DiscoveryCategory category, bool isSelected) {
     return FilterChip(
+      avatar: Icon(category.icon, size: 17),
       label: Text(
-        category,
+        category.label,
         style: TextStyle(
           color: isSelected ? Colors.white : const Color(0xFF1A1A1A),
           fontWeight: FontWeight.w500,
@@ -1368,10 +1409,26 @@ class _CreateEventScreenState extends State<CreateEventScreen>
       onSelected: (selected) {
         setState(() {
           if (selected) {
-            _selectedCategories.add(category);
+            if (_selectedDiscoveryCategoryIds.length >= 3) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Choose up to three categories')),
+              );
+              return;
+            }
+            _selectedDiscoveryCategoryIds.add(category.id);
+            _primaryDiscoveryCategoryId ??= category.id;
           } else {
-            _selectedCategories.remove(category);
+            _selectedDiscoveryCategoryIds.remove(category.id);
+            if (_primaryDiscoveryCategoryId == category.id) {
+              _primaryDiscoveryCategoryId =
+                  _selectedDiscoveryCategoryIds.firstOrNull;
+            }
           }
+          _selectedCategories
+            ..clear()
+            ..addAll(
+              DiscoveryCategory.legacyLabels(_selectedDiscoveryCategoryIds),
+            );
         });
       },
       backgroundColor: Colors.grey.withValues(alpha: 0.1),

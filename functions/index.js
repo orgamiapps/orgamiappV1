@@ -3780,12 +3780,16 @@ exports.aggregateProductFunnelDaily = createAggregateProductFunnelDaily(admin);
 
 const {
   createGetDiscoveryHome,
+  createGetDiscoveryHomeV2,
   createMaintainDiscoveryMetadata,
   createSavedEventCounter,
   createSearchDiscoveryEvents,
+  createSearchDiscoveryEventsV2,
 } = require("./discovery/marketplace");
 exports.getDiscoveryHomeV1 = createGetDiscoveryHome(admin);
+exports.getDiscoveryHomeV2 = createGetDiscoveryHomeV2(admin);
 exports.searchDiscoveryEventsV1 = createSearchDiscoveryEvents(admin);
+exports.searchDiscoveryEventsV2 = createSearchDiscoveryEventsV2(admin);
 exports.maintainDiscoveryMetadataV1 = createMaintainDiscoveryMetadata(admin);
 exports.updateDiscoverySaveCountV1 = createSavedEventCounter(admin);
 

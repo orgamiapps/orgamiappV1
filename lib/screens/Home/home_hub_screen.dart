@@ -57,6 +57,11 @@ bool resolveUseLegacyDiscovery(Map<String, dynamic>? data) {
   return data?['useLegacyFeed'] != false;
 }
 
+@visibleForTesting
+int resolveMarketplaceExperienceVersion(Map<String, dynamic>? data) {
+  return data?['marketplaceExperienceVersion'] == 2 ? 2 : 1;
+}
+
 class _HomeHubScreenState extends State<HomeHubScreen> {
   int _tabIndex = 0; // 0: Public, 1: Private
   final TextEditingController _searchCtlr = TextEditingController();
@@ -66,6 +71,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   String? _selectedCategoryLower;
   String? _discoverError;
   bool _useLegacyDiscovery = true;
+  int _marketplaceExperienceVersion = 1;
   // Removed unused _categoryOptions (old UI)
 
   @override
@@ -95,9 +101,12 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
           .doc('discovery')
           .get();
       if (mounted) {
-        setState(
-          () => _useLegacyDiscovery = resolveUseLegacyDiscovery(document.data()),
-        );
+        setState(() {
+          _useLegacyDiscovery = resolveUseLegacyDiscovery(document.data());
+          _marketplaceExperienceVersion = resolveMarketplaceExperienceVersion(
+            document.data(),
+          );
+        });
       }
     } catch (_) {
       // Fail closed to the legacy feed. The marketplace is enabled only by an
@@ -253,8 +262,9 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
                 key: ValueKey('legacy-public-events'),
                 showHeader: false,
               )
-            : const DiscoveryMarketplaceView(
+            : DiscoveryMarketplaceView(
                 key: ValueKey('discovery-marketplace'),
+                experienceVersion: _marketplaceExperienceVersion,
               ));
 
     return Scaffold(

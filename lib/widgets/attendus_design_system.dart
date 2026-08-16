@@ -1714,6 +1714,8 @@ class AttendUsEventSummaryCard extends StatelessWidget {
   final bool isSaved;
   final VoidCallback? onSave;
   final VoidCallback? onTap;
+  final double imageAspectRatio;
+  final IconData? fallbackIcon;
 
   const AttendUsEventSummaryCard({
     super.key,
@@ -1730,6 +1732,8 @@ class AttendUsEventSummaryCard extends StatelessWidget {
     this.isSaved = false,
     this.onSave,
     this.onTap,
+    this.imageAspectRatio = 16 / 8,
+    this.fallbackIcon,
   });
 
   Widget _imageFallback(BuildContext context, {bool isLoading = false}) {
@@ -1746,7 +1750,11 @@ class AttendUsEventSummaryCard extends StatelessWidget {
                   color: colorScheme.primary,
                 ),
               )
-            : Icon(Icons.event, color: colorScheme.primary, size: 40),
+            : Icon(
+                fallbackIcon ?? Icons.event,
+                color: colorScheme.primary,
+                size: 40,
+              ),
       ),
     );
   }
@@ -1763,7 +1771,7 @@ class AttendUsEventSummaryCard extends StatelessWidget {
           Stack(
             children: [
               AspectRatio(
-                aspectRatio: 16 / 8,
+                aspectRatio: imageAspectRatio,
                 child: ClipRRect(
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(AttendUsTokens.radiusMd),

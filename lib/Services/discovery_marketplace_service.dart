@@ -41,10 +41,24 @@ class DiscoveryMarketplaceService {
     bool nationwide = false,
     List<String> preferredCategories = const [],
     String regionCode = '',
+    int experienceVersion = 1,
+    String? selectedCategoryId,
+    String? datePreset,
+    bool freeOnly = false,
+    bool onlineOnly = false,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    final cacheKey =
-        'discovery_home_v1_${nationwide ? 'us' : '${latitude.toStringAsFixed(2)}_${longitude.toStringAsFixed(2)}'}';
+    final cacheKey = [
+      'discovery_home_v$experienceVersion',
+      nationwide
+          ? 'us'
+          : '${latitude.toStringAsFixed(2)}_${longitude.toStringAsFixed(2)}',
+      selectedCategoryId ?? 'all',
+      datePreset ?? 'any',
+      freeOnly ? 'free' : 'paid',
+      onlineOnly ? 'online' : 'all-modes',
+      preferredCategories.join(','),
+    ].join('_');
     final cachedRaw = prefs.getString(cacheKey);
     Map<String, dynamic>? cached;
     if (cachedRaw != null) {
@@ -60,18 +74,33 @@ class DiscoveryMarketplaceService {
       return DiscoveryHomeResult.fromMap(cached);
     }
     try {
-      final response = await _functions
-          .httpsCallable('getDiscoveryHomeV1')
-          .call({
-            'latitude': latitude,
-            'longitude': longitude,
-            'radiusMiles': radiusMiles,
-            'timeZone': DateTime.now().timeZoneName,
-            'nationwide': nationwide,
-            'preferredCategories': preferredCategories,
-            'regionCode': regionCode,
-          });
-      final data = Map<String, dynamic>.from(response.data as Map);
+      Future<Map<String, dynamic>> requestVersion(int version) async {
+        final response = await _functions
+            .httpsCallable('getDiscoveryHomeV$version')
+            .call({
+              'latitude': latitude,
+              'longitude': longitude,
+              'radiusMiles': radiusMiles,
+              'timeZone': DateTime.now().timeZoneName,
+              'nationwide': nationwide,
+              'preferredCategories': preferredCategories,
+              'regionCode': regionCode,
+              'selectedCategoryId': ?selectedCategoryId,
+              'datePreset': ?datePreset,
+              'freeOnly': freeOnly,
+              'onlineOnly': onlineOnly,
+            });
+        return Map<String, dynamic>.from(response.data as Map);
+      }
+
+      late Map<String, dynamic> data;
+      try {
+        data = await requestVersion(experienceVersion);
+      } catch (_) {
+        if (experienceVersion != 2) rethrow;
+        data = await requestVersion(1);
+        data['_experienceFallback'] = 'v1';
+      }
       data['_cachedAt'] = DateTime.now().toIso8601String();
       await prefs.setString(cacheKey, jsonEncode(data));
       return DiscoveryHomeResult.fromMap(data);
@@ -96,25 +125,36 @@ class DiscoveryMarketplaceService {
     bool nationwide = false,
     String? cursor,
     int limit = 24,
+    int experienceVersion = 1,
   }) async {
-    final response = await _functions
-        .httpsCallable('searchDiscoveryEventsV1')
-        .call({
-          'latitude': latitude,
-          'longitude': longitude,
-          'radiusMiles': radiusMiles,
-          'query': query,
-          'datePreset': ?datePreset,
-          'category': ?category,
-          'onlineOnly': onlineOnly,
-          'freeOnly': freeOnly,
-          'nationwide': nationwide,
-          'cursor': ?cursor,
-          'limit': limit,
-        });
-    return DiscoverySearchResult.fromMap(
-      Map<String, dynamic>.from(response.data as Map),
-    );
+    Future<DiscoverySearchResult> requestVersion(int version) async {
+      final response = await _functions
+          .httpsCallable('searchDiscoveryEventsV$version')
+          .call({
+            'latitude': latitude,
+            'longitude': longitude,
+            'radiusMiles': radiusMiles,
+            'query': query,
+            'datePreset': ?datePreset,
+            if (version == 1) 'category': ?category,
+            if (version == 2) 'categoryId': ?category,
+            'onlineOnly': onlineOnly,
+            'freeOnly': freeOnly,
+            'nationwide': nationwide,
+            'cursor': ?cursor,
+            'limit': limit,
+          });
+      return DiscoverySearchResult.fromMap(
+        Map<String, dynamic>.from(response.data as Map),
+      );
+    }
+
+    try {
+      return await requestVersion(experienceVersion);
+    } catch (_) {
+      if (experienceVersion != 2) rethrow;
+      return requestVersion(1);
+    }
   }
 
   Future<Set<String>> savedEventIds() async {

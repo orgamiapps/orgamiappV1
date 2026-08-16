@@ -37,6 +37,10 @@ jobs:
           node --test tools/check_firestore_query_contracts.test.js
           tools/verify_firestore_indexes.test.js
       - run: node tools/check_firestore_query_contracts.js
+      - name: Validate Discovery category contract
+        run: >-
+          node --test tools/check_discovery_category_catalog.test.js &&
+          node tools/check_discovery_category_catalog.js
       - name: Check formatting
         run: dart format --output=none --set-exit-if-changed lib test tools
       - run: flutter analyze

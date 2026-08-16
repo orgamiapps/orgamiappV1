@@ -29,12 +29,20 @@ const EVENTS = new Set([
   "discovery_registration_start",
   "discovery_registration_complete",
   "discovery_organizer_create_cta",
+  "discovery_category_module_impression",
+  "discovery_category_selected",
+  "discovery_category_cleared",
+  "discovery_category_view_all",
+  "discovery_quick_choice_selected",
+  "discovery_section_view_all",
+  "discovery_search_page_loaded",
+  "discovery_category_no_result",
 ]);
 const DIMENSIONS = new Set([
   "entryPoint", "feature", "authChoice", "checkInMethod", "platform",
   "result", "errorCategory", "section", "position", "radiusBand",
   "locationSource", "category", "accessMode", "resultCount", "source",
-  "targetType", "metro",
+  "targetType", "metro", "categoryId", "choice", "experienceVersion",
 ]);
 const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 
@@ -165,6 +173,9 @@ function createAggregateProductFunnelDaily(adminSdk) {
         registrationConversion: (discoveryCounts.discovery_registration_start || 0) > 0 ?
           (discoveryCounts.discovery_registration_complete || 0) /
             discoveryCounts.discovery_registration_start : 0,
+        categorySelectionRate: (discoveryCounts.discovery_category_module_impression || 0) > 0 ?
+          (discoveryCounts.discovery_category_selected || 0) /
+            discoveryCounts.discovery_category_module_impression : 0,
       },
       sessions: sessions.size,
       updatedAt: FieldValue.serverTimestamp(),

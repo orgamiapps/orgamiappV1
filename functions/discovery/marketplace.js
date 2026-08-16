@@ -9,6 +9,11 @@ const {
   geohashForLocation,
   geohashQueryBounds,
 } = require("geofire-common");
+const {
+  CATEGORY_BY_ID,
+  categoryFacets,
+  inferDiscoveryCategories,
+} = require("./category-catalog");
 
 const DISCOVERY_RADII_MILES = Object.freeze([25, 50, 100]);
 const MILES_TO_KM = 1.609344;
@@ -111,6 +116,7 @@ function eventDto(document, center = null) {
         [center.latitude, center.longitude], [latitude, longitude],
     ) / MILES_TO_KM;
   }
+  const discovery = inferDiscoveryCategories(data);
   return {
     id,
     title: String(data.title || ""),
@@ -137,6 +143,10 @@ function eventDto(document, center = null) {
     radius: Number(data.radius || 0),
     radiusUnit: String(data.radiusUnit || "meters"),
     categories: Array.isArray(data.categories) ? data.categories.map(String) : [],
+    primaryDiscoveryCategoryId: discovery.primaryDiscoveryCategoryId,
+    discoveryCategoryIds: discovery.discoveryCategoryIds,
+    discoveryCategorySource: discovery.discoveryCategorySource,
+    discoveryCategoryVersion: discovery.discoveryCategoryVersion,
     isFeatured: Boolean(data.isFeatured),
     featureEndDate: normalizeTimestamp(data.featureEndDate),
     ticketsEnabled: Boolean(data.ticketsEnabled),
@@ -155,8 +165,8 @@ function eventDto(document, center = null) {
 function listingQuality(event) {
   let score = 0;
   if (event.imageUrl) score += 0.25;
-  if (event.description.length >= 80) score += 0.25;
-  if (event.categories.length) score += 0.2;
+  if (String(event.description || "").length >= 80) score += 0.25;
+  if ((event.discoveryCategoryIds || []).length || (event.categories || []).length) score += 0.2;
   if (event.locationName || event.locationType === "online") score += 0.15;
   if (event.groupName || event.organizationId) score += 0.15;
   return score;
@@ -164,12 +174,15 @@ function listingQuality(event) {
 
 function preferenceScore(event, preferences) {
   const preferred = new Set((preferences.preferredCategories || []).map((v) => String(v).toLowerCase()));
-  const categories = event.categories.map((v) => String(v).toLowerCase());
+  const categories = (event.categories || []).map((v) => String(v).toLowerCase());
   const categoryMatch = preferred.size ? categories.filter((v) => preferred.has(v)).length / preferred.size : 0;
+  const preferredDiscovery = new Set((preferences.preferredDiscoveryCategoryIds || []).map(String));
+  const discoveryMatch = (event.discoveryCategoryIds || []).some((id) => preferredDiscovery.has(id)) ? 1 : 0;
   const savedOrganizer = preferences.savedOrganizerIds?.has(event.customerUid) ? 1 : 0;
   const followedOrganizer = preferences.followedUserIds?.has(event.customerUid) ? 1 : 0;
   const followedOrganization = event.organizationId && preferences.followedOrganizationIds?.has(event.organizationId) ? 1 : 0;
-  return Math.min(1, categoryMatch * 0.6 + savedOrganizer * 0.15 + followedOrganizer * 0.15 + followedOrganization * 0.2);
+  return Math.min(1, categoryMatch * 0.35 + discoveryMatch * 0.25 + savedOrganizer * 0.15 +
+    followedOrganizer * 0.15 + followedOrganization * 0.2);
 }
 
 function scoreEvent(event, preferences = {}, now = new Date()) {
@@ -266,6 +279,8 @@ async function loadPreferences(db, request) {
   if (!isFullUser(request)) return {
     preferredCategories: Array.isArray(request.data?.preferredCategories) ?
       request.data.preferredCategories.map(String).slice(0, 20) : [],
+    preferredDiscoveryCategoryIds: Array.isArray(request.data?.preferredDiscoveryCategoryIds) ?
+      request.data.preferredDiscoveryCategoryIds.map(String).filter((id) => CATEGORY_BY_ID.has(id)).slice(0, 15) : [],
   };
   const uid = request.auth.uid;
   const [preferenceDoc, behaviorDoc, savedSnapshot, followedUsersSnapshot,
@@ -303,6 +318,8 @@ async function loadPreferences(db, request) {
       ...(Array.isArray(preferenceData.preferredCategories) ? preferenceData.preferredCategories : []),
       ...behavioralCategories,
     ])].slice(0, 30),
+    preferredDiscoveryCategoryIds: Array.isArray(preferenceData.preferredDiscoveryCategoryIds) ?
+      preferenceData.preferredDiscoveryCategoryIds.map(String).filter((id) => CATEGORY_BY_ID.has(id)).slice(0, 15) : [],
     savedOrganizerIds,
     followedUserIds: new Set([
       ...followedUsersSnapshot.docs.map((doc) => doc.id),
@@ -316,6 +333,8 @@ function coldStartPreferences(request) {
   return {
     preferredCategories: Array.isArray(request?.data?.preferredCategories) ?
       request.data.preferredCategories.map(String).slice(0, 20) : [],
+    preferredDiscoveryCategoryIds: Array.isArray(request?.data?.preferredDiscoveryCategoryIds) ?
+      request.data.preferredDiscoveryCategoryIds.map(String).filter((id) => CATEGORY_BY_ID.has(id)).slice(0, 15) : [],
     savedOrganizerIds: new Set(),
     followedUserIds: new Set(),
     followedOrganizationIds: new Set(),
@@ -487,6 +506,139 @@ function decodeCursor(value) {
   }
 }
 
+function selectedDiscoveryCategory(data) {
+  const value = String(data?.selectedCategoryId || data?.categoryId || "").trim();
+  if (value && !CATEGORY_BY_ID.has(value)) {
+    throw new HttpsError("invalid-argument", "Unknown discovery category.");
+  }
+  return value || null;
+}
+
+function dateWindow(datePreset, now) {
+  const start = new Date(now);
+  const end = new Date(now);
+  if (datePreset === "today") {
+    start.setHours(0, 0, 0, 0);
+    end.setHours(24, 0, 0, 0);
+    return {start, end};
+  }
+  if (datePreset === "weekend") {
+    const days = (6 - now.getDay() + 7) % 7;
+    start.setDate(now.getDate() + days);
+    start.setHours(0, 0, 0, 0);
+    end.setTime(start.getTime() + 2 * 86400000);
+    return {start, end};
+  }
+  return null;
+}
+
+function applyV2Filters(events, data, now, {onlineOnly = false} = {}) {
+  const selected = selectedDiscoveryCategory(data);
+  const window = dateWindow(String(data?.datePreset || ""), now);
+  return events.filter((event) => {
+    if (onlineOnly && event.locationType !== "online") return false;
+    if (selected && !(event.discoveryCategoryIds || []).includes(selected)) return false;
+    if (data?.freeOnly === true && event.ticketsEnabled && Number(event.ticketPrice || 0) > 0) return false;
+    if (window) {
+      const startsAt = new Date(event.selectedDateTime);
+      if (startsAt < window.start || startsAt >= window.end) return false;
+    }
+    return true;
+  });
+}
+
+function addSectionTotals(sections, localEvents, onlineEvents, now = new Date()) {
+  const sevenDays = now.getTime() + 7 * 86400000;
+  return sections.map((section) => {
+    let totalAvailable = localEvents.length;
+    if (section.id === "soon") {
+      totalAvailable = localEvents.filter((event) =>
+        new Date(event.selectedDateTime).getTime() <= sevenDays).length;
+    } else if (section.id === "featured") {
+      totalAvailable = localEvents.filter((event) => event.isFeatured &&
+        (!event.featureEndDate || new Date(event.featureEndDate) > now)).length;
+    } else if (section.id === "online") {
+      totalAvailable = onlineEvents.length;
+    }
+    return {...section, totalAvailable};
+  });
+}
+
+function createGetDiscoveryHomeV2(admin) {
+  const db = admin.firestore();
+  return onCall({region: "us-central1", enforceAppCheck: process.env.FUNCTIONS_EMULATOR !== "true",
+    timeoutSeconds: 30, memory: "512MiB", maxInstances: 30}, async (request) => {
+    requireCaller(request);
+    await enforceDiscoveryRateLimit(db, request);
+    const center = validateCenter(request.data);
+    const requestedRadius = Math.min(100, Math.max(25, Number(request.data?.radiusMiles || 25)));
+    const now = new Date();
+    const preferences = await loadPreferencesSafely(db, request);
+    const selectedCategoryId = selectedDiscoveryCategory(request.data);
+    const nationwide = request.data?.nationwide === true;
+    let allLocal;
+    let allOnline;
+    if (nationwide) {
+      const events = await queryNationwide(db, now, 150);
+      allLocal = events.filter((item) => item.locationType !== "online");
+      allOnline = events.filter((item) => item.locationType === "online");
+    } else {
+      [allLocal, allOnline] = await Promise.all([queryNearby(db, center, 100, now), queryOnline(db, now, 100)]);
+    }
+    const eligibleLocalAtAnyRadius = applyV2Filters(allLocal, request.data, now);
+    const radiusMiles = nationwide ? 100 : chooseFallbackRadius(eligibleLocalAtAnyRadius, requestedRadius);
+    const facetEvents = [...allLocal.filter((event) => nationwide || event.distanceMiles <= radiusMiles), ...allOnline];
+    let local = eligibleLocalAtAnyRadius
+        .filter((event) => nationwide || event.distanceMiles <= radiusMiles);
+    let online = applyV2Filters(allOnline, request.data, now, {onlineOnly: true});
+    if (request.data?.onlineOnly === true) local = [];
+    let sections = nationwide ? buildNationwideSections([...local, ...online], preferences, now) :
+      buildSections(local, online, preferences, radiusMiles, now);
+    const regionCode = String(request.data?.regionCode || "").trim().toUpperCase();
+    if (!nationwide && local.length === 0 && regionCode && request.data?.onlineOnly !== true) {
+      const statewide = applyV2Filters(
+          await queryStatewide(db, regionCode, center, now), request.data, now,
+      );
+      if (statewide.length) {
+        sections = [{id: "recommended", title: `Across ${regionCode}`,
+          subtitle: "No events within 100 miles, so we expanded statewide", featured: false,
+          events: sortByScore(statewide, preferences, now).slice(0, 12)},
+        ...sections.filter((section) => section.id !== "recommended")];
+        local = statewide;
+      }
+    }
+    sections = addSectionTotals(sections, local, online, now);
+    return {sections, categoryFacets: categoryFacets(facetEvents, preferences), selectedCategoryId,
+      radiusMiles, expandedRadius: !nationwide && radiusMiles > requestedRadius,
+      localResultCount: local.length, generatedAt: now.toISOString(), schemaVersion: 2};
+  });
+}
+
+function createSearchDiscoveryEventsV2(admin) {
+  const db = admin.firestore();
+  return onCall({region: "us-central1", enforceAppCheck: process.env.FUNCTIONS_EMULATOR !== "true",
+    timeoutSeconds: 30, memory: "512MiB", maxInstances: 30}, async (request) => {
+    requireCaller(request);
+    await enforceDiscoveryRateLimit(db, request);
+    const center = validateCenter(request.data);
+    const radiusMiles = Math.min(100, Math.max(1, Number(request.data?.radiusMiles || 25)));
+    const limit = Math.min(MAX_SEARCH_RESULTS, Math.max(1, Number(request.data?.limit || 24)));
+    const query = String(request.data?.query || "").trim().toLowerCase().slice(0, 120);
+    const now = new Date();
+    const preferences = await loadPreferencesSafely(db, request);
+    let events = request.data?.nationwide === true ? await queryNationwide(db, now, 150) :
+      request.data?.onlineOnly === true ? await queryOnline(db, now, 100) : await queryNearby(db, center, radiusMiles, now);
+    events = applyV2Filters(events, request.data, now, {onlineOnly: request.data?.onlineOnly === true});
+    if (query) events = events.filter((event) => includesQuery(event, query));
+    events = sortByScore(events, preferences, now);
+    const offset = decodeCursor(request.data?.cursor);
+    const page = events.slice(offset, offset + limit);
+    return {events: page, nextCursor: offset + limit < events.length ? encodeCursor(offset + limit) : null,
+      total: events.length, radiusMiles, selectedCategoryId: selectedDiscoveryCategory(request.data),
+      generatedAt: now.toISOString(), schemaVersion: 2};
+  });
+}
+
 function createSearchDiscoveryEvents(admin) {
   const db = admin.firestore();
   return onCall({
@@ -558,16 +710,22 @@ function createMaintainDiscoveryMetadata(_admin) {
       latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180 &&
       !(latitude === 0 && longitude === 0) && city.length > 0 &&
       regionCode.length > 0 && countryCode === "US";
+    const discoveryCategories = inferDiscoveryCategories(data);
     const desired = {
       geohash: valid ? geohashForLocation([latitude, longitude]) : null,
       city: valid ? city : "",
       regionCode: valid ? regionCode : "",
       countryCode: valid ? countryCode : null,
       discoveryLocationValid: valid,
+      ...discoveryCategories,
     };
     if (data.geohash === desired.geohash && data.city === desired.city &&
         data.regionCode === desired.regionCode && data.countryCode === desired.countryCode &&
-        data.discoveryLocationValid === desired.discoveryLocationValid) return;
+        data.discoveryLocationValid === desired.discoveryLocationValid &&
+        data.primaryDiscoveryCategoryId === desired.primaryDiscoveryCategoryId &&
+        JSON.stringify(data.discoveryCategoryIds || []) === JSON.stringify(desired.discoveryCategoryIds) &&
+        data.discoveryCategorySource === desired.discoveryCategorySource &&
+        data.discoveryCategoryVersion === desired.discoveryCategoryVersion) return;
     await after.ref.set({...desired, discoveryMetadataUpdatedAt: FieldValue.serverTimestamp()}, {merge: true});
   });
 }
@@ -588,12 +746,15 @@ function createSavedEventCounter(admin) {
 module.exports = {
   DISCOVERY_RADII_MILES,
   activePublicEvent,
+  applyV2Filters,
   buildSections,
   chooseFallbackRadius,
   createGetDiscoveryHome,
+  createGetDiscoveryHomeV2,
   createMaintainDiscoveryMetadata,
   createSavedEventCounter,
   createSearchDiscoveryEvents,
+  createSearchDiscoveryEventsV2,
   eventDto,
   loadPreferencesSafely,
   scoreEvent,

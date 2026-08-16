@@ -22,6 +22,10 @@ class EventModel {
 
   bool private, getLocation;
   List<String> categories;
+  String? primaryDiscoveryCategoryId;
+  List<String> discoveryCategoryIds;
+  String discoveryCategorySource;
+  int discoveryCategoryVersion;
   bool isFeatured;
   DateTime? featureEndDate;
   bool ticketsEnabled;
@@ -80,6 +84,10 @@ class EventModel {
     this.regionCode = '',
     this.countryCode = 'US',
     this.categories = const [],
+    this.primaryDiscoveryCategoryId,
+    this.discoveryCategoryIds = const [],
+    this.discoveryCategorySource = 'inferred',
+    this.discoveryCategoryVersion = 1,
     this.isFeatured = false,
     this.featureEndDate,
     this.ticketsEnabled = false,
@@ -144,6 +152,15 @@ class EventModel {
       categories: (data.containsKey('categories') && data['categories'] != null)
           ? List<String>.from(data['categories'])
           : [],
+      primaryDiscoveryCategoryId: data['primaryDiscoveryCategoryId']
+          ?.toString(),
+      discoveryCategoryIds: data['discoveryCategoryIds'] is List
+          ? List<String>.from(data['discoveryCategoryIds'])
+          : const [],
+      discoveryCategorySource:
+          data['discoveryCategorySource']?.toString() ?? 'inferred',
+      discoveryCategoryVersion:
+          (data['discoveryCategoryVersion'] as num?)?.round() ?? 1,
       isFeatured: data['isFeatured'] ?? false,
       featureEndDate: data['featureEndDate'] != null
           ? (data['featureEndDate'] is Timestamp
@@ -358,6 +375,10 @@ class EventModel {
     data['longitude'] = isOnline ? 0.0 : longitude;
     data['latitude'] = isOnline ? 0.0 : latitude;
     data['categories'] = categories;
+    data['primaryDiscoveryCategoryId'] = primaryDiscoveryCategoryId;
+    data['discoveryCategoryIds'] = discoveryCategoryIds.take(3).toList();
+    data['discoveryCategorySource'] = discoveryCategorySource;
+    data['discoveryCategoryVersion'] = discoveryCategoryVersion;
     data['isFeatured'] = isFeatured;
     data['featureEndDate'] = featureEndDate;
     data['ticketsEnabled'] = ticketsEnabled;

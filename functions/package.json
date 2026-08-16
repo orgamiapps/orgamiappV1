@@ -6,7 +6,7 @@
     "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",
     "start": "npm run shell",
-    "test": "node --test test/admin-unit.test.js test/places.test.js test/places-rate-limit.test.js test/callable-security.test.js test/account-deletion.test.js test/biometric-retention.test.js test/ticket-issuance.test.js test/guest-experience.test.js test/attendance-v2.test.js test/scheduled-reminders.test.js test/discovery-marketplace.test.js",
+    "test": "node --test test/admin-unit.test.js test/places.test.js test/places-rate-limit.test.js test/callable-security.test.js test/account-deletion.test.js test/biometric-retention.test.js test/ticket-issuance.test.js test/guest-experience.test.js test/attendance-v2.test.js test/scheduled-reminders.test.js test/discovery-marketplace.test.js test/discovery-categories.test.js",
     "test:rules": "firebase emulators:exec --config ../firebase.json --project demo-attendus-admin --only firestore,storage \"node --test --test-concurrency=1 test/firestore-rules.test.js test/storage-rules.test.js\"",
     "test:integration": "node tools/run-integration-tests.js --project demo-attendus-admin",
     "test:integration:repeat": "node tools/run-integration-tests.js --project demo-attendus-admin --repeat 3",
@@ -19,7 +19,8 @@
     "reminders:canary": "node tools/canary-scheduled-reminders.js",
     "discovery:backfill": "node tools/backfill-discovery-marketplace.js",
     "discovery:migrate-saves": "node tools/migrate-saved-events.js",
-    "discovery:validate-release": "node tools/validate-discovery-release.js"
+    "discovery:validate-release": "node tools/validate-discovery-release.js",
+    "discovery:backfill-categories": "node tools/backfill-discovery-categories.js"
   },
   "engines": {
     "node": "22"
