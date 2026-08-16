@@ -18,6 +18,7 @@ import 'package:attendus/Services/account_access_service.dart';
 import 'package:attendus/widgets/account_required_sheet.dart';
 import 'package:attendus/Services/discovery_marketplace_service.dart';
 import 'package:attendus/Services/product_funnel_service.dart';
+import 'package:attendus/Services/community_share_service.dart';
 
 class GroupProfileScreenV2 extends StatefulWidget {
   final String organizationId;
@@ -202,8 +203,18 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
     final data = doc.data();
     final name = (data?['name'] ?? '').toString();
     final description = (data?['description'] ?? '').toString();
+    final publicPageEnabled = data?['publicPageEnabled'] == true;
     await SharePlus.instance.share(
-      ShareParams(text: 'Check out $name on Attendus!\n$description'),
+      ShareParams(
+        text: [
+          'Check out $name on Attendus!',
+          description,
+          if (publicPageEnabled)
+            CommunityShareService.communityUri(
+              widget.organizationId,
+            ).toString(),
+        ].where((part) => part.isNotEmpty).join('\n'),
+      ),
     );
   }
 

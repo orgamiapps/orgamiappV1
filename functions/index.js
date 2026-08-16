@@ -15,7 +15,7 @@ const {
   onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
-const {onCall, onRequest, HttpsError} = require("firebase-functions/v2/https");
+const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {defineSecret} = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
 const {
@@ -23,6 +23,18 @@ const {
   PLACES_RATE_WINDOW_MS,
   enforceSharedPlacesRateLimit,
 } = require("./places/rate-limit");
+const {
+  createMaintainPublicCommunityPage,
+  createMaintainPublicEventPage,
+  createPublicWeb,
+} = require("./public-web/renderer");
+const {
+  createGetPublicTicketCheckoutStatus,
+  createPublicTicketCheckout,
+  createRegisterPublicEvent,
+  createReleaseExpiredTicketReservations,
+  createStripeWebhook,
+} = require("./public-web/checkout");
 
 const GOOGLE_PLACES_API_KEY = defineSecret("GOOGLE_PLACES_API_KEY");
 const placesRateWindows = new Map();
@@ -71,6 +83,27 @@ function placesKey() {
     );
   }
   return value;
+}
+
+async function timeZoneForCoordinates(latitude, longitude) {
+  try {
+    const query = new URLSearchParams({
+      location: `${latitude},${longitude}`,
+      timestamp: String(Math.floor(Date.now() / 1000)),
+      key: placesKey(),
+    });
+    const body = await googleMapsRequest(
+        `https://maps.googleapis.com/maps/api/timezone/json?${query}`,
+    );
+    return body.status === "OK" ? String(body.timeZoneId || "") : "";
+  } catch (error) {
+    logger.warn("Time zone enrichment was unavailable", {
+      latitude,
+      longitude,
+      message: error.message,
+    });
+    return "";
+  }
 }
 
 async function googleMapsRequest(url, options = {}) {
@@ -261,6 +294,9 @@ exports.placeDetails = onCall(
       let city = "";
       let regionCode = "";
       let countryCode = "";
+      let streetNumber = "";
+      let route = "";
+      let postalCode = "";
       for (const component of body.addressComponents || []) {
         const types = component.types || [];
         if (!city && ["locality", "postal_town", "administrative_area_level_2"]
@@ -273,10 +309,21 @@ exports.placeDetails = onCall(
         if (types.includes("country")) {
           countryCode = String(component.shortText || component.longText || "");
         }
+        if (types.includes("street_number")) {
+          streetNumber = String(component.longText || component.shortText || "");
+        }
+        if (types.includes("route")) {
+          route = String(component.longText || component.shortText || "");
+        }
+        if (types.includes("postal_code")) {
+          postalCode = String(component.longText || component.shortText || "");
+        }
       }
       if (useCase === "discoveryCity" && countryCode !== "US") {
         throw new HttpsError("invalid-argument", "Choose a location in the United States.");
       }
+      const eventTimeZone = useCase === "event" ?
+        await timeZoneForCoordinates(latitude, longitude) : "";
       return {
         placeId: String(body.id || placeId),
         displayName: String(body.displayName?.text || ""),
@@ -284,6 +331,9 @@ exports.placeDetails = onCall(
         city,
         regionCode,
         countryCode,
+        streetAddress: [streetNumber, route].filter(Boolean).join(" "),
+        postalCode,
+        eventTimeZone,
         latitude,
         longitude,
       };
@@ -334,6 +384,9 @@ exports.reverseGeocode = onCall(
       let city = "";
       let regionCode = "";
       let countryCode = "";
+      let streetNumber = "";
+      let route = "";
+      let postalCode = "";
       for (const component of body.results[0].address_components || []) {
         const types = component.types || [];
         if (!city && ["locality", "postal_town", "administrative_area_level_2"]
@@ -346,16 +399,30 @@ exports.reverseGeocode = onCall(
         if (types.includes("country")) {
           countryCode = String(component.short_name || component.long_name || "");
         }
+        if (types.includes("street_number")) {
+          streetNumber = String(component.long_name || component.short_name || "");
+        }
+        if (types.includes("route")) {
+          route = String(component.long_name || component.short_name || "");
+        }
+        if (types.includes("postal_code")) {
+          postalCode = String(component.long_name || component.short_name || "");
+        }
       }
       if (useCase === "discoveryCity" && countryCode !== "US") {
         throw new HttpsError("invalid-argument", "Discovery is currently available in the United States.");
       }
+      const eventTimeZone = useCase === "event" ?
+        await timeZoneForCoordinates(latitude, longitude) : "";
       return {
         placeId: String(body.results[0].place_id || ""),
         formattedAddress: String(body.results[0].formatted_address || ""),
         city,
         regionCode,
         countryCode,
+        streetAddress: [streetNumber, route].filter(Boolean).join(" "),
+        postalCode,
+        eventTimeZone,
         latitude,
         longitude,
       };
@@ -3738,15 +3805,7 @@ exports.confirmFeaturePayment = onCall(
     paymentTemporarilyUnavailable,
 );
 
-exports.stripeWebhook = onRequest(
-    {region: "us-central1", maxInstances: 2},
-    (_req, res) => {
-      res.set("Cache-Control", "no-store");
-      res.status(503).json({
-        error: "payment_processing_temporarily_unavailable",
-      });
-    },
-);
+exports.stripeWebhook = createStripeWebhook(admin);
 
 exports.applyScheduledPlanChanges = onSchedule({
   schedule: "0 */6 * * *",
@@ -3799,6 +3858,15 @@ const {
 } = require("./discovery/notifications");
 exports.queueDiscoveryNotificationsV1 = createQueueDiscoveryNotifications(admin);
 exports.deliverDiscoveryNotificationsV1 = createDeliverDiscoveryNotifications(admin);
+exports.publicWeb = createPublicWeb(admin);
+exports.maintainPublicEventPageV1 = createMaintainPublicEventPage(admin);
+exports.maintainPublicCommunityPageV1 = createMaintainPublicCommunityPage(admin);
+exports.registerPublicEventV1 = createRegisterPublicEvent(admin);
+exports.createPublicTicketCheckoutV1 = createPublicTicketCheckout(admin);
+exports.getPublicTicketCheckoutStatusV1 =
+  createGetPublicTicketCheckoutStatus(admin);
+exports.releaseExpiredTicketReservationsV1 =
+  createReleaseExpiredTicketReservations(admin);
 
 const {
   createEndCheckInSession,

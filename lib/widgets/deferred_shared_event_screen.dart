@@ -5,8 +5,13 @@ import 'package:flutter/material.dart';
 
 class DeferredSharedEventScreen extends StatelessWidget {
   final String eventId;
+  final String? initialAction;
 
-  const DeferredSharedEventScreen({super.key, required this.eventId});
+  const DeferredSharedEventScreen({
+    super.key,
+    required this.eventId,
+    this.initialAction,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +19,10 @@ class DeferredSharedEventScreen extends StatelessWidget {
       loadLibrary: shared_event.loadLibrary,
       recoveryKey: 'shared-event',
       loadingLabel: 'Opening event',
-      builder: () => shared_event.SharedEventScreen(eventId: eventId),
+      builder: () => shared_event.SharedEventScreen(
+        eventId: eventId,
+        initialAction: initialAction,
+      ),
     );
   }
 }

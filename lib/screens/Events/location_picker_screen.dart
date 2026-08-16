@@ -17,6 +17,9 @@ class PlaceSelection {
   final String city;
   final String regionCode;
   final String countryCode;
+  final String streetAddress;
+  final String postalCode;
+  final String eventTimeZone;
 
   const PlaceSelection({
     required this.location,
@@ -26,6 +29,9 @@ class PlaceSelection {
     this.city = '',
     this.regionCode = '',
     this.countryCode = 'US',
+    this.streetAddress = '',
+    this.postalCode = '',
+    this.eventTimeZone = '',
   });
 }
 
@@ -42,6 +48,9 @@ class LocationPickerResult {
   String get city => selection.city;
   String get regionCode => selection.regionCode;
   String get countryCode => selection.countryCode;
+  String get streetAddress => selection.streetAddress;
+  String get postalCode => selection.postalCode;
+  String get eventTimeZone => selection.eventTimeZone;
 }
 
 class LocationPickerScreen extends StatefulWidget {
@@ -50,6 +59,12 @@ class LocationPickerScreen extends StatefulWidget {
   final String? initialPlaceId;
   final String? initialDisplayName;
   final String? initialAddress;
+  final String initialCity;
+  final String initialRegionCode;
+  final String initialCountryCode;
+  final String initialStreetAddress;
+  final String initialPostalCode;
+  final String initialEventTimeZone;
   final PlacesService? placesService;
   final bool mapEnabled;
   final LocationPickerMapBuilder? mapBuilder;
@@ -61,6 +76,12 @@ class LocationPickerScreen extends StatefulWidget {
     this.initialPlaceId,
     this.initialDisplayName,
     this.initialAddress,
+    this.initialCity = '',
+    this.initialRegionCode = '',
+    this.initialCountryCode = 'US',
+    this.initialStreetAddress = '',
+    this.initialPostalCode = '',
+    this.initialEventTimeZone = '',
     this.placesService,
     this.mapEnabled = true,
     this.mapBuilder,
@@ -117,6 +138,12 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         formattedAddress:
             widget.initialAddress ??
             '${initial.latitude.toStringAsFixed(6)}, ${initial.longitude.toStringAsFixed(6)}',
+        city: widget.initialCity,
+        regionCode: widget.initialRegionCode,
+        countryCode: widget.initialCountryCode,
+        streetAddress: widget.initialStreetAddress,
+        postalCode: widget.initialPostalCode,
+        eventTimeZone: widget.initialEventTimeZone,
       );
       _searchController.text = _selection!.formattedAddress;
       _updateMarker(initial);
@@ -231,6 +258,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         city: details.city,
         regionCode: details.regionCode,
         countryCode: details.countryCode,
+        streetAddress: details.streetAddress,
+        postalCode: details.postalCode,
+        eventTimeZone: details.eventTimeZone,
       );
       setState(() {
         _selection = selection;
@@ -283,6 +313,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           city: details.city,
           regionCode: details.regionCode,
           countryCode: details.countryCode,
+          streetAddress: details.streetAddress,
+          postalCode: details.postalCode,
+          eventTimeZone: details.eventTimeZone,
         );
         _searchController.text = _selection!.formattedAddress;
       });

@@ -9,12 +9,16 @@ let env;
 const token = {firebase: {sign_in_provider: "password"}};
 
 test.before(async () => {
+  const [firestoreHost = "127.0.0.1", firestorePort = "8080"] =
+    String(process.env.FIRESTORE_EMULATOR_HOST || "127.0.0.1:8080").split(":");
+  const [storageHost = "127.0.0.1", storagePort = "9199"] =
+    String(process.env.FIREBASE_STORAGE_EMULATOR_HOST || "127.0.0.1:9199").split(":");
   env = await initializeTestEnvironment({
     projectId: "demo-attendus-admin",
-    firestore: {host: "127.0.0.1", port: 8080},
+    firestore: {host: firestoreHost, port: Number(firestorePort)},
     storage: {
-      host: "127.0.0.1",
-      port: 9199,
+      host: storageHost,
+      port: Number(storagePort),
       rules: fs.readFileSync(path.join(__dirname, "../../storage.rules"), "utf8"),
     },
   });

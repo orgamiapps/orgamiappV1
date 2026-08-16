@@ -83,7 +83,12 @@ import 'dart:io';
 
 class SingleEventScreen extends StatefulWidget {
   final EventModel eventModel;
-  const SingleEventScreen({super.key, required this.eventModel});
+  final String? initialAction;
+  const SingleEventScreen({
+    super.key,
+    required this.eventModel,
+    this.initialAction,
+  });
 
   @override
   State<SingleEventScreen> createState() => _SingleEventScreenState();
@@ -106,6 +111,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   bool _isGettingTicket = false;
   bool _hasTicket = false;
   bool _isCheckingTicket = false;
+  bool _initialActionHandled = false;
   bool _isFacialRecognitionInProgress =
       false; // Flag to prevent repeated facial recognition dialogs
   // Tab index removed - no longer using tabs
@@ -1183,8 +1189,18 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
     // Load data progressively to prevent UI blocking
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadDataProgressively();
+      _loadDataProgressively().then((_) => _handleInitialAction());
     });
+  }
+
+  Future<void> _handleInitialAction() async {
+    if (!mounted || _initialActionHandled) return;
+    _initialActionHandled = true;
+    if (widget.initialAction == 'rsvp' && !eventModel.ticketsEnabled) {
+      await _rsvpForEvent();
+    } else if (widget.initialAction == 'ticket' && eventModel.ticketsEnabled) {
+      await _getTicket();
+    }
   }
 
   void _initAnimationControllers() {

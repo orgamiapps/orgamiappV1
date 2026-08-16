@@ -21,7 +21,9 @@ import 'package:attendus/Services/navigation_state_service.dart';
 import 'package:attendus/Services/guest_mode_service.dart';
 import 'package:attendus/widgets/app_startup_gate.dart';
 import 'package:attendus/Services/event_share_service.dart';
+import 'package:attendus/Services/community_share_service.dart';
 import 'package:attendus/widgets/deferred_shared_event_screen.dart';
+import 'package:attendus/widgets/deferred_shared_community_screen.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
@@ -321,12 +323,27 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           onGenerateRoute: (settings) {
             final name = settings.name;
             if (name == null) return null;
-            final eventId = EventShareService.eventIdFromUri(Uri.parse(name));
-            if (eventId == null) return null;
-            return MaterialPageRoute<void>(
-              settings: settings,
-              builder: (_) => DeferredSharedEventScreen(eventId: eventId),
-            );
+            final uri = Uri.parse(name);
+            final eventId = EventShareService.eventIdFromUri(uri);
+            if (eventId != null) {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) => DeferredSharedEventScreen(
+                  eventId: eventId,
+                  initialAction: uri.queryParameters['action'],
+                ),
+              );
+            }
+            final communityId = CommunityShareService.communityIdFromUri(uri);
+            if (communityId != null) {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) => DeferredSharedCommunityScreen(
+                  organizationId: communityId,
+                ),
+              );
+            }
+            return null;
           },
           // Localization scaffolding removed until ARB/gen is configured
           localizationsDelegates: const [

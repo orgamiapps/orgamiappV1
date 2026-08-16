@@ -7,6 +7,12 @@ void main() {
 
     expect(uri.toString(), 'https://attendus.app/event/event-123');
     expect(EventShareService.eventIdFromUri(uri), 'event-123');
+    expect(
+      EventShareService.eventIdFromUri(
+        Uri.parse('/app/event/event-123?action=ticket'),
+      ),
+      'event-123',
+    );
   });
 
   test('rejects unrelated and malformed URLs', () {

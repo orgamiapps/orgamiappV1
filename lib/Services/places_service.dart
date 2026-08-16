@@ -33,6 +33,9 @@ class PlaceDetails {
   final String city;
   final String regionCode;
   final String countryCode;
+  final String streetAddress;
+  final String postalCode;
+  final String eventTimeZone;
   final LatLng location;
 
   const PlaceDetails({
@@ -43,6 +46,9 @@ class PlaceDetails {
     this.city = '',
     this.regionCode = '',
     this.countryCode = '',
+    this.streetAddress = '',
+    this.postalCode = '',
+    this.eventTimeZone = '',
   });
 
   factory PlaceDetails.fromMap(Map<String, dynamic> data) {
@@ -53,6 +59,9 @@ class PlaceDetails {
       city: data['city']?.toString() ?? '',
       regionCode: data['regionCode']?.toString() ?? '',
       countryCode: data['countryCode']?.toString() ?? '',
+      streetAddress: data['streetAddress']?.toString() ?? '',
+      postalCode: data['postalCode']?.toString() ?? '',
+      eventTimeZone: data['eventTimeZone']?.toString() ?? '',
       location: LatLng(
         (data['latitude'] as num).toDouble(),
         (data['longitude'] as num).toDouble(),

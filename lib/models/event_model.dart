@@ -13,6 +13,9 @@ class EventModel {
   String city;
   String regionCode;
   String countryCode;
+  String streetAddress;
+  String postalCode;
+  String eventTimeZone;
 
   DateTime selectedDateTime, eventGenerateTime;
 
@@ -31,6 +34,7 @@ class EventModel {
   bool ticketsEnabled;
   int maxTickets;
   int issuedTickets;
+  int reservedTickets;
   int saveCount;
   double? ticketPrice; // Price per ticket in USD
   bool ticketUpgradeEnabled; // Whether skip-the-line upgrades are available
@@ -83,6 +87,9 @@ class EventModel {
     this.city = '',
     this.regionCode = '',
     this.countryCode = 'US',
+    this.streetAddress = '',
+    this.postalCode = '',
+    this.eventTimeZone = 'UTC',
     this.categories = const [],
     this.primaryDiscoveryCategoryId,
     this.discoveryCategoryIds = const [],
@@ -93,6 +100,7 @@ class EventModel {
     this.ticketsEnabled = false,
     this.maxTickets = 0,
     this.issuedTickets = 0,
+    this.reservedTickets = 0,
     this.saveCount = 0,
     this.ticketPrice,
     this.ticketUpgradeEnabled = false,
@@ -131,6 +139,9 @@ class EventModel {
       city: data['city']?.toString() ?? '',
       regionCode: data['regionCode']?.toString() ?? '',
       countryCode: data['countryCode']?.toString() ?? 'US',
+      streetAddress: data['streetAddress']?.toString() ?? '',
+      postalCode: data['postalCode']?.toString() ?? '',
+      eventTimeZone: data['eventTimeZone']?.toString() ?? 'UTC',
       imageUrl: data['imageUrl'],
       customerUid: data['customerUid'],
       status: data['status'],
@@ -170,6 +181,7 @@ class EventModel {
       ticketsEnabled: data['ticketsEnabled'] ?? false,
       maxTickets: data['maxTickets'] ?? 0,
       issuedTickets: data['issuedTickets'] ?? 0,
+      reservedTickets: data['reservedTickets'] ?? 0,
       saveCount: data['saveCount'] ?? 0,
       ticketPrice: data['ticketPrice']?.toDouble(),
       ticketUpgradeEnabled: data['ticketUpgradeEnabled'] ?? false,
@@ -363,6 +375,9 @@ class EventModel {
     data['city'] = isOnline ? '' : city;
     data['regionCode'] = isOnline ? '' : regionCode;
     data['countryCode'] = isOnline ? '' : countryCode;
+    data['streetAddress'] = isOnline ? '' : streetAddress;
+    data['postalCode'] = isOnline ? '' : postalCode;
+    data['eventTimeZone'] = eventTimeZone;
     data['imageUrl'] = imageUrl;
     data['customerUid'] = customerUid;
     data['status'] = status;
@@ -384,6 +399,7 @@ class EventModel {
     data['ticketsEnabled'] = ticketsEnabled;
     data['maxTickets'] = maxTickets;
     data['issuedTickets'] = issuedTickets;
+    data['reservedTickets'] = reservedTickets;
     data['saveCount'] = saveCount;
     if (ticketPrice != null) data['ticketPrice'] = ticketPrice;
     data['ticketUpgradeEnabled'] = ticketUpgradeEnabled;

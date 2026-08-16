@@ -14,7 +14,8 @@ const freeEvent = {
   ticketPrice: 0,
   maxTickets: 10,
   issuedTickets: 2,
-  selectedDateTime: new Date(),
+  status: "active",
+  selectedDateTime: new Date("2100-01-01T00:00:00Z"),
 };
 
 test("free ticket identifiers are stable without exposing user IDs", () => {
@@ -39,6 +40,13 @@ test("capacity and event configuration are server validated", () => {
         error.code === "resource-exhausted",
   );
   assert.doesNotThrow(() => validateFreeTicketEvent(freeEvent));
+});
+
+test("scheduled public events can issue tickets", () => {
+  assert.doesNotThrow(() => validateFreeTicketEvent({
+    ...freeEvent,
+    status: "scheduled",
+  }));
 });
 
 test("private event access requires ownership or invitation", () => {

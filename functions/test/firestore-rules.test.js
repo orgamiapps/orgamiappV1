@@ -6,7 +6,9 @@ const {initializeTestEnvironment, assertFails, assertSucceeds} = require("@fireb
 
 let env;
 test.before(async () => {
-  env = await initializeTestEnvironment({projectId: "demo-attendus-admin", firestore: {rules: fs.readFileSync(path.join(__dirname, "../../firestore.rules"), "utf8"), host: "127.0.0.1", port: 8080}});
+  const [host = "127.0.0.1", port = "8080"] =
+    String(process.env.FIRESTORE_EMULATOR_HOST || "127.0.0.1:8080").split(":");
+  env = await initializeTestEnvironment({projectId: "demo-attendus-admin", firestore: {rules: fs.readFileSync(path.join(__dirname, "../../firestore.rules"), "utf8"), host, port: Number(port)}});
 });
 test.beforeEach(async () => {
   await env.clearFirestore();
@@ -29,6 +31,8 @@ for (const role of ["ordinary", "super_admin", "support", "billing_admin", "anal
       "CheckInSessions", "CheckInAudit", "check_in_session_secrets",
       "check_in_idempotency", "check_in_event_state", "service_rate_limits",
       "scheduledNotifications", "_user_analytics_recompute",
+      "TicketReservations", "payment_review_queue", "PublicWebEvents",
+      "PublicWebCommunities", "stripe_webhook_events",
     ]) await assertFails(db.collection(collection).doc("target").set({roles: ["super_admin"], tier: "premium"}));
   });
 }
@@ -123,6 +127,7 @@ test("event owners cannot grant themselves paid or featured entitlements", async
   const event = dbFor("owner").collection("Events").doc("event-a");
   await assertFails(event.update({isFeatured: true}));
   await assertFails(event.update({issuedTickets: 999}));
+  await assertFails(event.update({reservedTickets: 1}));
   await assertSucceeds(event.update({title: "Safe title update"}));
 });
 

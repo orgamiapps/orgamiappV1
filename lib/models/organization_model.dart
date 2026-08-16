@@ -13,6 +13,7 @@ class OrganizationModel {
   final String? locationAddress;
   final double? latitude;
   final double? longitude;
+  final bool publicPageEnabled;
 
   OrganizationModel({
     required this.id,
@@ -27,6 +28,7 @@ class OrganizationModel {
     this.locationAddress,
     this.latitude,
     this.longitude,
+    this.publicPageEnabled = false,
   });
 
   factory OrganizationModel.fromJson(Map<String, dynamic> data) {
@@ -43,6 +45,7 @@ class OrganizationModel {
       locationAddress: data['locationAddress'],
       latitude: (data['latitude'] as num?)?.toDouble(),
       longitude: (data['longitude'] as num?)?.toDouble(),
+      publicPageEnabled: data['publicPageEnabled'] == true,
     );
   }
 
@@ -60,6 +63,7 @@ class OrganizationModel {
       'locationAddress': locationAddress,
       'latitude': latitude,
       'longitude': longitude,
+      'publicPageEnabled': publicPageEnabled,
     };
   }
 }

@@ -85,6 +85,10 @@ service cloud.firestore {
     match /admin_rate_limits/{doc} { allow read, write: if false; }
     match /service_rate_limits/{doc} { allow read, write: if false; }
     match /stripe_webhook_events/{doc} { allow read, write: if false; }
+    match /TicketReservations/{doc} { allow read, write: if false; }
+    match /payment_review_queue/{doc} { allow read, write: if false; }
+    match /PublicWebEvents/{doc} { allow read, write: if false; }
+    match /PublicWebCommunities/{doc} { allow read, write: if false; }
     match /account_deletion_jobs/{doc} { allow read, write: if false; }
     match /biometric_quarantine/{doc} { allow read, write: if false; }
     match /FaceEnrollments/{doc} { allow read, write: if false; }
@@ -188,7 +192,8 @@ service cloud.firestore {
       allow update: if eventOwner(eventId) &&
         request.resource.data.customerUid == resource.data.customerUid &&
         !changedKeys().hasAny([
-          'isFeatured', 'featureEndDate', 'issuedTickets', 'paidTicketCount',
+          'isFeatured', 'featureEndDate', 'issuedTickets', 'reservedTickets',
+          'paidTicketCount',
           'grossRevenue', 'netRevenue', 'attendanceCount', 'commentCount',
           'saveCount', 'geohash', 'countryCode', 'discoveryLocationValid',
           'discoveryMetadataUpdatedAt'

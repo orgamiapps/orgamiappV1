@@ -160,6 +160,9 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   String _selectedCity = '';
   String _selectedRegionCode = '';
   String _selectedCountryCode = 'US';
+  String _selectedStreetAddress = '';
+  String _selectedPostalCode = '';
+  String _selectedEventTimeZone = 'UTC';
   bool _isResolvingAddress = false;
 
   Future<void> _pickLocation() async {
@@ -171,6 +174,12 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           initialPlaceId: _selectedPlaceId,
           initialDisplayName: _selectedPlaceName,
           initialAddress: _resolvedAddress,
+          initialCity: _selectedCity,
+          initialRegionCode: _selectedRegionCode,
+          initialCountryCode: _selectedCountryCode,
+          initialStreetAddress: _selectedStreetAddress,
+          initialPostalCode: _selectedPostalCode,
+          initialEventTimeZone: _selectedEventTimeZone,
         ),
       ),
     );
@@ -186,6 +195,11 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         _selectedCountryCode = picked.countryCode.isEmpty
             ? 'US'
             : picked.countryCode;
+        _selectedStreetAddress = picked.streetAddress;
+        _selectedPostalCode = picked.postalCode;
+        _selectedEventTimeZone = picked.eventTimeZone.isEmpty
+            ? 'UTC'
+            : picked.eventTimeZone;
         locationEdtController.text = picked.formattedAddress;
         locationNameEdtController.text = picked.displayName.isNotEmpty
             ? picked.displayName
@@ -206,6 +220,9 @@ class _CreateEventScreenState extends State<CreateEventScreen>
         _selectedCity = '';
         _selectedRegionCode = '';
         _selectedCountryCode = 'US';
+        _selectedStreetAddress = '';
+        _selectedPostalCode = '';
+        _selectedEventTimeZone = 'UTC';
         _resolvedAddress = null;
         locationEdtController.clear();
         locationNameEdtController.clear();
@@ -547,6 +564,9 @@ class _CreateEventScreenState extends State<CreateEventScreen>
           city: hasLocation ? _selectedCity : '',
           regionCode: hasLocation ? _selectedRegionCode : '',
           countryCode: hasLocation ? _selectedCountryCode : '',
+          streetAddress: hasLocation ? _selectedStreetAddress : '',
+          postalCode: hasLocation ? _selectedPostalCode : '',
+          eventTimeZone: _selectedEventTimeZone,
           customerUid: currentUser.uid,
           imageUrl: thumbnailUrlCtlr.text,
           selectedDateTime: _startDateTime,

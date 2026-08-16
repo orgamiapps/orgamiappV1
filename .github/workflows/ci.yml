@@ -41,6 +41,10 @@ jobs:
         run: >-
           node --test tools/check_discovery_category_catalog.test.js &&
           node tools/check_discovery_category_catalog.js
+      - name: Validate public web routing and asset budget
+        run: >-
+          node --test tools/check_public_web_contract.test.js &&
+          node tools/check_public_web_contract.js
       - name: Check formatting
         run: dart format --output=none --set-exit-if-changed lib test tools
       - run: flutter analyze

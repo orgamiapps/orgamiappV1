@@ -22,12 +22,21 @@ function validateFreeTicketEvent(event) {
   }
   const maximum = Number(event.maxTickets || 0);
   const issued = Number(event.issuedTickets || 0);
+  const reserved = Math.max(0, Number(event.reservedTickets || 0));
   if (!Number.isSafeInteger(maximum) || maximum <= 0 ||
-      !Number.isSafeInteger(issued) || issued < 0 || issued >= maximum) {
+      !Number.isSafeInteger(issued) || issued < 0 ||
+      issued + reserved >= maximum) {
     throw new HttpsError("resource-exhausted", "No tickets are available.");
   }
   if (!event.selectedDateTime) {
     throw new HttpsError("failed-precondition", "The event date is missing.");
+  }
+  const start = event.selectedDateTime?.toDate ?
+    event.selectedDateTime.toDate() : new Date(event.selectedDateTime);
+  const status = String(event.status || "").toLowerCase();
+  if ((status !== "active" && status !== "scheduled") ||
+      Number.isNaN(start.getTime()) || start <= new Date()) {
+    throw new HttpsError("failed-precondition", "This event has ended.");
   }
 }
 

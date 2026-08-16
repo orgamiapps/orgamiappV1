@@ -16,8 +16,13 @@ enum SharedEventLoadState { loading, event, restricted, notFound, error }
 
 class SharedEventScreen extends StatefulWidget {
   final String eventId;
+  final String? initialAction;
 
-  const SharedEventScreen({super.key, required this.eventId});
+  const SharedEventScreen({
+    super.key,
+    required this.eventId,
+    this.initialAction,
+  });
 
   @override
   State<SharedEventScreen> createState() => _SharedEventScreenState();
@@ -142,7 +147,10 @@ class _SharedEventScreenState extends State<SharedEventScreen> {
   @override
   Widget build(BuildContext context) {
     if (_state == SharedEventLoadState.event && _event != null) {
-      return SingleEventScreen(eventModel: _event!);
+      return SingleEventScreen(
+        eventModel: _event!,
+        initialAction: widget.initialAction,
+      );
     }
     return Scaffold(
       appBar: AppBar(title: const Text('Shared event')),

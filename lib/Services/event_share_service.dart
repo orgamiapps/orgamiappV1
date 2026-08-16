@@ -12,7 +12,12 @@ class EventShareService {
   static String? eventIdFromUri(Uri uri) {
     if (uri.host.isNotEmpty && uri.host != 'attendus.app') return null;
     final segments = uri.pathSegments.where((part) => part.isNotEmpty).toList();
-    if (segments.length != 2 || segments.first != 'event') return null;
+    final canonical = segments.length == 2 && segments.first == 'event';
+    final application =
+        segments.length == 3 &&
+        segments[0] == 'app' &&
+        segments[1] == 'event';
+    if (!canonical && !application) return null;
     final eventId = segments.last.trim();
     return RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(eventId) ? eventId : null;
   }

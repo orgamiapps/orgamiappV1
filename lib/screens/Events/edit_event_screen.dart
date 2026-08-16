@@ -71,6 +71,9 @@ class _EditEventScreenState extends State<EditEventScreen>
   String _selectedCity = '';
   String _selectedRegionCode = '';
   String _selectedCountryCode = 'US';
+  String _selectedStreetAddress = '';
+  String _selectedPostalCode = '';
+  String _selectedEventTimeZone = 'UTC';
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -156,6 +159,9 @@ class _EditEventScreenState extends State<EditEventScreen>
     _selectedCity = event.city;
     _selectedRegionCode = event.regionCode;
     _selectedCountryCode = event.countryCode;
+    _selectedStreetAddress = event.streetAddress;
+    _selectedPostalCode = event.postalCode;
+    _selectedEventTimeZone = event.eventTimeZone;
     _resolvedAddress = event.location;
 
     // Initialize location and radius
@@ -223,6 +229,12 @@ class _EditEventScreenState extends State<EditEventScreen>
           initialPlaceId: _selectedPlaceId,
           initialDisplayName: _selectedPlaceName,
           initialAddress: _resolvedAddress,
+          initialCity: _selectedCity,
+          initialRegionCode: _selectedRegionCode,
+          initialCountryCode: _selectedCountryCode,
+          initialStreetAddress: _selectedStreetAddress,
+          initialPostalCode: _selectedPostalCode,
+          initialEventTimeZone: _selectedEventTimeZone,
         ),
       ),
     );
@@ -238,6 +250,11 @@ class _EditEventScreenState extends State<EditEventScreen>
         _selectedCountryCode = picked.countryCode.isEmpty
             ? 'US'
             : picked.countryCode;
+        _selectedStreetAddress = picked.streetAddress;
+        _selectedPostalCode = picked.postalCode;
+        _selectedEventTimeZone = picked.eventTimeZone.isEmpty
+            ? 'UTC'
+            : picked.eventTimeZone;
         locationEdtController.text = picked.formattedAddress;
         _hasChanges = true;
       });
@@ -256,6 +273,9 @@ class _EditEventScreenState extends State<EditEventScreen>
       _selectedCity = '';
       _selectedRegionCode = '';
       _selectedCountryCode = 'US';
+      _selectedStreetAddress = '';
+      _selectedPostalCode = '';
+      _selectedEventTimeZone = 'UTC';
       _resolvedAddress = null;
       locationEdtController.clear();
     });
@@ -393,6 +413,9 @@ class _EditEventScreenState extends State<EditEventScreen>
           city: hasPhysicalLocation ? _selectedCity : '',
           regionCode: hasPhysicalLocation ? _selectedRegionCode : '',
           countryCode: hasPhysicalLocation ? _selectedCountryCode : '',
+          streetAddress: hasPhysicalLocation ? _selectedStreetAddress : '',
+          postalCode: hasPhysicalLocation ? _selectedPostalCode : '',
+          eventTimeZone: _selectedEventTimeZone,
           groupName: groupNameEdtController.text.trim(),
           imageUrl: imageUrl ?? '', // Use empty string if no image
           selectedDateTime: widget.eventModel.selectedDateTime,
@@ -410,6 +433,7 @@ class _EditEventScreenState extends State<EditEventScreen>
           ticketsEnabled: widget.eventModel.ticketsEnabled,
           maxTickets: widget.eventModel.maxTickets,
           issuedTickets: widget.eventModel.issuedTickets,
+          reservedTickets: widget.eventModel.reservedTickets,
           saveCount: widget.eventModel.saveCount,
           isFeatured: widget.eventModel.isFeatured,
           status: widget.eventModel.status,
