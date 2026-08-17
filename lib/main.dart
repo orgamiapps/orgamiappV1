@@ -338,9 +338,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             if (communityId != null) {
               return MaterialPageRoute<void>(
                 settings: settings,
-                builder: (_) => DeferredSharedCommunityScreen(
-                  organizationId: communityId,
-                ),
+                builder: (_) =>
+                    DeferredSharedCommunityScreen(organizationId: communityId),
               );
             }
             return null;

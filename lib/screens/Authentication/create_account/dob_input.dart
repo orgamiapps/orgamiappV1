@@ -13,15 +13,21 @@ class DateOfBirthInputFormatter extends TextInputFormatter {
     if (digits.length > 8) digits = digits.substring(0, 8);
 
     final digitsBeforeCursor = newValue.selection.isValid
-        ? newValue.text
-              .substring(0, newValue.selection.end.clamp(0, newValue.text.length))
+          ? newValue.text
+              .substring(
+                0,
+                newValue.selection.end.clamp(0, newValue.text.length),
+              )
               .replaceAll(RegExp(r'\D'), '')
               .length
               .clamp(0, digits.length)
         : digits.length;
 
     final formatted = formatDateOfBirthDigits(digits);
-    var cursor = _formattedOffsetForDigitCount(digitsBeforeCursor, digits.length);
+    var cursor = _formattedOffsetForDigitCount(
+      digitsBeforeCursor,
+      digits.length,
+    );
     cursor = cursor.clamp(0, formatted.length);
 
     return TextEditingValue(
