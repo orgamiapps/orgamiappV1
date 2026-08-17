@@ -13,7 +13,7 @@ class DateOfBirthInputFormatter extends TextInputFormatter {
     if (digits.length > 8) digits = digits.substring(0, 8);
 
     final digitsBeforeCursor = newValue.selection.isValid
-          ? newValue.text
+        ? newValue.text
               .substring(
                 0,
                 newValue.selection.end.clamp(0, newValue.text.length),
