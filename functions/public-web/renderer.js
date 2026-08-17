@@ -80,7 +80,8 @@ function isoInTimeZone(date, timeZone) {
   }).formatToParts(date);
   const part = (type) => parts.find((entry) => entry.type === type)?.value || "";
   const offsetName = part("timeZoneName");
-  const offset = offsetName === "GMT" ? "Z" : offsetName.replace("GMT", "");
+  const offset = ["GMT", "GMT+00:00", "GMT-00:00"].includes(offsetName) ?
+    "Z" : offsetName.replace("GMT", "");
   return `${part("year")}-${part("month")}-${part("day")}T` +
     `${part("hour")}:${part("minute")}:${part("second")}${offset}`;
 }
