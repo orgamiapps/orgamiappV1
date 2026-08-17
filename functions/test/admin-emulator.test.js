@@ -104,6 +104,7 @@ test("free ticket issuance is atomic and idempotent", async () => {
     imageUrl: "",
     location: "Test Hall",
     private: false,
+    status: "active",
     ticketsEnabled: true,
     ticketPrice: 0,
     maxTickets: 2,
