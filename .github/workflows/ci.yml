@@ -46,7 +46,9 @@ jobs:
           node --test tools/check_public_web_contract.test.js &&
           node tools/check_public_web_contract.js
       - name: Check formatting
-        run: dart format --output=none --set-exit-if-changed lib test tools
+        run: |
+          dart format lib test tools
+          git diff --exit-code
       - run: flutter analyze
       - run: flutter test --exclude-tags=emulator
 
