@@ -5,7 +5,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
-import '../../Controller/customer_controller.dart';
+import '../../controller/customer_controller.dart';
 import '../../Permissions/permissions_helper.dart';
 import '../../Services/face_recognition_service.dart';
 import '../../models/event_model.dart';

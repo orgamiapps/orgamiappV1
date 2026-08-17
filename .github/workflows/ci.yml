@@ -49,8 +49,14 @@ jobs:
         run: |
           dart format lib test tools
           git diff --exit-code
-      - run: flutter analyze
+      - run: flutter analyze lib test tools
       - run: flutter test --exclude-tags=emulator
+      - name: Analyze and test Attendus Admin
+        working-directory: apps/attendus_admin
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
 
   web-release:
     runs-on: ubuntu-latest
