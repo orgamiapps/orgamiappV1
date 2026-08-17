@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -7,6 +9,8 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:attendus/Services/attendance_check_in_service.dart';
 import 'package:attendus/models/check_in_session.dart';
 import 'package:attendus/models/event_model.dart';
@@ -32,6 +36,7 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
   int _pendingScans = 0;
   bool _offlineReady = false;
   late List<String> _staffIds;
+  Map<String, Map<String, dynamic>> _registrationDetails = const {};
 
   bool get _isOwner =>
       FirebaseAuth.instance.currentUser?.uid == widget.event.customerUid;
@@ -41,6 +46,7 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
     super.initState();
     _staffIds = List<String>.from(widget.event.checkInStaff);
     _loadSession();
+    _loadRegistrationDetails();
     _refreshTimer = Timer.periodic(const Duration(seconds: 25), (_) {
       _refreshOperationalState();
     });
@@ -65,6 +71,48 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
       _showError(error);
     }
     await _refreshConnectivity();
+  }
+
+  Future<void> _loadRegistrationDetails() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.isAnonymous) return;
+    try {
+      final response =
+          await FirebaseFunctions.instanceFor(region: 'us-central1')
+              .httpsCallable('getOrganizerEventRegistrationsV1')
+              .call<Map<String, dynamic>>({'eventId': widget.event.id});
+      final rows = (response.data['registrations'] as List? ?? const [])
+          .whereType<Map>()
+          .map((row) => row.cast<String, dynamic>());
+      if (mounted) {
+        setState(
+          () => _registrationDetails = {
+            for (final row in rows) row['id'].toString(): row,
+          },
+        );
+      }
+    } on FirebaseFunctionsException catch (error) {
+      if (error.code != 'permission-denied') _showError(error);
+    }
+  }
+
+  Future<void> _exportRegistrationContacts() async {
+    await _run(() async {
+      final response =
+          await FirebaseFunctions.instanceFor(region: 'us-central1')
+              .httpsCallable('exportOrganizerEventRegistrationsV1')
+              .call<Map<String, dynamic>>({'eventId': widget.event.id});
+      final bytes = base64Decode(response.data['base64'].toString());
+      final directory = await getTemporaryDirectory();
+      final file = File('${directory.path}/${response.data['filename']}');
+      await file.writeAsBytes(bytes, flush: true);
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'text/csv')],
+          subject: '${widget.event.title} registrations',
+        ),
+      );
+    });
   }
 
   Future<void> _refreshOperationalState() async {
@@ -563,6 +611,11 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
         subtitle: const Text(
           'Search and check in anyone who needs assistance.',
         ),
+        trailing: IconButton(
+          tooltip: 'Export registration contacts (audited)',
+          onPressed: _busy ? null : _exportRegistrationContacts,
+          icon: const Icon(Icons.download_outlined),
+        ),
         children: [
           if (registrations.isEmpty)
             const Padding(
@@ -580,12 +633,22 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
                   data['userName']?.toString() ??
                   'Attendee';
               final checkedIn = attended.contains(uid);
+              final detail = _registrationDetails[doc.id];
+              final contact = detail?['contact']?.toString();
+              final delivery = detail?['deliveryStatus']?.toString();
               return ListTile(
                 leading: CircleAvatar(
                   child: Text(name.isEmpty ? '?' : name[0].toUpperCase()),
                 ),
                 title: Text(name),
-                subtitle: Text(checkedIn ? 'Already checked in' : 'Registered'),
+                subtitle: Text(
+                  [
+                    checkedIn ? 'Already checked in' : 'Registered',
+                    if (contact?.isNotEmpty == true) contact!,
+                    if (delivery != null && delivery != 'not_applicable')
+                      'Confirmation: ${delivery.replaceAll('_', ' ')}',
+                  ].join(' · '),
+                ),
                 trailing: checkedIn
                     ? const Icon(Icons.check_circle, color: Colors.green)
                     : FilledButton.tonal(

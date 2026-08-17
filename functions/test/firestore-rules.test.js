@@ -33,6 +33,9 @@ for (const role of ["ordinary", "super_admin", "support", "billing_admin", "anal
       "scheduledNotifications", "_user_analytics_recompute",
       "TicketReservations", "payment_review_queue", "PublicWebEvents",
       "PublicWebCommunities", "stripe_webhook_events",
+      "GuestAttendees", "GuestEventContactClaims", "GuestManageTokens",
+      "GuestManageSessions", "PublicRegistrationFlows", "OutboundMessages",
+      "CommunicationTemplates", "CommunicationSuppressions",
     ]) await assertFails(db.collection(collection).doc("target").set({roles: ["super_admin"], tier: "premium"}));
   });
 }

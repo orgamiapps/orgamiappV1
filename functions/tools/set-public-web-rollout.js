@@ -14,8 +14,8 @@ async function main() {
   const projectId = value("--project");
   const mode = value("--mode");
   if (!allowedProjects.has(projectId)) throw new Error("Use an explicitly approved project.");
-  if (!["disabled", "pages", "registration", "paid"].includes(mode)) {
-    throw new Error("Use --mode disabled|pages|registration|paid.");
+  if (!["disabled", "pages", "registration", "accountless", "paid"].includes(mode)) {
+    throw new Error("Use --mode disabled|pages|registration|accountless|paid.");
   }
   if (getApps().length === 0) initializeApp({projectId});
   const ref = getFirestore().collection("AppConfig").doc("publicWeb");
@@ -25,7 +25,8 @@ async function main() {
   const stripePublishableKey = value("--stripe-publishable-key") ||
     String(current.stripePublishableKey || "");
   const pages = mode !== "disabled";
-  const registration = ["registration", "paid"].includes(mode);
+  const registration = ["registration", "accountless", "paid"].includes(mode);
+  const accountless = ["accountless", "paid"].includes(mode);
   const paid = mode === "paid";
   if (registration && !appCheckSiteKey) {
     throw new Error("Registration requires --app-check-site-key or an existing value.");
@@ -36,13 +37,14 @@ async function main() {
   await ref.set({
     publicPagesEnabled: pages,
     inlineRegistrationEnabled: registration,
+    accountlessRegistrationEnabled: accountless,
     paidTicketCheckoutEnabled: paid,
     appCheckSiteKey,
     stripePublishableKey,
     updatedAt: FieldValue.serverTimestamp(),
     rolloutMode: mode,
   }, {merge: true});
-  process.stdout.write(`${JSON.stringify({projectId, mode, pages, registration,
+  process.stdout.write(`${JSON.stringify({projectId, mode, pages, registration, accountless,
     paid, appCheckConfigured: Boolean(appCheckSiteKey),
     stripePublishableConfigured: Boolean(stripePublishableKey)})}\n`);
 }

@@ -362,6 +362,8 @@ function paidTicketData(admin, reservation, paymentIntentId, ticketId) {
     eventLocation: reservation.eventLocation,
     eventDateTime: reservation.eventDateTime,
     customerUid: reservation.customerUid,
+    guestId: reservation.guestId || null,
+    identityType: reservation.identityType || "account",
     customerName: reservation.customerName,
     ticketCode: crypto.randomBytes(4).toString("hex").toUpperCase(),
     issuedDateTime: admin.firestore.FieldValue.serverTimestamp(),
@@ -404,10 +406,12 @@ async function fulfillPayment(admin, stripeEvent) {
         intent.currency !== reservation.currency) {
       throw new Error("Payment amount or currency did not match reservation");
     }
-    const ticketId = ticketDocumentId(reservation.eventId, reservation.customerUid);
+    const ticketId = ticketDocumentId(
+        reservation.eventId, reservation.guestId || reservation.customerUid,
+    );
     const ticketRef = db.collection("Tickets").doc(ticketId);
     const eventRef = db.collection("Events").doc(reservation.eventId);
-    const registrationId = registrationDocumentId(
+    const registrationId = reservation.registrationId || registrationDocumentId(
         reservation.eventId, reservation.customerUid, "ticket",
     );
     transaction.set(ticketRef,
@@ -418,10 +422,15 @@ async function fulfillPayment(admin, stripeEvent) {
       userName: reservation.customerName,
       realName: reservation.customerName,
       customerUid: reservation.customerUid,
+      guestId: reservation.guestId || null,
+      identityType: reservation.identityType || "account",
+      contactType: reservation.contactType || null,
+      contactRef: reservation.guestId ? `GuestAttendees/${reservation.guestId}` : null,
       attendanceDateTime: admin.firestore.FieldValue.serverTimestamp(),
       answers: [],
       isAnonymous: false,
       registrationSource: "stripe_webhook_v1",
+      status: "confirmed",
     }, {merge: true});
     transaction.update(eventRef, {
       reservedTickets: admin.firestore.FieldValue.increment(-1),
@@ -437,6 +446,40 @@ async function fulfillPayment(admin, stripeEvent) {
       ticketId,
       completedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, {merge: true});
+    if (reservation.guestId) {
+      const manageUrl = `https://attendus.app/manage/${reservation.manageToken}`;
+      transaction.set(db.collection("OutboundMessages")
+          .doc(`confirmation_${registrationId}`), {
+        templateId: "guest_registration_confirmation",
+        channel: reservation.contactType === "phone" ? "sms" : "email",
+        status: "pending",
+        attempts: 0,
+        registrationId,
+        guestId: reservation.guestId,
+        eventId: reservation.eventId,
+        encryptedContact: reservation.encryptedContact,
+        payload: {
+          firstName: String(reservation.customerName || "Attendee").split(" ")[0],
+          eventTitle: reservation.eventTitle,
+          eventStart: reservation.eventDateTime,
+          eventLocation: reservation.eventLocation,
+          kind: "paid_ticket",
+          manageUrl,
+        },
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        nextAttemptAt: new Date(),
+      });
+      transaction.set(db.collection("PublicRegistrationFlows")
+          .doc(`flow_${reservation.idempotencyHash}`), {
+        status: "confirmed", ticketId, registrationId,
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, {merge: true});
+      transaction.set(db.collection("GuestEventContactClaims")
+          .doc(reservation.contactClaimId || `unlinked_${reservation.guestId}`), {
+        status: "confirmed", ticketId,
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, {merge: true});
+    }
     transaction.create(processedRef, {
       type: stripeEvent.type,
       processedAt: admin.firestore.FieldValue.serverTimestamp(),

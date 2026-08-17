@@ -9,6 +9,7 @@ import 'analytics_screen.dart';
 import 'mutation_dialog.dart';
 import 'paged_resource_screen.dart';
 import 'settings_screen.dart';
+import 'communications_screen.dart';
 
 class AdminShell extends StatefulWidget {
   const AdminShell({super.key, required this.onThemeChanged});
@@ -75,6 +76,12 @@ class _AdminShellState extends State<AdminShell> {
           'Analytics',
           Icons.analytics_outlined,
           AnalyticsScreen(),
+        ),
+      if (permissions.communicationsRead)
+        const _Destination(
+          'Communications',
+          Icons.mark_email_read_outlined,
+          CommunicationsScreen(),
         ),
       if (permissions.moderation)
         _Destination(

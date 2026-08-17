@@ -151,6 +151,16 @@ jobs:
         run: >-
           flutter build apk --release --split-per-abi
           --dart-define=ATTENDUS_RELEASE_ID=${{ github.sha }}
+      - name: Build signed release app bundle
+        env:
+          GOOGLE_MAPS_ANDROID_API_KEY: ci-placeholder-key
+          ATTENDUS_ANDROID_STORE_FILE: ${{ runner.temp }}/attendus-ci-release.jks
+          ATTENDUS_ANDROID_STORE_PASSWORD: ci-release-password
+          ATTENDUS_ANDROID_KEY_ALIAS: attendus-ci-release
+          ATTENDUS_ANDROID_KEY_PASSWORD: ci-release-password
+        run: >-
+          flutter build appbundle --release
+          --dart-define=ATTENDUS_RELEASE_ID=${{ github.sha }}
       - name: Verify release signatures and supported ABIs
         shell: bash
         run: |
@@ -167,6 +177,15 @@ jobs:
               exit 1
             fi
           done
+          jarsigner -verify -certs -verbose build/app/outputs/bundle/release/app-release.aab |
+            grep -q 'jar verified'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: attendus-android-release-${{ github.sha }}
+          path: |
+            build/app/outputs/flutter-apk/app-*-release.apk
+            build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
 
   ios-release:
     runs-on: macos-15
@@ -183,6 +202,13 @@ jobs:
         run: >-
           flutter build ios --release --no-codesign
           --dart-define=ATTENDUS_RELEASE_ID=${{ github.sha }}
+      - name: Package compiled iOS release
+        run: ditto -c -k --sequesterRsrc --keepParent build/ios/iphoneos/Runner.app build/ios/attendus-ios-release.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: attendus-ios-release-${{ github.sha }}
+          path: build/ios/attendus-ios-release.zip
+          if-no-files-found: error
 
   secret-scan:
     runs-on: ubuntu-latest

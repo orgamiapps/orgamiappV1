@@ -319,6 +319,22 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "Tickets",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "eventId", "order": "ASCENDING"},
+        {"fieldPath": "guestId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "OutboundMessages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "nextAttemptAt", "order": "ASCENDING"}
+      ]
     }
   ],
   "fieldOverrides": [
@@ -381,6 +397,18 @@
         {"order": "ASCENDING", "queryScope": "COLLECTION"},
         {"order": "DESCENDING", "queryScope": "COLLECTION"}
       ]
+    },
+    {
+      "collectionGroup": "GuestManageTokens",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "GuestManageSessions",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
     }
   ]
 }

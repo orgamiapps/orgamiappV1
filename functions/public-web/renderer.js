@@ -4,6 +4,9 @@ const crypto = require("node:crypto");
 const {onRequest} = require("firebase-functions/v2/https");
 const {onDocumentWritten} = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
+const QRCode = require("qrcode");
+const {CONTACT_HMAC_KEY, CONTACT_KMS_KEY_NAME, contactHash, digest,
+  encryptContact, maskedContact, normalizeContact} = require("./accountless");
 
 const PUBLIC_ORIGIN = "https://attendus.app";
 const PAGE_SIZE = 10000;
@@ -185,7 +188,7 @@ function shell({title, summary, canonical, image, body, jsonLd, config, nonce}) 
 <meta property="og:url" content="${safeCanonical}"><meta property="og:image" content="${safeImage}">
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${safeTitle}">
 <meta name="twitter:description" content="${safeSummary}"><meta name="twitter:image" content="${safeImage}">
-<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="/public-web/v1/public.css">
+<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="/public-web/v1/public.css"><link rel="stylesheet" href="/public-web/v1/registration.css">
 <script type="application/ld+json" nonce="${nonce}">${safeJson(jsonLd)}</script></head>
 <body><a class="skip-link" href="#main">Skip to event details</a>
 <header class="site-header"><a class="brand" href="/" aria-label="Attendus home"><img src="/icons/Icon-192.png" alt="" width="36" height="36"><span>Attendus</span></a></header>
@@ -308,25 +311,243 @@ function notFound(res, nonce) {
   res.status(404).send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Page not found | Attendus</title><link rel="stylesheet" href="/public-web/v1/public.css"></head><body><main class="not-found"><h1>Page not found</h1><p>This page is unavailable.</p><a class="cta" href="/">Discover events</a></main></body></html>`);
 }
 
+function cookies(req) {
+  return Object.fromEntries(String(req.get("cookie") || "").split(";")
+      .map((part) => part.trim().split("="))
+      .filter((parts) => parts.length === 2)
+      .map(([key, value]) => [key, decodeURIComponent(value)]));
+}
+
+async function manageSession(db, req) {
+  const raw = cookies(req).attendus_guest_manage;
+  if (!raw || !/^[A-Za-z0-9_-]{32,200}$/.test(raw)) return null;
+  const snapshot = await db.collection("GuestManageSessions")
+      .doc(crypto.createHash("sha256").update(raw).digest("hex")).get();
+  if (!snapshot.exists || snapshot.get("status") !== "active") return null;
+  const expires = asDate(snapshot.get("expiresAt"));
+  return !expires || expires <= new Date() ? null : {ref: snapshot.ref, ...snapshot.data()};
+}
+
+async function exchangeManageToken(db, req, res, raw, nonce) {
+  if (!/^[A-Za-z0-9_-]{32,200}$/.test(raw)) return notFound(res, nonce);
+  const tokenRef = db.collection("GuestManageTokens")
+      .doc(crypto.createHash("sha256").update(raw).digest("hex"));
+  const sessionRaw = crypto.randomBytes(32).toString("base64url");
+  const sessionRef = db.collection("GuestManageSessions")
+      .doc(crypto.createHash("sha256").update(sessionRaw).digest("hex"));
+  let accepted = false;
+  await db.runTransaction(async (transaction) => {
+    const token = await transaction.get(tokenRef);
+    const expires = token.exists ? asDate(token.get("expiresAt")) : null;
+    if (!token.exists || token.get("status") !== "active" || !expires || expires <= new Date()) return;
+    accepted = true;
+    const csrfToken = crypto.randomBytes(24).toString("base64url");
+    transaction.update(tokenRef, {status: "exchanged", exchangedAt: new Date()});
+    transaction.create(sessionRef, {status: "active", registrationId: token.get("registrationId"),
+      guestId: token.get("guestId"), csrfToken, createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 2 * 3600000)});
+    transaction.set(db.collection("GuestAttendees").doc(token.get("guestId")), {
+      verificationStatus: "verified", verifiedAt: new Date(),
+    }, {merge: true});
+  });
+  if (!accepted) return notFound(res, nonce);
+  res.set("Set-Cookie", `attendus_guest_manage=${encodeURIComponent(sessionRaw)}; Path=/manage; Max-Age=7200; HttpOnly; Secure; SameSite=Strict`);
+  res.set("Cache-Control", "no-store");
+  return res.redirect(303, "/manage");
+}
+
+async function manageData(db, session) {
+  const registration = await db.collection("RegisterAttendance")
+      .doc(session.registrationId).get();
+  if (!registration.exists || registration.get("guestId") !== session.guestId) return null;
+  const event = await db.collection("Events").doc(registration.get("eventId")).get();
+  if (!event.exists) return null;
+  const tickets = await db.collection("Tickets").where("eventId", "==", event.id)
+      .where("guestId", "==", session.guestId).limit(1).get();
+  const guest = await db.collection("GuestAttendees").doc(session.guestId).get();
+  return {registration, event, ticket: tickets.empty ? null : tickets.docs[0], guest};
+}
+
+function managePage(res, nonce, data, session, notice = "") {
+  pageHeaders(res, nonce);
+  res.set("X-Robots-Tag", "noindex, nofollow");
+  const event = data.event.data();
+  const registration = data.registration.data();
+  const ticket = data.ticket?.data();
+  const guest = data.guest.data() || {};
+  const cancelled = registration.status === "cancelled" || ticket?.revoked === true;
+  const paid = ticket?.isPaid === true;
+  const cancel = !cancelled && !paid && eventStartForManage(event) > new Date() ?
+    `<form method="post" action="/manage/action"><input type="hidden" name="csrf" value="${escapeHtml(session.csrfToken)}"><input type="hidden" name="action" value="cancel"><button class="secondary-button danger" type="submit">Cancel registration</button></form>` : "";
+  const ticketMarkup = ticket ? `<section class="manage-ticket" aria-labelledby="ticket-heading"><h2 id="ticket-heading">Your ticket</h2><div class="ticket-code"><span>Ticket code</span><strong>${escapeHtml(ticket.ticketCode)}</strong><img src="/manage/ticket.svg" width="220" height="220" alt="QR ticket code ${escapeHtml(ticket.ticketCode)}"></div><button class="secondary-button print-ticket" type="button">Print ticket</button></section>` : "";
+  const contactForm = `<details class="contact-update"><summary>Update confirmation contact</summary><form method="post" action="/manage/action"><input type="hidden" name="csrf" value="${escapeHtml(session.csrfToken)}"><input type="hidden" name="action" value="update_contact"><label>Contact method <select name="contactType"><option value="email">Email</option><option value="phone">U.S. mobile</option></select></label><label>Email or phone <input name="contactValue" required maxlength="254"></label><p class="sms-consent">If you choose mobile, you agree to transactional Attendus texts for this registration. Message and data rates may apply. Reply STOP to opt out or HELP for help.</p><button class="secondary-button" type="submit">Update and resend</button></form></details>`;
+  const body = `<main id="main" class="page manage-page"><article><div class="eyebrow">Guest registration</div><h1>${escapeHtml(event.title)}</h1>${notice ? `<p class="notice" role="status">${escapeHtml(notice)}</p>` : ""}<dl class="details"><div><dt>Status</dt><dd>${cancelled ? "Cancelled" : "Confirmed"}</dd></div><div><dt>Attendee</dt><dd>${escapeHtml(registration.realName || registration.userName)}</dd></div><div><dt>Contact</dt><dd>${escapeHtml(guest.maskedContact || "Protected")}</dd></div><div><dt>Date</dt><dd>${escapeHtml(formatDate(eventStartForManage(event), validTimeZone(event.eventTimeZone)))}</dd></div></dl>${ticketMarkup}<div class="manage-actions"><a class="secondary-button" href="/manage/calendar.ics">Download calendar invite</a><a class="secondary-button" href="/event/${encodeURIComponent(data.event.id)}">View event</a>${cancel}</div>${contactForm}${paid ? `<p>Paid ticket refunds are handled by the organizer or <a href="mailto:support@attendus.app">support@attendus.app</a>.</p>` : ""}</article></main>`;
+  res.status(200).send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Manage registration | Attendus</title><link rel="stylesheet" href="/public-web/v1/public.css"><link rel="stylesheet" href="/public-web/v1/registration.css"></head><body><a class="skip-link" href="#main">Skip to registration</a><header class="site-header"><a class="brand" href="/"><img src="/icons/Icon-192.png" alt="" width="36" height="36"><span>Attendus</span></a></header>${body}<script nonce="${nonce}">document.querySelector('.print-ticket')?.addEventListener('click',()=>window.print());</script></body></html>`);
+}
+
+function eventStartForManage(event) {
+  return asDate(event.selectedDateTime) || new Date(0);
+}
+
+async function renderManage(db, req, res, nonce) {
+  const session = await manageSession(db, req);
+  if (!session) return notFound(res, nonce);
+  const data = await manageData(db, session);
+  if (!data) return notFound(res, nonce);
+  return managePage(res, nonce, data, session);
+}
+
+async function manageCalendar(db, req, res, nonce) {
+  const session = await manageSession(db, req);
+  if (!session) return notFound(res, nonce);
+  const data = await manageData(db, session);
+  if (!data) return notFound(res, nonce);
+  const event = data.event.data();
+  const start = eventStartForManage(event);
+  const end = eventEnd(event);
+  const format = (date) => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const clean = (value) => String(value || "").replaceAll("\\", "\\\\")
+      .replaceAll("\n", "\\n").replaceAll(",", "\\,").replaceAll(";", "\\;");
+  const method = data.registration.get("status") === "cancelled" ? "CANCEL" : "PUBLISH";
+  const content = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Attendus//Registration//EN",
+    `METHOD:${method}`, "BEGIN:VEVENT", `UID:${data.registration.id}@attendus.app`,
+    `DTSTAMP:${format(new Date())}`, `DTSTART:${format(start)}`, `DTEND:${format(end)}`,
+    `SUMMARY:${clean(event.title)}`, `LOCATION:${clean(event.location)}`,
+    `URL:${PUBLIC_ORIGIN}/event/${data.event.id}`, "END:VEVENT", "END:VCALENDAR", ""].join("\r\n");
+  res.set("Cache-Control", "no-store"); res.set("X-Robots-Tag", "noindex, nofollow");
+  res.set("Content-Disposition", "attachment; filename=attendus-event.ics");
+  return res.type("text/calendar").send(content);
+}
+
+async function manageTicketQr(db, req, res, nonce) {
+  const session = await manageSession(db, req);
+  if (!session) return notFound(res, nonce);
+  const data = await manageData(db, session);
+  const code = data?.ticket?.get("ticketCode");
+  if (!code) return notFound(res, nonce);
+  const svg = await QRCode.toString(code, {type: "svg", margin: 1, width: 220,
+    errorCorrectionLevel: "M"});
+  res.set("Cache-Control", "private, no-store");
+  res.set("X-Robots-Tag", "noindex, nofollow");
+  return res.type("image/svg+xml").send(svg);
+}
+
+async function manageAction(db, req, res, nonce) {
+  const session = await manageSession(db, req);
+  if (!session || req.body?.csrf !== session.csrfToken ||
+      !["cancel", "update_contact"].includes(req.body?.action)) {
+    return notFound(res, nonce);
+  }
+  const data = await manageData(db, session);
+  if (!data) return notFound(res, nonce);
+  if (req.body.action === "update_contact") {
+    try {
+      const contact = normalizeContact(req.body.contactType, req.body.contactValue);
+      const hash = contactHash(contact);
+      const encrypted = await encryptContact(contact);
+      const guest = data.guest.data();
+      const oldClaim = db.collection("GuestEventContactClaims")
+          .doc(digest(data.event.id, guest.contactHash));
+      const newClaim = db.collection("GuestEventContactClaims").doc(digest(data.event.id, hash));
+      await db.runTransaction(async (transaction) => {
+        const collision = await transaction.get(newClaim);
+        if (collision.exists && collision.get("guestId") !== data.guest.id) {
+          throw new Error("That contact already has a registration.");
+        }
+        transaction.set(newClaim, {eventId: data.event.id, guestId: data.guest.id,
+          registrationId: data.registration.id, contactHash: hash,
+          status: data.registration.get("status"), updatedAt: new Date()});
+        if (oldClaim.id !== newClaim.id) transaction.delete(oldClaim);
+        transaction.update(data.guest.ref, {contactType: contact.type, contactHash: hash,
+          encryptedContact: encrypted, maskedContact: maskedContact(contact),
+          transactionalSmsConsent: contact.type === "phone",
+          smsConsentAt: contact.type === "phone" ? new Date() : null,
+          verificationStatus: "pending", verifiedAt: null, updatedAt: new Date()});
+      });
+      const rawToken = crypto.randomBytes(32).toString("base64url");
+      const tokenId = crypto.createHash("sha256").update(rawToken).digest("hex");
+      const messageId = `resend_${crypto.randomUUID()}`;
+      await Promise.all([
+        db.collection("GuestManageTokens").doc(tokenId).set({guestId: data.guest.id,
+          registrationId: data.registration.id, ownerUid: "contact_proof_only", status: "active",
+          createdAt: new Date(), expiresAt: new Date(Date.now() + 72 * 3600000)}),
+        db.collection("OutboundMessages").doc(messageId).set({id: messageId,
+          templateId: "guest_registration_confirmation",
+          channel: contact.type === "phone" ? "sms" : "email", status: "pending", attempts: 0,
+          registrationId: data.registration.id, guestId: data.guest.id, eventId: data.event.id,
+          encryptedContact: encrypted, maskedContact: maskedContact(contact), payload: {
+            firstName: data.guest.get("firstName"), eventTitle: data.event.get("title"),
+            eventStart: data.event.get("selectedDateTime"), eventLocation: data.event.get("location"),
+            kind: data.ticket ? "ticket" : "rsvp",
+            manageUrl: `${PUBLIC_ORIGIN}/manage/${rawToken}`}, createdAt: new Date(),
+          nextAttemptAt: new Date()}),
+      ]);
+      return managePage(res, nonce, await manageData(db, session), session,
+          "Contact updated. A new confirmation is being sent.");
+    } catch (error) {
+      return managePage(res, nonce, data, session,
+          error.message || "Contact could not be updated.");
+    }
+  }
+  if (eventStartForManage(data.event.data()) <= new Date() || data.ticket?.get("isPaid") === true) {
+    return managePage(res, nonce, data, session, "This registration cannot be cancelled online.");
+  }
+  await db.runTransaction(async (transaction) => {
+    const current = await transaction.get(data.registration.ref);
+    if (!current.exists || current.get("status") === "cancelled") return;
+    transaction.update(data.registration.ref, {status: "cancelled", cancelledAt: new Date(),
+      cancellationSource: "guest_manage_page"});
+    if (data.ticket && data.ticket.get("revoked") !== true) {
+      transaction.update(data.ticket.ref, {revoked: true, revokedReason: "guest_cancelled",
+        revokedAt: new Date()});
+      transaction.update(data.event.ref, {issuedTickets:
+        require("firebase-admin/firestore").FieldValue.increment(-1)});
+    }
+  });
+  const guest = data.guest.data();
+  if (guest.encryptedContact) {
+    const messageId = `cancellation_${data.registration.id}`;
+    await db.collection("OutboundMessages").doc(messageId).set({id: messageId,
+      templateId: "guest_registration_cancelled",
+      channel: guest.contactType === "phone" ? "sms" : "email", status: "pending", attempts: 0,
+      registrationId: data.registration.id, guestId: data.guest.id, eventId: data.event.id,
+      encryptedContact: guest.encryptedContact, maskedContact: guest.maskedContact,
+      payload: {firstName: guest.firstName, eventTitle: data.event.get("title"),
+        eventStart: data.event.get("selectedDateTime"), eventLocation: data.event.get("location")},
+      createdAt: new Date(), nextAttemptAt: new Date()});
+  }
+  const refreshed = await manageData(db, session);
+  return managePage(res, nonce, refreshed, session, "Your registration has been cancelled.");
+}
+
 async function configFor(db) {
   const snapshot = await db.collection("AppConfig").doc("publicWeb").get();
   const data = snapshot.data() || {};
   return {
     publicPagesEnabled: data.publicPagesEnabled === true,
     inlineRegistrationEnabled: data.inlineRegistrationEnabled === true,
+    accountlessRegistrationEnabled: data.accountlessRegistrationEnabled === true,
     paidTicketCheckoutEnabled: data.paidTicketCheckoutEnabled === true,
     appCheckSiteKey: text(data.appCheckSiteKey),
     stripePublishableKey: text(data.stripePublishableKey),
   };
 }
 
-function browserConfig(flags, action) {
+function browserConfig(flags, action, event = null) {
   const actionName = typeof action === "string" ? action : action?.action;
   return {
     inlineRegistrationEnabled: flags.inlineRegistrationEnabled,
+    accountlessRegistrationEnabled: flags.accountlessRegistrationEnabled,
     paidTicketCheckoutEnabled: flags.paidTicketCheckoutEnabled,
     action: actionName || "view",
     ticketState: typeof action === "object" ? action.state : "view",
+    event: event ? {
+      title: text(event.title),
+      date: asDate(event.selectedDateTime)?.toISOString() || null,
+      location: event.locationType === "online" ? "Online event" :
+        text(event.locationName || event.location),
+      price: Math.max(0, Number(event.ticketPrice || 0)),
+    } : null,
     firebase: {
       apiKey: "AIzaSyA-PFyqhP5aEVE6XwGku3jMe91G3efMaVw",
       authDomain: "attendus.app",
@@ -357,7 +578,7 @@ async function renderEvent(db, req, res, id, flags, nonce) {
     image: data.imageUrl,
     body: eventBody(id, data, organization, flags),
     jsonLd: eventJsonLd(id, data, organization),
-    config: browserConfig(flags, action),
+    config: browserConfig(flags, action, data),
     nonce,
   });
   pageHeaders(res, nonce);
@@ -454,9 +675,10 @@ function createPublicWeb(admin) {
     maxInstances: 30,
     memory: "256MiB",
     timeoutSeconds: 20,
+    secrets: [CONTACT_HMAC_KEY, CONTACT_KMS_KEY_NAME],
   }, async (req, res) => {
     const nonce = crypto.randomBytes(18).toString("base64");
-    if (!["GET", "HEAD"].includes(req.method)) {
+    if (!["GET", "HEAD", "POST"].includes(req.method)) {
       res.set("Allow", "GET, HEAD");
       return res.status(405).send("Method not allowed");
     }
@@ -468,7 +690,21 @@ function createPublicWeb(admin) {
         return res.status(503).send("Public pages are not enabled.");
       }
       const path = req.path.replace(/\/+$/, "") || "/";
-      let match = path.match(/^\/event\/([A-Za-z0-9_-]+)$/);
+      let match = path.match(/^\/manage\/([A-Za-z0-9_-]+)$/);
+      if (match && req.method !== "POST") {
+        return exchangeManageToken(db, req, res, match[1], nonce);
+      }
+      if (path === "/manage" && req.method !== "POST") return renderManage(db, req, res, nonce);
+      if (path === "/manage/calendar.ics" && req.method !== "POST") {
+        return manageCalendar(db, req, res, nonce);
+      }
+      if (path === "/manage/ticket.svg" && req.method !== "POST") {
+        return manageTicketQr(db, req, res, nonce);
+      }
+      if (path === "/manage/action" && req.method === "POST") {
+        return manageAction(db, req, res, nonce);
+      }
+      match = path.match(/^\/event\/([A-Za-z0-9_-]+)$/);
       if (match) return renderEvent(db, req, res, match[1], flags, nonce);
       match = path.match(/^\/community\/([A-Za-z0-9_-]+)$/);
       if (match) return renderCommunity(db, req, res, match[1], flags, nonce);

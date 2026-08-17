@@ -4,9 +4,11 @@ const ROLES = Object.freeze(["super_admin", "support", "billing_admin", "analyst
 
 const ROLE_PERMISSIONS = Object.freeze({
   super_admin: ["*"],
-  support: ["accounts.read", "accounts.mutate", "audit.read"],
+  support: ["accounts.read", "accounts.mutate", "audit.read",
+    "communications.read", "communications.mutate"],
   billing_admin: ["accounts.read", "subscriptions.read", "subscriptions.mutate", "audit.read"],
-  analyst: ["analytics.read", "accounts.read", "subscriptions.read", "audit.read"],
+  analyst: ["analytics.read", "accounts.read", "subscriptions.read", "audit.read",
+    "communications.read"],
   moderator: ["moderation.read", "moderation.mutate", "events.read", "events.mutate", "organizations.read", "organizations.mutate", "audit.read"],
 });
 

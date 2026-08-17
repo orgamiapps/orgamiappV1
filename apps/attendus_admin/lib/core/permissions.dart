@@ -27,6 +27,12 @@ class AdminPermissions {
       isSuperAdmin || roles.contains(AdminRole.billingAdmin);
   bool get analyticsRead => isSuperAdmin || roles.contains(AdminRole.analyst);
   bool get moderation => isSuperAdmin || roles.contains(AdminRole.moderator);
+  bool get communicationsRead =>
+      isSuperAdmin ||
+      roles.contains(AdminRole.support) ||
+      roles.contains(AdminRole.analyst);
+  bool get communicationsMutate =>
+      isSuperAdmin || roles.contains(AdminRole.support);
   bool get roleManagement => isSuperAdmin;
   static AdminPermissions fromWire(Iterable<dynamic> values) =>
       AdminPermissions(

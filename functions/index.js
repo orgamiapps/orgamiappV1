@@ -35,6 +35,24 @@ const {
   createReleaseExpiredTicketReservations,
   createStripeWebhook,
 } = require("./public-web/checkout");
+const {
+  createCancelPublicRegistrationV1,
+  createAnonymizeExpiredGuestContacts,
+  createClaimPublicRegistrationV1,
+  createExportOrganizerEventRegistrationsV1,
+  createFollowPublicEventOrganizerV1,
+  createGetOrganizerEventRegistrationsV1,
+  createGetPublicRegistrationStatusV2,
+  createResendPublicRegistrationConfirmationV1,
+  createStartPublicRegistrationV2,
+  createUpdatePublicRegistrationContactV1,
+} = require("./public-web/accountless");
+const {
+  createDeliverOutboundMessage,
+  createRetryOutboundMessages,
+  createTwilioInbound,
+  createTwilioStatusCallback,
+} = require("./communications/delivery");
 
 const GOOGLE_PLACES_API_KEY = defineSecret("GOOGLE_PLACES_API_KEY");
 const placesRateWindows = new Map();
@@ -3867,6 +3885,25 @@ exports.getPublicTicketCheckoutStatusV1 =
   createGetPublicTicketCheckoutStatus(admin);
 exports.releaseExpiredTicketReservationsV1 =
   createReleaseExpiredTicketReservations(admin);
+exports.startPublicRegistrationV2 = createStartPublicRegistrationV2(admin);
+exports.getPublicRegistrationStatusV2 = createGetPublicRegistrationStatusV2(admin);
+exports.cancelPublicRegistrationV1 = createCancelPublicRegistrationV1(admin);
+exports.anonymizeExpiredGuestContactsV1 =
+  createAnonymizeExpiredGuestContacts(admin);
+exports.claimPublicRegistrationV1 = createClaimPublicRegistrationV1(admin);
+exports.resendPublicRegistrationConfirmationV1 =
+  createResendPublicRegistrationConfirmationV1(admin);
+exports.updatePublicRegistrationContactV1 =
+  createUpdatePublicRegistrationContactV1(admin);
+exports.getOrganizerEventRegistrationsV1 =
+  createGetOrganizerEventRegistrationsV1(admin);
+exports.exportOrganizerEventRegistrationsV1 =
+  createExportOrganizerEventRegistrationsV1(admin);
+exports.followPublicEventOrganizerV1 = createFollowPublicEventOrganizerV1(admin);
+exports.deliverOutboundMessageV1 = createDeliverOutboundMessage(admin);
+exports.retryOutboundMessagesV1 = createRetryOutboundMessages(admin);
+exports.twilioStatusCallbackV1 = createTwilioStatusCallback(admin);
+exports.twilioInboundV1 = createTwilioInbound(admin);
 
 const {
   createEndCheckInSession,

@@ -175,6 +175,34 @@
     ],
     "rewrites": [
       {
+        "source": "/manage/**",
+        "function": {
+          "functionId": "publicWeb",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/manage",
+        "function": {
+          "functionId": "publicWeb",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/communications/sms-status",
+        "function": {
+          "functionId": "twilioStatusCallbackV1",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/communications/sms-inbound",
+        "function": {
+          "functionId": "twilioInboundV1",
+          "region": "us-central1"
+        }
+      },
+      {
         "source": "/event/**",
         "function": {
           "functionId": "publicWeb",

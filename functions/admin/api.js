@@ -11,6 +11,8 @@ const {writeAudit} = require("./audit");
 const {PLAN_PRICE_ENV} = require("./constants");
 const {canAssignRoles} = require("./rbac");
 const {planForPrice, tierForPlan} = require("./subscriptions");
+const {CONTACT_KMS_KEY_NAME, decryptContact, encryptContact,
+  maskedContact, normalizeContact} = require("../public-web/accountless");
 
 const asIso = (value) => value && typeof value.toDate === "function" ? value.toDate().toISOString() : value instanceof Date ? value.toISOString() : value || null;
 const pageToken = (value) => value ? Buffer.from(String(value), "utf8").toString("base64url") : null;
@@ -229,6 +231,116 @@ function createAdminApi(adminSdk) {
     return {actor, data};
   }
 
+  async function communicationMessages(req) {
+    return listCollection(req, "OutboundMessages", "communications.read",
+        ["templateId", "channel", "status", "maskedContact", "attempts", "provider",
+          "providerStatus", "lastError", "createdAt", "acceptedAt"], "createdAt");
+  }
+
+  async function guestRegistrations(req) {
+    return listCollection(req, "GuestAttendees", "communications.read",
+        ["fullName", "contactType", "maskedContact", "deliveryStatus", "verificationStatus",
+          "claimedByUid", "createdAt", "retentionAt"], "createdAt");
+  }
+
+  async function guestRegistrationDetail(req, id) {
+    const actor = await authorize(req, adminSdk, db, "communications.read");
+    const snapshot = await db.collection("GuestAttendees").doc(id).get();
+    if (!snapshot.exists) fail(404, "GUEST_NOT_FOUND", "Guest registration was not found.");
+    const contact = await decryptContact(snapshot.get("encryptedContact"));
+    await writeAudit(db, adminSdk, {actor, action: "communications.guest_contact.view",
+      targetType: "guest", targetId: id, reason: "Administrative guest detail view",
+      requestId: req.requestId, metadata: {contactType: contact.type}});
+    return {actor, data: {...docDto(snapshot, ["fullName", "contactType", "maskedContact",
+      "deliveryStatus", "verificationStatus", "claimedByUid", "createdAt", "retentionAt"]),
+    contact: contact.display || contact.value}};
+  }
+
+  async function retryCommunication(req, id) {
+    const actor = await authorize(req, adminSdk, db, "communications.mutate");
+    return mutate(req, actor, {action: "communications.message.retry",
+      targetType: "outbound_message", targetId: id, destructive: false}, async () => {
+      const ref = db.collection("OutboundMessages").doc(id);
+      const before = await ref.get();
+      if (!before.exists) fail(404, "MESSAGE_NOT_FOUND", "Outbound message was not found.");
+      if (!["failed", "dead_letter", "retry"].includes(before.get("status"))) {
+        fail(409, "MESSAGE_NOT_RETRYABLE", "Only failed messages can be retried.");
+      }
+      const after = {status: "pending", nextAttemptAt: new Date(), lastError: null,
+        retriedBy: actor.uid, retriedAt: adminSdk.firestore.FieldValue.serverTimestamp()};
+      await ref.update(after);
+      return {before: before.data(), after, response: {status: "pending"}};
+    });
+  }
+
+  async function testCommunication(req) {
+    const actor = await authorize(req, adminSdk, db, "communications.mutate");
+    return mutate(req, actor, {action: "communications.test_send", targetType: "provider",
+      targetId: String(req.body.contactType || "unknown"), destructive: false}, async () => {
+      const contact = normalizeContact(req.body.contactType, req.body.contactValue);
+      const encryptedContact = await encryptContact(contact);
+      const ref = db.collection("OutboundMessages").doc(`admin_test_${crypto.randomUUID()}`);
+      const message = {id: ref.id, templateId: "guest_registration_confirmation",
+        channel: contact.type === "phone" ? "sms" : "email", status: "pending", attempts: 0,
+        encryptedContact, maskedContact: maskedContact(contact), isProviderTest: true,
+        payload: {firstName: "Attendus", eventTitle: "Attendus communications test",
+          eventStart: new Date(Date.now() + 86400000), eventLocation: "Attendus",
+          kind: "rsvp", manageUrl: "https://attendus.app"},
+        createdAt: adminSdk.firestore.FieldValue.serverTimestamp(), nextAttemptAt: new Date(),
+        requestedBy: actor.uid};
+      await ref.create(message);
+      return {before: null, after: {id: ref.id, channel: message.channel, status: "pending"},
+        response: {messageId: ref.id, status: "pending", maskedContact: message.maskedContact}};
+    });
+  }
+
+  async function communicationTemplates(req) {
+    const actor = await authorize(req, adminSdk, db, "communications.read");
+    const ids = ["guest_registration_confirmation", "guest_registration_cancelled"];
+    const snapshots = await db.getAll(...ids.map((id) => db.collection("CommunicationTemplates").doc(id)));
+    return {actor, data: snapshots.map((snapshot, index) => snapshot.exists ?
+      docDto(snapshot, ["name", "channel", "status", "version", "updatedBy", "updatedAt"]) :
+      {id: ids[index], name: ids[index].replaceAll("_", " "), channel: "email_sms",
+        status: "fallback", version: 0, updatedBy: null, updatedAt: null}), nextPageToken: null};
+  }
+
+  async function communicationTemplateDetail(req, id) {
+    const actor = await authorize(req, adminSdk, db, "communications.read");
+    const snapshot = await db.collection("CommunicationTemplates").doc(id).get();
+    return {actor, data: snapshot.exists ? {id: snapshot.id, ...snapshot.data()} :
+      {id, status: "fallback", version: 0,
+        subject: id.endsWith("cancelled") ? "Registration cancelled: {{eventTitle}}" :
+          "You're confirmed for {{eventTitle}}",
+        text: "Hi {{firstName}}, view your Attendus registration: {{manageUrl}}",
+        html: "<h1>{{eventTitle}}</h1><p>Hi {{firstName}},</p><p><a href=\"{{manageUrl}}\">View your registration</a></p>",
+        sms: "Attendus: {{eventTitle}}. {{manageUrl}} Help: {{supportEmail}}. Reply STOP to opt out."}};
+  }
+
+  async function publishTemplate(req, id) {
+    const actor = await authorize(req, adminSdk, db, "communications.mutate");
+    return mutate(req, actor, {action: "communications.template.publish",
+      targetType: "communication_template", targetId: id}, async () => {
+      const allowed = new Set(["guest_registration_confirmation", "guest_registration_cancelled"]);
+      if (!allowed.has(id)) fail(400, "INVALID_TEMPLATE", "Unsupported template identifier.");
+      const fields = ["subject", "text", "html", "sms"];
+      const content = Object.fromEntries(fields.map((field) => [field,
+        validate.string(req.body[field] || "", field, {min: field === "sms" ? 1 : 0,
+          max: field === "html" ? 20000 : 2000})]));
+      const unknown = [...String(content.html).matchAll(/\{\{([^}]+)\}\}/g)]
+          .map((match) => match[1]).filter((key) =>
+            !["firstName", "eventTitle", "manageUrl", "supportEmail"].includes(key));
+      if (unknown.length) fail(400, "INVALID_PLACEHOLDER", "Template contains an unknown placeholder.");
+      const ref = db.collection("CommunicationTemplates").doc(id);
+      const before = await ref.get();
+      const version = Number(before.get("version") || 0) + 1;
+      const after = {...content, id, name: id.replaceAll("_", " "), channel: "email_sms",
+        status: "published", version, updatedBy: actor.uid,
+        updatedAt: adminSdk.firestore.FieldValue.serverTimestamp()};
+      await ref.set(after);
+      return {before: before.data() || null, after, response: {status: "published", version}};
+    });
+  }
+
   async function moderationMutation(req, collection, id, action, permission) {
     const actor = await authorize(req, adminSdk, db, permission);
     return mutate(req, actor, {action: `${collection}.${action}`, targetType: collection, targetId: id}, async () => {
@@ -334,7 +446,8 @@ function createAdminApi(adminSdk) {
     });
   }
 
-  return onRequest({region: "us-central1", timeoutSeconds: 60, memory: "512MiB", cors: false}, async (req, res) => {
+  return onRequest({region: "us-central1", timeoutSeconds: 60, memory: "512MiB", cors: false,
+    secrets: [CONTACT_KMS_KEY_NAME]}, async (req, res) => {
     req.requestId = req.get("x-request-id") || crypto.randomUUID();
     res.set("x-request-id", req.requestId);
     res.set("cache-control", "no-store");
@@ -357,6 +470,22 @@ function createAdminApi(adminSdk) {
       else if (path === "/v1/metrics/daily" && req.method === "GET") result = await dailyMetrics(req);
       else if (path === "/v1/guest-funnel" && req.method === "GET") result = await guestFunnel(req);
       else if (path === "/v1/discovery/market-health" && req.method === "GET") result = await discoveryMarketHealth(req);
+      else if (path === "/v1/communications/messages" && req.method === "GET") result = await communicationMessages(req);
+      else if (/^\/v1\/communications\/messages\/[^/]+\/retry$/.test(path) && req.method === "POST") {
+        result = {data: await retryCommunication(req, path.split("/")[4])};
+      } else if (path === "/v1/communications/guests" && req.method === "GET") result = await guestRegistrations(req);
+      else if (path === "/v1/communications/test" && req.method === "POST") {
+        result = {data: await testCommunication(req)};
+      }
+      else if (/^\/v1\/communications\/guests\/[^/]+$/.test(path) && req.method === "GET") {
+        result = await guestRegistrationDetail(req, path.split("/")[4]);
+      } else if (path === "/v1/communications/templates" && req.method === "GET") result = await communicationTemplates(req);
+      else if (/^\/v1\/communications\/templates\/[^/]+$/.test(path) && req.method === "GET") {
+        result = await communicationTemplateDetail(req, path.split("/")[4]);
+      }
+      else if (/^\/v1\/communications\/templates\/[^/]+\/publish$/.test(path) && req.method === "POST") {
+        result = {data: await publishTemplate(req, path.split("/")[4])};
+      }
       else if (path === "/v1/reports" && req.method === "GET") result = await listCollection(req, "reports", "moderation.read", ["type", "reason", "details", "status", "reporterUid", "targetUid", "eventId", "createdAt"], "createdAt");
       else if (/^\/v1\/reports\/[^/]+\/(resolve|dismiss)$/.test(path) && req.method === "POST") {
         const parts = path.split("/"); result = {data: await moderationMutation(req, "reports", parts[3], parts[4], "moderation.mutate")};
