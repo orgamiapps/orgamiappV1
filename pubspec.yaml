@@ -95,7 +95,7 @@ dependencies:
   flutter_secure_storage: 10.3.1
   mobile_scanner: ^7.0.1
   calendar_view: 2.0.0
-  connectivity_plus: ^7.0.0
+  connectivity_plus: 7.0.0
   local_auth: ^3.0.2
   cryptography: ^2.9.0
   # Payment processing
