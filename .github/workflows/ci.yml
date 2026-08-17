@@ -149,7 +149,7 @@ jobs:
           -alias attendus-ci-release
           -keyalg RSA -keysize 3072 -validity 2
           -dname "CN=Attendus CI, OU=Engineering, O=Attendus, C=US"
-      - name: Build signed release APKs
+      - name: Build signed universal release APK
         env:
           GOOGLE_MAPS_ANDROID_API_KEY: ci-placeholder-key
           ATTENDUS_ANDROID_STORE_FILE: ${{ runner.temp }}/attendus-ci-release.jks
@@ -157,7 +157,7 @@ jobs:
           ATTENDUS_ANDROID_KEY_ALIAS: attendus-ci-release
           ATTENDUS_ANDROID_KEY_PASSWORD: ci-release-password
         run: >-
-          flutter build apk --release --split-per-abi
+          flutter build apk --release
           --dart-define=ATTENDUS_RELEASE_ID=${{ github.sha }}
       - name: Build signed release app bundle
         env:
@@ -175,8 +175,8 @@ jobs:
           set -euo pipefail
           apksigner="$(find "$ANDROID_SDK_ROOT/build-tools" -name apksigner -type f | sort -V | tail -1)"
           test -x "$apksigner"
-          mapfile -t apks < <(find build/app/outputs/flutter-apk -name 'app-*-release.apk' -type f | sort)
-          test "${#apks[@]}" -eq 2
+          mapfile -t apks < <(find build/app/outputs/flutter-apk -name 'app-release.apk' -type f | sort)
+          test "${#apks[@]}" -eq 1
           for apk in "${apks[@]}"; do
             output="$($apksigner verify --print-certs "$apk")"
             grep -q 'CN=Attendus CI' <<<"$output"
@@ -191,7 +191,7 @@ jobs:
         with:
           name: attendus-android-release-${{ github.sha }}
           path: |
-            build/app/outputs/flutter-apk/app-*-release.apk
+            build/app/outputs/flutter-apk/app-release.apk
             build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: error
 
