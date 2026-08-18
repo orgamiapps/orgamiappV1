@@ -2,29 +2,49 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {normalizeContact, normalizeName, maskedContact, ticketQrSvg, validateEvent} =
+const {decryptEmail, encryptEmail, maskedEmail, normalizeEmail, normalizeName,
+  normalizeRegistrationIdentity, ticketQrSvg, validateEvent} =
   require("../public-web/accountless");
 const {calendarInvite, fallbackTemplate} = require("../communications/delivery");
 
-test("normalizes email and U.S. phone contacts", () => {
-  assert.deepEqual(normalizeContact("email", " Person@Example.COM "), {
-    type: "email", value: "person@example.com", display: "person@example.com",
-  });
-  assert.deepEqual(normalizeContact("phone", "(239) 555-0123"), {
-    type: "phone", value: "+12395550123", display: "(239) 555-0123",
-  });
-  assert.equal(maskedContact(normalizeContact("phone", "+1 239 555 0123")),
-      "(***) ***-0123");
+test("normalizes and masks guest email", () => {
+  assert.equal(normalizeEmail(" Person@Example.COM "), "person@example.com");
+  assert.equal(maskedEmail("person@example.com"), "p***@example.com");
 });
 
-test("rejects non-U.S. and malformed contacts", () => {
-  assert.throws(() => normalizeContact("phone", "+44 20 7946 0958"), /U.S. mobile/);
-  assert.throws(() => normalizeContact("email", "missing-at.example"), /email/);
+test("rejects malformed email", () => {
+  assert.throws(() => normalizeEmail("missing-at.example"), /email/);
 });
 
-test("requires a real first and last name value", () => {
-  assert.equal(normalizeName("  María-José  ", "first name"), "María-José");
-  assert.throws(() => normalizeName("<script>", "first name"), /first name/);
+test("normalizes a single Unicode full name", () => {
+  assert.equal(normalizeName("  María-José   O’Neil  "), "María-José O’Neil");
+  assert.throws(() => normalizeName("<script>"), /full name/);
+});
+
+test("registration identity accepts only full name and email", () => {
+  assert.deepEqual(normalizeRegistrationIdentity({
+    fullName: "  Taylor   Rivera ", email: " Taylor@Example.com ",
+  }), {fullName: "Taylor Rivera", greetingName: "Taylor", email: "taylor@example.com"});
+  assert.throws(() => normalizeRegistrationIdentity({fullName: "Taylor Rivera",
+    email: "taylor@example.com", contactType: "phone"}), /fullName and email/);
+  assert.throws(() => normalizeRegistrationIdentity({firstName: "Taylor",
+    lastName: "Rivera", email: "taylor@example.com"}), /fullName and email/);
+});
+
+test("encrypts and decrypts email in emulator mode", async () => {
+  const previousEmulator = process.env.FUNCTIONS_EMULATOR;
+  const previousKey = process.env.GUEST_CONTACT_KMS_KEY_NAME;
+  process.env.FUNCTIONS_EMULATOR = "true";
+  process.env.GUEST_CONTACT_KMS_KEY_NAME = "emulator";
+  try {
+    const encrypted = await encryptEmail("person@example.com");
+    assert.equal(await decryptEmail(encrypted), "person@example.com");
+  } finally {
+    if (previousEmulator === undefined) delete process.env.FUNCTIONS_EMULATOR;
+    else process.env.FUNCTIONS_EMULATOR = previousEmulator;
+    if (previousKey === undefined) delete process.env.GUEST_CONTACT_KMS_KEY_NAME;
+    else process.env.GUEST_CONTACT_KMS_KEY_NAME = previousKey;
+  }
 });
 
 test("event eligibility is server authoritative", () => {
@@ -47,14 +67,13 @@ test("calendar invitation uses a stable registration UID", () => {
   assert.match(invite, /LOCATION:Main Hall\\; Suite 2/);
 });
 
-test("fallback messages identify Attendus and provide opt-out copy", () => {
+test("fallback email identifies Attendus", () => {
   const template = fallbackTemplate({registrationId: "r1", payload: {
     firstName: "Taylor", eventTitle: "Community Night", kind: "rsvp",
     manageUrl: "https://attendus.app/manage/token",
   }});
   assert.match(template.subject, /Community Night/);
-  assert.match(template.sms, /^Attendus:/);
-  assert.match(template.sms, /Reply STOP/);
+  assert.deepEqual(Object.keys(template).sort(), ["html", "subject", "text"]);
   assert.match(template.html, /support@attendus\.app/);
 });
 

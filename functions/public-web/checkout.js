@@ -424,8 +424,7 @@ async function fulfillPayment(admin, stripeEvent) {
       customerUid: reservation.customerUid,
       guestId: reservation.guestId || null,
       identityType: reservation.identityType || "account",
-      contactType: reservation.contactType || null,
-      contactRef: reservation.guestId ? `GuestAttendees/${reservation.guestId}` : null,
+      emailRef: reservation.guestId ? `GuestAttendees/${reservation.guestId}` : null,
       attendanceDateTime: admin.firestore.FieldValue.serverTimestamp(),
       answers: [],
       isAnonymous: false,
@@ -451,13 +450,13 @@ async function fulfillPayment(admin, stripeEvent) {
       transaction.set(db.collection("OutboundMessages")
           .doc(`confirmation_${registrationId}`), {
         templateId: "guest_registration_confirmation",
-        channel: reservation.contactType === "phone" ? "sms" : "email",
+        channel: "email",
         status: "pending",
         attempts: 0,
         registrationId,
         guestId: reservation.guestId,
         eventId: reservation.eventId,
-        encryptedContact: reservation.encryptedContact,
+        encryptedEmail: reservation.encryptedEmail,
         payload: {
           firstName: String(reservation.customerName || "Attendee").split(" ")[0],
           eventTitle: reservation.eventTitle,
@@ -474,8 +473,8 @@ async function fulfillPayment(admin, stripeEvent) {
         status: "confirmed", ticketId, registrationId,
         completedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, {merge: true});
-      transaction.set(db.collection("GuestEventContactClaims")
-          .doc(reservation.contactClaimId || `unlinked_${reservation.guestId}`), {
+      transaction.set(db.collection("GuestEventEmailClaims")
+          .doc(reservation.emailClaimId || `unlinked_${reservation.guestId}`), {
         status: "confirmed", ticketId,
         completedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, {merge: true});

@@ -11,8 +11,8 @@ const {writeAudit} = require("./audit");
 const {PLAN_PRICE_ENV} = require("./constants");
 const {canAssignRoles} = require("./rbac");
 const {planForPrice, tierForPlan} = require("./subscriptions");
-const {CONTACT_KMS_KEY_NAME, decryptContact, encryptContact,
-  maskedContact, normalizeContact} = require("../public-web/accountless");
+const {CONTACT_KMS_KEY_NAME, decryptEmail, encryptEmail,
+  maskedEmail, normalizeEmail} = require("../public-web/accountless");
 
 const asIso = (value) => value && typeof value.toDate === "function" ? value.toDate().toISOString() : value instanceof Date ? value.toISOString() : value || null;
 const pageToken = (value) => value ? Buffer.from(String(value), "utf8").toString("base64url") : null;
@@ -233,13 +233,13 @@ function createAdminApi(adminSdk) {
 
   async function communicationMessages(req) {
     return listCollection(req, "OutboundMessages", "communications.read",
-        ["templateId", "channel", "status", "maskedContact", "attempts", "provider",
+        ["templateId", "channel", "status", "maskedEmail", "attempts", "provider",
           "providerStatus", "lastError", "createdAt", "acceptedAt"], "createdAt");
   }
 
   async function guestRegistrations(req) {
     return listCollection(req, "GuestAttendees", "communications.read",
-        ["fullName", "contactType", "maskedContact", "deliveryStatus", "verificationStatus",
+        ["fullName", "maskedEmail", "deliveryStatus", "verificationStatus",
           "claimedByUid", "createdAt", "retentionAt"], "createdAt");
   }
 
@@ -247,13 +247,14 @@ function createAdminApi(adminSdk) {
     const actor = await authorize(req, adminSdk, db, "communications.read");
     const snapshot = await db.collection("GuestAttendees").doc(id).get();
     if (!snapshot.exists) fail(404, "GUEST_NOT_FOUND", "Guest registration was not found.");
-    const contact = await decryptContact(snapshot.get("encryptedContact"));
-    await writeAudit(db, adminSdk, {actor, action: "communications.guest_contact.view",
+    const encryptedEmail = snapshot.get("encryptedEmail");
+    const email = encryptedEmail ? await decryptEmail(encryptedEmail) : null;
+    await writeAudit(db, adminSdk, {actor, action: "communications.guest_email.view",
       targetType: "guest", targetId: id, reason: "Administrative guest detail view",
-      requestId: req.requestId, metadata: {contactType: contact.type}});
-    return {actor, data: {...docDto(snapshot, ["fullName", "contactType", "maskedContact",
+      requestId: req.requestId, metadata: {channel: "email"}});
+    return {actor, data: {...docDto(snapshot, ["fullName", "maskedEmail",
       "deliveryStatus", "verificationStatus", "claimedByUid", "createdAt", "retentionAt"]),
-    contact: contact.display || contact.value}};
+    email}};
   }
 
   async function retryCommunication(req, id) {
@@ -276,13 +277,13 @@ function createAdminApi(adminSdk) {
   async function testCommunication(req) {
     const actor = await authorize(req, adminSdk, db, "communications.mutate");
     return mutate(req, actor, {action: "communications.test_send", targetType: "provider",
-      targetId: String(req.body.contactType || "unknown"), destructive: false}, async () => {
-      const contact = normalizeContact(req.body.contactType, req.body.contactValue);
-      const encryptedContact = await encryptContact(contact);
+      targetId: "email", destructive: false}, async () => {
+      const email = normalizeEmail(req.body.email);
+      const encryptedEmail = await encryptEmail(email);
       const ref = db.collection("OutboundMessages").doc(`admin_test_${crypto.randomUUID()}`);
       const message = {id: ref.id, templateId: "guest_registration_confirmation",
-        channel: contact.type === "phone" ? "sms" : "email", status: "pending", attempts: 0,
-        encryptedContact, maskedContact: maskedContact(contact), isProviderTest: true,
+        channel: "email", status: "pending", attempts: 0,
+        encryptedEmail, maskedEmail: maskedEmail(email), isProviderTest: true,
         payload: {firstName: "Attendus", eventTitle: "Attendus communications test",
           eventStart: new Date(Date.now() + 86400000), eventLocation: "Attendus",
           kind: "rsvp", manageUrl: "https://attendus.app"},
@@ -290,7 +291,7 @@ function createAdminApi(adminSdk) {
         requestedBy: actor.uid};
       await ref.create(message);
       return {before: null, after: {id: ref.id, channel: message.channel, status: "pending"},
-        response: {messageId: ref.id, status: "pending", maskedContact: message.maskedContact}};
+        response: {messageId: ref.id, status: "pending", maskedEmail: message.maskedEmail}};
     });
   }
 
@@ -300,7 +301,7 @@ function createAdminApi(adminSdk) {
     const snapshots = await db.getAll(...ids.map((id) => db.collection("CommunicationTemplates").doc(id)));
     return {actor, data: snapshots.map((snapshot, index) => snapshot.exists ?
       docDto(snapshot, ["name", "channel", "status", "version", "updatedBy", "updatedAt"]) :
-      {id: ids[index], name: ids[index].replaceAll("_", " "), channel: "email_sms",
+      {id: ids[index], name: ids[index].replaceAll("_", " "), channel: "email",
         status: "fallback", version: 0, updatedBy: null, updatedAt: null}), nextPageToken: null};
   }
 
@@ -312,8 +313,7 @@ function createAdminApi(adminSdk) {
         subject: id.endsWith("cancelled") ? "Registration cancelled: {{eventTitle}}" :
           "You're confirmed for {{eventTitle}}",
         text: "Hi {{firstName}}, view your Attendus registration: {{manageUrl}}",
-        html: "<h1>{{eventTitle}}</h1><p>Hi {{firstName}},</p><p><a href=\"{{manageUrl}}\">View your registration</a></p>",
-        sms: "Attendus: {{eventTitle}}. {{manageUrl}} Help: {{supportEmail}}. Reply STOP to opt out."}};
+        html: "<h1>{{eventTitle}}</h1><p>Hi {{firstName}},</p><p><a href=\"{{manageUrl}}\">View your registration</a></p>"}};
   }
 
   async function publishTemplate(req, id) {
@@ -322,9 +322,9 @@ function createAdminApi(adminSdk) {
       targetType: "communication_template", targetId: id}, async () => {
       const allowed = new Set(["guest_registration_confirmation", "guest_registration_cancelled"]);
       if (!allowed.has(id)) fail(400, "INVALID_TEMPLATE", "Unsupported template identifier.");
-      const fields = ["subject", "text", "html", "sms"];
+      const fields = ["subject", "text", "html"];
       const content = Object.fromEntries(fields.map((field) => [field,
-        validate.string(req.body[field] || "", field, {min: field === "sms" ? 1 : 0,
+        validate.string(req.body[field] || "", field, {min: 0,
           max: field === "html" ? 20000 : 2000})]));
       const unknown = [...String(content.html).matchAll(/\{\{([^}]+)\}\}/g)]
           .map((match) => match[1]).filter((key) =>
@@ -333,7 +333,7 @@ function createAdminApi(adminSdk) {
       const ref = db.collection("CommunicationTemplates").doc(id);
       const before = await ref.get();
       const version = Number(before.get("version") || 0) + 1;
-      const after = {...content, id, name: id.replaceAll("_", " "), channel: "email_sms",
+      const after = {...content, id, name: id.replaceAll("_", " "), channel: "email",
         status: "published", version, updatedBy: actor.uid,
         updatedAt: adminSdk.firestore.FieldValue.serverTimestamp()};
       await ref.set(after);

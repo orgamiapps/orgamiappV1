@@ -1,6 +1,5 @@
 "use strict";
 
-const {HttpsError} = require("firebase-functions/v2/https");
 const {
   enforceRateLimit,
   requireAdminCallable,
@@ -12,7 +11,6 @@ const {
 } = require("../security/callable");
 
 const NOTIFICATION_ROLES = ["super_admin", "support", "moderator"];
-const SMS_ROLES = ["super_admin", "support"];
 
 async function audit(db, admin, entry) {
   await db.collection("admin_audit_logs").add({
@@ -21,7 +19,7 @@ async function audit(db, admin, entry) {
   });
 }
 
-function createAdminDispatchHandlers({admin, twilioClient, twilioFromNumber, logger}) {
+function createAdminDispatchHandlers({admin}) {
   const db = admin.firestore();
 
   async function sendCustomNotifications(req) {
@@ -106,67 +104,7 @@ function createAdminDispatchHandlers({admin, twilioClient, twilioFromNumber, log
     return result;
   }
 
-  async function sendBulkSms(req) {
-    const actor = await requireAdminCallable(req, db, SMS_ROLES);
-    const operation = requireConfirmedOperation(req.data);
-    const phoneNumbers = requireStringArray(req.data?.phoneNumbers, "Phone numbers", {
-      max: 50,
-      pattern: /^\+[1-9][0-9]{7,14}$/,
-    });
-    const message = requireString(req.data?.message, "Message", {max: 1000});
-    if (!twilioClient || !twilioFromNumber) {
-      throw new HttpsError("failed-precondition", "SMS delivery is not configured.");
-    }
-
-    await enforceRateLimit(db, {
-      uid: actor.uid,
-      operation: "sendBulkSms",
-      limit: 2,
-    });
-    const reservation = await reserveIdempotencyKey(db, {
-      operation: "sendBulkSms",
-      uid: actor.uid,
-      key: operation.idempotencyKey,
-    });
-    if (reservation.result) return reservation.result;
-
-    let sent = 0;
-    const failures = [];
-    for (let offset = 0; offset < phoneNumbers.length; offset += 10) {
-      const group = phoneNumbers.slice(offset, offset + 10);
-      const results = await Promise.allSettled(group.map((to) =>
-        twilioClient.messages.create({to, from: twilioFromNumber, body: message})));
-      results.forEach((result, index) => {
-        if (result.status === "fulfilled") sent += 1;
-        else failures.push({to: group[index], error: String(result.reason?.message || result.reason)});
-      });
-    }
-    const result = {
-      status: "ok",
-      recipientCount: phoneNumbers.length,
-      sent,
-      failed: failures.length,
-    };
-    await reservation.ref.set({
-      status: "completed",
-      result,
-      completedAt: admin.firestore.Timestamp.now(),
-    }, {merge: true});
-    await audit(db, admin, {
-      action: "notifications.send_sms",
-      actorUid: actor.uid,
-      actorRoles: actor.roles,
-      reason: operation.reason,
-      idempotencyKey: operation.idempotencyKey,
-      recipientCount: phoneNumbers.length,
-      failureSample: failures.slice(0, 10),
-      result,
-    });
-    logger.info("Administrative SMS dispatch completed", result);
-    return result;
-  }
-
-  return {sendBulkSms, sendCustomNotifications};
+  return {sendCustomNotifications};
 }
 
 module.exports = {createAdminDispatchHandlers};

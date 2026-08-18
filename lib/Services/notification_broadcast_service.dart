@@ -24,21 +24,6 @@ class NotificationBroadcastService {
     return Map<String, dynamic>.from(result.data as Map);
   }
 
-  // Send SMS via callable Twilio backend (safe no-op if not configured)
-  static Future<Map<String, dynamic>> sendSms({
-    required List<String> phoneNumbers,
-    required String message,
-    Map<String, dynamic>? meta,
-  }) async {
-    final callable = _functions.httpsCallable('sendBulkSms');
-    final result = await callable.call({
-      'phoneNumbers': phoneNumbers,
-      'message': message,
-      'meta': meta ?? {},
-    });
-    return Map<String, dynamic>.from(result.data as Map);
-  }
-
   // Fetch notification history
   static Future<List<Map<String, dynamic>>> getHistory({
     String? eventId,

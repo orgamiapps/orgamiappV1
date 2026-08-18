@@ -63,35 +63,15 @@
   function registrationForm(node, action, context) {
     const content = node.querySelector(".dialog-content");
     const paid = config.ticketState === "paid_ticket";
-    content.innerHTML = `${eventSummary()}<form class="registration-form"><div class="name-grid"><label>First name <input name="firstName" autocomplete="given-name" maxlength="80" required></label><label>Last name <input name="lastName" autocomplete="family-name" maxlength="80" required></label></div><fieldset><legend>Where should we send your confirmation?</legend><div class="segmented"><label><input type="radio" name="contactType" value="email" checked> Email</label><label><input type="radio" name="contactType" value="phone"> Text</label></div></fieldset><label class="contact-label"><span>Email address</span><input name="contact" type="email" autocomplete="email" required></label><p class="sms-consent" hidden>By continuing, you agree to receive transactional texts from Attendus about this registration. Message and data rates may apply. Reply STOP to opt out or HELP for help.</p><div class="checkout-terms"><span>${paid ? `Ticket: $${Number(config.event?.price || 0).toFixed(2)} USD` : action === "rsvp" ? "RSVP · Free" : "Ticket · Free"}</span><small>Event questions are completed separately during event check-in.</small></div><button class="cta continue" type="submit">${paid ? "Continue to payment" : action === "rsvp" ? "Confirm RSVP" : "Get ticket"}</button></form>`;
+    content.innerHTML = `${eventSummary()}<form class="registration-form"><label>Full name <input name="fullName" autocomplete="name" maxlength="160" required></label><label>Email address <input name="email" type="email" autocomplete="email" maxlength="254" required></label><div class="checkout-terms"><span>${paid ? `Ticket: $${Number(config.event?.price || 0).toFixed(2)} USD` : action === "rsvp" ? "RSVP · Free" : "Ticket · Free"}</span><small>Event questions are completed separately during event check-in.</small></div><button class="cta continue" type="submit">${paid ? "Continue to payment" : action === "rsvp" ? "Confirm RSVP" : "Get ticket"}</button></form>`;
     content.querySelector(".checkout-summary strong").textContent = config.event?.title || "Event";
     content.querySelector(".summary-date").textContent = config.event?.date ?
       new Intl.DateTimeFormat("en-US", {dateStyle: "medium", timeStyle: "short"})
           .format(new Date(config.event.date)) : "";
     content.querySelector(".summary-location").textContent = config.event?.location || "";
-    const contact = content.querySelector("[name=contact]");
-    for (const radio of content.querySelectorAll("[name=contactType]")) {
-      radio.addEventListener("change", () => {
-        const phone = radio.value === "phone" && radio.checked;
-        if (!radio.checked) return;
-        contact.type = phone ? "tel" : "email";
-        contact.autocomplete = phone ? "tel-national" : "email";
-        contact.placeholder = phone ? "(555) 555-0123" : "name@example.com";
-        content.querySelector(".contact-label span").textContent = phone ? "U.S. mobile number" : "Email address";
-        content.querySelector(".sms-consent").hidden = !phone;
-      });
-    }
     const user = context.auth.currentUser;
-    const names = String(user?.displayName || "").trim().split(/\s+/);
-    if (names.length > 1) {
-      content.querySelector("[name=firstName]").value = names.shift();
-      content.querySelector("[name=lastName]").value = names.join(" ");
-    }
-    if (user?.email) contact.value = user.email;
-    if (user?.phoneNumber) {
-      const phone = content.querySelector('[name=contactType][value="phone"]');
-      phone.checked = true; phone.dispatchEvent(new Event("change")); contact.value = user.phoneNumber;
-    }
+    if (user?.displayName) content.querySelector("[name=fullName]").value = user.displayName;
+    if (user?.email) content.querySelector("[name=email]").value = user.email;
     return content.querySelector("form");
   }
   function loadStripe() {
@@ -126,7 +106,7 @@
     }
     throw new Error("Payment is processing. Your confirmation will arrive shortly.");
   }
-  async function upgradeAccount(node, context, contactType, contactValue, fullName,
+  async function upgradeAccount(node, context, email, fullName,
       registrationId, claimToken) {
     const area = node.querySelector(".account-upgrade");
     area.hidden = false;
@@ -155,71 +135,32 @@
       } catch (error) { dialogStatus(node, error.message || "Account could not be linked.", true); }
     });
     const form = area.querySelector(".credential-upgrade");
-    form.querySelector(".upgrade-contact").textContent = contactType === "phone" ?
-      "Create with this phone" : "Create with this email";
-    if (contactType === "phone") {
-      form.querySelector("label").hidden = true;
-      const recaptcha = document.createElement("div"); recaptcha.id = "phone-recaptcha";
-      form.prepend(recaptcha);
-    }
+    form.querySelector(".upgrade-contact").textContent = "Create with this email";
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       try {
-        if (contactType === "email") {
-          const password = form.querySelector("[name=password]").value;
-          if (password.length < 8) throw new Error("Use a password of at least 8 characters.");
-          const credential = context.authModule.EmailAuthProvider.credential(contactValue, password);
-          let linked;
-          try {
-            linked = await context.authModule.linkWithCredential(context.auth.currentUser, credential);
-          } catch (error) {
-            if (error.code !== "auth/email-already-in-use" &&
-                error.code !== "auth/credential-already-in-use") throw error;
-            linked = await context.authModule.signInWithEmailAndPassword(context.auth,
-                contactValue, password);
-          }
-          await context.authModule.updateProfile(linked.user, {displayName: fullName});
-          if (registrationId) await call("claimPublicRegistrationV1", {registrationId, claimToken}, context);
-          dialogStatus(node, "Account created. Your ticket is saved.");
-          accountReady();
-        } else {
-          dialogStatus(node, "Sending a verification code…");
-          const verifier = new context.authModule.RecaptchaVerifier(context.auth, "phone-recaptcha",
-              {size: "invisible"});
-          const provider = new context.authModule.PhoneAuthProvider(context.auth);
-          const verificationId = await provider.verifyPhoneNumber(contactValue, verifier);
-          const codeLabel = document.createElement("label");
-          codeLabel.className = "phone-code";
-          codeLabel.innerHTML = "Verification code <input inputmode=\"numeric\" autocomplete=\"one-time-code\" pattern=\"[0-9]{6}\" maxlength=\"6\" required>";
-          const verify = document.createElement("button");
-          verify.type = "button"; verify.className = "secondary-button";
-          verify.textContent = "Verify phone";
-          form.querySelector("[type=submit]").hidden = true;
-          form.append(codeLabel, verify);
-          const codeInput = codeLabel.querySelector("input"); codeInput.focus();
-          const code = await new Promise((resolve) => verify.addEventListener("click", () => {
-            if (!codeInput.reportValidity()) return;
-            verify.disabled = true; resolve(codeInput.value.trim());
-          }, {once: true}));
-          const credential = context.authModule.PhoneAuthProvider.credential(verificationId, code.trim());
-          let linked;
-          try {
-            linked = await context.authModule.linkWithCredential(context.auth.currentUser, credential);
-          } catch (error) {
-            if (error.code !== "auth/credential-already-in-use") throw error;
-            linked = await context.authModule.signInWithCredential(context.auth, credential);
-          }
-          await context.authModule.updateProfile(linked.user, {displayName: fullName});
-          if (registrationId) await call("claimPublicRegistrationV1", {registrationId, claimToken}, context);
-          dialogStatus(node, "Account created. Your ticket is saved.");
-          accountReady();
+        const password = form.querySelector("[name=password]").value;
+        if (password.length < 8) throw new Error("Use a password of at least 8 characters.");
+        const credential = context.authModule.EmailAuthProvider.credential(email, password);
+        let linked;
+        try {
+          linked = await context.authModule.linkWithCredential(context.auth.currentUser, credential);
+        } catch (error) {
+          if (error.code !== "auth/email-already-in-use" &&
+              error.code !== "auth/credential-already-in-use") throw error;
+          linked = await context.authModule.signInWithEmailAndPassword(context.auth,
+              email, password);
         }
+        await context.authModule.updateProfile(linked.user, {displayName: fullName});
+        if (registrationId) await call("claimPublicRegistrationV1", {registrationId, claimToken}, context);
+        dialogStatus(node, "Account created. Your ticket is saved.");
+        accountReady();
       } catch (error) { dialogStatus(node, error.message || "Account could not be created.", true); }
     });
   }
-  function showConfirmation(node, result, contactType, contactValue, fullName, context) {
+  function showConfirmation(node, result, email, fullName, context) {
     const content = node.querySelector(".dialog-content");
-    content.innerHTML = `<div class="confirmation"><div class="success-mark" aria-hidden="true">✓</div><h3>You're confirmed</h3><p>Your ${result.kind === "rsvp" ? "RSVP" : "ticket"} is ready. We’re sending a secure confirmation to your ${contactType === "phone" ? "mobile number" : "email"}.</p>${result.ticketId ? `<div class="ticket-reference"><span>Ticket</span><strong>${result.ticketCode || result.ticketId.slice(-10).toUpperCase()}</strong>${result.ticketQrSvg ? `<div class="ticket-qr" role="img" aria-label="QR ticket code ${result.ticketCode}">${result.ticketQrSvg}</div>` : ""}</div>` : ""}<div class="confirmation-actions">${result.manageUrl ? `<a class="secondary-button" href="${result.manageUrl}">View or print ticket</a>` : ""}<button class="secondary-button add-calendar" type="button">Add to calendar</button></div><section class="account-upgrade" hidden><h3>Save your tickets</h3><p>Create an optional account to manage tickets and follow organizers.</p><button class="secondary-button google-upgrade" type="button">Continue with Google</button><form class="credential-upgrade"><label>Password <input name="password" type="password" minlength="8" autocomplete="new-password"></label><button class="secondary-button upgrade-contact" type="submit"></button></form><button class="secondary-button follow-organizer" type="button" hidden>Follow organizer</button></section><button class="link-button show-account" type="button">Create an account (optional)</button></div>`;
+    content.innerHTML = `<div class="confirmation"><div class="success-mark" aria-hidden="true">✓</div><h3>You're confirmed</h3><p>Your ${result.kind === "rsvp" ? "RSVP" : "ticket"} is ready. We’re sending a secure confirmation to your email.</p><p class="delivery-state" role="status">Email delivery: ${result.deliveryStatus === "pending" ? "sending" : result.deliveryStatus || "sending"}</p>${result.ticketId ? `<div class="ticket-reference"><span>Ticket</span><strong>${result.ticketCode || result.ticketId.slice(-10).toUpperCase()}</strong>${result.ticketQrSvg ? `<div class="ticket-qr" role="img" aria-label="QR ticket code ${result.ticketCode}">${result.ticketQrSvg}</div>` : ""}</div>` : ""}<div class="confirmation-actions">${result.manageUrl ? `<a class="secondary-button" href="${result.manageUrl}">View or print ticket</a>` : ""}<button class="secondary-button add-calendar" type="button">Add to calendar</button></div><section class="account-upgrade" hidden><h3>Save your tickets</h3><p>Create an optional account to manage tickets and follow organizers.</p><button class="secondary-button google-upgrade" type="button">Continue with Google</button><form class="credential-upgrade"><label>Password <input name="password" type="password" minlength="8" autocomplete="new-password"></label><button class="secondary-button upgrade-contact" type="submit"></button></form><button class="secondary-button follow-organizer" type="button" hidden>Follow organizer</button></section><button class="link-button show-account" type="button">Create an account (optional)</button></div>`;
     content.querySelector(".add-calendar").addEventListener("click", () => {
       const event = config.event || {}; const start = new Date(event.date);
       const end = new Date(start.getTime() + 2 * 3600000);
@@ -227,7 +168,7 @@
       location.href = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title || "Event")}&dates=${compact(start)}/${compact(end)}&location=${encodeURIComponent(event.location || "")}`;
     });
     content.querySelector(".show-account").addEventListener("click", (event) => {
-      event.currentTarget.hidden = true; upgradeAccount(node, context, contactType, contactValue,
+      event.currentTarget.hidden = true; upgradeAccount(node, context, email,
           fullName, result.registrationId, result.claimToken);
     }, {once: true});
     if (context.auth.currentUser?.isAnonymous === false) {
@@ -245,22 +186,18 @@
         event.preventDefault();
         if (!form.reportValidity()) return;
         const data = new FormData(form);
-        const firstName = String(data.get("firstName") || "").trim();
-        const lastName = String(data.get("lastName") || "").trim();
-        const contactType = String(data.get("contactType") || "email");
-        const contactValue = String(data.get("contact") || "").trim();
+        const fullName = String(data.get("fullName") || "").trim();
+        const email = String(data.get("email") || "").trim();
         form.querySelector("button").disabled = true; dialogStatus(node, "Securing your place…");
         try {
-          const result = await call("startPublicRegistrationV2", {eventId, firstName, lastName,
-            contactType, contactValue, idempotencyKey: idempotencyKey("registration")}, context);
+          const result = await call("startPublicRegistrationV2", {eventId, fullName, email,
+            idempotencyKey: idempotencyKey("registration")}, context);
           if (result.status === "confirmation_pending") {
-            showConfirmation(node, result, contactType, contactValue,
-                `${firstName} ${lastName}`, context); resolve(); return;
+            showConfirmation(node, result, email, fullName, context); resolve(); return;
           }
           const completed = result.status === "payment_pending" ?
             {...result, ...await payment(node, result, context)} : result;
-          showConfirmation(node, completed, contactType, contactValue,
-              `${firstName} ${lastName}`, context); resolve();
+          showConfirmation(node, completed, email, fullName, context); resolve();
         } catch (error) {
           form.querySelector("button").disabled = false;
           dialogStatus(node, error.message || "Registration could not be completed.", true);

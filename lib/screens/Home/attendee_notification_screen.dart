@@ -28,9 +28,6 @@ class _AttendeeNotificationScreenState extends State<AttendeeNotificationScreen>
   String _messageText = '';
   String _titleText = '';
 
-  // Delivery method
-  DeliveryMethod _deliveryMethod = DeliveryMethod.inApp;
-
   // Notification history
   List<Map<String, dynamic>> _notificationHistory = [];
   bool _isLoadingHistory = false;
@@ -84,7 +81,7 @@ class _AttendeeNotificationScreenState extends State<AttendeeNotificationScreen>
     });
 
     try {
-      // Fetch combined history (in-app and SMS)
+      // Fetch in-app notification history.
       final history = await NotificationBroadcastService.getHistory();
       if (!mounted) return;
       setState(() {
@@ -124,18 +121,7 @@ class _AttendeeNotificationScreenState extends State<AttendeeNotificationScreen>
 
   void _selectAllAttendees() {
     setState(() {
-      if (_deliveryMethod == DeliveryMethod.sms) {
-        _selectedAttendeeUids = _filteredAttendees
-            .where(
-              (attendee) =>
-                  attendee.phoneNumber != null &&
-                  attendee.phoneNumber!.isNotEmpty,
-            )
-            .map((attendee) => attendee.uid)
-            .toList();
-      } else {
-        _selectedAttendeeUids = _filteredAttendees.map((a) => a.uid).toList();
-      }
+      _selectedAttendeeUids = _filteredAttendees.map((a) => a.uid).toList();
     });
   }
 
@@ -168,31 +154,14 @@ class _AttendeeNotificationScreenState extends State<AttendeeNotificationScreen>
     });
 
     try {
-      if (_deliveryMethod == DeliveryMethod.inApp) {
-        final userIds = selectedAttendees.map((a) => a.uid).toList();
-        await NotificationBroadcastService.sendInApp(
-          userIds: userIds,
-          title: title,
-          body: _messageText.trim(),
-          type: 'broadcast',
-          data: {},
-        );
-      } else {
-        // SMS: filter to those with phone numbers
-        final phoneNumbers = selectedAttendees
-            .map((a) => a.phoneNumber?.trim())
-            .where((p) => p != null && p.isNotEmpty)
-            .map((p) => p!)
-            .toList();
-        if (phoneNumbers.isEmpty) {
-          throw Exception('No valid phone numbers selected');
-        }
-        await NotificationBroadcastService.sendSms(
-          phoneNumbers: phoneNumbers,
-          message: _messageText.trim(),
-          meta: {},
-        );
-      }
+      final userIds = selectedAttendees.map((a) => a.uid).toList();
+      await NotificationBroadcastService.sendInApp(
+        userIds: userIds,
+        title: title,
+        body: _messageText.trim(),
+        type: 'broadcast',
+        data: {},
+      );
 
       setState(() {
         _isSending = false;
@@ -222,8 +191,7 @@ class _AttendeeNotificationScreenState extends State<AttendeeNotificationScreen>
             AppAppBarView.modernHeader(
               context: context,
               title: 'Send Notifications',
-              subtitle:
-                  'Send SMS or in-app notifications to previous attendees',
+              subtitle: 'Send in-app notifications to previous attendees',
             ),
 
             // Tab Bar
@@ -300,86 +268,6 @@ class _AttendeeNotificationScreenState extends State<AttendeeNotificationScreen>
       padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
       child: Column(
         children: [
-          // Delivery method toggle
-          Container(
-            padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
-            decoration: BoxDecoration(
-              color: AppThemeColor.pureWhiteColor,
-              borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Delivery Method',
-                  style: TextStyle(
-                    fontSize: Dimensions.fontSizeDefault,
-                    fontWeight: FontWeight.w600,
-                    color: AppThemeColor.darkBlueColor,
-                  ),
-                ),
-                const SizedBox(height: Dimensions.spaceSizeSmall),
-                Text(
-                  'Choose method of sending notifications',
-                  style: TextStyle(
-                    fontSize: Dimensions.fontSizeSmall,
-                    color: AppThemeColor.dullFontColor,
-                  ),
-                ),
-                const SizedBox(height: Dimensions.spaceSizeSmall),
-                Row(
-                  children: [
-                    ChoiceChip(
-                      label: const Text('In-App'),
-                      selected: _deliveryMethod == DeliveryMethod.inApp,
-                      onSelected: (v) {
-                        if (!v) return;
-                        setState(() {
-                          _deliveryMethod = DeliveryMethod.inApp;
-                          // Keep selection (all users valid)
-                        });
-                      },
-                    ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: const Text('SMS'),
-                      selected: _deliveryMethod == DeliveryMethod.sms,
-                      onSelected: (v) {
-                        if (!v) return;
-                        setState(() {
-                          _deliveryMethod = DeliveryMethod.sms;
-                          // Remove selections without phone numbers
-                          _selectedAttendeeUids = _selectedAttendeeUids.where((
-                            uid,
-                          ) {
-                            final a = _filteredAttendees.firstWhere(
-                              (x) => x.uid == uid,
-                              orElse: () => CustomerModel(
-                                uid: '',
-                                name: '',
-                                email: '',
-                                createdAt: DateTime.now(),
-                              ),
-                            );
-                            return a.phoneNumber != null &&
-                                a.phoneNumber!.isNotEmpty;
-                          }).toList();
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
           // Search and Selection Controls
           Container(
             padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
@@ -609,16 +497,10 @@ class _AttendeeNotificationScreenState extends State<AttendeeNotificationScreen>
                 ),
                 const SizedBox(height: Dimensions.spaceSizeSmall),
                 Text(
-                  _deliveryMethod == DeliveryMethod.sms
-                      ? '${_messageText.length}/160 characters'
-                      : '${_messageText.length} characters',
+                  '${_messageText.length} characters',
                   style: TextStyle(
                     fontSize: Dimensions.fontSizeSmall,
-                    color:
-                        _deliveryMethod == DeliveryMethod.sms &&
-                            _messageText.length > 160
-                        ? Colors.red
-                        : AppThemeColor.dullFontColor,
+                    color: AppThemeColor.dullFontColor,
                   ),
                 ),
               ],
@@ -744,9 +626,6 @@ class _AttendeeNotificationScreenState extends State<AttendeeNotificationScreen>
             itemBuilder: (context, index) {
               final attendee = _filteredAttendees[index];
               final isSelected = _selectedAttendeeUids.contains(attendee.uid);
-              final canReceiveSMS =
-                  attendee.phoneNumber != null &&
-                  attendee.phoneNumber!.isNotEmpty;
 
               return Container(
                 margin: const EdgeInsets.symmetric(
@@ -812,41 +691,17 @@ class _AttendeeNotificationScreenState extends State<AttendeeNotificationScreen>
                               color: AppThemeColor.dullFontColor,
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Icon(
-                            canReceiveSMS ? Icons.phone : Icons.phone_disabled,
-                            size: 14,
-                            color: canReceiveSMS
-                                ? AppThemeColor.darkGreenColor
-                                : AppThemeColor.dullIconColor,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            canReceiveSMS ? 'SMS available' : 'No phone number',
-                            style: TextStyle(
-                              fontSize: Dimensions.fontSizeSmall,
-                              color: canReceiveSMS
-                                  ? AppThemeColor.darkGreenColor
-                                  : AppThemeColor.dullFontColor,
-                            ),
-                          ),
                         ],
                       ),
                     ],
                   ),
                   trailing: Checkbox(
                     value: isSelected,
-                    onChanged:
-                        (_deliveryMethod == DeliveryMethod.sms &&
-                            !canReceiveSMS)
-                        ? null
-                        : (value) => _toggleAttendeeSelection(attendee.uid),
+                    onChanged: (value) =>
+                        _toggleAttendeeSelection(attendee.uid),
                     activeColor: AppThemeColor.darkBlueColor,
                   ),
-                  onTap:
-                      (_deliveryMethod == DeliveryMethod.sms && !canReceiveSMS)
-                      ? null
-                      : () => _toggleAttendeeSelection(attendee.uid),
+                  onTap: () => _toggleAttendeeSelection(attendee.uid),
                 ),
               );
             },
@@ -920,15 +775,12 @@ class _AttendeeNotificationScreenState extends State<AttendeeNotificationScreen>
       itemCount: _notificationHistory.length,
       itemBuilder: (context, index) {
         final notification = _notificationHistory[index];
-        final type = notification['type'] ?? 'in_app';
         final sentAt = (notification['timestamp'] is Timestamp)
             ? (notification['timestamp'] as Timestamp).toDate()
             : (notification['timestamp'] ?? DateTime.now());
         final total = notification['totalRecipients'] ?? 0;
         final success = notification['successCount'] ?? 0;
-        final title =
-            notification['title'] ??
-            (type == 'sms' ? 'SMS Broadcast' : 'In-App Broadcast');
+        final title = notification['title'] ?? 'In-App Broadcast';
         final message = notification['message'] ?? '';
         return Container(
           margin: const EdgeInsets.only(bottom: Dimensions.spaceSizeSmall),
@@ -958,7 +810,7 @@ class _AttendeeNotificationScreenState extends State<AttendeeNotificationScreen>
                       ),
                     ),
                     child: Icon(
-                      type == 'sms' ? Icons.sms : Icons.notifications,
+                      Icons.notifications,
                       color: AppThemeColor.darkBlueColor,
                       size: 20,
                     ),
@@ -1014,36 +866,6 @@ class _AttendeeNotificationScreenState extends State<AttendeeNotificationScreen>
                   color: AppThemeColor.darkBlueColor,
                 ),
               ),
-              if (type == 'sms' && (notification['failureCount'] ?? 0) > 0) ...[
-                const SizedBox(height: Dimensions.spaceSizeSmall),
-                Container(
-                  padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(
-                      Dimensions.radiusDefault,
-                    ),
-                    border: Border.all(
-                      color: Colors.orange.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.warning_amber, size: 16, color: Colors.orange),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '${notification['failureCount']} failed deliveries',
-                          style: TextStyle(
-                            fontSize: Dimensions.fontSizeSmall,
-                            color: Colors.orange[700],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ],
           ),
         );
@@ -1051,5 +873,3 @@ class _AttendeeNotificationScreenState extends State<AttendeeNotificationScreen>
     );
   }
 }
-
-enum DeliveryMethod { inApp, sms }

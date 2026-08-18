@@ -54,45 +54,40 @@ function requireIdempotencyKey(value) {
   return result;
 }
 
-function normalizeName(value, label) {
+function normalizeName(value, label = "full name") {
   const result = typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
-  if (result.length < 1 || result.length > 80 ||
-      !/^[\p{L}\p{M}][\p{L}\p{M}\s.'-]*$/u.test(result)) {
+  if (result.length < 1 || result.length > 160 ||
+      !/^[\p{L}\p{M}][\p{L}\p{M}\s.'’-]*$/u.test(result)) {
     throw new HttpsError("invalid-argument", `Enter a valid ${label}.`);
   }
   return result;
 }
 
-function normalizeContact(type, value) {
-  const contactType = type === "phone" ? "phone" : type === "email" ? "email" : "";
+function normalizeEmail(value) {
   const raw = typeof value === "string" ? value.trim() : "";
-  if (contactType === "email") {
-    const email = raw.toLowerCase();
-    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      throw new HttpsError("invalid-argument", "Enter a valid email address.");
-    }
-    return {type: contactType, value: email, display: email};
+  const email = raw.toLowerCase();
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new HttpsError("invalid-argument", "Enter a valid email address.");
   }
-  if (contactType === "phone") {
-    const digits = raw.replace(/\D/g, "");
-    const national = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
-    if (!/^[2-9][0-9]{9}$/.test(national)) {
-      throw new HttpsError("invalid-argument", "Enter a valid U.S. mobile number.");
-    }
-    return {type: contactType, value: `+1${national}`,
-      display: `(${national.slice(0, 3)}) ${national.slice(3, 6)}-${national.slice(6)}`};
-  }
-  throw new HttpsError("invalid-argument", "Choose email or text message.");
+  return email;
 }
 
-function contactHash(contact) {
+function normalizeRegistrationIdentity(data) {
+  if (["firstName", "lastName", "contactType", "contactValue"].some((field) =>
+    Object.prototype.hasOwnProperty.call(data || {}, field))) {
+    throw new HttpsError("invalid-argument", "Use fullName and email for registration.");
+  }
+  const fullName = normalizeName(data?.fullName);
+  return {fullName, greetingName: fullName.split(" ")[0], email: normalizeEmail(data?.email)};
+}
+
+function emailHash(email) {
   return crypto.createHmac("sha256", secretValue(CONTACT_HMAC_KEY, "Guest contact protection"))
-      .update(`v1\0${contact.type}\0${contact.value}`).digest("hex");
+      .update(`v1\0email\0${email}`).digest("hex");
 }
 
-function maskedContact(contact) {
-  if (contact.type === "phone") return `(***) ***-${contact.value.slice(-4)}`;
-  const [local, domain] = contact.value.split("@");
+function maskedEmail(email) {
+  const [local, domain] = email.split("@");
   return `${local.slice(0, 1)}***@${domain}`;
 }
 
@@ -118,12 +113,12 @@ async function kmsCrypt(operation, value) {
     Buffer.from(result.plaintext, "base64").toString("utf8");
 }
 
-async function encryptContact(contact) {
-  return kmsCrypt("encrypt", JSON.stringify(contact));
+async function encryptEmail(email) {
+  return kmsCrypt("encrypt", email);
 }
 
-async function decryptContact(ciphertext) {
-  return JSON.parse(await kmsCrypt("decrypt", ciphertext));
+async function decryptEmail(ciphertext) {
+  return kmsCrypt("decrypt", ciphertext);
 }
 
 function eventStart(event) {
@@ -191,12 +186,12 @@ function manageTokenData(admin, guestId, registrationId, ownerUid) {
 }
 
 function queueConfirmation(transaction, db, admin, {registrationId, guestId, eventId,
-  encryptedContact, contactType, masked, firstName, manageToken, kind, event}) {
+  encryptedEmail, masked, greetingName, manageToken, kind, event}) {
   const ref = db.collection("OutboundMessages").doc(`confirmation_${registrationId}`);
   transaction.set(ref, {id: ref.id, templateId: "guest_registration_confirmation",
-    channel: contactType === "phone" ? "sms" : "email", status: "pending", attempts: 0,
-    registrationId, guestId, eventId, encryptedContact, maskedContact: masked,
-    payload: {firstName, eventTitle: String(event.title || "Event").slice(0, 300),
+    channel: "email", status: "pending", attempts: 0,
+    registrationId, guestId, eventId, encryptedEmail, maskedEmail: masked,
+    payload: {firstName: greetingName, eventTitle: String(event.title || "Event").slice(0, 300),
       eventStart: event.selectedDateTime, eventLocation: String(event.location || ""), kind,
       manageUrl: `${PUBLIC_ORIGIN}/manage/${manageToken}`},
     createdAt: admin.firestore.FieldValue.serverTimestamp(), nextAttemptAt: new Date()},
@@ -210,12 +205,9 @@ function createStartPublicRegistrationV2(admin) {
     const caller = requireCaller(req);
     const eventId = requireId(req.data?.eventId, "event ID");
     const key = requireIdempotencyKey(req.data?.idempotencyKey);
-    const firstName = normalizeName(req.data?.firstName, "first name");
-    const lastName = normalizeName(req.data?.lastName, "last name");
-    const fullName = `${firstName} ${lastName}`;
-    const contact = normalizeContact(req.data?.contactType, req.data?.contactValue);
-    const hash = contactHash(contact);
-    const encryptedContact = await encryptContact(contact);
+    const {fullName, greetingName, email} = normalizeRegistrationIdentity(req.data);
+    const hash = emailHash(email);
+    const encryptedEmail = await encryptEmail(email);
     await requireFeature(db, "accountlessRegistrationEnabled");
     await enforceRateLimit(db, caller.uid, "start_registration");
     const eventRef = db.collection("Events").doc(eventId);
@@ -227,19 +219,19 @@ function createStartPublicRegistrationV2(admin) {
     if (kind === "paid_ticket") await requireFeature(db, "paidTicketCheckoutEnabled");
 
     const claimId = digest(eventId, hash);
-    const claimRef = db.collection("GuestEventContactClaims").doc(claimId);
+    const claimRef = db.collection("GuestEventEmailClaims").doc(claimId);
     const existingClaim = await claimRef.get();
     if (existingClaim.exists) {
       const existing = existingClaim.data();
       const duplicateManage = manageTokenData(admin, existing.guestId,
-          existing.registrationId, "contact_proof_only");
+          existing.registrationId, "email_proof_only");
       await Promise.all([
         db.collection("GuestManageTokens").doc(duplicateManage.id).set(duplicateManage.document),
         db.collection("OutboundMessages").doc(`resend_${crypto.randomUUID()}`).set({
-        templateId: "guest_registration_confirmation", channel: contact.type === "phone" ? "sms" : "email",
+        templateId: "guest_registration_confirmation", channel: "email",
         status: "pending", attempts: 0, registrationId: existing.registrationId,
-        guestId: existing.guestId, eventId, encryptedContact, maskedContact: maskedContact(contact),
-        payload: {firstName, eventTitle: String(event.title || "Event"), duplicate: true,
+        guestId: existing.guestId, eventId, encryptedEmail, maskedEmail: maskedEmail(email),
+        payload: {firstName: greetingName, eventTitle: String(event.title || "Event"), duplicate: true,
           eventStart: event.selectedDateTime, eventLocation: String(event.location || ""),
           kind, manageUrl: `${PUBLIC_ORIGIN}/manage/${duplicateManage.raw}`},
         createdAt: admin.firestore.FieldValue.serverTimestamp(), nextAttemptAt: new Date(),
@@ -281,25 +273,23 @@ function createStartPublicRegistrationV2(admin) {
         const current = freshEvent.data(); validateEvent(current);
         if (Number(current.issuedTickets || 0) + Number(current.reservedTickets || 0) >=
             Number(current.maxTickets || 0)) throw new HttpsError("resource-exhausted", "No tickets are available.");
-        transaction.create(guestRef, {id: guestId, ownerUid: caller.uid, firstName, lastName,
-          fullName, contactType: contact.type, contactHash: hash, contactHashVersion: 1,
-          encryptedContact, maskedContact: maskedContact(contact), verificationStatus: "pending",
-          transactionalSmsConsent: contact.type === "phone", smsConsentVersion: 1,
-          smsConsentAt: contact.type === "phone" ? now : null,
+        transaction.create(guestRef, {id: guestId, ownerUid: caller.uid, fullName, greetingName,
+          emailHash: hash, emailHashVersion: 1, encryptedEmail, maskedEmail: maskedEmail(email),
+          verificationStatus: "pending",
           claimedByUid: caller.isAnonymous ? null : caller.uid, createdAt: now, retentionAt});
-        transaction.create(claimRef, {eventId, guestId, registrationId, contactHash: hash,
+        transaction.create(claimRef, {eventId, guestId, registrationId, emailHash: hash,
           status: "payment_pending", createdAt: now});
         transaction.create(manageRef, manage.document);
         transaction.create(flowRef, {id: flowId, eventId, guestId, registrationId,
           reservationId, ownerUid: caller.uid, kind, status: "payment_pending", createdAt: now});
         transaction.create(reservationRef, {id: reservationId, eventId, customerUid: caller.uid,
           guestId, identityType: caller.isAnonymous ? "guest" : "account",
-          registrationId, contactClaimId: claimId,
+          registrationId, emailClaimId: claimId,
           amount, currency: "usd", status: "reserved",
           attemptId: digest(flowId, key), idempotencyHash: digest(eventId, caller.uid, key),
           eventTitle: String(event.title || "Event"), eventImageUrl: String(event.imageUrl || ""),
           eventLocation: String(event.location || ""), eventDateTime: event.selectedDateTime,
-          customerName: fullName, encryptedContact, contactType: contact.type,
+          customerName: fullName, encryptedEmail,
           manageToken: manage.raw, creatorUid: String(event.customerUid || ""), createdAt: now,
           expiresAt: new Date(Date.now() + 15 * 60000)});
         transaction.update(eventRef, {reservedTickets: admin.firestore.FieldValue.increment(1)});
@@ -310,7 +300,7 @@ function createStartPublicRegistrationV2(admin) {
       try {
         intent = await stripe.paymentIntents.create({amount, currency: "usd",
           automatic_payment_methods: {enabled: true}, description: `Ticket for ${event.title || "Event"}`,
-          receipt_email: contact.type === "email" ? contact.value : undefined,
+          receipt_email: email,
           metadata: {reservationId, attemptId: digest(flowId, key), eventId, customerUid: caller.uid,
             guestId, registrationId}}, {idempotencyKey: `attendus_guest_${digest(eventId, caller.uid, key)}`});
       } catch (error) {
@@ -333,7 +323,7 @@ function createStartPublicRegistrationV2(admin) {
         db.collection("TicketPayments").doc(intent.id).set({id: intent.id,
           paymentIntentId: intent.id, reservationId, eventId, customerUid: caller.uid, guestId,
           identityType: caller.isAnonymous ? "guest" : "account", customerName: fullName,
-          encryptedContact, contactType: contact.type,
+          encryptedEmail,
           amount: amount / 100, amountCents: amount, currency: "usd", status: "pending", createdAt: now}),
       ]);
       return {status: "payment_pending", kind, flowId, clientSecret: intent.client_secret,
@@ -353,13 +343,11 @@ function createStartPublicRegistrationV2(admin) {
           Number(current.reservedTickets || 0) >= Number(current.maxTickets || 0)) {
         throw new HttpsError("resource-exhausted", "No tickets are available.");
       }
-      transaction.create(guestRef, {id: guestId, ownerUid: caller.uid, firstName, lastName,
-        fullName, contactType: contact.type, contactHash: hash, contactHashVersion: 1,
-        encryptedContact, maskedContact: maskedContact(contact), verificationStatus: "pending",
-        transactionalSmsConsent: contact.type === "phone", smsConsentVersion: 1,
-        smsConsentAt: contact.type === "phone" ? now : null,
+      transaction.create(guestRef, {id: guestId, ownerUid: caller.uid, fullName, greetingName,
+        emailHash: hash, emailHashVersion: 1, encryptedEmail, maskedEmail: maskedEmail(email),
+        verificationStatus: "pending",
         claimedByUid: caller.isAnonymous ? null : caller.uid, createdAt: now, retentionAt});
-      transaction.create(claimRef, {eventId, guestId, registrationId, contactHash: hash,
+      transaction.create(claimRef, {eventId, guestId, registrationId, emailHash: hash,
         status: "confirmed", createdAt: now});
       transaction.create(manageRef, manage.document);
       transaction.create(flowRef, {id: flowId, eventId, guestId, registrationId,
@@ -367,7 +355,7 @@ function createStartPublicRegistrationV2(admin) {
       transaction.create(registrationRef, {id: registrationId, eventId, userName: fullName,
         realName: fullName, customerUid: caller.uid, guestId,
         identityType: caller.isAnonymous ? "guest" : "account",
-        contactType: contact.type, contactRef: guestRef.path, attendanceDateTime: now,
+        emailRef: guestRef.path, attendanceDateTime: now,
         answers: [], isAnonymous: caller.isAnonymous, registrationSource: "public_event_page_v2",
         status: "confirmed"});
       if (kind === "free_ticket") {
@@ -383,7 +371,7 @@ function createStartPublicRegistrationV2(admin) {
         transaction.update(eventRef, {issuedTickets: admin.firestore.FieldValue.increment(1)});
       }
       queueConfirmation(transaction, db, admin, {registrationId, guestId, eventId,
-        encryptedContact, contactType: contact.type, masked: maskedContact(contact), firstName,
+        encryptedEmail, masked: maskedEmail(email), greetingName,
         manageToken: manage.raw, kind, event});
     });
     return {status: "confirmed", kind, flowId, registrationId, ticketId,
@@ -443,16 +431,16 @@ function createCancelPublicRegistrationV1(admin) {
           revokedAt: admin.firestore.FieldValue.serverTimestamp()});
         transaction.update(eventRef, {issuedTickets: admin.firestore.FieldValue.increment(-1)});
       }
-      if (guest.exists && guest.get("encryptedContact")) {
+      if (guest.exists && guest.get("encryptedEmail")) {
         const messageRef = db.collection("OutboundMessages")
             .doc(`cancellation_${registrationId}`);
         transaction.set(messageRef, {id: messageRef.id,
           templateId: "guest_registration_cancelled",
-          channel: guest.get("contactType") === "phone" ? "sms" : "email",
+          channel: "email",
           status: "pending", attempts: 0, registrationId, guestId: guest.id,
-          eventId: event.id, encryptedContact: guest.get("encryptedContact"),
-          maskedContact: guest.get("maskedContact"), payload: {
-            firstName: guest.get("firstName"), eventTitle: event.get("title"),
+          eventId: event.id, encryptedEmail: guest.get("encryptedEmail"),
+          maskedEmail: guest.get("maskedEmail"), payload: {
+            firstName: guest.get("greetingName"), eventTitle: event.get("title"),
             eventStart: event.get("selectedDateTime"), eventLocation: event.get("location"),
           }, createdAt: admin.firestore.FieldValue.serverTimestamp(), nextAttemptAt: new Date()});
       }
@@ -488,14 +476,14 @@ function createGetOrganizerEventRegistrationsV1(admin) {
     const guestMap = new Map(guests.filter((doc) => doc.exists).map((doc) => [doc.id, doc.data()]));
     const rows = await Promise.all(registrations.docs.map(async (doc) => {
       const data = doc.data(); const guest = guestMap.get(data.guestId);
-      const contact = guest ? await decryptContact(guest.encryptedContact) : null;
+      const email = guest?.encryptedEmail ? await decryptEmail(guest.encryptedEmail) : null;
       return {id: doc.id, name: data.realName || data.userName || "Attendee",
         identityType: data.identityType || "account", status: data.status || "confirmed",
-        contactType: contact?.type || null, contact: contact?.display || contact?.value || null,
+        email,
         deliveryStatus: guest?.deliveryStatus || "not_applicable",
         verificationStatus: guest?.verificationStatus || "not_applicable"};
     }));
-    await db.collection("admin_audit_logs").add({action: "event.registration_contacts.view",
+    await db.collection("admin_audit_logs").add({action: "event.registration_emails.view",
       actorUid: caller.uid, targetType: "event", targetId: eventId, recordCount: rows.length,
       createdAt: admin.firestore.FieldValue.serverTimestamp()});
     return {registrations: rows};
@@ -518,20 +506,22 @@ function createExportOrganizerEventRegistrationsV1(admin) {
     }
     const registrations = await db.collection("RegisterAttendance").where("eventId", "==", eventId)
         .limit(500).get();
-    const rows = [["Name", "Contact type", "Contact", "Status", "Identity"]];
+    const rows = [["Name", "Email", "Status", "Identity"]];
     for (const document of registrations.docs) {
       const data = document.data();
-      let contact = null;
+      let email = null;
       if (data.guestId) {
         const guest = await db.collection("GuestAttendees").doc(data.guestId).get();
-        if (guest.exists) contact = await decryptContact(guest.get("encryptedContact"));
+        if (guest.exists && guest.get("encryptedEmail")) {
+          email = await decryptEmail(guest.get("encryptedEmail"));
+        }
       }
-      rows.push([data.realName || data.userName || "Attendee", contact?.type || "",
-        contact?.display || contact?.value || "", data.status || "confirmed",
+      rows.push([data.realName || data.userName || "Attendee", email || "",
+        data.status || "confirmed",
         data.identityType || "account"]);
     }
     const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
-    await db.collection("admin_audit_logs").add({action: "event.registration_contacts.export",
+    await db.collection("admin_audit_logs").add({action: "event.registration_emails.export",
       actorUid: caller.uid, targetType: "event", targetId: eventId,
       recordCount: rows.length - 1, createdAt: admin.firestore.FieldValue.serverTimestamp()});
     return {filename: `attendus-${eventId}-registrations.csv`,
@@ -567,50 +557,53 @@ function createResendPublicRegistrationConfirmationV1(admin) {
     await Promise.all([
       db.collection("GuestManageTokens").doc(manage.id).set(manage.document),
       messageRef.set({templateId: "guest_registration_confirmation",
-        channel: guest.get("contactType") === "phone" ? "sms" : "email", status: "pending",
+        channel: "email", status: "pending",
         attempts: 0, registrationId, guestId: guest.id, eventId: event.id,
-        encryptedContact: guest.get("encryptedContact"), maskedContact: guest.get("maskedContact"),
-        payload: {firstName: guest.get("firstName"), eventTitle: event.get("title"),
+        encryptedEmail: guest.get("encryptedEmail"), maskedEmail: guest.get("maskedEmail"),
+        payload: {firstName: guest.get("greetingName"), eventTitle: event.get("title"),
           eventStart: event.get("selectedDateTime"), eventLocation: event.get("location"),
           kind: registration.get("registrationSource")?.includes("ticket") ? "ticket" : "rsvp",
           manageUrl: `${PUBLIC_ORIGIN}/manage/${manage.raw}`},
         createdAt: admin.firestore.FieldValue.serverTimestamp(), nextAttemptAt: new Date()}),
     ]);
-    return {status: "pending", maskedContact: guest.get("maskedContact")};
+    return {status: "pending", maskedEmail: guest.get("maskedEmail")};
   });
 }
 
-function createUpdatePublicRegistrationContactV1(admin) {
+function createUpdatePublicRegistrationEmailV1(admin) {
   const db = admin.firestore();
   return onCall({region: "us-central1", enforceAppCheck: process.env.FUNCTIONS_EMULATOR !== "true",
     secrets: [CONTACT_HMAC_KEY, CONTACT_KMS_KEY_NAME], maxInstances: 20}, async (req) => {
     const caller = requireCaller(req);
     const registrationId = requireId(req.data?.registrationId, "registration");
     requireIdempotencyKey(req.data?.idempotencyKey);
-    const contact = normalizeContact(req.data?.contactType, req.data?.contactValue);
-    const newHash = contactHash(contact);
-    const encrypted = await encryptContact(contact);
-    await enforceRateLimit(db, caller.uid, "update_contact");
+    if (["contactType", "contactValue"].some((field) =>
+      Object.prototype.hasOwnProperty.call(req.data || {}, field))) {
+      throw new HttpsError("invalid-argument", "Use email to update this registration.");
+    }
+    const email = normalizeEmail(req.data?.email);
+    const newHash = emailHash(email);
+    const encrypted = await encryptEmail(email);
+    await enforceRateLimit(db, caller.uid, "update_email");
     const {registration, guest, event} = await ownedRegistration(db, caller.uid, registrationId);
-    const oldClaim = db.collection("GuestEventContactClaims")
-        .doc(digest(event.id, guest.get("contactHash")));
-    const newClaim = db.collection("GuestEventContactClaims").doc(digest(event.id, newHash));
+    const oldClaim = db.collection("GuestEventEmailClaims")
+        .doc(digest(event.id, guest.get("emailHash")));
+    const newClaim = db.collection("GuestEventEmailClaims").doc(digest(event.id, newHash));
     await db.runTransaction(async (transaction) => {
       const collision = await transaction.get(newClaim);
       if (collision.exists && collision.get("guestId") !== guest.id) {
-        throw new HttpsError("already-exists", "A registration already uses that contact.");
+        throw new HttpsError("already-exists", "A registration already uses that email.");
       }
       transaction.set(newClaim, {eventId: event.id, guestId: guest.id, registrationId,
-        contactHash: newHash, status: registration.get("status") || "confirmed",
+        emailHash: newHash, status: registration.get("status") || "confirmed",
         updatedAt: admin.firestore.FieldValue.serverTimestamp()});
       if (oldClaim.id !== newClaim.id) transaction.delete(oldClaim);
-      transaction.update(guest.ref, {contactType: contact.type, contactHash: newHash,
-        encryptedContact: encrypted, maskedContact: maskedContact(contact),
+      transaction.update(guest.ref, {emailHash: newHash,
+        encryptedEmail: encrypted, maskedEmail: maskedEmail(email),
         verificationStatus: "pending", verifiedAt: null,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()});
-      transaction.update(registration.ref, {contactType: contact.type});
     });
-    return {status: "updated", maskedContact: maskedContact(contact)};
+    return {status: "updated", maskedEmail: maskedEmail(email)};
   });
 }
 
@@ -699,8 +692,8 @@ function createAnonymizeExpiredGuestContacts(admin) {
     let anonymized = 0;
     for (const document of snapshot.docs) {
       if (document.get("claimedByUid") || document.get("anonymizedAt")) continue;
-      await document.ref.update({firstName: null, lastName: null, fullName: "Former attendee",
-        encryptedContact: null, maskedContact: "Expired", contactHash: null,
+      await document.ref.update({fullName: "Former attendee", greetingName: null,
+        encryptedEmail: null, maskedEmail: "Expired", emailHash: null,
         verificationStatus: "expired", anonymizedAt: admin.firestore.FieldValue.serverTimestamp()});
       anonymized += 1;
     }
@@ -721,14 +714,15 @@ module.exports = {
   createGetPublicRegistrationStatusV2,
   createResendPublicRegistrationConfirmationV1,
   createStartPublicRegistrationV2,
-  createUpdatePublicRegistrationContactV1,
-  decryptContact,
+  createUpdatePublicRegistrationEmailV1,
+  decryptEmail,
   digest,
-  encryptContact,
-  contactHash,
-  maskedContact,
-  normalizeContact,
+  encryptEmail,
+  emailHash,
+  maskedEmail,
+  normalizeEmail,
   normalizeName,
+  normalizeRegistrationIdentity,
   ticketQrSvg,
   validateEvent,
 };

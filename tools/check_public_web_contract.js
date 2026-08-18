@@ -11,8 +11,7 @@ function verify(config, robots, files) {
   const catchAll = rewrites.findIndex((entry) => entry.source === "**");
   for (const [source, functionId] of [["/event/**", "publicWeb"],
     ["/community/**", "publicWeb"], ["/manage", "publicWeb"],
-    ["/manage/**", "publicWeb"], ["/communications/sms-status", "twilioStatusCallbackV1"],
-    ["/communications/sms-inbound", "twilioInboundV1"], ["/sitemap.xml", "publicWeb"],
+    ["/manage/**", "publicWeb"], ["/sitemap.xml", "publicWeb"],
     ["/sitemaps/**", "publicWeb"]]) {
     const index = rewrites.findIndex((entry) => entry.source === source &&
       entry.function?.functionId === functionId);
@@ -30,13 +29,36 @@ function verify(config, robots, files) {
   return failures;
 }
 
+function verifyEmailOnly(sources) {
+  const forbidden = [
+    /twilio/i,
+    /sendBulkSms/,
+    /PhoneAuthProvider/,
+    /communications\/sms-/,
+    /channel\s*:\s*[^\n]*["']sms["']/,
+    /TWILIO_[A-Z_]+/,
+  ];
+  const failures = [];
+  for (const [name, source] of Object.entries(sources)) {
+    for (const pattern of forbidden) {
+      if (pattern.test(source)) failures.push(`${name} contains disabled SMS integration code`);
+    }
+  }
+  return failures;
+}
+
 function main() {
   const config = JSON.parse(readFileSync(join(root, "firebase.json"), "utf8"));
   const robots = readFileSync(join(root, "web", "robots.txt"), "utf8");
   const files = Object.fromEntries([
-    "public.css", "registration.css", "actions.js",
+    "public.css", "registration-email-v2.css", "actions-email-v2.js",
   ].map((name) => [name, statSync(join(root, "web", "public-web", "v1", name)).size]));
-  const failures = verify(config, robots, files);
+  const sources = Object.fromEntries([
+    "firebase.json", "functions/index.js", "functions/communications/delivery.js",
+    "functions/notifications/admin-dispatch.js", "functions/package.json",
+    "web/public-web/v1/actions-email-v2.js",
+  ].map((name) => [name, readFileSync(join(root, ...name.split("/")), "utf8")]));
+  const failures = [...verify(config, robots, files), ...verifyEmailOnly(sources)];
   if (failures.length) throw new Error(failures.join("\n"));
   process.stdout.write(`Public web contract passed (${JSON.stringify(files)}).\n`);
 }
@@ -50,4 +72,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = {verify};
+module.exports = {verify, verifyEmailOnly};

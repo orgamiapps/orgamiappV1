@@ -3,24 +3,18 @@
 const crypto = require("node:crypto");
 const {defineSecret} = require("firebase-functions/params");
 const {onDocumentCreated} = require("firebase-functions/v2/firestore");
-const {onRequest} = require("firebase-functions/v2/https");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const logger = require("firebase-functions/logger");
-const {CONTACT_HMAC_KEY, CONTACT_KMS_KEY_NAME, contactHash, decryptContact,
-  normalizeContact} = require("../public-web/accountless");
+const {CONTACT_KMS_KEY_NAME, decryptEmail} =
+  require("../public-web/accountless");
 
 const MICROSOFT_TENANT_ID = defineSecret("MICROSOFT_TENANT_ID");
 const MICROSOFT_CLIENT_ID = defineSecret("MICROSOFT_CLIENT_ID");
 const MICROSOFT_CERT_THUMBPRINT = defineSecret("MICROSOFT_CERT_THUMBPRINT");
 const MICROSOFT_PRIVATE_KEY = defineSecret("MICROSOFT_PRIVATE_KEY");
-const TWILIO_ACCOUNT_SID = defineSecret("TWILIO_ACCOUNT_SID");
-const TWILIO_AUTH_TOKEN = defineSecret("TWILIO_AUTH_TOKEN");
-const TWILIO_MESSAGING_SERVICE_SID = defineSecret("TWILIO_MESSAGING_SERVICE_SID");
 const SUPPORT_EMAIL = "support@attendus.app";
-const PUBLIC_ORIGIN = "https://attendus.app";
-const DELIVERY_SECRETS = [CONTACT_HMAC_KEY, CONTACT_KMS_KEY_NAME, MICROSOFT_TENANT_ID,
-  MICROSOFT_CLIENT_ID, MICROSOFT_CERT_THUMBPRINT, MICROSOFT_PRIVATE_KEY,
-  TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_MESSAGING_SERVICE_SID];
+const DELIVERY_SECRETS = [CONTACT_KMS_KEY_NAME, MICROSOFT_TENANT_ID,
+  MICROSOFT_CLIENT_ID, MICROSOFT_CERT_THUMBPRINT, MICROSOFT_PRIVATE_KEY];
 
 function secret(secretParam, label) {
   const value = secretParam.value().trim();
@@ -96,9 +90,7 @@ function fallbackTemplate(message) {
     `<p>${escapeHtml(action)}</p><p><strong>${escapeHtml(payload.eventTitle)}</strong></p>` +
     (cancelled ? "" : `<p><a href="${escapeHtml(payload.manageUrl)}">View ticket and registration</a></p>`) +
     `<p>Questions? Contact <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a>.</p>`;
-  const sms = `Attendus: ${action} ${payload.eventTitle}. ${cancelled ? "" : payload.manageUrl} ` +
-    `Help: ${SUPPORT_EMAIL}. Reply STOP to opt out.`;
-  return {subject, text, html, sms};
+  return {subject, text, html};
 }
 
 async function templateFor(db, message) {
@@ -112,8 +104,7 @@ async function templateFor(db, message) {
       (_, key) => values[key]);
   return {subject: render(snapshot.get("subject")) || fallback.subject,
     text: render(snapshot.get("text")) || fallback.text,
-    html: render(snapshot.get("html")) || fallback.html,
-    sms: render(snapshot.get("sms")) || fallback.sms};
+    html: render(snapshot.get("html")) || fallback.html};
 }
 
 async function sendEmail(db, message, contact) {
@@ -134,21 +125,6 @@ async function sendEmail(db, message, contact) {
   return {provider: "microsoft_graph", providerStatus: "accepted"};
 }
 
-async function sendSms(db, message, contact) {
-  const suppress = await db.collection("CommunicationSuppressions")
-      .doc(contactHash(contact)).get();
-  if (suppress.exists && suppress.get("smsSuppressed") === true) {
-    throw new Error("SMS contact is suppressed");
-  }
-  const twilio = require("twilio")(secret(TWILIO_ACCOUNT_SID, "Twilio account"),
-      secret(TWILIO_AUTH_TOKEN, "Twilio authentication"));
-  const template = await templateFor(db, message);
-  const result = await twilio.messages.create({to: contact.value,
-    messagingServiceSid: secret(TWILIO_MESSAGING_SERVICE_SID, "Twilio Messaging Service"),
-    body: template.sms, statusCallback: `${PUBLIC_ORIGIN}/communications/sms-status`});
-  return {provider: "twilio", providerStatus: result.status || "accepted", providerMessageId: result.sid};
-}
-
 async function processMessage(admin, ref) {
   const db = admin.firestore();
   let reserved = false;
@@ -165,9 +141,11 @@ async function processMessage(admin, ref) {
   const snapshot = await ref.get();
   const message = snapshot.data();
   try {
-    const contact = await decryptContact(message.encryptedContact);
-    const result = message.channel === "sms" ? await sendSms(db, message, contact) :
-      await sendEmail(db, message, contact);
+    if (message.channel !== "email" || !message.encryptedEmail) {
+      throw new Error("Unsupported outbound delivery channel");
+    }
+    const email = await decryptEmail(message.encryptedEmail);
+    const result = await sendEmail(db, message, {value: email});
     await ref.update({...result, status: "accepted",
       acceptedAt: admin.firestore.FieldValue.serverTimestamp(), lastError: null});
     if (message.guestId) await db.collection("GuestAttendees").doc(message.guestId).set({
@@ -204,54 +182,5 @@ function createRetryOutboundMessages(admin) {
   });
 }
 
-function createTwilioStatusCallback(admin) {
-  return onRequest({region: "us-central1", invoker: "public", secrets: [TWILIO_AUTH_TOKEN],
-    maxInstances: 20}, async (req, res) => {
-    if (req.method !== "POST") return res.status(405).send("Method not allowed");
-    const signature = req.get("x-twilio-signature");
-    const valid = require("twilio").validateRequest(secret(TWILIO_AUTH_TOKEN, "Twilio authentication"),
-        signature, `${PUBLIC_ORIGIN}/communications/sms-status`, req.body || {});
-    if (!valid) return res.status(403).send("Invalid signature");
-    const sid = String(req.body.MessageSid || "");
-    const status = String(req.body.MessageStatus || "unknown");
-    const snapshot = await admin.firestore().collection("OutboundMessages")
-        .where("providerMessageId", "==", sid).limit(1).get();
-    if (!snapshot.empty) await snapshot.docs[0].ref.update({providerStatus: status,
-      status: ["failed", "undelivered"].includes(status) ? "failed" :
-        status === "delivered" ? "delivered" : "accepted",
-      providerUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      providerErrorCode: req.body.ErrorCode || null});
-    return res.status(204).send("");
-  });
-}
-
-function createTwilioInbound(admin) {
-  return onRequest({region: "us-central1", invoker: "public",
-    secrets: [TWILIO_AUTH_TOKEN, CONTACT_HMAC_KEY], maxInstances: 20}, async (req, res) => {
-    if (req.method !== "POST") return res.status(405).send("Method not allowed");
-    const signature = req.get("x-twilio-signature");
-    const valid = require("twilio").validateRequest(secret(TWILIO_AUTH_TOKEN, "Twilio authentication"),
-        signature, `${PUBLIC_ORIGIN}/communications/sms-inbound`, req.body || {});
-    if (!valid) return res.status(403).send("Invalid signature");
-    let contact;
-    try {
-      contact = normalizeContact("phone", String(req.body.From || ""));
-    } catch (_) {
-      return res.status(200).type("text/xml").send("<Response></Response>");
-    }
-    const command = String(req.body.Body || "").trim().toUpperCase();
-    const ref = admin.firestore().collection("CommunicationSuppressions").doc(contactHash(contact));
-    if (["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"].includes(command)) {
-      await ref.set({smsSuppressed: true, source: "twilio_inbound",
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()}, {merge: true});
-    } else if (["START", "UNSTOP"].includes(command)) {
-      await ref.set({smsSuppressed: false, source: "twilio_inbound",
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()}, {merge: true});
-    }
-    return res.status(200).type("text/xml").send("<Response></Response>");
-  });
-}
-
 module.exports = {calendarInvite, createDeliverOutboundMessage,
-  createRetryOutboundMessages, createTwilioInbound, createTwilioStatusCallback,
-  fallbackTemplate, graphAssertion, processMessage};
+  createRetryOutboundMessages, fallbackTemplate, graphAssertion, processMessage};

@@ -5,8 +5,8 @@ const {onRequest} = require("firebase-functions/v2/https");
 const {onDocumentWritten} = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const QRCode = require("qrcode");
-const {CONTACT_HMAC_KEY, CONTACT_KMS_KEY_NAME, contactHash, digest,
-  encryptContact, maskedContact, normalizeContact} = require("./accountless");
+const {CONTACT_HMAC_KEY, CONTACT_KMS_KEY_NAME, digest, emailHash,
+  encryptEmail, maskedEmail, normalizeEmail} = require("./accountless");
 
 const PUBLIC_ORIGIN = "https://attendus.app";
 const PAGE_SIZE = 10000;
@@ -189,13 +189,13 @@ function shell({title, summary, canonical, image, body, jsonLd, config, nonce}) 
 <meta property="og:url" content="${safeCanonical}"><meta property="og:image" content="${safeImage}">
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${safeTitle}">
 <meta name="twitter:description" content="${safeSummary}"><meta name="twitter:image" content="${safeImage}">
-<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="/public-web/v1/public.css"><link rel="stylesheet" href="/public-web/v1/registration.css">
+<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="/public-web/v1/public.css"><link rel="stylesheet" href="/public-web/v1/registration-email-v2.css">
 <script type="application/ld+json" nonce="${nonce}">${safeJson(jsonLd)}</script></head>
 <body><a class="skip-link" href="#main">Skip to event details</a>
 <header class="site-header"><a class="brand" href="/" aria-label="Attendus home"><img src="/icons/Icon-192.png" alt="" width="36" height="36"><span>Attendus</span></a></header>
 ${body}<footer class="site-footer"><span>Attendus</span><a href="/privacy">Privacy</a><a href="/terms">Terms</a></footer>
 <script id="attendus-public-config" type="application/json" nonce="${nonce}">${safeJson(config)}</script>
-<script src="/public-web/v1/actions.js" defer></script></body></html>`;
+<script src="/public-web/v1/actions-email-v2.js" defer></script></body></html>`;
 }
 
 function organizerFor(event, organization) {
@@ -381,9 +381,9 @@ function managePage(res, nonce, data, session, notice = "") {
   const cancel = !cancelled && !paid && eventStartForManage(event) > new Date() ?
     `<form method="post" action="/manage/action"><input type="hidden" name="csrf" value="${escapeHtml(session.csrfToken)}"><input type="hidden" name="action" value="cancel"><button class="secondary-button danger" type="submit">Cancel registration</button></form>` : "";
   const ticketMarkup = ticket ? `<section class="manage-ticket" aria-labelledby="ticket-heading"><h2 id="ticket-heading">Your ticket</h2><div class="ticket-code"><span>Ticket code</span><strong>${escapeHtml(ticket.ticketCode)}</strong><img src="/manage/ticket.svg" width="220" height="220" alt="QR ticket code ${escapeHtml(ticket.ticketCode)}"></div><button class="secondary-button print-ticket" type="button">Print ticket</button></section>` : "";
-  const contactForm = `<details class="contact-update"><summary>Update confirmation contact</summary><form method="post" action="/manage/action"><input type="hidden" name="csrf" value="${escapeHtml(session.csrfToken)}"><input type="hidden" name="action" value="update_contact"><label>Contact method <select name="contactType"><option value="email">Email</option><option value="phone">U.S. mobile</option></select></label><label>Email or phone <input name="contactValue" required maxlength="254"></label><p class="sms-consent">If you choose mobile, you agree to transactional Attendus texts for this registration. Message and data rates may apply. Reply STOP to opt out or HELP for help.</p><button class="secondary-button" type="submit">Update and resend</button></form></details>`;
-  const body = `<main id="main" class="page manage-page"><article><div class="eyebrow">Guest registration</div><h1>${escapeHtml(event.title)}</h1>${notice ? `<p class="notice" role="status">${escapeHtml(notice)}</p>` : ""}<dl class="details"><div><dt>Status</dt><dd>${cancelled ? "Cancelled" : "Confirmed"}</dd></div><div><dt>Attendee</dt><dd>${escapeHtml(registration.realName || registration.userName)}</dd></div><div><dt>Contact</dt><dd>${escapeHtml(guest.maskedContact || "Protected")}</dd></div><div><dt>Date</dt><dd>${escapeHtml(formatDate(eventStartForManage(event), validTimeZone(event.eventTimeZone)))}</dd></div></dl>${ticketMarkup}<div class="manage-actions"><a class="secondary-button" href="/manage/calendar.ics">Download calendar invite</a><a class="secondary-button" href="/event/${encodeURIComponent(data.event.id)}">View event</a>${cancel}</div>${contactForm}${paid ? `<p>Paid ticket refunds are handled by the organizer or <a href="mailto:support@attendus.app">support@attendus.app</a>.</p>` : ""}</article></main>`;
-  res.status(200).send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Manage registration | Attendus</title><link rel="stylesheet" href="/public-web/v1/public.css"><link rel="stylesheet" href="/public-web/v1/registration.css"></head><body><a class="skip-link" href="#main">Skip to registration</a><header class="site-header"><a class="brand" href="/"><img src="/icons/Icon-192.png" alt="" width="36" height="36"><span>Attendus</span></a></header>${body}<script nonce="${nonce}">document.querySelector('.print-ticket')?.addEventListener('click',()=>window.print());</script></body></html>`);
+  const emailForm = `<details class="contact-update"><summary>Update confirmation email</summary><form method="post" action="/manage/action"><input type="hidden" name="csrf" value="${escapeHtml(session.csrfToken)}"><input type="hidden" name="action" value="update_email"><label>Email address <input name="email" type="email" autocomplete="email" required maxlength="254"></label><button class="secondary-button" type="submit">Update and resend</button></form></details>`;
+  const body = `<main id="main" class="page manage-page"><article><div class="eyebrow">Guest registration</div><h1>${escapeHtml(event.title)}</h1>${notice ? `<p class="notice" role="status">${escapeHtml(notice)}</p>` : ""}<dl class="details"><div><dt>Status</dt><dd>${cancelled ? "Cancelled" : "Confirmed"}</dd></div><div><dt>Attendee</dt><dd>${escapeHtml(registration.realName || registration.userName)}</dd></div><div><dt>Email</dt><dd>${escapeHtml(guest.maskedEmail || "Protected")}</dd></div><div><dt>Date</dt><dd>${escapeHtml(formatDate(eventStartForManage(event), validTimeZone(event.eventTimeZone)))}</dd></div></dl>${ticketMarkup}<div class="manage-actions"><a class="secondary-button" href="/manage/calendar.ics">Download calendar invite</a><a class="secondary-button" href="/event/${encodeURIComponent(data.event.id)}">View event</a>${cancel}</div>${emailForm}${paid ? `<p>Paid ticket refunds are handled by the organizer or <a href="mailto:support@attendus.app">support@attendus.app</a>.</p>` : ""}</article></main>`;
+  res.status(200).send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Manage registration | Attendus</title><link rel="stylesheet" href="/public-web/v1/public.css"><link rel="stylesheet" href="/public-web/v1/registration-email-v2.css"></head><body><a class="skip-link" href="#main">Skip to registration</a><header class="site-header"><a class="brand" href="/"><img src="/icons/Icon-192.png" alt="" width="36" height="36"><span>Attendus</span></a></header>${body}<script nonce="${nonce}">document.querySelector('.print-ticket')?.addEventListener('click',()=>window.print());</script></body></html>`);
 }
 
 function eventStartForManage(event) {
@@ -436,33 +436,31 @@ async function manageTicketQr(db, req, res, nonce) {
 async function manageAction(db, req, res, nonce) {
   const session = await manageSession(db, req);
   if (!session || req.body?.csrf !== session.csrfToken ||
-      !["cancel", "update_contact"].includes(req.body?.action)) {
+      !["cancel", "update_email"].includes(req.body?.action)) {
     return notFound(res, nonce);
   }
   const data = await manageData(db, session);
   if (!data) return notFound(res, nonce);
-  if (req.body.action === "update_contact") {
+  if (req.body.action === "update_email") {
     try {
-      const contact = normalizeContact(req.body.contactType, req.body.contactValue);
-      const hash = contactHash(contact);
-      const encrypted = await encryptContact(contact);
+      const email = normalizeEmail(req.body.email);
+      const hash = emailHash(email);
+      const encrypted = await encryptEmail(email);
       const guest = data.guest.data();
-      const oldClaim = db.collection("GuestEventContactClaims")
-          .doc(digest(data.event.id, guest.contactHash));
-      const newClaim = db.collection("GuestEventContactClaims").doc(digest(data.event.id, hash));
+      const oldClaim = db.collection("GuestEventEmailClaims")
+          .doc(digest(data.event.id, guest.emailHash));
+      const newClaim = db.collection("GuestEventEmailClaims").doc(digest(data.event.id, hash));
       await db.runTransaction(async (transaction) => {
         const collision = await transaction.get(newClaim);
         if (collision.exists && collision.get("guestId") !== data.guest.id) {
-          throw new Error("That contact already has a registration.");
+          throw new Error("That email already has a registration.");
         }
         transaction.set(newClaim, {eventId: data.event.id, guestId: data.guest.id,
-          registrationId: data.registration.id, contactHash: hash,
+          registrationId: data.registration.id, emailHash: hash,
           status: data.registration.get("status"), updatedAt: new Date()});
         if (oldClaim.id !== newClaim.id) transaction.delete(oldClaim);
-        transaction.update(data.guest.ref, {contactType: contact.type, contactHash: hash,
-          encryptedContact: encrypted, maskedContact: maskedContact(contact),
-          transactionalSmsConsent: contact.type === "phone",
-          smsConsentAt: contact.type === "phone" ? new Date() : null,
+        transaction.update(data.guest.ref, {emailHash: hash,
+          encryptedEmail: encrypted, maskedEmail: maskedEmail(email),
           verificationStatus: "pending", verifiedAt: null, updatedAt: new Date()});
       });
       const rawToken = crypto.randomBytes(32).toString("base64url");
@@ -470,24 +468,24 @@ async function manageAction(db, req, res, nonce) {
       const messageId = `resend_${crypto.randomUUID()}`;
       await Promise.all([
         db.collection("GuestManageTokens").doc(tokenId).set({guestId: data.guest.id,
-          registrationId: data.registration.id, ownerUid: "contact_proof_only", status: "active",
+          registrationId: data.registration.id, ownerUid: "email_proof_only", status: "active",
           createdAt: new Date(), expiresAt: new Date(Date.now() + 72 * 3600000)}),
         db.collection("OutboundMessages").doc(messageId).set({id: messageId,
           templateId: "guest_registration_confirmation",
-          channel: contact.type === "phone" ? "sms" : "email", status: "pending", attempts: 0,
+          channel: "email", status: "pending", attempts: 0,
           registrationId: data.registration.id, guestId: data.guest.id, eventId: data.event.id,
-          encryptedContact: encrypted, maskedContact: maskedContact(contact), payload: {
-            firstName: data.guest.get("firstName"), eventTitle: data.event.get("title"),
+          encryptedEmail: encrypted, maskedEmail: maskedEmail(email), payload: {
+            firstName: data.guest.get("greetingName"), eventTitle: data.event.get("title"),
             eventStart: data.event.get("selectedDateTime"), eventLocation: data.event.get("location"),
             kind: data.ticket ? "ticket" : "rsvp",
             manageUrl: `${PUBLIC_ORIGIN}/manage/${rawToken}`}, createdAt: new Date(),
           nextAttemptAt: new Date()}),
       ]);
       return managePage(res, nonce, await manageData(db, session), session,
-          "Contact updated. A new confirmation is being sent.");
+          "Email updated. A new confirmation is being sent.");
     } catch (error) {
       return managePage(res, nonce, data, session,
-          error.message || "Contact could not be updated.");
+          error.message || "Email could not be updated.");
     }
   }
   if (eventStartForManage(data.event.data()) <= new Date() || data.ticket?.get("isPaid") === true) {
@@ -506,14 +504,14 @@ async function manageAction(db, req, res, nonce) {
     }
   });
   const guest = data.guest.data();
-  if (guest.encryptedContact) {
+  if (guest.encryptedEmail) {
     const messageId = `cancellation_${data.registration.id}`;
     await db.collection("OutboundMessages").doc(messageId).set({id: messageId,
       templateId: "guest_registration_cancelled",
-      channel: guest.contactType === "phone" ? "sms" : "email", status: "pending", attempts: 0,
+      channel: "email", status: "pending", attempts: 0,
       registrationId: data.registration.id, guestId: data.guest.id, eventId: data.event.id,
-      encryptedContact: guest.encryptedContact, maskedContact: guest.maskedContact,
-      payload: {firstName: guest.firstName, eventTitle: data.event.get("title"),
+      encryptedEmail: guest.encryptedEmail, maskedEmail: guest.maskedEmail,
+      payload: {firstName: guest.greetingName, eventTitle: data.event.get("title"),
         eventStart: data.event.get("selectedDateTime"), eventLocation: data.event.get("location")},
       createdAt: new Date(), nextAttemptAt: new Date()});
   }

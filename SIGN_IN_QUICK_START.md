@@ -255,7 +255,7 @@ For **Most Secure** Events:
 
 For **Regular** Events:
 - [ ] Display QR code prominently at entrance
-- [ ] Share event code via email/SMS
+- [ ] Share event code via email
 - [ ] Print QR codes as backup
 - [ ] Have staff ready to help attendees
 
@@ -379,4 +379,3 @@ if (FeatureFlags.useModernSignIn) {
 **Last Updated**: October 27, 2025  
 **Version**: 1.0.0  
 **Status**: ✅ Production Ready
-

@@ -16,10 +16,8 @@ Accountless registration is additive and fails closed. Keep
   `MICROSOFT_TENANT_ID`, `MICROSOFT_CLIENT_ID`, the base64url SHA-1 certificate
   thumbprint in `MICROSOFT_CERT_THUMBPRINT`, and the PEM PKCS#8 private key in
   `MICROSOFT_PRIVATE_KEY`.
-- Configure a compliant Twilio Messaging Service and store `TWILIO_ACCOUNT_SID`,
-  `TWILIO_AUTH_TOKEN`, and `TWILIO_MESSAGING_SERVICE_SID`. Configure its inbound URL as
-  `https://attendus.app/communications/sms-inbound`, its status callback as
-  `https://attendus.app/communications/sms-status`, and enable Advanced Opt-Out.
+- Guest registration accepts a full name and email address only. Microsoft Graph is the
+  sole transactional delivery provider; no SMS provider or phone-only guest flow is deployed.
 - Keep the live `STRIPE_SECRET_KEY`, publishable key, signed webhook secret, and webhook
   event subscriptions from the public-web rollout healthy.
 
@@ -31,10 +29,10 @@ delivery state, never raw provider credentials.
 1. Deploy Firestore rules, indexes, and TTL policies and wait for index readiness.
 2. Deploy Functions and Hosting while accountless flags remain false.
 3. Verify the function manifest, anonymous Auth, App Check, KMS round-trip, Microsoft
-   test delivery, Twilio test delivery and signed callbacks, and signed Stripe fixtures.
+   test delivery, and signed Stripe fixtures.
 4. Run a harmless RSVP against a real eligible event and verify the originating browser,
    management link, calendar file, cancellation, roster visibility, and audit log.
-5. Enable `accountlessRegistrationEnabled` and email/SMS delivery. Enable
+5. Enable `accountlessRegistrationEnabled` and email delivery. Enable
    `paidTicketCheckoutEnabled` only after the payment configuration gate passes.
 6. Monitor registration errors, duplicate claims, inventory counters, webhook failures,
    delivery dead letters, suppression callbacks, and claim failures for at least one hour.
@@ -53,4 +51,4 @@ Rollback is configuration-only and does not delete guest records:
 4. Keep public semantic pages online unless rendering itself is affected.
 
 Queued confirmations remain retryable from Attendus Admin. Never delete a confirmed
-registration because its email or SMS delivery failed.
+registration because its email delivery failed.

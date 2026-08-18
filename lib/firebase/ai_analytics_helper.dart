@@ -384,7 +384,8 @@ class AIAnalyticsHelper {
           'description': 'Implement reminder system to reduce dropout by 30%',
           'impact': 'Medium',
           'confidence': 0.8,
-          'implementation': 'Send SMS/email reminders 24h and 1h before events',
+          'implementation':
+              'Send email and in-app reminders 24h and 1h before events',
         });
       }
 

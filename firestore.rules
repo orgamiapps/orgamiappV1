@@ -87,13 +87,12 @@ service cloud.firestore {
     match /stripe_webhook_events/{doc} { allow read, write: if false; }
     match /TicketReservations/{doc} { allow read, write: if false; }
     match /GuestAttendees/{doc} { allow read, write: if false; }
-    match /GuestEventContactClaims/{doc} { allow read, write: if false; }
+    match /GuestEventEmailClaims/{doc} { allow read, write: if false; }
     match /GuestManageTokens/{doc} { allow read, write: if false; }
     match /GuestManageSessions/{doc} { allow read, write: if false; }
     match /PublicRegistrationFlows/{doc} { allow read, write: if false; }
     match /OutboundMessages/{doc} { allow read, write: if false; }
     match /CommunicationTemplates/{doc} { allow read, write: if false; }
-    match /CommunicationSuppressions/{doc} { allow read, write: if false; }
     match /payment_review_queue/{doc} { allow read, write: if false; }
     match /PublicWebEvents/{doc} { allow read, write: if false; }
     match /PublicWebCommunities/{doc} { allow read, write: if false; }

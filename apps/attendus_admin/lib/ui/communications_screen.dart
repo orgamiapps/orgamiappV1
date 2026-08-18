@@ -47,7 +47,7 @@ class CommunicationsScreen extends StatelessWidget {
                   'id',
                   'channel',
                   'status',
-                  'maskedContact',
+                  'maskedEmail',
                   'attempts',
                   'providerStatus',
                   'lastError',
@@ -61,8 +61,7 @@ class CommunicationsScreen extends StatelessWidget {
                 columns: const [
                   'id',
                   'fullName',
-                  'contactType',
-                  'maskedContact',
+                  'maskedEmail',
                   'deliveryStatus',
                   'verificationStatus',
                   'claimedByUid',
@@ -91,55 +90,35 @@ class CommunicationsScreen extends StatelessWidget {
   );
 
   static Future<void> _testSend(BuildContext context) async {
-    final contact = TextEditingController();
-    var type = 'email';
+    final email = TextEditingController();
     final values = await showDialog<Map<String, String>>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Send provider test'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: type,
-                decoration: const InputDecoration(labelText: 'Channel'),
-                items: const [
-                  DropdownMenuItem(value: 'email', child: Text('Email')),
-                  DropdownMenuItem(value: 'phone', child: Text('U.S. mobile')),
-                ],
-                onChanged: (value) => setState(() => type = value ?? 'email'),
-              ),
-              TextField(
-                controller: contact,
-                keyboardType: type == 'phone'
-                    ? TextInputType.phone
-                    : TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  labelText: type == 'phone'
-                      ? 'U.S. mobile number'
-                      : 'Email address',
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, {
-                'contactType': type,
-                'contactValue': contact.text.trim(),
-              }),
-              child: const Text('Continue'),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Send provider test'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: email,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(labelText: 'Email address'),
             ),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, {'email': email.text.trim()}),
+            child: const Text('Continue'),
+          ),
+        ],
       ),
     );
-    contact.dispose();
+    email.dispose();
     if (values == null || !context.mounted) return;
     final request = await showDialog<MutationRequest>(
       context: context,
@@ -223,7 +202,7 @@ class CommunicationsScreen extends StatelessWidget {
     VoidCallback _,
   ) => [
     IconButton(
-      tooltip: 'View full contact (audited)',
+      tooltip: 'View full email (audited)',
       onPressed: () => _guestDetail(context, row['id'].toString()),
       icon: const Icon(Icons.visibility_outlined),
     ),
@@ -241,10 +220,10 @@ class CommunicationsScreen extends StatelessWidget {
         builder: (_) => AlertDialog(
           title: Text(data['fullName']?.toString() ?? 'Guest registration'),
           content: SelectableText(
-            'Contact: ${data['contact']}\n'
+            'Email: ${data['email']}\n'
             'Delivery: ${data['deliveryStatus']}\n'
             'Verification: ${data['verificationStatus']}\n\n'
-            'This full-contact access has been recorded in the audit log.',
+            'This full-email access has been recorded in the audit log.',
           ),
           actions: [
             TextButton(
@@ -289,7 +268,6 @@ class CommunicationsScreen extends StatelessWidget {
       final subject = TextEditingController(text: data['subject']?.toString());
       final text = TextEditingController(text: data['text']?.toString());
       final html = TextEditingController(text: data['html']?.toString());
-      final sms = TextEditingController(text: data['sms']?.toString());
       final result = await showDialog<Map<String, String>>(
         context: context,
         builder: (dialogContext) => AlertDialog(
@@ -319,11 +297,6 @@ class CommunicationsScreen extends StatelessWidget {
                     maxLines: 8,
                     decoration: const InputDecoration(labelText: 'HTML'),
                   ),
-                  TextField(
-                    controller: sms,
-                    maxLines: 4,
-                    decoration: const InputDecoration(labelText: 'SMS'),
-                  ),
                 ],
               ),
             ),
@@ -338,7 +311,6 @@ class CommunicationsScreen extends StatelessWidget {
                 'subject': subject.text,
                 'text': text.text,
                 'html': html.text,
-                'sms': sms.text,
               }),
               child: const Text('Continue'),
             ),

@@ -45,13 +45,11 @@ const {
   createGetPublicRegistrationStatusV2,
   createResendPublicRegistrationConfirmationV1,
   createStartPublicRegistrationV2,
-  createUpdatePublicRegistrationContactV1,
+  createUpdatePublicRegistrationEmailV1,
 } = require("./public-web/accountless");
 const {
   createDeliverOutboundMessage,
   createRetryOutboundMessages,
-  createTwilioInbound,
-  createTwilioStatusCallback,
 } = require("./communications/delivery");
 
 const GOOGLE_PLACES_API_KEY = defineSecret("GOOGLE_PLACES_API_KEY");
@@ -464,37 +462,11 @@ const {createMetricsAggregator} = require("./admin/metrics");
 const {createAdminDispatchHandlers} = require("./notifications/admin-dispatch");
 exports.adminApi = createAdminApi(admin);
 exports.aggregateAdminMetricsDaily = createMetricsAggregator(admin);
-// Optional Twilio setup for SMS sending
-let twilioClient = null;
-try {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  if (accountSid && authToken) {
-    const twilio = require("twilio");
-    twilioClient = twilio(accountSid, authToken);
-    logger.info("Twilio client initialized");
-  } else {
-    logger.info("Twilio not configured; SMS sending will be skipped");
-  }
-} catch (e) {
-  logger.error("Failed to initialize Twilio", e);
-}
-
-const adminDispatch = createAdminDispatchHandlers({
-  admin,
-  twilioClient,
-  twilioFromNumber: process.env.TWILIO_FROM_NUMBER,
-  logger,
-});
+const adminDispatch = createAdminDispatchHandlers({admin});
 
 exports.sendCustomNotifications = onCall(
     {region: "us-central1", enforceAppCheck: true, maxInstances: 5},
     adminDispatch.sendCustomNotifications,
-);
-
-exports.sendBulkSms = onCall(
-    {region: "us-central1", enforceAppCheck: true, maxInstances: 2},
-    adminDispatch.sendBulkSms,
 );
 
 // For cost control, you can set the maximum number of containers that can be
@@ -1438,7 +1410,7 @@ function generateOptimizations(analyticsData, peakHoursAnalysis, sentimentAnalys
       description: "Implement reminder system to reduce dropout by 30%",
       impact: "Medium",
       confidence: 0.8,
-      implementation: "Send SMS/email reminders 24h and 1h before events",
+      implementation: "Send email and in-app reminders 24h and 1h before events",
     });
   }
 
@@ -3893,8 +3865,8 @@ exports.anonymizeExpiredGuestContactsV1 =
 exports.claimPublicRegistrationV1 = createClaimPublicRegistrationV1(admin);
 exports.resendPublicRegistrationConfirmationV1 =
   createResendPublicRegistrationConfirmationV1(admin);
-exports.updatePublicRegistrationContactV1 =
-  createUpdatePublicRegistrationContactV1(admin);
+exports.updatePublicRegistrationEmailV1 =
+  createUpdatePublicRegistrationEmailV1(admin);
 exports.getOrganizerEventRegistrationsV1 =
   createGetOrganizerEventRegistrationsV1(admin);
 exports.exportOrganizerEventRegistrationsV1 =
@@ -3902,8 +3874,6 @@ exports.exportOrganizerEventRegistrationsV1 =
 exports.followPublicEventOrganizerV1 = createFollowPublicEventOrganizerV1(admin);
 exports.deliverOutboundMessageV1 = createDeliverOutboundMessage(admin);
 exports.retryOutboundMessagesV1 = createRetryOutboundMessages(admin);
-exports.twilioStatusCallbackV1 = createTwilioStatusCallback(admin);
-exports.twilioInboundV1 = createTwilioInbound(admin);
 
 const {
   createEndCheckInSession,
