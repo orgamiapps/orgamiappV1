@@ -227,8 +227,7 @@ class EventModel {
       occurrenceIndex: (data['occurrenceIndex'] as num?)?.round(),
       seriesVersion: (data['seriesVersion'] as num?)?.round(),
       eventRevision: (data['eventRevision'] as num?)?.round() ?? 0,
-      wizardSchemaVersion:
-          (data['wizardSchemaVersion'] as num?)?.round() ?? 1,
+      wizardSchemaVersion: (data['wizardSchemaVersion'] as num?)?.round() ?? 1,
       signInMethods:
           (data.containsKey('signInMethods') && data['signInMethods'] != null)
           ? List<String>.from(data['signInMethods'])
