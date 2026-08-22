@@ -58,7 +58,7 @@ import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
 import 'package:attendus/screens/Events/chose_location_in_map_screen.dart';
 import 'package:attendus/screens/Events/feature_event_screen.dart';
-import 'package:attendus/screens/Events/edit_event_screen.dart';
+import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:attendus/screens/Events/event_location_view_screen.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:attendus/screens/Events/Widget/qr_dialogue.dart';
@@ -1783,8 +1783,18 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                               Navigator.pop(context);
                               RouterClass.nextScreenNormal(
                                 context,
-                                EditEventScreen(eventModel: eventModel),
+                                EventCreationExperienceGate(event: eventModel),
                               );
+                            },
+                          ),
+                          _CompactAction(
+                            icon: Icons.copy_all_outlined,
+                            title: 'Duplicate',
+                            subtitle: 'Create a safe copy',
+                            color: const Color(0xFF475569),
+                            onTap: () {
+                              Navigator.pop(context);
+                              openDuplicateEventWizard(context, eventModel);
                             },
                           ),
                           _CompactAction(
@@ -5916,7 +5926,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                   Navigator.pop(context);
                   RouterClass.nextScreenNormal(
                     context,
-                    EditEventScreen(eventModel: eventModel),
+                    EventCreationExperienceGate(event: eventModel),
                   );
                 },
                 icon: const Icon(Icons.edit, size: 18),

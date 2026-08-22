@@ -77,25 +77,43 @@ function calendarInvite(message, method = "PUBLISH") {
     `URL:${icsEscape(message.payload?.manageUrl)}`, "END:VEVENT", "END:VCALENDAR", ""].join("\r\n");
 }
 
+function shouldAttachCalendar(templateId) {
+  return templateId === "guest_registration_cancelled" ||
+    !["guest_registration_declined", "guest_registration_pending",
+      "guest_registration_waitlisted"].includes(templateId);
+}
+
 function fallbackTemplate(message) {
   const payload = message.payload || {};
   const cancelled = message.templateId === "guest_registration_cancelled";
+  const declined = message.templateId === "guest_registration_declined";
+  const pending = message.templateId === "guest_registration_pending";
+  const waitlisted = message.templateId === "guest_registration_waitlisted";
   const subject = cancelled ? `Registration cancelled: ${payload.eventTitle}` :
-    `You're confirmed for ${payload.eventTitle}`;
+    declined ? `Registration update: ${payload.eventTitle}` :
+    pending ? `Registration received: ${payload.eventTitle}` :
+      waitlisted ? `You're on the waitlist for ${payload.eventTitle}` :
+        `You're confirmed for ${payload.eventTitle}`;
   const action = cancelled ? "Your registration has been cancelled." :
-    `Your ${message.payload?.kind === "rsvp" ? "RSVP" : "ticket"} is confirmed.`;
+    declined ? "The organizer was unable to approve your registration." :
+    pending ? "Your registration is awaiting organizer approval." :
+      waitlisted ? "A place is not currently available, so you have been added to the waitlist." :
+        `Your ${message.payload?.kind === "rsvp" ? "RSVP" : "ticket"} is confirmed.`;
+  const actionable = !cancelled && !declined && !pending;
   const text = `Hi ${payload.firstName || "there"}, ${action} ${payload.eventTitle}. ` +
-    `${cancelled ? "" : `View your registration: ${payload.manageUrl}`}`;
+    `${actionable ? `View your registration: ${payload.manageUrl}` : ""}`;
   const html = `<h1>${escapeHtml(subject)}</h1><p>Hi ${escapeHtml(payload.firstName || "there")},</p>` +
     `<p>${escapeHtml(action)}</p><p><strong>${escapeHtml(payload.eventTitle)}</strong></p>` +
-    (cancelled ? "" : `<p><a href="${escapeHtml(payload.manageUrl)}">View ticket and registration</a></p>`) +
+    (actionable ? `<p><a href="${escapeHtml(payload.manageUrl)}">View registration</a></p>` : "") +
     `<p>Questions? Contact <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a>.</p>`;
   return {subject, text, html};
 }
 
 async function templateFor(db, message) {
   const snapshot = await db.collection("CommunicationTemplates").doc(message.templateId).get();
-  if (!snapshot.exists || snapshot.get("status") !== "published") return fallbackTemplate(message);
+  if (!snapshot.exists || snapshot.get("status") !== "published") {
+    return {...fallbackTemplate(message), attachCalendar: shouldAttachCalendar(message.templateId)};
+  }
   const fallback = fallbackTemplate(message);
   const values = {firstName: message.payload?.firstName || "there",
     eventTitle: message.payload?.eventTitle || "Event", manageUrl: message.payload?.manageUrl || "",
@@ -104,7 +122,8 @@ async function templateFor(db, message) {
       (_, key) => values[key]);
   return {subject: render(snapshot.get("subject")) || fallback.subject,
     text: render(snapshot.get("text")) || fallback.text,
-    html: render(snapshot.get("html")) || fallback.html};
+    html: render(snapshot.get("html")) || fallback.html,
+    attachCalendar: shouldAttachCalendar(message.templateId)};
 }
 
 async function sendEmail(db, message, contact) {
@@ -112,14 +131,16 @@ async function sendEmail(db, message, contact) {
   const token = await graphAccessToken();
   const invite = calendarInvite(message,
       message.templateId === "guest_registration_cancelled" ? "CANCEL" : "PUBLISH");
+  const attachments = template.attachCalendar ? [{"@odata.type": "#microsoft.graph.fileAttachment",
+    name: "attendus-event.ics", contentType: message.templateId === "guest_registration_cancelled" ?
+      "text/calendar; method=CANCEL" : "text/calendar; method=PUBLISH",
+    contentBytes: Buffer.from(invite).toString("base64")}] : [];
   const response = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(SUPPORT_EMAIL)}/sendMail`, {
     method: "POST", headers: {authorization: `Bearer ${token}`, "content-type": "application/json"},
     body: JSON.stringify({message: {subject: template.subject,
       body: {contentType: "HTML", content: template.html},
       toRecipients: [{emailAddress: {address: contact.value}}],
-      attachments: [{"@odata.type": "#microsoft.graph.fileAttachment",
-        name: "attendus-event.ics", contentType: "text/calendar; method=PUBLISH",
-        contentBytes: Buffer.from(invite).toString("base64")}]} , saveToSentItems: true}),
+      attachments}, saveToSentItems: true}),
   });
   if (response.status !== 202) throw new Error(`Microsoft Graph rejected email (${response.status})`);
   return {provider: "microsoft_graph", providerStatus: "accepted"};

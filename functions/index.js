@@ -51,6 +51,8 @@ const {
   createDeliverOutboundMessage,
   createRetryOutboundMessages,
 } = require("./communications/delivery");
+const {createEventWizardFunctions} = require("./events/wizard");
+const {createStartPublicRegistrationV3} = require("./events/registration-v3");
 
 const GOOGLE_PLACES_API_KEY = defineSecret("GOOGLE_PLACES_API_KEY");
 const placesRateWindows = new Map();
@@ -1542,7 +1544,8 @@ exports.updateUserAnalyticsOnEventCreateV2 = onDocumentCreated({
   region: "us-central1",
   retry: true,
 }, async (event) => {
-  const eventData = event.data.data();
+  const eventData = event.data?.data();
+  if (!eventData) return {skipped: true, reason: "missing_event_snapshot"};
   const userId = eventData.customerUid;
   if (!userId) return {skipped: true, reason: "missing_owner"};
 
@@ -3874,6 +3877,20 @@ exports.exportOrganizerEventRegistrationsV1 =
 exports.followPublicEventOrganizerV1 = createFollowPublicEventOrganizerV1(admin);
 exports.deliverOutboundMessageV1 = createDeliverOutboundMessage(admin);
 exports.retryOutboundMessagesV1 = createRetryOutboundMessages(admin);
+exports.startPublicRegistrationV3 = createStartPublicRegistrationV3(admin);
+
+const eventWizardFunctions = createEventWizardFunctions(admin);
+exports.saveEventDraftV1 = eventWizardFunctions.saveEventDraftV1;
+exports.listEventDraftsV1 = eventWizardFunctions.listEventDraftsV1;
+exports.archiveEventDraftV1 = eventWizardFunctions.archiveEventDraftV1;
+exports.deleteEventDraftV1 = eventWizardFunctions.deleteEventDraftV1;
+exports.duplicateEventToDraftV1 = eventWizardFunctions.duplicateEventToDraftV1;
+exports.createEditEventDraftV1 = eventWizardFunctions.createEditEventDraftV1;
+exports.listEventTemplatesV1 = eventWizardFunctions.listEventTemplatesV1;
+exports.saveEventTemplateV1 = eventWizardFunctions.saveEventTemplateV1;
+exports.deleteEventTemplateV1 = eventWizardFunctions.deleteEventTemplateV1;
+exports.publishEventDraftV1 = eventWizardFunctions.publishEventDraftV1;
+exports.decideEventRegistrationV1 = eventWizardFunctions.decideEventRegistrationV1;
 
 const {
   createEndCheckInSession,

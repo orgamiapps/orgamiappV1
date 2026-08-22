@@ -115,6 +115,31 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
     });
   }
 
+  Future<void> _decideRegistration(
+    String registrationId,
+    String decision,
+  ) async {
+    await _run(() async {
+      await FirebaseFunctions.instanceFor(
+        region: 'us-central1',
+      ).httpsCallable('decideEventRegistrationV1').call<Map<String, dynamic>>({
+        'eventId': widget.event.id,
+        'registrationId': registrationId,
+        'decision': decision,
+      });
+      await _loadRegistrationDetails();
+      if (!mounted) return;
+      final resultLabel = switch (decision) {
+        'approve' => 'approved',
+        'decline' => 'declined',
+        _ => 'promoted',
+      };
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Registration $resultLabel.')));
+    });
+  }
+
   Future<void> _refreshOperationalState() async {
     await _refreshConnectivity();
     if (_session != null) await _refreshCredential(silent: true);
@@ -634,8 +659,9 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
                   'Attendee';
               final checkedIn = attended.contains(uid);
               final detail = _registrationDetails[doc.id];
-              final contact = detail?['contact']?.toString();
+              final contact = detail?['email']?.toString();
               final delivery = detail?['deliveryStatus']?.toString();
+              final status = detail?['status']?.toString() ?? 'confirmed';
               return ListTile(
                 leading: CircleAvatar(
                   child: Text(name.isEmpty ? '?' : name[0].toUpperCase()),
@@ -643,16 +669,42 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
                 title: Text(name),
                 subtitle: Text(
                   [
-                    checkedIn ? 'Already checked in' : 'Registered',
+                    checkedIn
+                        ? 'Already checked in'
+                        : status.replaceAll('_', ' '),
                     if (contact?.isNotEmpty == true) contact!,
                     if (delivery != null && delivery != 'not_applicable')
                       'Confirmation: ${delivery.replaceAll('_', ' ')}',
                   ].join(' · '),
                 ),
-                trailing: checkedIn
+                trailing: status == 'pending'
+                    ? PopupMenuButton<String>(
+                        tooltip: 'Decide registration',
+                        enabled: !_busy,
+                        onSelected: (decision) =>
+                            _decideRegistration(doc.id, decision),
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(
+                            value: 'approve',
+                            child: Text('Approve'),
+                          ),
+                          PopupMenuItem(
+                            value: 'decline',
+                            child: Text('Decline'),
+                          ),
+                        ],
+                      )
+                    : status == 'waitlisted'
+                    ? FilledButton.tonal(
+                        onPressed: _busy
+                            ? null
+                            : () => _decideRegistration(doc.id, 'promote'),
+                        child: const Text('Offer place'),
+                      )
+                    : checkedIn
                     ? const Icon(Icons.check_circle, color: Colors.green)
                     : FilledButton.tonal(
-                        onPressed: _session == null
+                        onPressed: _session == null || status != 'confirmed'
                             ? null
                             : () => _checkInRoster(uid: uid, name: name),
                         child: const Text('Check in'),

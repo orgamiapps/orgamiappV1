@@ -9,7 +9,7 @@ import 'package:attendus/models/customer_model.dart';
 
 // Event screens
 import 'package:attendus/screens/Events/single_event_screen.dart';
-import 'package:attendus/screens/Events/edit_event_screen.dart';
+import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:attendus/screens/Events/ticket_management_screen.dart';
 import 'package:attendus/screens/Events/event_analytics_screen.dart';
 
@@ -201,7 +201,7 @@ class RouteBuilder {
 
         if (doc.exists) {
           final event = EventModel.fromJson(doc);
-          return EditEventScreen(eventModel: event);
+          return EventCreationExperienceGate(event: event);
         }
       } catch (e) {
         Logger.error('Error fetching event for edit $eventId: $e');

@@ -3,7 +3,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {decryptEmail, encryptEmail, maskedEmail, normalizeEmail, normalizeName,
-  normalizeRegistrationIdentity, ticketQrSvg, validateEvent} =
+  normalizeRegistrationIdentity, ticketQrSvg, validateEvent,
+  validateRegistrationWindow} =
   require("../public-web/accountless");
 const {calendarInvite, fallbackTemplate} = require("../communications/delivery");
 
@@ -55,6 +56,21 @@ test("event eligibility is server authoritative", () => {
     selectedDateTime: future}), /Event not found/);
   assert.throws(() => validateEvent({status: "active", private: false,
     selectedDateTime: new Date(0)}), /ended/);
+});
+
+test("registration opening and closing times are enforced", () => {
+  const now = new Date("2030-01-02T12:00:00Z");
+  assert.doesNotThrow(() => validateRegistrationWindow({}, now));
+  assert.doesNotThrow(() => validateRegistrationWindow({registrationPolicy: {
+    opensAt: new Date("2030-01-01T12:00:00Z"),
+    closesAt: new Date("2030-01-03T12:00:00Z"),
+  }}, now));
+  assert.throws(() => validateRegistrationWindow({registrationPolicy: {
+    opensAt: new Date("2030-01-03T12:00:00Z"),
+  }}, now), /not open/i);
+  assert.throws(() => validateRegistrationWindow({registrationPolicy: {
+    closesAt: new Date("2030-01-01T12:00:00Z"),
+  }}, now), /closed/i);
 });
 
 test("calendar invitation uses a stable registration UID", () => {

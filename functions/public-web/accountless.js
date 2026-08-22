@@ -6,6 +6,7 @@ const {defineSecret} = require("firebase-functions/params");
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const QRCode = require("qrcode");
+const {registrationAnswers} = require("../events/question-answers");
 
 const CONTACT_HMAC_KEY = defineSecret("GUEST_CONTACT_HMAC_KEY");
 const CONTACT_KMS_KEY_NAME = defineSecret("GUEST_CONTACT_KMS_KEY_NAME");
@@ -137,6 +138,19 @@ function validateEvent(event, now = new Date()) {
   }
 }
 
+function validateRegistrationWindow(event, now = new Date()) {
+  const policy = event?.registrationPolicy || {};
+  const parse = (value) => value?.toDate ? value.toDate() : value ? new Date(value) : null;
+  const opens = parse(policy.opensAt);
+  const closes = parse(policy.closesAt);
+  if (opens && !Number.isNaN(opens.getTime()) && now < opens) {
+    throw new HttpsError("failed-precondition", "Registration has not opened yet.");
+  }
+  if (closes && !Number.isNaN(closes.getTime()) && now > closes) {
+    throw new HttpsError("failed-precondition", "Registration is closed.");
+  }
+}
+
 function registrationKind(event) {
   if (event.ticketsEnabled !== true) return "rsvp";
   return Number(event.ticketPrice || 0) > 0 ? "paid_ticket" : "free_ticket";
@@ -215,6 +229,8 @@ function createStartPublicRegistrationV2(admin) {
     if (!eventSnapshot.exists) throw new HttpsError("not-found", "Event not found.");
     const event = eventSnapshot.data();
     validateEvent(event);
+    validateRegistrationWindow(event);
+    const answers = await registrationAnswers(eventRef, req.data?.answers);
     const kind = registrationKind(event);
     if (kind === "paid_ticket") await requireFeature(db, "paidTicketCheckoutEnabled");
 
@@ -270,7 +286,7 @@ function createStartPublicRegistrationV2(admin) {
           transaction.get(eventRef), transaction.get(claimRef),
         ]);
         if (claim.exists) throw new HttpsError("already-exists", "Registration already exists.");
-        const current = freshEvent.data(); validateEvent(current);
+        const current = freshEvent.data(); validateEvent(current); validateRegistrationWindow(current);
         if (Number(current.issuedTickets || 0) + Number(current.reservedTickets || 0) >=
             Number(current.maxTickets || 0)) throw new HttpsError("resource-exhausted", "No tickets are available.");
         transaction.create(guestRef, {id: guestId, ownerUid: caller.uid, fullName, greetingName,
@@ -290,6 +306,7 @@ function createStartPublicRegistrationV2(admin) {
           eventTitle: String(event.title || "Event"), eventImageUrl: String(event.imageUrl || ""),
           eventLocation: String(event.location || ""), eventDateTime: event.selectedDateTime,
           customerName: fullName, encryptedEmail,
+          answers,
           manageToken: manage.raw, creatorUid: String(event.customerUid || ""), createdAt: now,
           expiresAt: new Date(Date.now() + 15 * 60000)});
         transaction.update(eventRef, {reservedTickets: admin.firestore.FieldValue.increment(1)});
@@ -338,7 +355,7 @@ function createStartPublicRegistrationV2(admin) {
         transaction.get(eventRef), transaction.get(claimRef),
       ]);
       if (claim.exists) throw new HttpsError("already-exists", "Registration already exists.");
-      const current = freshEvent.data(); validateEvent(current);
+      const current = freshEvent.data(); validateEvent(current); validateRegistrationWindow(current);
       if (kind === "free_ticket" && Number(current.issuedTickets || 0) +
           Number(current.reservedTickets || 0) >= Number(current.maxTickets || 0)) {
         throw new HttpsError("resource-exhausted", "No tickets are available.");
@@ -356,7 +373,7 @@ function createStartPublicRegistrationV2(admin) {
         realName: fullName, customerUid: caller.uid, guestId,
         identityType: caller.isAnonymous ? "guest" : "account",
         emailRef: guestRef.path, attendanceDateTime: now,
-        answers: [], isAnonymous: caller.isAnonymous, registrationSource: "public_event_page_v2",
+        answers, isAnonymous: caller.isAnonymous, registrationSource: "public_event_page_v2",
         status: "confirmed"});
       if (kind === "free_ticket") {
         ticketId = `free_${digest(eventId, guestId)}`;
@@ -719,10 +736,12 @@ module.exports = {
   digest,
   encryptEmail,
   emailHash,
+  enforceRateLimit,
   maskedEmail,
   normalizeEmail,
   normalizeName,
   normalizeRegistrationIdentity,
   ticketQrSvg,
   validateEvent,
+  validateRegistrationWindow,
 };

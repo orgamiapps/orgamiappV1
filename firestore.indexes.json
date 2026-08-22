@@ -335,6 +335,40 @@
         {"fieldPath": "status", "order": "ASCENDING"},
         {"fieldPath": "nextAttemptAt", "order": "ASCENDING"}
       ]
+    },
+    {
+      "collectionGroup": "EventDrafts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "ownerUid", "order": "ASCENDING"},
+        {"fieldPath": "archived", "order": "ASCENDING"},
+        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "EventTemplates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "ownerUid", "order": "ASCENDING"},
+        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "EventTemplates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "organizationId", "order": "ASCENDING"},
+        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "EventDrafts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "ownerUid", "order": "ASCENDING"},
+        {"fieldPath": "sourceEventId", "order": "ASCENDING"},
+        {"fieldPath": "archived", "order": "ASCENDING"}
+      ]
     }
   ],
   "fieldOverrides": [

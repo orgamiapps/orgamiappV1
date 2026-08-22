@@ -63,7 +63,8 @@
   function registrationForm(node, action, context) {
     const content = node.querySelector(".dialog-content");
     const paid = config.ticketState === "paid_ticket";
-    content.innerHTML = `${eventSummary()}<form class="registration-form"><label>Full name <input name="fullName" autocomplete="name" maxlength="160" required></label><label>Email address <input name="email" type="email" autocomplete="email" maxlength="254" required></label><div class="checkout-terms"><span>${paid ? `Ticket: $${Number(config.event?.price || 0).toFixed(2)} USD` : action === "rsvp" ? "RSVP · Free" : "Ticket · Free"}</span><small>Event questions are completed separately during event check-in.</small></div><button class="cta continue" type="submit">${paid ? "Continue to payment" : action === "rsvp" ? "Confirm RSVP" : "Get ticket"}</button></form>`;
+    const registrationQuestions = config.event?.questions || [];
+    content.innerHTML = `${eventSummary()}<form class="registration-form"><label>Full name <input name="fullName" autocomplete="name" maxlength="160" required></label><label>Email address <input name="email" type="email" autocomplete="email" maxlength="254" required></label><fieldset class="registration-questions" hidden><legend>A few details from the organizer</legend></fieldset><div class="checkout-terms"><span>${paid ? `Ticket: $${Number(config.event?.price || 0).toFixed(2)} USD` : action === "rsvp" ? "RSVP · Free" : "Ticket · Free"}</span><small>${registrationQuestions.length ? "Required questions must be completed before confirmation." : "Any check-in questions are completed separately when you arrive."}</small></div><button class="cta continue" type="submit">${paid ? "Continue to payment" : config.event?.approvalMode === "manual" ? "Request a place" : action === "rsvp" ? "Confirm RSVP" : "Get ticket"}</button></form>`;
     content.querySelector(".checkout-summary strong").textContent = config.event?.title || "Event";
     content.querySelector(".summary-date").textContent = config.event?.date ?
       new Intl.DateTimeFormat("en-US", {dateStyle: "medium", timeStyle: "short"})
@@ -72,7 +73,58 @@
     const user = context.auth.currentUser;
     if (user?.displayName) content.querySelector("[name=fullName]").value = user.displayName;
     if (user?.email) content.querySelector("[name=email]").value = user.email;
+    const questionSet = content.querySelector(".registration-questions");
+    for (const question of registrationQuestions) {
+      const wrapper = document.createElement("div"); wrapper.className = "registration-question";
+      const legend = document.createElement(question.type === "multiple_choice" ? "fieldset" : "label");
+      if (question.type === "multiple_choice") {
+        const title = document.createElement("legend");
+        title.textContent = `${question.prompt}${question.required ? " (required)" : ""}`;
+        legend.append(title);
+        for (const option of question.options || []) {
+          const label = document.createElement("label"); label.className = "choice-option";
+          const input = document.createElement("input"); input.type = "checkbox";
+          input.name = `question:${question.id}`; input.value = option;
+          label.append(input, document.createTextNode(option)); legend.append(label);
+        }
+      } else if (question.type === "acknowledgement") {
+        legend.className = "choice-option acknowledgement";
+        const input = document.createElement("input"); input.type = "checkbox";
+        input.name = `question:${question.id}`; input.value = "true"; input.required = question.required;
+        legend.append(input, document.createTextNode(question.prompt));
+      } else if (question.type === "single_choice") {
+        legend.textContent = question.prompt;
+        const select = document.createElement("select"); select.name = `question:${question.id}`;
+        select.required = question.required;
+        const empty = document.createElement("option"); empty.value = ""; empty.textContent = "Choose an option";
+        select.append(empty);
+        for (const option of question.options || []) {
+          const item = document.createElement("option"); item.value = option; item.textContent = option;
+          select.append(item);
+        }
+        legend.append(select);
+      } else {
+        legend.textContent = question.prompt;
+        const input = document.createElement(question.type === "long_text" ? "textarea" : "input");
+        input.name = `question:${question.id}`; input.required = question.required;
+        if (input instanceof HTMLTextAreaElement) input.rows = 3;
+        else input.type = "text";
+        legend.append(input);
+      }
+      wrapper.append(legend); questionSet.append(wrapper);
+    }
+    questionSet.hidden = registrationQuestions.length === 0;
     return content.querySelector("form");
+  }
+  function answersFrom(form) {
+    const data = new FormData(form); const result = {};
+    for (const question of config.event?.questions || []) {
+      const name = `question:${question.id}`;
+      if (question.type === "multiple_choice") result[question.id] = data.getAll(name).map(String);
+      else if (question.type === "acknowledgement") result[question.id] = data.get(name) === "true";
+      else result[question.id] = String(data.get(name) || "");
+    }
+    return result;
   }
   function loadStripe() {
     if (window.Stripe) return Promise.resolve(window.Stripe);
@@ -160,8 +212,11 @@
   }
   function showConfirmation(node, result, email, fullName, context) {
     const content = node.querySelector(".dialog-content");
-    content.innerHTML = `<div class="confirmation"><div class="success-mark" aria-hidden="true">✓</div><h3>You're confirmed</h3><p>Your ${result.kind === "rsvp" ? "RSVP" : "ticket"} is ready. We’re sending a secure confirmation to your email.</p><p class="delivery-state" role="status">Email delivery: ${result.deliveryStatus === "pending" ? "sending" : result.deliveryStatus || "sending"}</p>${result.ticketId ? `<div class="ticket-reference"><span>Ticket</span><strong>${result.ticketCode || result.ticketId.slice(-10).toUpperCase()}</strong>${result.ticketQrSvg ? `<div class="ticket-qr" role="img" aria-label="QR ticket code ${result.ticketCode}">${result.ticketQrSvg}</div>` : ""}</div>` : ""}<div class="confirmation-actions">${result.manageUrl ? `<a class="secondary-button" href="${result.manageUrl}">View or print ticket</a>` : ""}<button class="secondary-button add-calendar" type="button">Add to calendar</button></div><section class="account-upgrade" hidden><h3>Save your tickets</h3><p>Create an optional account to manage tickets and follow organizers.</p><button class="secondary-button google-upgrade" type="button">Continue with Google</button><form class="credential-upgrade"><label>Password <input name="password" type="password" minlength="8" autocomplete="new-password"></label><button class="secondary-button upgrade-contact" type="submit"></button></form><button class="secondary-button follow-organizer" type="button" hidden>Follow organizer</button></section><button class="link-button show-account" type="button">Create an account (optional)</button></div>`;
-    content.querySelector(".add-calendar").addEventListener("click", () => {
+    const pending = result.status === "pending"; const waitlisted = result.status === "waitlisted";
+    const heading = pending ? "Request received" : waitlisted ? "You're on the waitlist" : "You're confirmed";
+    const summary = pending ? "The organizer will review your request. We’re sending a secure status link to your email." : waitlisted ? "The event is currently full. We’ll email you if a place becomes available." : `Your ${result.kind === "rsvp" ? "RSVP" : "ticket"} is ready. We’re sending a secure confirmation to your email.`;
+    content.innerHTML = `<div class="confirmation"><div class="success-mark" aria-hidden="true">✓</div><h3>${heading}</h3><p>${summary}</p><p class="delivery-state" role="status">Email delivery: ${result.deliveryStatus === "pending" ? "sending" : result.deliveryStatus || "sending"}</p>${result.ticketId ? `<div class="ticket-reference"><span>Ticket</span><strong>${result.ticketCode || result.ticketId.slice(-10).toUpperCase()}</strong>${result.ticketQrSvg ? `<div class="ticket-qr" role="img" aria-label="QR ticket code ${result.ticketCode}">${result.ticketQrSvg}</div>` : ""}</div>` : ""}<div class="confirmation-actions">${result.manageUrl ? `<a class="secondary-button" href="${result.manageUrl}">Manage registration</a>` : ""}${pending || waitlisted ? "" : `<button class="secondary-button add-calendar" type="button">Add to calendar</button>`}</div><section class="account-upgrade" hidden><h3>Save your registrations</h3><p>Create an optional account to manage tickets and follow organizers.</p><button class="secondary-button google-upgrade" type="button">Continue with Google</button><form class="credential-upgrade"><label>Password <input name="password" type="password" minlength="8" autocomplete="new-password"></label><button class="secondary-button upgrade-contact" type="submit"></button></form><button class="secondary-button follow-organizer" type="button" hidden>Follow organizer</button></section><button class="link-button show-account" type="button">Create an account (optional)</button></div>`;
+    content.querySelector(".add-calendar")?.addEventListener("click", () => {
       const event = config.event || {}; const start = new Date(event.date);
       const end = new Date(start.getTime() + 2 * 3600000);
       const compact = (date) => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
@@ -174,7 +229,8 @@
     if (context.auth.currentUser?.isAnonymous === false) {
       content.querySelector(".show-account").hidden = true;
     }
-    dialogStatus(node, "Confirmation complete."); status("Registration confirmed.");
+    dialogStatus(node, pending ? "Request submitted." : waitlisted ? "Waitlist request complete." : "Confirmation complete.");
+    status(pending ? "Registration request submitted." : waitlisted ? "Added to waitlist." : "Registration confirmed.");
   }
   async function perform(eventId, action) {
     const context = await firebase();
@@ -190,8 +246,10 @@
         const email = String(data.get("email") || "").trim();
         form.querySelector("button").disabled = true; dialogStatus(node, "Securing your place…");
         try {
-          const result = await call("startPublicRegistrationV2", {eventId, fullName, email,
-            idempotencyKey: idempotencyKey("registration")}, context);
+          const callable = config.ticketState === "paid_ticket" ?
+            "startPublicRegistrationV2" : "startPublicRegistrationV3";
+          const result = await call(callable, {eventId, fullName, email,
+            answers: answersFrom(form), idempotencyKey: idempotencyKey("registration")}, context);
           if (result.status === "confirmation_pending") {
             showConfirmation(node, result, email, fullName, context); resolve(); return;
           }

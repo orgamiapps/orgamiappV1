@@ -6,7 +6,7 @@
     "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",
     "start": "npm run shell",
-    "test": "node --test test/admin-unit.test.js test/places.test.js test/places-rate-limit.test.js test/callable-security.test.js test/account-deletion.test.js test/biometric-retention.test.js test/ticket-issuance.test.js test/guest-experience.test.js test/attendance-v2.test.js test/scheduled-reminders.test.js test/discovery-marketplace.test.js test/discovery-categories.test.js test/public-web.test.js test/public-checkout.test.js test/accountless-registration.test.js",
+    "test": "node --test test/admin-unit.test.js test/places.test.js test/places-rate-limit.test.js test/callable-security.test.js test/account-deletion.test.js test/biometric-retention.test.js test/ticket-issuance.test.js test/guest-experience.test.js test/attendance-v2.test.js test/scheduled-reminders.test.js test/discovery-marketplace.test.js test/discovery-categories.test.js test/public-web.test.js test/public-checkout.test.js test/accountless-registration.test.js test/event-wizard.test.js",
     "test:rules": "firebase emulators:exec --config ../firebase.test.json --project demo-attendus-admin --only firestore,storage \"node --test --test-concurrency=1 test/firestore-rules.test.js test/storage-rules.test.js\"",
     "test:integration": "node tools/run-integration-tests.js --project demo-attendus-admin",
     "test:integration:repeat": "node tools/run-integration-tests.js --project demo-attendus-admin --repeat 3",
@@ -23,7 +23,8 @@
     "discovery:backfill-categories": "node tools/backfill-discovery-categories.js",
     "public-web:backfill": "node tools/backfill-public-web.js",
     "public-web:validate": "node tools/validate-public-web.js",
-    "public-web:rollout": "node tools/set-public-web-rollout.js"
+    "public-web:rollout": "node tools/set-public-web-rollout.js",
+    "event-wizard:rollout": "node tools/set-event-creation-rollout.js"
   },
   "engines": {
     "node": "22"

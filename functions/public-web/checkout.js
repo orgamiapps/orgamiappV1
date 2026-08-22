@@ -426,7 +426,7 @@ async function fulfillPayment(admin, stripeEvent) {
       identityType: reservation.identityType || "account",
       emailRef: reservation.guestId ? `GuestAttendees/${reservation.guestId}` : null,
       attendanceDateTime: admin.firestore.FieldValue.serverTimestamp(),
-      answers: [],
+      answers: Array.isArray(reservation.answers) ? reservation.answers : [],
       isAnonymous: false,
       registrationSource: "stripe_webhook_v1",
       status: "confirmed",

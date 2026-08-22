@@ -123,6 +123,23 @@ test("signed clients can read but cannot alter the Discovery rollback switch", a
   await assertFails(config.update({useLegacyFeed: true}));
 });
 
+test("event wizard drafts, templates, and series remain server-only", async () => {
+  await seed(async (db) => {
+    await db.collection("EventDrafts").doc("draft-a").set({ownerUid: "owner"});
+    await db.collection("EventTemplates").doc("template-a").set({ownerUid: "owner"});
+    await db.collection("EventSeries").doc("series-a").set({ownerUid: "owner"});
+  });
+  const owner = dbFor("owner");
+  for (const [collection, id] of [
+    ["EventDrafts", "draft-a"],
+    ["EventTemplates", "template-a"],
+    ["EventSeries", "series-a"],
+  ]) {
+    await assertFails(owner.collection(collection).doc(id).get());
+    await assertFails(owner.collection(collection).doc(`${id}-forged`).set({ownerUid: "owner"}));
+  }
+});
+
 test("event owners cannot grant themselves paid or featured entitlements", async () => {
   await seed(async (db) => db.collection("Events").doc("event-a").set({
     customerUid: "owner", private: false, isFeatured: false, issuedTickets: 0,

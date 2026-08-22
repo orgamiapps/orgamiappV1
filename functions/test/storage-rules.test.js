@@ -54,6 +54,14 @@ test("organization uploads require an approved administrator", async () => {
   await assertFails(storageFor("stranger").ref("organizations/org-a/logo-3.png").put(png, {contentType: "image/png"}));
 });
 
+test("draft images are private to the owning full account", async () => {
+  const path = "event-drafts/user-a/draft-a/cover.png";
+  await assertSucceeds(storageFor("user-a").ref(path).put(png, {contentType: "image/png"}));
+  await assertSucceeds(storageFor("user-a").ref(path).getDownloadURL());
+  await assertFails(storageFor("user-b").ref(path).getDownloadURL());
+  await assertFails(storageFor("user-b").ref(path).put(png, {contentType: "image/png"}));
+});
+
 test("unknown storage paths are denied", async () => {
   await assertFails(storageFor("user-a").ref("unreviewed/user-a/file.png").put(png, {contentType: "image/png"}));
 });

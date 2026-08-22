@@ -68,6 +68,13 @@ service firebase.storage {
       allow update, delete: if false;
     }
 
+    match /event-drafts/{uid}/{draftId}/{fileName} {
+      allow read: if fullUser() && request.auth.uid == uid;
+      allow create, update: if fullUser() && request.auth.uid == uid &&
+        validImage(10 * 1024 * 1024);
+      allow delete: if fullUser() && request.auth.uid == uid;
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

@@ -44,6 +44,14 @@ class EventModel {
   List<String> checkInStaff; // User IDs with event-day console access
   String? organizationId; // Optional organization context for the event
   List<String> accessList; // Private-event invitees outside the organization
+  Map<String, dynamic> registrationPolicy;
+  Map<String, dynamic> experience;
+  Map<String, dynamic> reminderPolicy;
+  String? seriesId;
+  int? occurrenceIndex;
+  int? seriesVersion;
+  int eventRevision;
+  int wizardSchemaVersion;
 
   // Sign-in methods configuration
   // Legacy support: ['qr_code', 'manual_code', 'geofence', 'facial_recognition']
@@ -110,6 +118,14 @@ class EventModel {
     this.checkInStaff = const [],
     this.organizationId,
     this.accessList = const [],
+    this.registrationPolicy = const {},
+    this.experience = const {},
+    this.reminderPolicy = const {},
+    this.seriesId,
+    this.occurrenceIndex,
+    this.seriesVersion,
+    this.eventRevision = 0,
+    this.wizardSchemaVersion = 1,
     this.signInMethods = const [
       'qr_code',
       'manual_code',
@@ -198,6 +214,21 @@ class EventModel {
       accessList: (data.containsKey('accessList') && data['accessList'] != null)
           ? List<String>.from(data['accessList'])
           : [],
+      registrationPolicy: data['registrationPolicy'] is Map
+          ? Map<String, dynamic>.from(data['registrationPolicy'])
+          : const {},
+      experience: data['experience'] is Map
+          ? Map<String, dynamic>.from(data['experience'])
+          : const {},
+      reminderPolicy: data['reminderPolicy'] is Map
+          ? Map<String, dynamic>.from(data['reminderPolicy'])
+          : const {},
+      seriesId: data['seriesId']?.toString(),
+      occurrenceIndex: (data['occurrenceIndex'] as num?)?.round(),
+      seriesVersion: (data['seriesVersion'] as num?)?.round(),
+      eventRevision: (data['eventRevision'] as num?)?.round() ?? 0,
+      wizardSchemaVersion:
+          (data['wizardSchemaVersion'] as num?)?.round() ?? 1,
       signInMethods:
           (data.containsKey('signInMethods') && data['signInMethods'] != null)
           ? List<String>.from(data['signInMethods'])
@@ -411,6 +442,14 @@ class EventModel {
     data['checkInStaff'] = checkInStaff;
     if (organizationId != null) data['organizationId'] = organizationId;
     data['accessList'] = accessList;
+    data['registrationPolicy'] = registrationPolicy;
+    data['experience'] = experience;
+    data['reminderPolicy'] = reminderPolicy;
+    data['seriesId'] = seriesId;
+    data['occurrenceIndex'] = occurrenceIndex;
+    data['seriesVersion'] = seriesVersion;
+    data['eventRevision'] = eventRevision;
+    data['wizardSchemaVersion'] = wizardSchemaVersion;
     data['signInMethods'] = normalizedSignInMethods;
     data['checkInPolicy'] = checkInPolicy.toJson();
     if (normalizedSecurityTier != null) {

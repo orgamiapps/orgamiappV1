@@ -91,6 +91,9 @@ service cloud.firestore {
     match /GuestManageTokens/{doc} { allow read, write: if false; }
     match /GuestManageSessions/{doc} { allow read, write: if false; }
     match /PublicRegistrationFlows/{doc} { allow read, write: if false; }
+    match /EventDrafts/{doc} { allow read, write: if false; }
+    match /EventTemplates/{doc} { allow read, write: if false; }
+    match /EventSeries/{doc} { allow read, write: if false; }
     match /OutboundMessages/{doc} { allow read, write: if false; }
     match /CommunicationTemplates/{doc} { allow read, write: if false; }
     match /payment_review_queue/{doc} { allow read, write: if false; }

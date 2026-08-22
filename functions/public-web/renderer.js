@@ -532,7 +532,7 @@ async function configFor(db) {
   };
 }
 
-function browserConfig(flags, action, event = null) {
+function browserConfig(flags, action, event = null, questions = []) {
   const actionName = typeof action === "string" ? action : action?.action;
   return {
     inlineRegistrationEnabled: flags.inlineRegistrationEnabled,
@@ -546,6 +546,15 @@ function browserConfig(flags, action, event = null) {
       location: event.locationType === "online" ? "Online event" :
         text(event.locationName || event.location),
       price: Math.max(0, Number(event.ticketPrice || 0)),
+      approvalMode: event.registrationPolicy?.approvalMode === "manual" ? "manual" : "automatic",
+      questions: questions.map((question) => ({
+        id: text(question.id),
+        prompt: text(question.prompt || question.questionTitle),
+        type: ["short_text", "long_text", "single_choice", "multiple_choice", "acknowledgement"]
+            .includes(question.type) ? question.type : "long_text",
+        options: Array.isArray(question.options) ? question.options.map(text).filter(Boolean).slice(0, 20) : [],
+        required: question.required === true,
+      })),
     } : null,
     firebase: {
       apiKey: "AIzaSyA-PFyqhP5aEVE6XwGku3jMe91G3efMaVw",
@@ -570,6 +579,11 @@ async function renderEvent(db, req, res, id, flags, nonce) {
   }
   const canonical = `${PUBLIC_ORIGIN}/event/${encodeURIComponent(id)}`;
   const action = ticketState(data);
+  const questionSnapshot = await snapshot.ref.collection("EventQuestions")
+      .where("timing", "==", "registration").get();
+  const registrationQuestions = questionSnapshot.docs
+      .map((document) => ({id: document.id, ...document.data()}))
+      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
   const html = shell({
     title: text(data.title) || "Event",
     summary: eventDescription(data, organization),
@@ -577,7 +591,7 @@ async function renderEvent(db, req, res, id, flags, nonce) {
     image: data.imageUrl,
     body: eventBody(id, data, organization, flags),
     jsonLd: eventJsonLd(id, data, organization),
-    config: browserConfig(flags, action, data),
+    config: browserConfig(flags, action, data, registrationQuestions),
     nonce,
   });
   pageHeaders(res, nonce);

@@ -37,12 +37,29 @@ const EVENTS = new Set([
   "discovery_section_view_all",
   "discovery_search_page_loaded",
   "discovery_category_no_result",
+  "event_wizard_started",
+  "event_wizard_template_selected",
+  "event_wizard_draft_saved",
+  "event_wizard_draft_restored",
+  "event_wizard_stage_viewed",
+  "event_wizard_stage_completed",
+  "event_wizard_stage_error",
+  "event_wizard_preview_opened",
+  "event_wizard_duplicate_started",
+  "event_wizard_recurrence_configured",
+  "event_wizard_attendance_preset_selected",
+  "event_wizard_advanced_attendance_opened",
+  "event_wizard_publish_attempted",
+  "event_wizard_publish_succeeded",
+  "event_wizard_publish_failed",
+  "event_wizard_abandoned",
 ]);
 const DIMENSIONS = new Set([
   "entryPoint", "feature", "authChoice", "checkInMethod", "platform",
   "result", "errorCategory", "section", "position", "radiusBand",
   "locationSource", "category", "accessMode", "resultCount", "source",
   "targetType", "metro", "categoryId", "choice", "experienceVersion",
+  "stage", "mode", "templateId", "organizationContext", "saveState",
 ]);
 const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 
