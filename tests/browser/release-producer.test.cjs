@@ -6,7 +6,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
 const {files} = require('../../tools/web_release_contract');
-const {validateFixture, allowStagingRequest, scrubBrowserError, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, readOwnedHistoryTitles, visibleHistoryTitle} = require('../../tools/web_release_producers/browser')._test;
+const {validateFixture, allowStagingRequest, scrubBrowserError, pageErrorDiagnostic, createPageErrorRecorder, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, readOwnedHistoryTitles, visibleHistoryTitle} = require('../../tools/web_release_producers/browser')._test;
 const {bindingId} = require('../../functions/communications/qualification-isolation');
 test('browser and Safari use the same insertion-aware computed text scaling and control-boundary probe', () => {
   assert.equal(require('../../tools/web_release_producers/browser')._test.htmlResponsiveProbe,
@@ -21,6 +21,57 @@ function context() {
   for (const role of ['owner', 'attendee', 'unauthorized']) fixture[role] = {uid: role, email: `${runId}-${role}@example.test`, password: 'fixture-password'};
   return {projectId: 'attendus-staging', baseUrl: 'https://attendus-staging.web.app', fixture};
 }
+
+test('page errors retain exact sealed artifact frames and observation context without raw URLs or payloads', () => {
+  const c = context(), artifact = 'releases/fixture/main.dart.js', digest = 'a'.repeat(64);
+  const candidate = {webFiles: {[artifact]: digest}};
+  const error = Object.assign(Error('Null check operator used on a null value'), {stack:
+    'Error: bearer/private payload\n' +
+    `    at secretFunction (https://attendus-staging.web.app/${artifact}?session=secret#token:123:45)\n` +
+    `otherSecret@https://attendus-staging.web.app/${artifact}:124:7\n` +
+    '    at privateAccount (https://foreign.example/secret-path?token=secret:1:2)\n' +
+    '    at unsafe (https://username:password@attendus-staging.web.app/releases/fixture/main.dart.js:3:4)\n' +
+    '    at notSealed (https://attendus-staging.web.app/manage/private-proof:5:6)'});
+  const record = pageErrorDiagnostic(error, {candidate, context: c, errorIndex: 5, contextId: 2, pageId: 3,
+    pageRole: 'owner', engine: 'webkit', observedDuringStep: {gate: 'browser-auth-guest-organizer', sequence: 6},
+    pageUrl: 'https://attendus-staging.web.app/app/event/private-id?session=secret#private', now: 1791129600000});
+  assert.deepEqual(record.frames, [{artifact, sha256: digest, line: 123, column: 45}, {artifact, sha256: digest, line: 124, column: 7}]);
+  assert.equal(record.nullCheckMessage, true); assert.equal(record.errorIndex, 5);
+  assert.equal(record.pageRole, 'owner'); assert.equal(record.contextId, 2); assert.equal(record.pageId, 3);
+  assert.equal(record.engine, 'webkit'); assert.equal(record.routeFamily, '/app/event/:id');
+  assert.deepEqual(record.observedDuringStep, {gate: 'browser-auth-guest-organizer', sequence: 6});
+  assert.equal(record.at, new Date(1791129600000).toISOString());
+  for (const privateText of ['secret', 'username', 'password', 'private-id', 'private-proof', 'foreign.example', 'secretFunction']) {
+    assert.equal(JSON.stringify(record).includes(privateText), false, privateText);
+  }
+});
+
+test('page errors bound stacks and reject unsealed scripts, invalid coordinates and arbitrary context strings', () => {
+  const c = context(), artifact = 'main.dart.js', candidate = {webFiles: {[artifact]: 'b'.repeat(64)}};
+  const error = {name: 'private-error-name', message: 'private-body', stack:
+    `f@https://attendus-staging.web.app/${artifact}:0:1\n` +
+    `f@https://attendus-staging.web.app/${artifact}:99999999999999999999:1\n` +
+    Array.from({length: 100}, (_, i) => `f@https://attendus-staging.web.app/${artifact}:${i + 1}:2`).join('\n')};
+  const options = {candidate, context: c, pageUrl: 'https://attendus-staging.web.app/manage/private-proof?token=secret',
+    pageRole: 'private-role', engine: 'private-engine', observedDuringStep: {gate: 'private-step', sequence: 1}, now: 0};
+  const record = pageErrorDiagnostic(error, options);
+  assert.equal(record.frames.length, 12); assert.equal(record.stackTruncated, true);
+  assert.equal(record.routeFamily, '/manage/:proof'); assert.equal(record.errorName, 'Error');
+  assert.equal(record.pageRole, 'unassigned'); assert.equal(record.engine, 'unknown'); assert.equal(record.observedDuringStep, null);
+  assert.equal(JSON.stringify(record).includes('private'), false);
+  assert.equal(pageErrorDiagnostic(error, {...options, pageUrl: 'https://foreign.example/secret'}).routeFamily, 'outside-staging');
+  assert.deepEqual(pageErrorDiagnostic({message: 'Null check operator used on a null value'}, options).frames, []);
+  assert.equal(pageErrorDiagnostic({stack: 'x'.repeat(70000)}, options).stackTruncated, true);
+});
+
+test('page error recorder retains a sticky count past its bounded evidence capacity', () => {
+  const recorder = createPageErrorRecorder({candidate: {webFiles: {}}, context: context()});
+  for (let i = 0; i < 203; i++) recorder.record(Error('private payload'), {errorIndex: i, now: 0});
+  const result = recorder.snapshot();
+  assert.equal(result.totalCount, 203); assert.equal(result.entries.length, 200); assert.equal(result.omittedCount, 3);
+  assert.equal(result.entries[199].errorIndex, 199);
+  assert.equal(JSON.stringify(result).includes('private payload'), false);
+});
 test('staging evidence rejects real recipients, unowned records and production configuration', () => {
   assert.doesNotThrow(() => validateFixture(context()));
   for (const mutate of [c => c.fixture.owner.email = 'real@example.com', c => c.fixture.owner.uid = 'real-user',

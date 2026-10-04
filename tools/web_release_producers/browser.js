@@ -9,6 +9,7 @@ const serverDependencies = createRequire(path.resolve(__dirname, '../../function
 const {gitSourceFiles} = require('../web_release_contract');
 const {collectRosterPages} = require('./roster-read');
 const {activateFlutterSemanticsPage} = require('./flutter-semantics');
+const {readFirebaseAuthStatePage} = require('./firebase-auth-state');
 const {htmlResponsiveProbe} = require('./safari');
 const {validScope, bindingId} = require('../../functions/communications/qualification-isolation');
 const {chromium, firefox, webkit} = dependencies('@playwright/test');
@@ -159,6 +160,67 @@ function scrubBrowserError(error, fixture) {
   return result.replace(/eyJ[A-Za-z0-9_.-]+/g, '[token]');
 }
 
+function pageErrorDiagnostic(error, {candidate, context, pageUrl, errorIndex, contextId, pageId,
+  pageRole, engine, observedDuringStep, now = Date.now()}) {
+  const positive = (value) => Number.isSafeInteger(value) && value > 0 && value <= 100000000;
+  const origin = new URL(context.baseUrl).origin;
+  let routeFamily = 'outside-staging';
+  try {
+    const url = new URL(pageUrl);
+    if (url.origin === origin && !url.username && !url.password) {
+      routeFamily = 'other-staging';
+      for (const [pattern, family] of [
+        [/^\/$/, '/'], [/^\/app\/discover\/?$/, '/app/discover'],
+        [/^\/app\/event\/[^/]+\/?$/, '/app/event/:id'], [/^\/event\/[^/]+\/?$/, '/event/:id'],
+        [/^\/community\/[^/]+\/?$/, '/community/:id'], [/^\/manage\/?$/, '/manage'],
+        [/^\/manage\/[^/]+\/?$/, '/manage/:proof'], [/^\/app(?:\/|$)/, '/app/other'],
+      ]) if (pattern.test(url.pathname)) {routeFamily = family; break;}
+    }
+  } catch {/* Blank/closed/external pages retain only the fixed family. */}
+  const stack = typeof error?.stack === 'string' ? error.stack : '';
+  const lines = stack.slice(0, 65536).split(/\r?\n/), frames = [];
+  let stackTruncated = stack.length > 65536 || lines.length > 80;
+  for (const line of lines.slice(0, 80)) {
+    // Recognize Chromium and Firefox/WebKit frame shapes. Never persist raw
+    // stack text, function names, arbitrary message payloads or foreign URLs.
+    if (!/^\s*at\s+/.test(line) && !/^[^@\r\n]{0,300}@https:\/\//.test(line) && !/^https:\/\//.test(line)) continue;
+    const match = /(https:\/\/[^\s()]+):(\d+):(\d+)\)?$/.exec(line.trim());
+    if (!match || !positive(Number(match[2])) || !positive(Number(match[3]))) continue;
+    try {
+      const url = new URL(match[1]), artifact = url.pathname.slice(1);
+      const digest = Object.hasOwn(candidate.webFiles || {}, artifact) ? candidate.webFiles[artifact] : null;
+      if (url.origin !== origin || url.username || url.password || !/^[a-f0-9]{64}$/.test(digest || '')) continue;
+      if (frames.length === 12) {stackTruncated = true; continue;}
+      frames.push({artifact, sha256: digest, line: Number(match[2]), column: Number(match[3])});
+    } catch {/* Invalid frame locations are omitted, never echoed. */}
+  }
+  const roles = ['public', 'owner', 'attendee', 'staff', 'unauthorized', 'administrator', 'deletion',
+    'responsive', 'export', 'engine-public'];
+  return {schemaVersion: 1, at: new Date(now).toISOString(),
+    errorIndex: Number.isSafeInteger(errorIndex) && errorIndex >= 0 ? errorIndex : null,
+    contextId: positive(contextId) ? contextId : null, pageId: positive(pageId) ? pageId : null,
+    pageRole: roles.includes(pageRole) ? pageRole : 'unassigned',
+    engine: ['chromium', 'firefox', 'webkit', 'edge', 'chrome'].includes(engine) ? engine : 'unknown',
+    // This is observation context, not a claim about which step caused an
+    // asynchronous exception from an earlier operation.
+    observedDuringStep: [...GATES, 'post-close-replay'].includes(observedDuringStep?.gate) && positive(observedDuringStep?.sequence) ?
+      {gate: observedDuringStep.gate, sequence: observedDuringStep.sequence} : null,
+    routeFamily, errorName: ['Error', 'TypeError', 'RangeError', 'StateError', 'AssertionError', 'FirebaseError'].includes(error?.name) ? error.name : 'Error',
+    nullCheckMessage: error?.message === 'Null check operator used on a null value',
+    frames, stackPresent: Boolean(stack), stackTruncated};
+}
+
+function createPageErrorRecorder({candidate, context}) {
+  const entries = []; let totalCount = 0;
+  return {
+    record(error, options) {
+      totalCount++;
+      if (entries.length < 200) entries.push(pageErrorDiagnostic(error, {...options, candidate, context}));
+    },
+    snapshot() {return {entries: [...entries], totalCount, omittedCount: totalCount - entries.length};},
+  };
+}
+
 function parseCsv(input) {
   const rows = [], row = []; let field = '', quoted = false;
   for (let i = 0; i < input.length; i++) {
@@ -272,13 +334,16 @@ async function produce({candidate, context, outputDir}) {
   fs.mkdirSync(outputDir, {recursive: true});
   const gates = Object.fromEntries(activeGates.map((id) => [id, {assertions: [], rawPaths: [], blockers: []}]));
   const blocked = [], browserErrors = [], identityObservations = new Set(), anonymousUids = new Set();
+  const pageErrors = createPageErrorRecorder({candidate, context}), contextMetadata = new WeakMap();
+  let contextSequence = 0, pageSequence = 0, stepSequence = 0, observedDuringStep = null;
   let appCheckToken;
   const write = (gate, name, value) => { fs.writeFileSync(path.join(outputDir, name), JSON.stringify(value, null, 2)); gates[gate].rawPaths.push(name); };
   const record = (gate, id, expected, actual) => gates[gate].assertions.push({id, expected, actual});
   const scrub = (error) => scrubBrowserError(error, fixture);
   const browser = await chromium.launch({headless: true});
-  async function newContext(viewport = {width: 1440, height: 1000}, engine = browser) {
+  async function newContext(viewport = {width: 1440, height: 1000}, engine = browser, engineName = 'chromium') {
     const browserContext = await engine.newContext({viewport, serviceWorkers: replayOnly ? 'block' : 'allow'});
+    contextMetadata.set(browserContext, {contextId: ++contextSequence, engine: engineName});
     await browserContext.route('**/*', async (route) => {
       const request = route.request(), url = new URL(request.url());
       const headers = await request.allHeaders();
@@ -292,10 +357,14 @@ async function produce({candidate, context, outputDir}) {
     await browserContext.routeWebSocket('**/*', (socket) => { blocked.push({method: 'WEBSOCKET', origin: new URL(socket.url()).origin}); socket.close(); });
     return browserContext;
   }
-  async function pageFor(browserContext) {
+  async function pageFor(browserContext, pageRole) {
     const page = await browserContext.newPage();
+    const metadata = {...contextMetadata.get(browserContext), pageId: ++pageSequence, pageRole};
     page.setDefaultTimeout(30000);
-    page.on('pageerror', (error) => browserErrors.push(scrub(error)));
+    page.on('pageerror', (error) => {
+      const errorIndex = browserErrors.push(scrub(error)) - 1;
+      pageErrors.record(error, {...metadata, errorIndex, pageUrl: page.url(), observedDuringStep});
+    });
     observeCreatedIdentities(page);
     return page;
   }
@@ -337,26 +406,17 @@ async function produce({candidate, context, outputDir}) {
     gates[gate].rawPaths.push(name);
   }
   async function step(gate, operation) {
+    observedDuringStep = {gate, sequence: ++stepSequence};
     try {await operation();} catch (error) {gates[gate].blockers.push(scrub(error));}
+    finally {observedDuringStep = null;}
   }
   async function browserToken(page, account) {
     // Read only the currently authenticated browser identity in memory. The
     // token never enters evidence, traces, screenshots, or error messages.
-    const user = await page.evaluate(async () => new Promise((resolve, reject) => {
-      const open = indexedDB.open('firebaseLocalStorageDb');
-      open.onerror = () => reject(Error('Browser authentication storage unavailable.'));
-      open.onsuccess = () => {
-        const db = open.result;
-        if (!db.objectStoreNames.contains('firebaseLocalStorage')) {db.close(); resolve(null); return;}
-        const request = db.transaction('firebaseLocalStorage').objectStore('firebaseLocalStorage').getAll();
-        request.onsuccess = () => {
-          const value = request.result.find((row) => row.fbase_key?.startsWith('firebase:authUser:'))?.value;
-          db.close(); resolve(value ? {uid: value.uid, token: value.stsTokenManager?.accessToken} : null);
-        };
-        request.onerror = () => {db.close(); reject(Error('Browser authentication state unavailable.'));};
-      };
-    }));
-    if (user?.uid !== account.uid || !user.token) throw Error('Browser session does not match the owned fixture actor.');
+    const user = await readFirebaseAuthStatePage(page, {
+      apiKey: fixture.firebase.apiKey, projectId: fixture.firebase.projectId,
+      appName: '[DEFAULT]', expectedUid: account.uid, timeoutMs: 10000,
+    });
     return user.token;
   }
   async function callable(name, data, token) {
@@ -372,7 +432,7 @@ async function produce({candidate, context, outputDir}) {
     if (!['owner', 'attendee', 'staff', 'unauthorized', 'administrator', 'deletion'].includes(role) || !fixture[role] ||
         !fixture.ownedFixtureIds.includes(fixture[role].uid)) throw Error('Pilot actor is outside the owned fixture manifest.');
     if (!actors.has(role)) {
-      const actorContext = await newContext(), page = await pageFor(actorContext);
+      const actorContext = await newContext(), page = await pageFor(actorContext, role);
       await login(page, fixture[role]); actors.set(role, page);
     }
     if (!appCheckToken) throw Error('The packaged browser has not obtained an App Check token.');
@@ -453,7 +513,7 @@ async function produce({candidate, context, outputDir}) {
       record(gate, 'uncaught-browser-errors', [], browserErrors);
       record(gate, 'unexpected-blocked-network-requests', [], blocked);
       write(gate, 'fixture-created-identities.json', {runId: fixture.runId, projectId: context.projectId, anonymousUids: [...anonymousUids].sort()});
-      write(gate, 'browser-replay-network.json', {identity, blocked, browserErrors});
+      write(gate, 'browser-replay-network.json', {identity, blocked, browserErrors, pageErrors: pageErrors.snapshot()});
       return {gates, observedDeploymentIdentity: identity};
     }
     // Observe the original source timers before long UI journeys can cross an
@@ -504,8 +564,8 @@ async function produce({candidate, context, outputDir}) {
       for (const gate of GATES) gates[gate].blockers.push('Owned history event preflight failed; no browser fixture mutations started.');
       return {gates, observedDeploymentIdentity: identity};
     }
-    const publicContext = await newContext(), publicPage = await pageFor(publicContext);
-    const ownerContext = await newContext(), ownerPage = await pageFor(ownerContext);
+    const publicContext = await newContext(), publicPage = await pageFor(publicContext, 'public');
+    const ownerContext = await newContext(), ownerPage = await pageFor(ownerContext, 'owner');
     await step(GATES[0], async () => {
       const response = await publicPage.goto(context.baseUrl + fixture.event.publicPath);
       record(GATES[0], 'public-event-http', 200, response.status());
@@ -658,7 +718,7 @@ async function produce({candidate, context, outputDir}) {
       }
       // Flutter 200-percent layout is covered by the rendered emulator test;
       // this exact-artifact gate still requires an enabled semantics tree.
-      const appContext = await newContext({width: 390, height: 844}), appPage = await pageFor(appContext);
+      const appContext = await newContext({width: 390, height: 844}), appPage = await pageFor(appContext, 'responsive');
       await app(appPage);
       record(GATES[3], 'packaged-flutter-semantics-present', true, (await appPage.locator('flt-semantics').count()) > 0);
       await screenshot(GATES[3], appPage, 'packaged-flutter-390.png');
@@ -667,7 +727,7 @@ async function produce({candidate, context, outputDir}) {
       const large = fixture.largeRoster;
       if (!large || !fixture.ownedFixtureIds.includes(large.eventId) || !Number.isInteger(large.expectedRows) || large.expectedRows < 1000 || !Array.isArray(large.expectedCsvHeaders) ||
           !Array.isArray(large.expectedCsvSpecialNames) || large.expectedCsvSpecialNames.length < 2) throw Error('Owned large-roster fixture (at least 1000 rows), CSV headers and escaping examples are required.');
-      const exportContext = await newContext(), exportPage = await pageFor(exportContext);
+      const exportContext = await newContext(), exportPage = await pageFor(exportContext, 'export');
       await login(exportPage, fixture.owner);
       const token = await browserToken(exportPage, fixture.owner);
       const {seen, pages} = await collectRosterPages((name, data) => callable(name, data, token), {eventId: large.eventId});
@@ -765,7 +825,7 @@ async function produce({candidate, context, outputDir}) {
         const version = engine.version();
         scope.executed.push({name: entry.name, channel: entry.channel ?? null, version});
         record(GATES[0], `${entry.name}-runtime-version-reported`, true, typeof version === 'string' && version.trim().length > 0);
-        const engineContext = await newContext({width: 1280, height: 900}, engine), page = await pageFor(engineContext);
+        const engineContext = await newContext({width: 1280, height: 900}, engine, entry.name), page = await pageFor(engineContext, 'engine-public');
         await page.goto(context.baseUrl + fixture.event.publicPath);
         record(GATES[0], `${entry.name}-public-event-title`, fixture.event.title, await page.getByRole('heading', {level: 1}).innerText());
         await page.locator('[data-public-action]:visible').first().click();
@@ -849,12 +909,19 @@ async function produce({candidate, context, outputDir}) {
     for (const gate of GATES) record(gate, 'uncaught-browser-errors', [], browserErrors);
     for (const gate of GATES) record(gate, 'unexpected-blocked-network-requests', [], blocked);
     for (const gate of GATES) write(gate, `${gate}.json`, {identity, ...gates[gate]});
-    fs.writeFileSync(path.join(outputDir, 'browser-network.json'), JSON.stringify({blocked, browserErrors}, null, 2));
+    fs.writeFileSync(path.join(outputDir, 'browser-network.json'), JSON.stringify({blocked, browserErrors, pageErrors: pageErrors.snapshot()}, null, 2));
     for (const gate of GATES) gates[gate].rawPaths.push('browser-network.json');
     return {gates, observedDeploymentIdentity: identity};
   } finally {
+    // Retain setup failures before teardown; replace with the completed
+    // snapshot only after the browser and identity observations have settled.
+    const savePageErrors = (phase) => fs.writeFileSync(path.join(outputDir, 'page-error-diagnostics.json'),
+      JSON.stringify({phase, ...pageErrors.snapshot()}, null, 2));
+    savePageErrors('before-close');
+    for (const gate of activeGates) gates[gate].rawPaths.push('page-error-diagnostics.json');
     await browser.close();
     await Promise.allSettled([...identityObservations]);
+    savePageErrors('after-close');
     // Keep the cleanup manifest even when candidate identity or a browser
     // operation fails before a gate report can be produced.
     fs.writeFileSync(path.join(outputDir, 'fixture-created-identities.json'), JSON.stringify({runId: fixture.runId,
@@ -864,4 +931,4 @@ async function produce({candidate, context, outputDir}) {
 
 module.exports = produce;
 module.exports.produce = produce;
-module.exports._test = {validateFixture, allowStagingRequest, scrubBrowserError, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, htmlResponsiveProbe, readOwnedHistoryTitles, visibleHistoryTitle, openCheckInConsole};
+module.exports._test = {validateFixture, allowStagingRequest, scrubBrowserError, pageErrorDiagnostic, createPageErrorRecorder, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, htmlResponsiveProbe, readOwnedHistoryTitles, visibleHistoryTitle, openCheckInConsole};

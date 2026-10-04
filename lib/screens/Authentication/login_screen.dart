@@ -14,7 +14,13 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.authService, this.onSignedIn});
+
+  @visibleForTesting
+  final AuthService? authService;
+
+  @visibleForTesting
+  final VoidCallback? onSignedIn;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -28,6 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _obscurePassword = true;
   bool _socialSigningIn = false;
+  bool _emailSigningIn = false;
 
   @override
   void dispose() {
@@ -37,27 +44,34 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _makeLogin() async {
+    var authenticated = false;
     try {
       final email = _emailEdtController.text.trim();
       final password = _passwordEdtController.text;
 
       Logger.debug('Starting email/password login...');
-      final user = await AuthService().signInWithEmailAndPassword(
-        email,
-        password,
-      );
+      final user = await (widget.authService ?? AuthService())
+          .signInWithEmailAndPassword(email, password);
 
       if (user != null && mounted) {
+        authenticated = true;
         Logger.debug('Login successful, navigating to home.');
         _btnCtlr.success();
         await Future.delayed(const Duration(milliseconds: 500));
-        if (mounted) RouterClass().homeScreenRoute(context: context);
+        if (mounted) {
+          if (widget.onSignedIn != null) {
+            widget.onSignedIn!();
+          } else {
+            RouterClass().homeScreenRoute(context: context);
+          }
+        }
       } else {
         Logger.warning('Login failed - no user returned');
         _btnCtlr.reset();
         ShowToast().showNormalToast(msg: 'Login failed. Please try again.');
       }
     } on FirebaseAuthException catch (e) {
+      authenticated = false;
       Logger.warning('Firebase Auth Exception: ${e.code}');
       switch (e.code) {
         case 'invalid-credential':
@@ -103,9 +117,12 @@ class _LoginScreenState extends State<LoginScreen> {
       }
       _btnCtlr.reset();
     } catch (e) {
+      authenticated = false;
       _btnCtlr.reset();
       Logger.error('Error making login', e);
       ShowToast().showNormalToast(msg: 'Login failed. Please try again.');
+    } finally {
+      if (!authenticated) _emailSigningIn = false;
     }
   }
 
@@ -257,7 +274,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 SizedBox(
                   height: 52,
                   child: RoundedLoadingButton(
-                    animateOnTap: true,
+                    // Submission owns the animation for both Enter and tap.
+                    // The package must not invoke this callback again when
+                    // its loading animation completes.
+                    animateOnTap: false,
                     borderRadius: 12,
                     controller: _btnCtlr,
                     elevation: 0,
@@ -313,12 +333,10 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _submitLogin() {
+    if (_emailSigningIn || !_formKey.currentState!.validate()) return;
+    _emailSigningIn = true;
     _btnCtlr.start();
-    if (_formKey.currentState!.validate()) {
-      _makeLogin();
-    } else {
-      _btnCtlr.reset();
-    }
+    _makeLogin();
   }
 }
 
