@@ -6,6 +6,8 @@ const crypto = require("node:crypto");
 const {isDeepStrictEqual} = require("node:util");
 const {bindingId, emailHash, validScope} = require("../../functions/communications/qualification-isolation");
 const {schedule} = require("../../functions/events/schedule");
+const {digest} = require("../web_release_contract");
+const {normalizePolicy, policyWindow} = require("../../functions/attendance/v2");
 const PROJECT = "attendus-staging";
 const ROLES = ["owner", "attendee", "staff", "unauthorized"];
 const hash = (value) => crypto.createHash("sha256").update(value).digest("hex");
@@ -64,16 +66,20 @@ function createPilotObserver({fixture, candidateIdentity, db}) {
       }
       const time = schedule(event.data());
       if (time.end?.toISOString() !== fixture.eventClosesAt) throw Error("Pilot schedule changed; use a separate lifecycle event.");
-      return {id: event.id, revision: event.get("eventRevision") || 0, closesAt: time.end.toISOString()};
+      const policy = normalizePolicy(event.data());
+      return {id: event.id, revision: event.get("eventRevision") || 0, closesAt: time.end.toISOString(),
+        effectiveClosesAt: new Date(policyWindow(event.data(), policy).closesAtMs).toISOString(),
+        policySha256: digest(policy)};
     }, {readOnly: true});
     if (selection.guardOnly) return {event};
     const eventQuery = (collection) => db.collection(collection).where("eventId", "==", identity.eventId);
-    const [registrations, attendance, previews, announcements, captures, messages, inbox] = await Promise.all([
+    const [registrations, attendance, previews, announcements, captures, messages, inbox, exports] = await Promise.all([
       bounded(eventQuery("RegisterAttendance")), bounded(eventQuery("Attendance")),
       bounded(eventQuery("EventAnnouncementPreviews")), bounded(eventQuery("EventAnnouncements")),
       bounded(db.collection("QualificationCaptures").where("runId", "==", identity.runId), 1000),
       bounded(eventQuery("OutboundMessages"), 500),
       bounded(db.collection("users").doc(fixture.attendee.uid).collection("notifications")),
+      bounded(eventQuery("EventExportJobs")),
     ]);
     const matchesAnnouncement = (doc) => doc.get("actorUid") === fixture.owner.uid &&
       doc.get("title") === announcementTitle(fixture) && doc.get("body") === announcementBody && doc.get("audience") === "attendees";
@@ -96,6 +102,9 @@ function createPilotObserver({fixture, candidateIdentity, db}) {
       }),
       messages: messages.map((doc) => ({id: doc.id, announcementId: doc.get("announcementId") || null,
         status: doc.get("status"), provider: doc.get("provider") || null})),
+      exports: exports.filter((doc) => doc.get("actorUid") === fixture.owner.uid).map((doc) => ({jobId: doc.id,
+        status: doc.get("status"), generation: doc.get("generation") || null, rowCount: doc.get("rowCount") ?? null,
+        objectPath: doc.get("path") || null, expiresAt: doc.get("expiresAt")?.toDate?.().toISOString() || null})),
       inboxCount: inbox.length};
   };
 }
@@ -106,7 +115,7 @@ async function runBrowserPilot({fixture, candidateIdentity, callAs, observe, tim
       !Number.isFinite(timeoutMs) || timeoutMs < 1 || timeoutMs > 600000 ||
       !Number.isFinite(pollIntervalMs) || pollIntervalMs < 0 || pollIntervalMs > 15000) throw Error("Authenticated calls and bounded private observation are required.");
   const report = {schemaVersion: 1, identity, startedAt: new Date().toISOString(), assertions: [], observations: [],
-    pilot: {registrationIds: [], attendanceIds: [], exportJobId: null, announcementId: null}};
+    pilot: {registrationIds: [], attendanceIds: [], exportJobId: null, announcementId: null}, replayRequests: {}};
   const check = (id, expected, actual) => {
     report.assertions.push({id, expected, actual: actual ?? null});
     if (!isDeepStrictEqual(expected, actual)) throw Error(`Pilot assertion failed: ${id}`);
@@ -135,6 +144,7 @@ async function runBrowserPilot({fixture, candidateIdentity, callAs, observe, tim
     const eventId = identity.eventId;
     const registrationInput = {eventId, idempotencyKey: `${fixture.runId}:account-registration`,
       fullName: "Controlled pilot attendee", email: fixture.attendee.email, answers: {access: "Controlled accessibility answer"}};
+    report.replayRequests.registration = {role: "attendee", name: "startPublicRegistrationV3", data: registrationInput, requestSha256: digest(registrationInput)};
     const registered = await call("attendee", "startPublicRegistrationV3", registrationInput);
     check("account_registration_confirmed", "confirmed", registered.status);
     check("registration_receipt_has_id", true, safeId(registered.registrationId));
@@ -147,6 +157,7 @@ async function runBrowserPilot({fixture, candidateIdentity, callAs, observe, tim
     const admission = {eventId, sessionId: session.sessionId, idempotencyKey: `${fixture.runId}:manual-admission`,
       credential: {type: "staff_roster", attendeeId: fixture.attendee.uid, registrationId: registered.registrationId},
       answers: ["Door access code--ans--Controlled door answer"]};
+    report.replayRequests.admission = {role: "staff", name: "submitCheckIn", data: admission, requestSha256: digest(admission)};
     await deny("unauthorized_manual_admission_denied", "submitCheckIn", {...admission, idempotencyKey: `${fixture.runId}:unauthorized-admission`});
     const admitted = await call("staff", "submitCheckIn", admission);
     check("manual_admission_checked_in", "checked_in", admitted.status);
@@ -162,7 +173,9 @@ async function runBrowserPilot({fixture, candidateIdentity, callAs, observe, tim
     const materialized = await poll("authoritative roster", () => call("owner", "listEventRosterV2", {eventId, pageSize: 100}),
       (value) => (value.rows || []).some((row) => row.registrationId === registered.registrationId && row.attendanceIds?.includes(admitted.attendanceId)));
     check("roster_has_one_account_admission", 1, materialized.rows.filter((row) => row.registrationId === registered.registrationId).length);
-    const exported = await call("owner", "createEventExportV2", {eventId, idempotencyKey: `${fixture.runId}:pilot-export`});
+    const exportInput = {eventId, idempotencyKey: `${fixture.runId}:pilot-export`};
+    report.replayRequests.export = {role: "owner", name: "createEventExportV2", data: exportInput, requestSha256: digest(exportInput)};
+    const exported = await call("owner", "createEventExportV2", exportInput);
     check("export_receipt_has_id", true, safeId(exported.jobId));
     report.pilot.exportJobId = exported.jobId;
     check("export_retry_same_receipt", exported.jobId, (await call("owner", "createEventExportV2", {eventId, idempotencyKey: `${fixture.runId}:pilot-export`})).jobId);
@@ -175,12 +188,21 @@ async function runBrowserPilot({fixture, candidateIdentity, callAs, observe, tim
     report.observations.push({phase: "export", jobId: exported.jobId, status: exportResult.status,
       rowCount: exportResult.rowCount, generation: exportResult.generation || null}); // Signed URL deliberately omitted.
     const beforeAnnouncement = await observe();
+    report.pilotExport = beforeAnnouncement.exports?.find((value) => value.jobId === exported.jobId);
+    check("original_export_completion_and_expiry_retained", true, report.pilotExport?.status === "complete" &&
+      report.pilotExport.generation === exportResult.generation && report.pilotExport.rowCount === exportResult.rowCount &&
+      new RegExp(`^private-event-exports/${exported.jobId}/[A-Za-z0-9_-]+\\.csv$`).test(report.pilotExport.objectPath || "") &&
+      Date.parse(report.pilotExport.expiresAt) > Date.now());
     let preview = beforeAnnouncement.priorAnnouncement;
     if (preview && preview.status === "preview" && Date.parse(preview.expiresAt) <= Date.now()) throw Error("Existing pilot announcement preview expired; explicit review is required.");
     if (!preview) preview = await call("owner", "previewEventAnnouncementV1", {eventId, audience: "attendees",
       title: announcementTitle(fixture), body: announcementBody});
     check("announcement_has_attended_recipient", true, Number.isInteger(preview.count) && preview.count >= 1);
-    const announced = await call("owner", "sendEventAnnouncementV1", {eventId, previewToken: preview.previewToken});
+    const announcementInput = {eventId, previewToken: preview.previewToken};
+    // This is permission-bound, not an authentication bearer. Still retain only
+    // its digest; the replay observer resolves the exact original value privately.
+    report.replayRequests.announcement = {role: "owner", name: "sendEventAnnouncementV1", requestSha256: digest(announcementInput)};
+    const announced = await call("owner", "sendEventAnnouncementV1", announcementInput);
     check("announcement_receipt_has_id", true, safeId(announced.announcementId));
     report.pilot.announcementId = announced.announcementId;
     check("announcement_retry_same_receipt", announced.announcementId,

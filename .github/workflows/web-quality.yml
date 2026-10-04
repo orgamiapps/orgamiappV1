@@ -70,9 +70,12 @@ jobs:
     - run: node --test ../tools/test_web_bootstrap.js
     - name: Reject critical and high production vulnerabilities
       run: npm audit --omit=dev --audit-level=high
+    - name: Restore browser producer contract dependencies
+      run: npm ci
+      working-directory: tests/browser
     - name: Verify web release provenance and deployment contracts
-      run: node --test ../tools/web_release_contract.test.js ../tools/rehearse_web_backend.test.js ../tools/web_release_operations.test.js ../tools/seed_web_qualification.test.js ../tests/web_backend_tools.test.cjs
-        ../tests/web_browser_pilot.test.cjs ../tests/web_browser_communications.test.cjs ../tests/web_safari_producer.test.cjs ../tests/browser/*.test.cjs
+      run: node --test ../tools/web_release_contract.test.js ../tools/bridge_web_assets.test.js ../tools/rehearse_web_backend.test.js ../tools/web_release_operations.test.js ../tools/seed_web_qualification.test.js ../tests/web_backend_tools.test.cjs
+        ../tests/web_browser_pilot.test.cjs ../tests/web_browser_replay.test.cjs ../tests/web_browser_communications.test.cjs ../tests/web_safari_producer.test.cjs ../tests/browser/*.test.cjs
   firebase-emulators:
     runs-on: ubuntu-latest
     steps:

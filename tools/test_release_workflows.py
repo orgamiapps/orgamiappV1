@@ -73,6 +73,12 @@ def validate(workflows):
             if "--suite " + suite not in runs(jobs["browser-journeys"]):
                 raise ValueError("Missing browser journey gate: " + suite)
         validate_secret_scan(jobs["secret-scan"])
+        function_steps = jobs["functions"]["steps"]
+        producer_tests = next((index for index, step in enumerate(function_steps) if "../tests/browser/*.test.cjs" in step.get("run", "")), None)
+        if producer_tests is None or not any(step.get("run") == "npm ci" and step.get("working-directory") == "tests/browser" for step in function_steps[:producer_tests]):
+            raise ValueError("Producer contracts require locked browser dependencies before execution")
+        if "../tools/bridge_web_assets.test.js" not in runs(jobs["functions"]):
+            raise ValueError("Immutable Hosting bridge contracts must run before qualification")
     for filename, workflow in workflows.items():
         jobs = workflow["jobs"]
         for name, job in jobs.items():
@@ -111,6 +117,17 @@ def validate(workflows):
     if set(candidate["on"]) != {"workflow_dispatch"}:
         raise ValueError("Candidate deployment must be explicit")
     jobs = candidate["jobs"]
+    read_permissions = {"contents": "read", "actions": "read"}
+    if candidate.get("permissions") != read_permissions:
+        raise ValueError("Candidate workflow permissions must be read-only without shared OIDC")
+    for name, job in jobs.items():
+        authenticates = any(step.get("uses", "").startswith("google-github-actions/auth@") for step in job.get("steps", []))
+        permissions = job.get("permissions", candidate["permissions"])
+        if name in {"predecessors", "staging"}:
+            if not authenticates or permissions != {**read_permissions, "id-token": "write"}:
+                raise ValueError("Only authenticating predecessor/staging jobs may receive job-level OIDC")
+        elif authenticates or permissions != read_permissions:
+            raise ValueError("Candidate build and quality jobs cannot receive OIDC or cloud authentication")
     if jobs["quality"].get("uses") != "./.github/workflows/web-quality.yml" or len([j for j in jobs.values() if j.get("uses") == "./.github/workflows/web-quality.yml"]) != 1:
         raise ValueError("Candidate must use one same-SHA web quality result")
     if jobs["candidates"]["strategy"]["matrix"]["environment"] != ["staging", "production"] or set(dependencies(jobs["staging"])) != {"quality", "candidates"}:
@@ -129,13 +146,25 @@ def validate(workflows):
     promotion = workflows["web-release-promote.yml"]["jobs"]["promote"]
     if promotion.get("environment") != "production" or "--expected-prior-release" not in runs(promotion) or "--qualification-run" not in runs(promotion):
         raise ValueError("Production requires protected environment, provenance and predecessor")
+    if not any(step.get("uses", "").startswith("actions/upload-artifact@") and step.get("if") == "always()" and "hosting-asset-bridge.json" in step.get("with", {}).get("path", "") for step in promotion.get("steps", [])):
+        raise ValueError("Failed or successful Hosting bridge receipts must be retained")
     collector = workflows["web-release-observe.yml"]
     collect = collector["jobs"]["collect"]
+    if "post-close-replay" not in collector["on"]["workflow_dispatch"]["inputs"]["gates"]["options"]:
+        raise ValueError("The collector must expose the isolated post-close replay mode")
+    collector_steps = collect.get("steps", [])
+    mode_check = next((index for index, step in enumerate(collector_steps) if "selectedGates(process.env.PRODUCER, process.env.GATES)" in step.get("run", "")), None)
+    authentication = next(index for index, step in enumerate(collector_steps) if step.get("uses", "").startswith("google-github-actions/auth@"))
+    if mode_check is None or mode_check >= authentication:
+        raise ValueError("Producer/mode guard must precede cloud authentication")
     if "safari" not in collector["on"]["workflow_dispatch"]["inputs"]["producer"]["options"] or collect.get("runs-on") != "${{ inputs.producer == 'safari' && 'macos-15' || 'ubuntu-latest' }}":
         raise ValueError("Actual Safari evidence requires the pinned macOS runner")
     for step in collect.get("steps", []):
-        if "playwright install" in step.get("run", "") and step.get("if") != "${{ inputs.producer != 'safari' }}":
-            raise ValueError("Safari must use its native driver instead of Playwright binaries")
+        if "playwright install" in step.get("run", "") and step.get("if") != "${{ inputs.producer == 'browser' }}":
+            raise ValueError("Only the browser producer may install Playwright browsers; observations and Safari must skip them")
+    installs = [step.get("run", "").split() for step in collect.get("steps", []) if "playwright install" in step.get("run", "")]
+    if not any({"chromium", "firefox", "webkit", "chrome", "msedge"}.issubset(command) for command in installs):
+        raise ValueError("Browser qualification must install every required engine including branded Chrome and Edge")
     for filename in ["firebase-hosting-merge.yml", "firebase-hosting-pull-request.yml", "deploy-functions.yml", "deploy-firestore-indexes.yml"]:
         if any(job.get("uses") == "./.github/workflows/firebase-release.yml" or MUTATION.search(str(job)) for job in workflows[filename]["jobs"].values()):
             raise ValueError("Legacy entrypoint bypasses qualified promotion")
@@ -176,6 +205,28 @@ class ReleaseWorkflowTests(unittest.TestCase):
     def test_safari_requires_actual_macos_runner(self):
         self.mutate(lambda w: w["web-release-observe.yml"]["jobs"]["collect"].update({"runs-on": "ubuntu-latest"}), "Actual Safari")
 
+    def test_observation_jobs_skip_unused_browser_installation(self):
+        for condition in [None, "${{ inputs.producer != 'safari' }}", "${{ inputs.producer == 'backend' }}", "${{ inputs.producer == 'operations' }}"]:
+            def change(w):
+                for step in w["web-release-observe.yml"]["jobs"]["collect"]["steps"]:
+                    if "playwright install" in step.get("run", ""):
+                        step["if"] = condition
+            self.mutate(change, "Only the browser producer")
+
+    def test_browser_collector_installs_required_branded_engines(self):
+        for engine in ["chrome", "msedge"]:
+            def remove(w):
+                for step in w["web-release-observe.yml"]["jobs"]["collect"]["steps"]:
+                    if "playwright install" in step.get("run", ""):
+                        step["run"] = " ".join(value for value in step["run"].split() if value != engine)
+            self.mutate(remove, "branded Chrome and Edge")
+
+    def test_replay_mode_requires_pre_authentication_guard(self):
+        def remove(w):
+            steps = w["web-release-observe.yml"]["jobs"]["collect"]["steps"]
+            steps[:] = [step for step in steps if "selectedGates(" not in step.get("run", "")]
+        self.mutate(remove, "guard must precede")
+
     def test_launch_and_browser_gates_cannot_be_omitted(self):
         for filename in ["quality.yml", "web-quality.yml"]:
             for job, marker in [("firebase-emulators", "test:launch"), ("browser-journeys", "--suite flutter-browser")]:
@@ -186,6 +237,45 @@ class ReleaseWorkflowTests(unittest.TestCase):
 
     def test_quality_has_no_skip_input(self):
         self.mutate(lambda w: w["web-quality.yml"]["on"].update(workflow_call={"inputs": {"skip": {"type": "boolean"}}}), "bypass inputs")
+
+    def test_candidate_oidc_is_scoped_to_actual_authentication_jobs(self):
+        self.mutate(lambda w: w["firebase-release.yml"]["permissions"].update({"id-token": "write"}), "without shared OIDC")
+        for name in ["candidates", "quality"]:
+            self.mutate(lambda w: w["firebase-release.yml"]["jobs"][name].update(permissions={"contents": "read", "actions": "read", "id-token": "write"}), "cannot receive OIDC")
+        for name in ["predecessors", "staging"]:
+            self.mutate(lambda w: w["firebase-release.yml"]["jobs"][name].pop("permissions"), "job-level OIDC")
+            def remove_authentication(w):
+                steps = w["firebase-release.yml"]["jobs"][name]["steps"]
+                steps[:] = [step for step in steps if not step.get("uses", "").startswith("google-github-actions/auth@")]
+            self.mutate(remove_authentication, "authenticating predecessor/staging")
+        self.mutate(lambda w: w["firebase-release.yml"]["jobs"]["candidates"]["steps"].append({"uses": "google-github-actions/auth@v2"}), "cloud authentication")
+
+    def test_hosting_bridge_contracts_and_partial_receipts_are_retained(self):
+        for filename in ["quality.yml", "web-quality.yml"]:
+            def remove(w):
+                for step in w[filename]["jobs"]["functions"]["steps"]:
+                    if "run" in step:
+                        step["run"] = step["run"].replace("../tools/bridge_web_assets.test.js", "")
+            self.mutate(remove, "Hosting bridge contracts")
+        def remove_receipt(w):
+            for step in w["web-release-promote.yml"]["jobs"]["promote"]["steps"]:
+                if step.get("uses", "").startswith("actions/upload-artifact@"):
+                    step["with"]["path"] = step["with"]["path"].replace("build/web-promotion/hosting-asset-bridge.json", "")
+        self.mutate(remove_receipt, "bridge receipts")
+
+    def test_browser_producer_dependencies_precede_contract_tests(self):
+        for filename in ["quality.yml", "web-quality.yml"]:
+            def remove(w):
+                steps = w[filename]["jobs"]["functions"]["steps"]
+                steps[:] = [step for step in steps if step.get("working-directory") != "tests/browser"]
+            self.mutate(remove, "locked browser dependencies")
+
+            def reorder(w):
+                steps = w[filename]["jobs"]["functions"]["steps"]
+                restore = next(step for step in steps if step.get("working-directory") == "tests/browser")
+                steps.remove(restore)
+                steps.append(restore)
+            self.mutate(reorder, "locked browser dependencies")
 
     def test_secret_scan_requires_full_history(self):
         for filename in ["quality.yml", "web-quality.yml"]:

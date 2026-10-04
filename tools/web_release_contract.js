@@ -14,6 +14,7 @@ const GATES = Object.freeze([
   "event-close-replay-observation", "rules-storage-indexes-TTL", "backend-trigger-canaries",
   "rollback-rehearsal", "notification-delivery-isolation", "large-roster-export-download-expiry", "safari-web-acceptance",
 ]);
+const AUXILIARY_GATES = Object.freeze(["observation", "post-close-replay"]);
 const WORKFLOWS = Object.freeze({candidate: ".github/workflows/firebase-release.yml",
   evidence: ".github/workflows/web-release-observe.yml", qualification: ".github/workflows/web-release-qualify.yml"});
 const GATE_PRODUCERS = Object.freeze(Object.fromEntries([
@@ -22,6 +23,7 @@ const GATE_PRODUCERS = Object.freeze(Object.fromEntries([
   ...["owned-staging-pilot", "rules-storage-indexes-TTL", "rollback-rehearsal"].map((gate) => [gate, ["operations"]]),
   ["safari-web-acceptance", ["safari"]],
   ["observation", ["backend", "operations"]],
+  ["post-close-replay", ["browser"]],
 ]));
 const fail = (message) => { throw new Error(message); };
 const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex");
@@ -84,6 +86,7 @@ function deploymentManifest(root, source) {
   if (!names.includes("triggerAIInsights") || !names.includes("triggerAIInsightsV2")) fail("Both analytics trigger generations must remain exported");
   return {
     functions: names, deleteFunctions: [],
+    publicAssets: JSON.parse(fs.readFileSync(path.join(root, "functions/public-web/asset-manifest.json"), "utf8")),
     backendSha256: digest(Object.fromEntries(Object.entries(source).filter(([name]) => name.startsWith("functions/")))),
     firestoreRulesSha256: source["firestore.rules"], storageRulesSha256: source["storage.rules"],
     indexesSha256: source["firestore.indexes.json"], firebaseConfigSha256: source["firebase.json"],
@@ -129,7 +132,7 @@ function validateAssertions(report) {
   if (!Array.isArray(report.blockers) || report.blockers.length) fail("Unresolved active journey blockers");
 }
 function validateEvidence(report, candidate, rawRoot) {
-  if (report.schemaVersion !== 1 || ![...GATES, "observation"].includes(report.gate) || report.environment !== "staging" || report.projectId !== PROJECTS.staging || report.sourceSha !== candidate.sourceSha || report.candidateRunId !== candidate.candidateRunId || report.candidateSha256 !== digest(candidate) || report.webSha256 !== candidate.webSha256 || report.deploymentSha256 !== candidate.deploymentSha256 || report.configSha256 !== candidate.configSha256) fail("Evidence is bound to a different candidate");
+  if (report.schemaVersion !== 1 || ![...GATES, ...AUXILIARY_GATES].includes(report.gate) || report.environment !== "staging" || report.projectId !== PROJECTS.staging || report.sourceSha !== candidate.sourceSha || report.candidateRunId !== candidate.candidateRunId || report.candidateSha256 !== digest(candidate) || report.webSha256 !== candidate.webSha256 || report.deploymentSha256 !== candidate.deploymentSha256 || report.configSha256 !== candidate.configSha256) fail("Evidence is bound to a different candidate");
   const start = Date.parse(report.startedAt); const end = Date.parse(report.finishedAt);
   if (!Number.isFinite(start) || !Number.isFinite(end) || end < start || end > Date.now() + 60000) fail("Invalid evidence time");
   if (!/^[a-f0-9]{64}$/.test(report.producerSha256 || "") || !GATE_PRODUCERS[report.gate]?.some((producer) => report.producer === `tools/web_release_producers/${producer}.js`)) fail("Missing or unauthorized executable producer identity");
@@ -155,6 +158,12 @@ function qualify(candidate, productionCandidate, deployment, reports, now = Date
   const close = reports.find((report) => report.gate === "event-close-replay-observation");
   const closedAt = Date.parse(close?.window?.eventClosesAt); const replayedAt = Date.parse(close?.window?.replayObservedAt);
   if (!Number.isFinite(closedAt) || !Number.isFinite(replayedAt) || replayedAt - closedAt < 86400000 || last - closedAt < 86400000 || replayedAt > Date.parse(close.finishedAt)) fail("A verified event close and replay observation must span 24 hours");
+  const replay = reports.find((report) => report.gate === "post-close-replay" && digest(report) === close.window.replayReportSha256);
+  const effectiveClose = Date.parse(close.window.effectiveClosesAt), executedAt = Date.parse(close.window.replayExecutedAt);
+  if (!replay || !Number.isFinite(effectiveClose) || effectiveClose < closedAt || !Number.isFinite(executedAt) ||
+      executedAt <= effectiveClose || executedAt > replayedAt || Date.parse(replay.startedAt) <= effectiveClose ||
+      executedAt > Date.parse(replay.finishedAt) || replay.window?.replayExecutedAt !== close.window.replayExecutedAt ||
+      replay.window?.effectiveClosesAt !== close.window.effectiveClosesAt || replay.window?.eventClosesAt !== close.window.eventClosesAt) fail("An immutable authenticated post-close browser replay is required");
   if (reports.some((report) => report.observedStateSha256 !== deployment.stateSha256)) fail("Staging deployment drifted during qualification");
   return {schemaVersion: 1, sourceSha: candidate.sourceSha, candidateRunId: candidate.candidateRunId,
     stagingCandidateSha256: digest(candidate), productionCandidateSha256: digest(productionCandidate),
@@ -163,4 +172,4 @@ function qualify(candidate, productionCandidate, deployment, reports, now = Date
     gateReports: reports.map((report) => ({gate: report.gate, sha256: digest(report), runId: report.workflowRunId})), requiredGates: GATES};
 }
 
-module.exports = {PROJECTS, REPOSITORY, GATES, GATE_PRODUCERS, WORKFLOWS, canonical, digest, sha256, relativeFile, files, decodeGitBlobs, gitSourceFiles, sourceFiles, deploymentManifest, validateCandidate, validateArtifact, validateRun, validateEvidence, validateAssertions, qualify};
+module.exports = {PROJECTS, REPOSITORY, GATES, AUXILIARY_GATES, GATE_PRODUCERS, WORKFLOWS, canonical, digest, sha256, relativeFile, files, decodeGitBlobs, gitSourceFiles, sourceFiles, deploymentManifest, validateCandidate, validateArtifact, validateRun, validateEvidence, validateAssertions, qualify};

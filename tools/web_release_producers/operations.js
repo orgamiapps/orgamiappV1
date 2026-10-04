@@ -15,9 +15,10 @@ const {schedule} = require("../../functions/events/schedule");
 const assertion = (id, expected, actual) => ({id, expected, actual});
 const iso = (value) => value?.toDate?.().toISOString() || (value instanceof Date ? value.toISOString() : null);
 const terminal = new Set(["complete", "accepted", "suppressed", "cancelled", "expired", "in_app_only", "captured", "sent"]);
-function validateContext(candidate, context) {
+function validateContext(candidate, context, environment = process.env) {
+  const emulatorVariables = ["FIRESTORE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_HOST", "FIREBASE_STORAGE_EMULATOR_HOST", "STORAGE_EMULATOR_HOST", "FIREBASE_DATABASE_EMULATOR_HOST"];
   if (candidate.environment !== "staging" || candidate.projectId !== "attendus-staging" || context.projectId !== candidate.projectId ||
-      context.baseUrl !== "https://attendus-staging.web.app" || process.env.FIRESTORE_EMULATOR_HOST) throw Error("Operations qualification requires the deployed isolated staging candidate");
+      context.baseUrl !== "https://attendus-staging.web.app" || emulatorVariables.some((name) => environment[name])) throw Error("Operations qualification requires the deployed isolated staging candidate");
   const fixture = context.fixture;
   if (!fixture || !/^[A-Za-z0-9_-]{8,100}$/.test(fixture.runId || "") || !fixture.owner?.uid || !fixture.event?.id ||
       !Array.isArray(fixture.ownedFixtureIds) || !Number.isFinite(Date.parse(fixture.eventClosesAt))) throw Error("Bound fixture owner, event and close time are required");
@@ -99,10 +100,39 @@ function pilotReceipt(candidate, context) {
   }
   throw Error("A successful immutable browser evidence run containing actual pilot receipts is required");
 }
+async function inspectPilotExport({pilot, receipt, fixture, current, readMetadata, now = Date.now()}) {
+  const original = receipt.pilotExport;
+  const expires = Date.parse(original?.expiresAt);
+  const completed = Date.parse(receipt.completedAt);
+  if (!original || original.jobId !== pilot.exportJobId || original.status !== "complete" ||
+      !Number.isInteger(original.rowCount) || original.rowCount < pilot.registrationIds.length ||
+      typeof original.generation !== "string" || !original.generation ||
+      !/^[a-f0-9]{64}$/.test(original.jobId) ||
+      typeof original.objectPath !== "string" || !original.objectPath.startsWith(`private-event-exports/${original.jobId}/`) ||
+      !/^private-event-exports\/[a-f0-9]{64}\/[A-Za-z0-9_-]+\.csv$/.test(original.objectPath) ||
+      !Number.isFinite(expires) || !Number.isFinite(completed) || completed >= expires || !Number.isFinite(now)) {
+    throw Error("An immutable pre-expiry completed export receipt is required");
+  }
+  if (current && (current.id !== original.jobId || current.eventId !== fixture.event.id || current.actorUid !== fixture.owner.uid ||
+      current.status !== "complete" || current.generation !== original.generation || current.rowCount !== original.rowCount ||
+      current.expiresAt !== original.expiresAt || current.objectPath !== original.objectPath)) throw Error("Original pilot export was changed or recreated");
+  if (now < expires && !current) throw Error("Original pilot export disappeared before expiry");
+  let metadata = null;
+  try { metadata = await readMetadata(original.objectPath); }
+  catch (error) { if (Number(error.code || error.response?.status) !== 404) throw error; }
+  if (now < expires) {
+    if (!metadata || metadata.name !== original.objectPath || !/^\d+$/.test(String(metadata.generation || "")) || !(Number(metadata.size) > 0)) {
+      throw Error("Completed pilot export object is unavailable before expiry");
+    }
+  } else if (metadata) throw Error("Expired pilot export object has not been removed");
+  return {original, observedAt: new Date(now).toISOString(), jobPresent: !!current, objectPresent: !!metadata,
+    objectGeneration: metadata?.generation || null, disposition: now < expires ? "complete_unexpired" : "completed_then_expired_object_removed"};
+}
 async function produce({candidate, context, outputDir}) {
   const fixture = validateContext(candidate, context), client = await googleClient();
   const {initializeApp, applicationDefault, deleteApp} = fromFunctions("firebase-admin/app");
   const {getFirestore} = fromFunctions("firebase-admin/firestore");
+  const {getStorage} = fromFunctions("firebase-admin/storage");
   const app = initializeApp({projectId: context.projectId, credential: applicationDefault()}, `web-operations-${crypto.randomUUID()}`);
   const db = getFirestore(app), gates = {};
   const identity = {sourceSha: candidate.sourceSha, candidateRunId: candidate.candidateRunId, projectId: candidate.projectId, runId: fixture.runId};
@@ -136,16 +166,21 @@ async function produce({candidate, context, outputDir}) {
     const jobs = [...exports, ...announcements, ...await docs("OutboundMessages", fixture.event.id), ...await docs("scheduledNotifications", fixture.event.id)]
         .map((row) => ({id: row.ref.path, status: row.get("deliveryState") || row.get("status") || null, attempts: row.get("attemptCount") ?? row.get("attempts") ?? 0, leaseUntil: iso(row.get("leaseUntil"))}));
     await gate("owned-staging-pilot", async () => {
-      const {pilot, provenance} = pilotReceipt(candidate, context);
+      const {pilot, receipt, provenance} = pilotReceipt(candidate, context);
+      if (fixture.firebase?.storageBucket !== "attendus-staging.firebasestorage.app") throw Error("Pilot export bucket is not isolated staging");
+      const exportRows = exports.map((row) => ({id: row.id, status: row.get("status"), eventId: row.get("eventId"), actorUid: row.get("actorUid"),
+        rowCount: row.get("rowCount"), generation: row.get("generation") || null, expiresAt: iso(row.get("expiresAt")), objectPath: row.get("path") || null}));
+      const exportLifecycle = await inspectPilotExport({pilot, receipt, fixture, current: exportRows.find((row) => row.id === pilot.exportJobId),
+        readMetadata: async (objectPath) => (await getStorage(app).bucket(fixture.firebase.storageBucket).file(objectPath).getMetadata())[0]});
       const evidence = {...identity, provenance, eventId: fixture.event.id, eventRevision: event.get("eventRevision"), closesAt: close.toISOString(),
         registrations: registrations.map((row) => ({id: row.id, status: row.get("status"), uid: row.get("customerUid") || null})),
         attendance: attendance.map((row) => ({id: row.id, registrationId: row.get("registrationId") || null, checkedInAt: iso(row.get("checkInTime") || row.get("checkedInAt") || row.get("createdAt"))})),
-        exports: exports.map((row) => ({id: row.id, status: row.get("status"), rowCount: row.get("rowCount"), generation: row.get("generation") || null})),
+        exports: exportRows, exportLifecycle,
         announcements: announcements.map((row) => ({id: row.id, status: row.get("status"), count: row.get("count") || 0}))};
       return {blockers: [], rawPaths: [write("owned-staging-pilot/live.json", evidence)], assertions: [
         assertion("registered_admissions_exist", pilot.registrationIds.slice().sort(), registrations.filter((row) => pilot.registrationIds.includes(row.id)).map((row) => row.id).sort()),
         assertion("actual_attendance_exists", pilot.attendanceIds.slice().sort(), attendance.filter((row) => pilot.attendanceIds.includes(row.id)).map((row) => row.id).sort()),
-        assertion("roster_export_completed", true, evidence.exports.some((row) => row.id === pilot.exportJobId && row.status === "complete" && row.rowCount >= pilot.registrationIds.length && !!row.generation)),
+        assertion("roster_export_completion_and_retention_verified", true, ["complete_unexpired", "completed_then_expired_object_removed"].includes(exportLifecycle.disposition)),
         assertion("announcement_completed", true, evidence.announcements.some((row) => row.id === pilot.announcementId && row.status === "complete" && row.count > 0)),
         assertion("attendance_links_resolve", true, evidence.attendance.filter((row) => pilot.attendanceIds.includes(row.id)).every((row) => pilot.registrationIds.includes(row.registrationId))),
       ]};
@@ -186,4 +221,4 @@ async function produce({candidate, context, outputDir}) {
     return {gates};
   } finally { await db.terminate(); await deleteApp(app); }
 }
-module.exports = {produce, validateContext, inspectJobs, previewRelease, pilotReceipt, runtimeFlags};
+module.exports = {produce, validateContext, inspectJobs, previewRelease, pilotReceipt, runtimeFlags, inspectPilotExport};

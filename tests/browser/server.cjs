@@ -86,6 +86,23 @@ app.post('/__track', async (req, res) => {
   }
   manifest(); res.json({tracked: true});
 });
+app.post('/__event-window', async (req, res) => {
+  if (!ownedEvents.has(req.body.eventId) || !/^[A-Za-z0-9 .:_-]{1,100}$/.test(req.body.operation || '') ||
+      !['before', 'failure'].includes(req.body.phase)) return res.sendStatus(400);
+  const snapshot = await db.collection('Events').doc(req.body.eventId).get();
+  if (!snapshot.exists) return res.sendStatus(404);
+  const event = snapshot.data(), attendance = backend('./attendance/v2');
+  const policy = attendance.normalizePolicy(event), window = attendance.policyWindow(event, policy);
+  const observation = {runId: owner.runId, eventId: snapshot.id, operation: req.body.operation,
+    phase: req.body.phase, serverNow: new Date().toISOString(),
+    clientNow: Number.isFinite(Date.parse(req.body.clientNow)) ? new Date(req.body.clientNow).toISOString() : null,
+    startsAt: new Date(attendance.eventDateMillis(event)).toISOString(),
+    opensAt: new Date(window.opensAtMs).toISOString(), closesAt: new Date(window.closesAtMs).toISOString(),
+    opensBeforeMinutes: policy.opensBeforeMinutes, closesAfterMinutes: policy.closesAfterMinutes,
+    openingMode: policy.openingMode, eventRevision: event.eventRevision, status: event.status};
+  fs.appendFileSync(path.join(process.env.ATTENDUS_BROWSER_EVIDENCE, 'event-window-observations.jsonl'), JSON.stringify(observation) + '\n');
+  res.json(observation);
+});
 app.post('/__fixtures/:id', async (req, res) => {
   const id = req.params.id;
   if (!owner.ownsId(id)) return res.sendStatus(400);

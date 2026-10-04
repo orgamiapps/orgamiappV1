@@ -2,6 +2,7 @@
 const {readGuestRegistration, requireActiveAccounts} = require("../account/mutation-guard");
 
 const crypto = require("node:crypto");
+const PUBLIC_ASSETS = require("./asset-manifest.json").assets;
 const {browserEnvironment} = require("./browser-environment");
 const {onRequest} = require("firebase-functions/v2/https");
 const {onDocumentWritten} = require("firebase-functions/v2/firestore");
@@ -16,6 +17,12 @@ const INDEXABLE_EVENT_STATUSES = new Set([
   "active", "scheduled", "completed", "cancelled", "canceled",
 ]);
 const fallbackImage = () => `${publicOrigin()}/public-web/v1/event-fallback.png`;
+
+function publicAssetUrl(name) {
+  const version = PUBLIC_ASSETS[name];
+  if (!/^[a-f0-9]{64}$/.test(version || "")) throw new Error("Public asset version is missing");
+  return `/public-web/v1/assets/${version}/${name}`;
+}
 
 function text(value) {
   return String(value ?? "").trim();
@@ -198,13 +205,13 @@ function shell({title, summary, canonical, image, body, jsonLd, config, nonce}) 
 <meta property="og:url" content="${safeCanonical}"><meta property="og:image" content="${safeImage}">
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${safeTitle}">
 <meta name="twitter:description" content="${safeSummary}"><meta name="twitter:image" content="${safeImage}">
-<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="/public-web/v1/public.css"><link rel="stylesheet" href="/public-web/v1/registration-email-v2.css">
+<link rel="icon" href="/favicon.png"><link rel="stylesheet" href="${publicAssetUrl("public.css")}"><link rel="stylesheet" href="${publicAssetUrl("registration-email-v2.css")}">
 <script type="application/ld+json" nonce="${nonce}">${safeJson(jsonLd)}</script></head>
 <body><a class="skip-link" href="#main">Skip to event details</a>
 <header class="site-header"><a class="brand" href="/" aria-label="Attendus home"><img src="/icons/Icon-192.png" alt="" width="36" height="36"><span>Attendus</span></a></header>
 ${body}<footer class="site-footer"><span>Attendus</span><a href="/privacy">Privacy</a><a href="/terms">Terms</a></footer>
 <script id="attendus-public-config" type="application/json" nonce="${nonce}">${safeJson(config)}</script>
-<script src="/public-web/v1/actions-email-v2.js" defer></script></body></html>`;
+<script src="${publicAssetUrl("actions-email-v2.js")}" defer></script></body></html>`;
 }
 
 function organizerFor(event, organization) {
@@ -330,7 +337,7 @@ function eventBody(id, data, organization, config, now = new Date()) {
 function notFound(res, nonce) {
   pageHeaders(res, nonce);
   res.set("X-Robots-Tag", "noindex, nofollow");
-  res.status(404).send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Page not found | Attendus</title><link rel="stylesheet" href="/public-web/v1/public.css"></head><body><main class="not-found"><h1>Page not found</h1><p>This page is unavailable.</p><a class="cta" href="/">Discover events</a></main></body></html>`);
+  res.status(404).send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Page not found | Attendus</title><link rel="stylesheet" href="${publicAssetUrl("public.css")}"></head><body><main class="not-found"><h1>Page not found</h1><p>This page is unavailable.</p><a class="cta" href="/">Discover events</a></main></body></html>`);
 }
 
 function cookies(req) {
@@ -403,7 +410,7 @@ function managePage(res, nonce, data, session, notice = "") {
   const ticketMarkup = ticket ? `<section class="manage-ticket" aria-labelledby="ticket-heading"><h2 id="ticket-heading">Your ticket</h2><div class="ticket-code"><span>Ticket code</span><strong>${escapeHtml(ticket.ticketCode)}</strong><img src="/manage/ticket.svg" width="220" height="220" alt="QR ticket code ${escapeHtml(ticket.ticketCode)}"></div><button class="secondary-button print-ticket" type="button">Print ticket</button></section>` : "";
   const emailForm = `<details class="contact-update"><summary>Update confirmation email</summary><form method="post" action="/manage/action"><input type="hidden" name="csrf" value="${escapeHtml(session.csrfToken)}"><input type="hidden" name="action" value="update_email"><label>Email address <input name="email" type="email" autocomplete="email" required maxlength="254"></label><button class="secondary-button" type="submit">Update and resend</button></form></details>`;
   const body = `<main id="main" class="page manage-page"><article><div class="eyebrow">Guest registration</div><h1>${escapeHtml(event.title)}</h1>${notice ? `<p class="notice" role="status">${escapeHtml(notice)}</p>` : ""}<dl class="details"><div><dt>Status</dt><dd>${cancelled ? "Cancelled" : "Confirmed"}</dd></div><div><dt>Attendee</dt><dd>${escapeHtml(registration.realName || registration.userName)}</dd></div><div><dt>Email</dt><dd>${escapeHtml(guest.maskedEmail || "Protected")}</dd></div><div><dt>Date</dt><dd>${escapeHtml(formatDate(eventStartForManage(event), validTimeZone(event.eventTimeZone)))}</dd></div></dl>${ticketMarkup}<div class="manage-actions"><a class="secondary-button" href="/manage/attendance">Check in or get my event pass</a><a class="secondary-button" href="/manage/calendar.ics">Download calendar invite</a><a class="secondary-button" href="/event/${encodeURIComponent(data.event.id)}">View event</a>${cancel}</div>${emailForm}${paid ? `<p>Paid ticket refunds are handled by the organizer or <a href="mailto:support@attendus.app">support@attendus.app</a>.</p>` : ""}</article></main>`;
-  res.status(200).send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Manage registration | Attendus</title><link rel="stylesheet" href="/public-web/v1/public.css"><link rel="stylesheet" href="/public-web/v1/registration-email-v2.css"></head><body><a class="skip-link" href="#main">Skip to registration</a><header class="site-header"><a class="brand" href="/"><img src="/icons/Icon-192.png" alt="" width="36" height="36"><span>Attendus</span></a></header>${body}<script nonce="${nonce}">document.querySelector('.print-ticket')?.addEventListener('click',()=>window.print());</script></body></html>`);
+  res.status(200).send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Manage registration | Attendus</title><link rel="stylesheet" href="${publicAssetUrl("public.css")}"><link rel="stylesheet" href="${publicAssetUrl("registration-email-v2.css")}"></head><body><a class="skip-link" href="#main">Skip to registration</a><header class="site-header"><a class="brand" href="/"><img src="/icons/Icon-192.png" alt="" width="36" height="36"><span>Attendus</span></a></header>${body}<script nonce="${nonce}">document.querySelector('.print-ticket')?.addEventListener('click',()=>window.print());</script></body></html>`);
 }
 
 function eventStartForManage(event) {

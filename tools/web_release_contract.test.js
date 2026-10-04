@@ -7,7 +7,7 @@ const path = require("node:path");
 const c = require("./web_release_contract");
 const {verifyState, captureFunctionSources, pages} = require("./web_release_state");
 const {options, materializeBackend, materializeRules} = require("./web_release_pipeline");
-const {publishEvidence, retainReports} = require("./web_release_evidence");
+const {publishEvidence, retainReports, selectedGates} = require("./web_release_evidence");
 const hash = "a".repeat(64); const sourceSha = "a".repeat(40);
 function candidate(environment = "staging") {
   const value = {schemaVersion: 1, sourceSha, candidateRunId: "123", environment, projectId: c.PROJECTS[environment], releaseId: hash,
@@ -31,6 +31,11 @@ function fixture() {
   const value = candidate(); const production = candidate("production"); const now = Date.now() - 1000;
   const reports = c.GATES.map((gate) => report(gate, value, now));
   for (let hour = 0; hour <= 24; hour++) reports.push(report("observation", value, now - (24 - hour) * 3600000));
+  const replay = report("post-close-replay", value, now - 22 * 3600000);
+  replay.window = {eventClosesAt: new Date(now - 86400000).toISOString(), effectiveClosesAt: new Date(now - 23 * 3600000).toISOString(), replayExecutedAt: replay.finishedAt};
+  reports.push(replay);
+  Object.assign(reports.find((row) => row.gate === "event-close-replay-observation").window,
+      {effectiveClosesAt: replay.window.effectiveClosesAt, replayExecutedAt: replay.finishedAt, replayReportSha256: c.digest(replay)});
   const deployment = {candidateSha256: c.digest(value), environment: "staging", verifiedAt: new Date(now - 86400000 - 60000).toISOString(), stateSha256: hash};
   return {value, production, now, reports, deployment};
 }
@@ -73,6 +78,19 @@ test("same-source production configuration and prior deployment are mandatory", 
   assert.throws(() => c.qualify(f.value, f.production, f.deployment, f.reports, f.now), /one frozen source/);
   const value = candidate(); value.webFiles["injected.js"] = hash;
   assert.throws(() => c.validateCandidate(value, "staging"), /digest mismatch/);
+});
+
+test("passive post-close observations without an immutable actual replay cannot qualify", () => {
+  for (const alter of [
+    (f) => {f.reports = f.reports.filter((row) => row.gate !== "post-close-replay");},
+    (f) => {f.reports.find((row) => row.gate === "event-close-replay-observation").window.replayReportSha256 = "0".repeat(64);},
+    (f) => {f.reports.find((row) => row.gate === "event-close-replay-observation").window.replayExecutedAt = new Date(f.now - 24 * 3600000).toISOString();},
+  ]) {
+    const f = fixture(); alter(f); assert.throws(() => c.qualify(f.value, f.production, f.deployment, f.reports, f.now), /authenticated post-close/);
+  }
+  assert.deepEqual(selectedGates("browser", "post-close-replay"), ["post-close-replay"]);
+  for (const producer of ["backend", "operations", "safari"]) assert.throws(() => selectedGates(producer, "post-close-replay"), /requires browser/);
+  assert.throws(() => selectedGates("browser", "observation"), /not supported/);
 });
 test("raw files are rehashed and traversal paths rejected", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "attendus-raw-"));

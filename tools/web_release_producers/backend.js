@@ -13,6 +13,9 @@ const {captureRecoveryTarget} = require("../capture_recovery_target");
 const {inventoryRestoredContent, compareRecoveryContent} = require("../recovery_content");
 const {readAuthoritativeReadiness} = require("../authoritative_data_readiness");
 const {runtimeFlags} = require("./operations");
+const {verifiedReplay} = require("./browser-replay");
+const {normalizePolicy, policyWindow} = require("../../functions/attendance/v2");
+const {digest} = require("../web_release_contract");
 const hash = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const assertion = (id, expected, actual) => ({id, expected, actual});
 const safeId = (value) => typeof value === "string" && /^[A-Za-z0-9_.:-]{1,180}$/.test(value);
@@ -221,16 +224,27 @@ async function produce({candidate, context, outputDir}) {
       }
       const raw = write("event-close-replay-observation/sample.json", sample);
       const assertions = observationAssertions(sample, previous);
+      let replay = null;
       assertions.push(assertion("runtime_paid_and_wallet_providers_remain_disabled", [false, false, false],
           [flags.paidTicketCheckoutEnabled, flags.appleDeliveryEnabled, flags.googleDeliveryEnabled]));
       if (!requested?.has("observation")) {
         const settled = previous.filter((prior) => prior.eventClosesAt === sample.eventClosesAt && Date.parse(prior.observedAt) >= closes.getTime() + 15 * 60000 &&
           prior.jobs.length > 0 && prior.jobs.every((job) => terminal.has(job.status) && !["failed", "dead_letter"].includes(job.status)));
-        assertions.push(assertion("authenticated_post_close_replay_baseline_exists", true, settled.length > 0));
+        replay = verifiedReplay(candidate, context);
+        const effectiveClose = new Date(policyWindow(event.data(), normalizePolicy(event.data())).closesAtMs).toISOString();
+        assertions.push(assertion("authenticated_post_close_replay_has_immutable_browser_provenance", true, !!replay.provenance.receiptSha256));
+        assertions.push(assertion("replay_used_current_effective_close", effectiveClose, replay.receipt.effectiveClosesAt));
+        assertions.push(assertion("replay_used_current_event_revision", event.get("eventRevision") || 0, replay.receipt.snapshots[0].event.revision));
+        assertions.push(assertion("replay_used_current_check_in_policy", digest(normalizePolicy(event.data())), replay.receipt.snapshots[0].event.policySha256));
+        assertions.push(assertion("passive_post_close_jobs_settled", true, settled.length > 0));
         assertions.push(assertion("post_close_replay_observation_spans_24_hours", true, settled.length > 0 && Date.parse(sample.observedAt) >= closes.getTime() + 86400000 &&
           Date.parse(sample.observedAt) > Math.min(...settled.map((prior) => Date.parse(prior.observedAt)))));
       }
-      return {rawPaths: [raw], blockers: [], window: {eventClosesAt: sample.eventClosesAt, replayObservedAt: sample.observedAt},
+      if (replay) sample.authenticatedReplay = replay.provenance;
+      write("event-close-replay-observation/sample.json", sample);
+      return {rawPaths: [raw], blockers: [], window: {eventClosesAt: sample.eventClosesAt, replayObservedAt: sample.observedAt,
+        ...(replay ? {effectiveClosesAt: replay.receipt.effectiveClosesAt, replayExecutedAt: replay.receipt.completedAt,
+          replayReportSha256: replay.provenance.reportSha256} : {})},
         assertions};
     });
     return {gates};

@@ -38,6 +38,31 @@ function allowStagingRequest(value, method, context, headers = {}) {
   if (['data:', 'blob:', 'about:'].includes(url.protocol)) return true;
   if (url.origin === context.baseUrl) return true;
   if (url.protocol !== 'https:') return false;
+  // FlutterFire installs the popup resolver even for email/guest auth. Firebase
+  // JS proactively loads this read-only iframe on Safari/mobile before auth is
+  // ready; its project key and default app must stay bound to this fixture.
+  if (url.origin === 'https://attendus-staging.firebaseapp.com') {
+    if (method !== 'GET' || url.username || url.password || fixture.firebase.projectId !== 'attendus-staging') return false;
+    if (url.pathname === '/__/auth/iframe.js') return !url.search;
+    if (url.pathname !== '/__/auth/iframe') return false;
+    const params = url.searchParams;
+    const allowed = new Set(['apiKey', 'appName', 'v', 'eid', 'fw', 'usegapi', 'jsh']);
+    if ([...params.keys()].some((key) => !allowed.has(key) || params.getAll(key).length !== 1)) return false;
+    return params.get('apiKey') === fixture.firebase.apiKey && params.get('appName') === '[DEFAULT]' &&
+      /^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(params.get('v') || '') && params.get('eid') === 'p' &&
+      (!params.has('fw') || /^[A-Za-z0-9_,.-]{1,120}$/.test(params.get('fw'))) &&
+      (!params.has('usegapi') || params.get('usegapi') === '1') &&
+      (!params.has('jsh') || /^m;\/_\/scs\/abc-static\/_\/js\/k=gapi\.lb\.[A-Za-z0-9_.-]+\/d=1\/rs=[A-Za-z0-9_-]+\/m=__features__$/.test(params.get('jsh')));
+  }
+  if (url.origin === 'https://apis.google.com') {
+    if (method !== 'GET' || url.username || url.password) return false;
+    if (url.pathname === '/js/api.js') return [...url.searchParams.keys()].length === 1 &&
+      /^__iframefcb\d{1,6}$/.test(url.searchParams.get('onload') || '');
+    // Only the observed GAPI iframe module, not arbitrary APIs/modules. The
+    // version and resource signatures change independently of our app build.
+    return /^\/_\/scs\/abc-static\/_\/js\/k=gapi\.lb\.[A-Za-z0-9_.-]+\/m=gapi_iframes\/rt=j\/sv=1\/d=1\/ed=1\/rs=[A-Za-z0-9_-]+\/cb=gapi\.loaded_\d+$/.test(url.pathname) &&
+      [...url.searchParams.keys()].length === 1 && url.searchParams.get('le') === 'scs';
+  }
   if (url.hostname === 'us-central1-attendus-staging.cloudfunctions.net') return true;
   if (['identitytoolkit.googleapis.com', 'securetoken.googleapis.com'].includes(url.hostname)) return url.searchParams.getAll('key').length === 1 && url.searchParams.get('key') === fixture.firebase.apiKey;
   if (url.hostname === 'firestore.googleapis.com') {
@@ -113,10 +138,33 @@ function requirePassingBrowserJourneys(gates, browserErrors) {
   }
 }
 
+async function preflightBrandedBrowsers(replayOnly, launcher = chromium) {
+  if (replayOnly) return [];
+  const results = [];
+  for (const [name, channel] of [['chrome', 'chrome'], ['edge', 'msedge']]) {
+    let engine;
+    try {
+      engine = await launcher.launch({headless: true, channel, timeout: 30000});
+      const version = engine.version();
+      if (typeof version !== 'string' || !version.trim()) throw Error('Browser did not return its version.');
+      results.push({name, channel, version});
+    } catch (cause) {
+      const error = Error(`Required ${name} browser cannot launch; full journeys cannot begin.`, {cause});
+      error.browserEngines = results;
+      error.unavailableBrowser = name;
+      throw error;
+    } finally {if (engine) await engine.close();}
+  }
+  return results;
+}
+
 async function produce({candidate, context, outputDir}) {
   const fixture = validateFixture(context);
+  const replayOnly = context.requestedGates?.length === 1 && context.requestedGates[0] === 'post-close-replay';
+  if (context.requestedGates && !replayOnly) throw Error('Browser evidence supports only full journeys or post-close-replay.');
+  const activeGates = replayOnly ? ['post-close-replay'] : GATES;
   fs.mkdirSync(outputDir, {recursive: true});
-  const gates = Object.fromEntries(GATES.map((id) => [id, {assertions: [], rawPaths: [], blockers: []}]));
+  const gates = Object.fromEntries(activeGates.map((id) => [id, {assertions: [], rawPaths: [], blockers: []}]));
   const blocked = [], browserErrors = [], identityObservations = new Set(), anonymousUids = new Set();
   let appCheckToken;
   const write = (gate, name, value) => { fs.writeFileSync(path.join(outputDir, name), JSON.stringify(value, null, 2)); gates[gate].rawPaths.push(name); };
@@ -130,7 +178,7 @@ async function produce({candidate, context, outputDir}) {
   };
   const browser = await chromium.launch({headless: true});
   async function newContext(viewport = {width: 1440, height: 1000}, engine = browser) {
-    const browserContext = await engine.newContext({viewport, serviceWorkers: 'allow'});
+    const browserContext = await engine.newContext({viewport, serviceWorkers: replayOnly ? 'block' : 'allow'});
     await browserContext.route('**/*', async (route) => {
       const request = route.request(), url = new URL(request.url());
       const headers = await request.allHeaders();
@@ -222,7 +270,7 @@ async function produce({candidate, context, outputDir}) {
     return payload.result ?? payload.data;
   }
   const actors = new Map();
-  async function callAs(role, name, data) {
+  async function actorPage(role) {
     if (!['owner', 'attendee', 'staff', 'unauthorized', 'administrator', 'deletion'].includes(role) || !fixture[role] ||
         !fixture.ownedFixtureIds.includes(fixture[role].uid)) throw Error('Pilot actor is outside the owned fixture manifest.');
     if (!actors.has(role)) {
@@ -230,7 +278,11 @@ async function produce({candidate, context, outputDir}) {
       await login(page, fixture[role]); actors.set(role, page);
     }
     if (!appCheckToken) throw Error('The packaged browser has not obtained an App Check token.');
-    return callable(name, data, await browserToken(actors.get(role), fixture[role]));
+    return actors.get(role);
+  }
+  async function callAs(role, name, data) {
+    const page = await actorPage(role);
+    return callable(name, data, await browserToken(page, fixture[role]));
   }
   async function capturedGuestProof(notBefore) {
     const committed = gitSourceFiles(path.resolve(__dirname, '../..'), 'tools/web_release_producers/');
@@ -263,6 +315,60 @@ async function produce({candidate, context, outputDir}) {
     if (!manifestResponse.ok || sha(manifestBytes) !== expectedManifest) throw Error('Live release manifest bytes do not match the frozen candidate.');
     const identity = {candidateRunId: context.candidateRunId, sourceSha: context.sourceSha, releaseId: context.releaseId,
       projectId: context.projectId, webSha256: context.webSha256, manifestSha256: sha(manifestBytes)};
+    if (replayOnly) {
+      const gate = 'post-close-replay';
+      await step(gate, async () => {
+        const committed = gitSourceFiles(path.resolve(__dirname, '../..'), 'tools/web_release_producers/');
+        for (const name of ['browser-replay.js', 'browser-pilot.js']) {
+          const key = `tools/web_release_producers/${name}`;
+          if (!committed[key] || candidate.sourceFiles?.[key] !== sha(committed[key])) throw Error('Replay helper differs from the frozen candidate.');
+        }
+        if (process.env.FIRESTORE_EMULATOR_HOST || process.env.FIREBASE_AUTH_EMULATOR_HOST) throw Error('Post-close replay requires deployed staging.');
+        const {originalPilot, createReplayObserver, pageCallable, runReplay, RAW} = require('./browser-replay');
+        const original = originalPilot(candidate, context);
+        const {initializeApp, applicationDefault, deleteApp} = serverDependencies('firebase-admin/app');
+        const {getFirestore} = serverDependencies('firebase-admin/firestore');
+        const observerApp = initializeApp({projectId: 'attendus-staging', credential: applicationDefault()}, `browser-replay-${fixture.runId}`);
+        try {
+          const observe = createReplayObserver({fixture, candidateIdentity: context, db: getFirestore(observerApp), original});
+          const connect = async (role, online) => {
+            const page = await actorPage(role);
+            await browserToken(page, fixture[role]);
+            await page.context().setOffline(!online);
+            await page.waitForFunction((expected) => navigator.onLine === expected, online);
+          };
+          const invoke = async (role, name, data) => {
+            const page = await actorPage(role);
+            return pageCallable(page, {name, data, token: await browserToken(page, fixture[role]), appCheckToken, actorUid: fixture[role].uid});
+          };
+          try {
+            const receipt = await runReplay({candidate, context, original, observe, connect, invoke});
+            write(gate, RAW, receipt); gates[gate].assertions.push(...receipt.assertions);
+            gates[gate].window = {eventClosesAt: fixture.eventClosesAt, effectiveClosesAt: receipt.effectiveClosesAt, replayExecutedAt: receipt.completedAt};
+          } catch (error) {
+            if (error.replayReport) {write(gate, RAW, error.replayReport); gates[gate].assertions.push(...error.replayReport.assertions);}
+            throw error;
+          }
+        } finally {await getFirestore(observerApp).terminate(); await deleteApp(observerApp);}
+      });
+      await Promise.allSettled([...identityObservations]);
+      record(gate, 'uncaught-browser-errors', [], browserErrors);
+      record(gate, 'unexpected-blocked-network-requests', [], blocked);
+      write(gate, 'fixture-created-identities.json', {runId: fixture.runId, projectId: context.projectId, anonymousUids: [...anonymousUids].sort()});
+      write(gate, 'browser-replay-network.json', {identity, blocked, browserErrors});
+      return {gates, observedDeploymentIdentity: identity};
+    }
+    let brandedBrowsers;
+    try {brandedBrowsers = await preflightBrandedBrowsers(false);}
+    catch (error) {
+      write(GATES[0], 'browser-engine-scope.json', {identity, preflight: error.browserEngines,
+        unavailableBrowser: error.unavailableBrowser, blocker: scrub(error)});
+      for (const gate of GATES) {
+        gates[gate].blockers.push(scrub(error));
+        record(gate, 'required-branded-browsers-can-launch', ['chrome', 'edge'], (error.browserEngines ?? []).map((entry) => entry.name));
+      }
+      return {gates, observedDeploymentIdentity: identity};
+    }
     const publicContext = await newContext(), publicPage = await pageFor(publicContext);
     const ownerContext = await newContext(), ownerPage = await pageFor(ownerContext);
     await step(GATES[0], async () => {
@@ -475,29 +581,21 @@ async function produce({candidate, context, outputDir}) {
     });
     // Run separate real engines. Playwright WebKit is labeled as WebKit;
     // neither it nor desktop viewport emulation claims physical Safari.
-    const engines = [{name: 'firefox', type: firefox}, {name: 'webkit', type: webkit}];
-    const edgePaths = process.platform === 'win32' ? [process.env.PROGRAMFILES,
-      process.env['PROGRAMFILES(X86)'], process.env.LOCALAPPDATA].filter(Boolean)
-        .map((base) => path.join(base, 'Microsoft/Edge/Application/msedge.exe')) :
-      process.platform === 'linux' ? ['/opt/microsoft/msedge/msedge', '/usr/bin/microsoft-edge', '/usr/bin/microsoft-edge-stable'] :
-        ['/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'];
-    const edgeInstalled = edgePaths.some((file) => fs.existsSync(file));
-    if (edgeInstalled) engines.push({name: 'edge', type: chromium, channel: 'msedge'});
-    const chromePaths = process.platform === 'win32' ? [process.env.PROGRAMFILES,
-      process.env['PROGRAMFILES(X86)'], process.env.LOCALAPPDATA].filter(Boolean)
-        .map((base) => path.join(base, 'Google/Chrome/Application/chrome.exe')) :
-      process.platform === 'linux' ? ['/opt/google/chrome/chrome', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable'] :
-        ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'];
-    const chromeInstalled = chromePaths.some((file) => fs.existsSync(file));
-    if (chromeInstalled) engines.push({name: 'chrome', type: chromium, channel: 'chrome'});
-    write(GATES[3], 'browser-engine-scope.json', {deepJourneys: 'chromium', additionalJourneys: engines.map((entry) => entry.name),
-      chrome: chromeInstalled ? 'installed Google Chrome; included' : 'Google Chrome not installed on this host',
-      edge: edgeInstalled ? 'installed; included' : 'not installed on this host', physicalSafari: 'not available; unqualified'});
+    const engines = [{name: 'firefox', type: firefox}, {name: 'webkit', type: webkit},
+      {name: 'edge', type: chromium, channel: 'msedge'}, {name: 'chrome', type: chromium, channel: 'chrome'}];
+    const scope = {deepJourneys: {name: 'chromium', version: browser.version()},
+      additionalJourneys: engines.map((entry) => entry.name), brandedPreflight: brandedBrowsers,
+      executed: [], completed: [], physicalSafari: 'separate required Safari producer'};
+    write(GATES[3], 'browser-engine-scope.json', scope);
     for (const entry of engines) {
       let engine;
       const beforeBlockers = gates[GATES[0]].blockers.length;
+      const beforeAssertions = Object.fromEntries(GATES.map((gate) => [gate, gates[gate].assertions.length]));
       await step(GATES[0], async () => {
         engine = await entry.type.launch({headless: true, ...(entry.channel ? {channel: entry.channel} : {})});
+        const version = engine.version();
+        scope.executed.push({name: entry.name, channel: entry.channel ?? null, version});
+        record(GATES[0], `${entry.name}-runtime-version-reported`, true, typeof version === 'string' && version.trim().length > 0);
         const engineContext = await newContext({width: 1280, height: 900}, engine), page = await pageFor(engineContext);
         await page.goto(context.baseUrl + fixture.event.publicPath);
         record(GATES[0], `${entry.name}-public-event-title`, fixture.event.title, await page.getByRole('heading', {level: 1}).innerText());
@@ -530,8 +628,12 @@ async function produce({candidate, context, outputDir}) {
       if (gates[GATES[0]].blockers.length > beforeBlockers) {
         for (const gate of [GATES[1], GATES[2], GATES[3]]) gates[gate].blockers.push(`${entry.name} did not complete the required browser journeys; see browser-auth-guest-organizer evidence.`);
       }
+      if (gates[GATES[0]].blockers.length === beforeBlockers && GATES.every((gate) => gates[gate].assertions.slice(beforeAssertions[gate])
+        .every((assertion) => isDeepStrictEqual(assertion.expected, assertion.actual)))) scope.completed.push(entry.name);
       if (engine) await engine.close();
     }
+    write(GATES[3], 'browser-engine-scope.json', scope);
+    for (const gate of GATES.slice(0, 4)) record(gate, 'required-browser-journeys-complete', engines.map((entry) => entry.name), scope.completed);
     await step(GATES[0], async () => {
       await Promise.allSettled([...identityObservations]);
       if (blocked.length) throw Error('Blocked unexpected network requests must be resolved before disposable-account deletion.');
@@ -582,4 +684,4 @@ async function produce({candidate, context, outputDir}) {
 
 module.exports = produce;
 module.exports.produce = produce;
-module.exports._test = {validateFixture, allowStagingRequest, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys};
+module.exports._test = {validateFixture, allowStagingRequest, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers};

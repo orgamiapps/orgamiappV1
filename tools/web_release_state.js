@@ -74,6 +74,7 @@ async function captureState(projectId, client = null) {
     pages(client, `${firestore}/indexes`, "indexes"), pages(client, `${firestore}/fields`, "fields", {filter: "indexConfig.usesAncestorConfig=false OR ttlConfig:*"}), captureFunctionSources(projectId, client),
   ]);
   if (!hosting?.version?.name || !Array.isArray(functions)) throw Error("Incomplete Hosting/Functions predecessor inventory");
+  const hostingIdentity = await require("./bridge_web_assets").hostingIdentity(projectId, hosting.version.name, client);
   const rules = [];
   for (const release of releases.filter((item) => item.name.includes("/releases/cloud.firestore") || item.name.includes("/releases/firebase.storage/"))) {
     const set = (await client.request({url: `https://firebaserules.googleapis.com/v1/${release.rulesetName}`})).data;
@@ -89,9 +90,12 @@ async function captureState(projectId, client = null) {
     return metadata;
   });
   const state = {projectId, hostingVersion: hosting.version.name, hostingRelease: hosting.name,
+    hosting: hostingIdentity,
     functions: publicFunctions.sort((a, b) => a.id.localeCompare(b.id)), rules: rules.sort((a, b) => a.release.localeCompare(b.release)),
     functionSources,
     indexes: indexes.sort((a, b) => a.name.localeCompare(b.name)), fields: fields.filter((field) => field.indexConfig || field.ttlConfig).sort((a, b) => a.name.localeCompare(b.name))};
+  const latest = (await client.request({url: `https://firebasehosting.googleapis.com/v1beta1/sites/${projectId}/releases`, params: {pageSize: 1}})).data.releases?.[0];
+  if (latest?.name !== state.hostingRelease || latest.version?.name !== state.hostingVersion) throw Error("Hosting changed during deployment state capture");
   return {state, stateSha256: digest(state), capturedAt: new Date().toISOString()};
 }
 function verifyState(candidate, capture, manifest) {

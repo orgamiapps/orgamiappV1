@@ -251,6 +251,34 @@ test("published draft retries return their original result and reject changed sc
   await assert.rejects(publish.run(request(owner, {draftId, expectedDraftRevision: 1, recurrenceScope: "entire_series"})), {code: "already-exists"});
 });
 
+test("export download signing never outlives retention and rejects invalid expiry", async () => {
+  const eid = `export-expiry-${suffix}`;
+  await db.collection("Events").doc(eid).set({customerUid: owner, title: "Export expiry"});
+  const signed = [];
+  const isolated = createLaunchOperations({firestore: admin.firestore, storage: () => ({bucket: () => ({file: () => ({
+    getSignedUrl: async (options) => { signed.push(options); return ["https://example.test/fixture.csv"]; },
+  })})})});
+  for (const [scenario, expiry] of [["near", new Date(Date.now() + 60000)], ["normal", new Date(Date.now() + 3600000)],
+    ["expired", new Date(Date.now() - 1000)], ["malformed", "invalid"], ["map", {toMillis: "invalid"}], ["missing", null]]) {
+    const id = crypto.createHash("sha256").update(`${eid}-${scenario}`).digest("hex");
+    await db.collection("EventExportJobs").doc(id).set({eventId: eid, actorUid: owner, status: "complete", expiresAt: expiry,
+      path: `private-event-exports/${id}/fixture.csv`, subjectUids: [], rowCount: 1, generation: "fixture-generation"});
+    const before = Date.now(); const count = signed.length;
+    if (["near", "normal"].includes(scenario)) {
+      const result = await isolated.getEventExportV2.run(request(owner, {eventId: eid, jobId: id}));
+      assert.equal(result.status, "complete");
+      const options = signed.at(-1);
+      assert.equal(options.action, "read");
+      if (scenario === "near") assert.equal(options.expires, expiry.getTime());
+      else assert.ok(options.expires >= before + 5 * 60000 && options.expires <= Date.now() + 5 * 60000);
+      assert.ok(options.expires <= expiry.getTime());
+    } else {
+      await assert.rejects(isolated.getEventExportV2.run(request(owner, {eventId: eid, jobId: id})), {code: "not-found"});
+      assert.equal(signed.length, count);
+    }
+  }
+});
+
 test("export publication rechecks deletion after writing the private object", async () => {
   const eid = `export-race-${suffix}`; const attendee = `export-subject-${suffix}`;
   await db.collection("Events").doc(eid).set({customerUid: owner, title: "Export race", selectedDateTime: new Date(), eventDurationMinutes: 90, eventTimeZone: "UTC"});

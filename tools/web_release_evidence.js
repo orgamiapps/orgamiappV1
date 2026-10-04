@@ -7,6 +7,12 @@ const {download, loadCandidate, options, write} = require("./web_release_pipelin
 const {captureState, verifyState} = require("./web_release_state");
 const root = path.resolve(__dirname, "..");
 const PRODUCERS = Object.freeze({browser: "tools/web_release_producers/browser.js", backend: "tools/web_release_producers/backend.js", operations: "tools/web_release_producers/operations.js", safari: "tools/web_release_producers/safari.js"});
+function selectedGates(producer, mode = "all") {
+  if (mode === "post-close-replay" && producer === "browser") return [mode];
+  if (mode === "observation" && ["backend", "operations"].includes(producer)) return [mode];
+  if (mode === "all" && Object.hasOwn(PRODUCERS, producer)) return null;
+  throw Error("Gate mode is not supported by this producer; post-close-replay requires browser");
+}
 function evidenceFile(output, name) {
   c.relativeFile(name);
   if (/(?:^|\/)(?:\.env|.*debug.*\.log|.*credentials.*|.*private.*|gha-creds-.*)/i.test(name) || !/\.(?:json|png|txt|csv)$/.test(name)) throw Error("Unreviewed private/debug evidence cannot be uploaded");
@@ -36,7 +42,7 @@ function retainReports({output, candidate, producerPath, source, startedAt, fini
   if (after) write(path.join(output, "deployment-state.json"), after);
   for (const [gate, evidence] of Object.entries(result?.gates || {})) {
     if (requestedGates && !requestedGates.includes(gate)) continue;
-    if (![...c.GATES, "observation"].includes(gate)) { failures.push("unknown-gate"); continue; }
+    if (![...c.GATES, ...c.AUXILIARY_GATES].includes(gate)) { failures.push("unknown-gate"); continue; }
     const rawFiles = {}; const validationErrors = [];
     if (!Array.isArray(evidence?.rawPaths) || !evidence.rawPaths.length) validationErrors.push("missing-raw-evidence");
     for (const name of new Set([...(Array.isArray(evidence?.rawPaths) ? evidence.rawPaths : []), ...(after ? ["deployment-state.json"] : [])])) {
@@ -71,6 +77,7 @@ function retainReports({output, candidate, producerPath, source, startedAt, fini
 async function run(args) {
   const producerPath = PRODUCERS[args.producer];
   if (!producerPath || !args.output) throw Error("An allowlisted producer and output directory are required");
+  const requestedGates = selectedGates(args.producer, args.gates);
   const output = path.resolve(args.output); const bundle = `${output}-candidate`; const deployed = `${output}-deployment`;
   download(args["candidate-run"], "candidate", "web-candidate-staging", bundle);
   download(args["candidate-run"], "candidate", "web-staging-deployment", deployed);
@@ -89,8 +96,6 @@ async function run(args) {
   fs.mkdirSync(output, {recursive: true});
   const fixture = JSON.parse(process.env.STAGING_WEB_QA_CONTEXT_JSON || "{}");
   fixture.cacheUpgrade = {...fixture.cacheUpgrade, previousFiles: priorBundle.files, previousHostingVersion: priorBundle.hostingVersion};
-  if (args.gates && args.gates !== "observation" && args.gates !== "all") throw Error("Only all or observation gate selection is allowed");
-  const requestedGates = args.gates === "observation" ? ["observation"] : null;
   const priorEvidence = [];
   const priorRuns = args["prior-evidence-runs"] ? [...new Set(args["prior-evidence-runs"].split(","))] : [];
   if (priorRuns.length > 200) throw Error("Too many prior evidence runs");
@@ -123,4 +128,4 @@ async function run(args) {
   if (index.qualificationStatus !== "passed") throw Error("Qualification evidence is blocked; curated reports and raw hashes were retained in the diagnostic artifact");
 }
 if (require.main === module) run(options(process.argv.slice(2))).catch((error) => { console.error(error.stack); process.exitCode = 1; });
-module.exports = {run, PRODUCERS, publishEvidence, retainReports, evidenceFile};
+module.exports = {run, PRODUCERS, selectedGates, publishEvidence, retainReports, evidenceFile};

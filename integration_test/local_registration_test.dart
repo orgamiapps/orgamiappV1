@@ -1,4 +1,5 @@
 import 'fixture_harness.dart';
+import 'roster_readiness.dart';
 import 'dart:convert';
 
 import 'package:attendus/Services/firebase_initializer.dart';
@@ -185,16 +186,41 @@ void main() {
         String name,
         Map<String, dynamic> data,
       ) async {
-        final result =
-            await FirebaseFunctions.instanceFor(region: 'us-central1')
-                .httpsCallable(
-                  name,
-                  options: HttpsCallableOptions(
-                    timeout: const Duration(seconds: 120),
-                  ),
-                )
-                .call(data);
-        return Map<String, dynamic>.from(result.data as Map);
+        Map<String, dynamic>? observation;
+        if (data['eventId'] is String) {
+          observation = await BrowserFixtures.post('/__event-window', {
+            'eventId': data['eventId'],
+            'operation': name,
+            'phase': 'before',
+            'clientNow': DateTime.now().toUtc().toIso8601String(),
+          });
+        }
+        try {
+          final result =
+              await FirebaseFunctions.instanceFor(region: 'us-central1')
+                  .httpsCallable(
+                    name,
+                    options: HttpsCallableOptions(
+                      timeout: const Duration(seconds: 120),
+                    ),
+                  )
+                  .call(data);
+          return Map<String, dynamic>.from(result.data as Map);
+        } on FirebaseFunctionsException catch (error) {
+          if (data['eventId'] is String) {
+            observation = await BrowserFixtures.post('/__event-window', {
+              'eventId': data['eventId'],
+              'operation': name,
+              'phase': 'failure',
+              'clientNow': DateTime.now().toUtc().toIso8601String(),
+            });
+          }
+          throw FirebaseFunctionsException(
+            code: error.code,
+            message:
+                '$name: ${error.message}; event window: ${jsonEncode(observation)}',
+          );
+        }
       }
 
       var wizard = EventWizardService();
@@ -274,7 +300,9 @@ void main() {
         email: ownerEmail,
         password: password,
       );
-      final roster = await call('listEventRosterV2', {'eventId': eventId});
+      final roster = await waitForRoster(
+        () => call('listEventRosterV2', {'eventId': eventId}),
+      );
       expect(roster['rows'], hasLength(1));
       final session = await call('startCheckInSession', {'eventId': eventId});
       final checkInInput = <String, dynamic>{
@@ -319,19 +347,21 @@ void main() {
       edit.startAt = edit.startAt.add(const Duration(days: 1));
       edit.endAt = edit.endAt.add(const Duration(days: 1));
       await wizard.saveDraft(edit);
-      final preview = await call('previewEventChangeV1', {
-        'draftId': edit.draftId,
-        'expectedDraftRevision': edit.revision,
-        'recurrenceScope': 'this_occurrence',
-      });
+      final preview = await waitForRoster(
+        () => call('previewEventChangeV1', {
+          'draftId': edit.draftId,
+          'expectedDraftRevision': edit.revision,
+          'recurrenceScope': 'this_occurrence',
+        }),
+      );
       await wizard.publish(
         edit,
         changeReason: 'Local rescheduling rehearsal',
         changePreviewToken: preview['previewToken'] as String,
       );
-      final cancellation = await call('previewEventCancellationV1', {
-        'eventId': eventId,
-      });
+      final cancellation = await waitForRoster(
+        () => call('previewEventCancellationV1', {'eventId': eventId}),
+      );
       await call('cancelEventV1', {
         'eventId': eventId,
         'previewToken': cancellation['previewToken'],

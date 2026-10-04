@@ -6,7 +6,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
 const {files} = require('../../tools/web_release_contract');
-const {validateFixture, allowStagingRequest, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys} = require('../../tools/web_release_producers/browser')._test;
+const {validateFixture, allowStagingRequest, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers} = require('../../tools/web_release_producers/browser')._test;
 function context() {
   const runId = 'qa-browser-20261004';
   const fixture = {runId, controlledRecipientDomain: 'example.test', runStartsAt: '2026-10-04T00:00:00Z',
@@ -53,6 +53,46 @@ test('CSV evidence counts embedded newlines as one row and preserves escaped quo
   assert.throws(() => parseCsv('name\n"truncated'));
 });
 
+test('Safari Auth iframe is read-only and bound to the staging project key and default app', () => {
+  const c = context();
+  const frame = 'https://attendus-staging.firebaseapp.com/__/auth/iframe?apiKey=fixture-key&appName=%5BDEFAULT%5D&v=12.15.0&eid=p';
+  const hint = 'm;/_/scs/abc-static/_/js/k=gapi.lb.en.signature/d=1/rs=signature/m=__features__';
+  for (const url of [frame, frame + '&fw=Flutter&usegapi=1&jsh=' + encodeURIComponent(hint),
+    'https://attendus-staging.firebaseapp.com/__/auth/iframe.js']) assert.equal(allowStagingRequest(url, 'GET', c), true, url);
+  for (const url of [frame.replace('attendus-staging', 'orgami-66nxok'), frame.replace('attendus-staging', 'foreign'),
+    frame.replace('fixture-key', 'foreign-key'), frame + '&apiKey=foreign-key', frame + '&appName=other',
+    frame.replace('%5BDEFAULT%5D', 'other'), frame.replace('eid=p', 'eid=s'), frame.replace('12.15.0', 'invalid'),
+    frame.replace('/iframe?', '/handler?'), frame + '&redirectUrl=https://attendus.app',
+    frame + '&jsh=' + encodeURIComponent('m;/arbitrary'), frame.replace('.com/', '.com:444/'),
+    'https://attendus-staging.firebaseapp.com/__/auth/iframe.js?unexpected=1',
+    'https://attendus-staging.firebaseapp.com/__/auth/iframe-extra.js']) assert.equal(allowStagingRequest(url, 'GET', c), false, url);
+  for (const method of ['POST', 'PUT', 'DELETE', 'OPTIONS']) {
+    assert.equal(allowStagingRequest(frame, method, c), false);
+    assert.equal(allowStagingRequest('https://attendus-staging.firebaseapp.com/__/auth/iframe.js', method, c), false);
+  }
+  c.fixture.firebase.projectId = 'orgami-66nxok';
+  assert.equal(allowStagingRequest(frame, 'GET', c), false);
+});
+
+test('GAPI allows only the observed read-only Auth loader and iframe library', () => {
+  const c = context();
+  const loader = 'https://apis.google.com/js/api.js?onload=__iframefcb240125';
+  const library = 'https://apis.google.com/_/scs/abc-static/_/js/k=gapi.lb.en.gh7qIZtzO5w.O/m=gapi_iframes/rt=j/sv=1/d=1/ed=1/rs=AHpOoo84YKT1RVy0T6hcXi5rH3LooB1WCw/cb=gapi.loaded_0?le=scs';
+  for (const url of [loader, library]) {
+    assert.equal(allowStagingRequest(url, 'GET', c), true);
+    for (const method of ['POST', 'PUT', 'DELETE', 'OPTIONS']) assert.equal(allowStagingRequest(url, method, c), false);
+  }
+  for (const url of [loader + '&onload=foreign', loader.replace('__iframefcb240125', 'arbitrary'),
+    loader.replace('/js/api.js', '/js/client.js'), loader.replace('.com/', '.com:444/'),
+    library.replace('m=gapi_iframes', 'm=client'), library.replace('m=gapi_iframes', 'm=gapi_iframes,client'),
+    library.replace('abc-static', 'apps-static'), library + '&unexpected=1', library.replace('?le=scs', ''),
+    'https://apis.google.com/arbitrary',
+    'https://firebaseinstallations.googleapis.com/v1/projects/attendus-staging/installations']) {
+    assert.equal(allowStagingRequest(url, 'GET', c), false, url);
+  }
+  assert.equal(allowStagingRequest('https://firebaseinstallations.googleapis.com/v1/projects/attendus-staging/installations', 'POST', c), false);
+});
+
 test('Maps requests require the bound staging key except narrow read-only static assets', () => {
   const c = context(); c.fixture.mapsApiKey = 'staging-maps-key';
   for (const url of ['https://maps.googleapis.com/maps/api/js?key=staging-maps-key&v=weekly',
@@ -92,6 +132,30 @@ test('disposable deletion gate refuses preceding failures, omissions and browser
     g => g[names[4]].assertions[0].actual = [2], g => g[names[1]].assertions = []]) {
     const gates = fixture(); modify(gates); assert.throws(() => requirePassingBrowserJourneys(gates, []));
   }
+});
+test('full journeys require actual Chrome and Edge launches; replay does not require branded browsers', async () => {
+  const launched = [], closed = [];
+  const launcher = {launch: async (options) => {
+    launched.push(options);
+    return {version: () => options.channel === 'chrome' ? '130.0.1' : '130.0.2', close: async () => closed.push(options.channel)};
+  }};
+  assert.deepEqual(await preflightBrandedBrowsers(true, launcher), []);
+  assert.equal(launched.length, 0);
+  assert.deepEqual(await preflightBrandedBrowsers(false, launcher), [
+    {name: 'chrome', channel: 'chrome', version: '130.0.1'}, {name: 'edge', channel: 'msedge', version: '130.0.2'},
+  ]);
+  assert.deepEqual(closed, ['chrome', 'msedge']);
+  assert.deepEqual(launched.map((options) => options.channel), ['chrome', 'msedge']);
+  assert.ok(launched.every((options) => options.headless && options.timeout === 30000));
+  for (const missing of ['chrome', 'msedge']) {
+    await assert.rejects(preflightBrandedBrowsers(false, {launch: async (options) => {
+      if (options.channel === missing) throw Error('Executable missing');
+      return {version: () => '130.0.1', close: async () => {}};
+    }}), (error) => error.unavailableBrowser === (missing === 'chrome' ? 'chrome' : 'edge'));
+  }
+  let invalidClosed = false;
+  await assert.rejects(preflightBrandedBrowsers(false, {launch: async () => ({version: () => '', close: async () => {invalidClosed = true;}})}), /cannot launch/);
+  assert.equal(invalidClosed, true);
 });
 test('expiry observation accepts only the exact staging bucket and export job', () => {
   const value = 'https://storage.googleapis.com/attendus-staging.appspot.com/private-event-exports/job/roster.csv?Expires=1791000000&Signature=fixture';

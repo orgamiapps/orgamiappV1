@@ -4,13 +4,16 @@ name: Freeze web candidates and deploy staging
 permissions:
   contents: read
   actions: read
-  id-token: write
 jobs:
   quality:
     uses: ./.github/workflows/web-quality.yml
     secrets: inherit
   predecessors:
     needs: quality
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
     runs-on: ubuntu-latest
     environment: web-production-read
     steps:
@@ -109,6 +112,10 @@ jobs:
     needs:
     - quality
     - candidates
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
     runs-on: ubuntu-latest
     environment: staging
     steps:

@@ -539,9 +539,13 @@ function createLaunchOperations(admin) {
     const job = await db.collection("EventExportJobs").doc(id).get();
     if (!job.exists || job.get("eventId") !== access.eventId || job.get("actorUid") !== access.uid) throw new HttpsError("not-found", "Export not found.");
     if (job.get("status") !== "complete") return {status: job.get("status")};
-    if (job.get("expiresAt").toMillis() < Date.now()) throw new HttpsError("not-found", "Export expired. Generate a new export.");
+    const expiry = job.get("expiresAt");
+    const expiresAt = typeof expiry?.toMillis === "function" ? expiry.toMillis() : NaN;
+    if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) throw new HttpsError("not-found", "Export expired. Generate a new export.");
     for (const uid of job.get("subjectUids") || []) if ((await db.collection("account_deletion_jobs").doc(uid).get()).exists) throw new HttpsError("failed-precondition", "Export contains an attendee undergoing deletion. Generate a new export after reconciliation.");
-    const [url] = await admin.storage().bucket().file(job.get("path")).getSignedUrl({action: "read", expires: Date.now() + 5 * 60000});
+    const now = Date.now();
+    if (expiresAt <= now) throw new HttpsError("not-found", "Export expired. Generate a new export.");
+    const [url] = await admin.storage().bucket().file(job.get("path")).getSignedUrl({action: "read", expires: Math.min(expiresAt, now + 5 * 60000)});
     return {status: "complete", url, rowCount: job.get("rowCount"), generation: job.get("generation"), filters: job.get("filters"), snapshotAt: job.get("snapshotAt"), generatedAt: job.get("generatedAt")};
   });
 

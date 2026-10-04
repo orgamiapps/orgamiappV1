@@ -15,9 +15,12 @@ function fixture() {
 }
 function adapters(f, {allowUnauthorized = false, unsafeProvider = false, unknownRegistration = false} = {}) {
   const calls = [], state = {registered: false, admitted: false, announced: false, previews: 0};
-  const event = {id: f.event.id, closesAt: f.eventClosesAt, revision: 1};
+  const event = {id: f.event.id, closesAt: f.eventClosesAt, revision: 1,
+    effectiveClosesAt: new Date(Date.parse(f.eventClosesAt) + 3600000).toISOString(), policySha256: "a".repeat(64)};
   return {calls, state,
     observe: async () => ({event, inboxCount: 0,
+      exports: state.exported ? [{jobId: "export-1", status: "complete", generation: "123", rowCount: 1,
+        objectPath: "private-event-exports/export-1/lease-1.csv", expiresAt: new Date(Date.now() + 86400000).toISOString()}] : [],
       registrations: state.registered ? [{id: "reg-1", status: "confirmed", identityType: "account"}] : [],
       attendance: state.admitted ? [{id: "attendance-1", registrationId: "reg-1", status: "checked_in"}] : [],
       priorAnnouncement: state.announced ? {previewToken: "preview-1", count: 1, status: "complete"} : null,
@@ -44,7 +47,7 @@ function adapters(f, {allowUnauthorized = false, unsafeProvider = false, unknown
           const created = !state.admitted; state.admitted = true; return {attendanceId: "attendance-1", created, status: "checked_in"};
         }
         case "listEventRosterV2": return {rows: [{registrationId: "reg-1", attendanceIds: ["attendance-1"]}]};
-        case "createEventExportV2": return {jobId: "export-1"};
+        case "createEventExportV2": state.exported = true; return {jobId: "export-1"};
         case "getEventExportV2": return {status: "complete", rowCount: 1, generation: "123", url: "https://secret.example/signed"};
         case "previewEventAnnouncementV1": state.previews++; assert.equal(data.audience, "attendees"); return {previewToken: "preview-1", count: 1};
         case "sendEventAnnouncementV1": state.announced = true; return {announcementId: "preview-1", count: 1};
@@ -61,6 +64,9 @@ test("browser pilot uses exact authenticated APIs, safe receipts and explicit sa
   assert.ok(report.assertions.every((row) => JSON.stringify(row.expected) === JSON.stringify(row.actual)));
   assert.ok(!JSON.stringify(report).includes("NEVER-EMIT"));
   assert.ok(!JSON.stringify(report).includes("secret.example"));
+  assert.deepEqual(report.replayRequests.admission.data, mock.calls.find((row) => row.name === "submitCheckIn" && row.role === "staff").data);
+  assert.equal(report.replayRequests.announcement.data, undefined, "announcement replay stores only a digest of its privately resolved input");
+  assert.equal(report.pilotExport.objectPath, "private-event-exports/export-1/lease-1.csv");
   assert.equal(mock.calls.some((row) => /cancel|reschedule|updateEvent/.test(row.name)), false);
   const submissions = mock.calls.filter((row) => row.name === "submitCheckIn" && row.role === "staff");
   assert.deepEqual(submissions[0].data, submissions[1].data);

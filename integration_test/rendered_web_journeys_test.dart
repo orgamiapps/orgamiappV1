@@ -23,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:provider/provider.dart';
 import 'fixture_harness.dart';
+import 'ui_actions.dart';
 
 Future<void> until(
   WidgetTester tester,
@@ -54,16 +55,13 @@ Future<void> tapText(WidgetTester tester, String text) async {
     () => matches.evaluate().isNotEmpty,
     'Expected action $text',
   );
-  final finder = matches.last;
-  await tester.ensureVisible(finder);
-  // Scrolling updates the viewport before the next layout. Hit-test the
-  // rendered button only after its new position has been painted.
-  await tester.pump();
+  final finder = await revealAction(tester, matches.last);
   final paintedTarget = finder.hitTestable();
-  expect(
-    paintedTarget,
-    findsOneWidget,
-    reason: 'Action $text must be hit-testable after scrolling',
+  await until(
+    tester,
+    () => paintedTarget.evaluate().length == 1,
+    'Action $text hit-testable after scrolling',
+    seconds: 15,
   );
   await tester.tap(paintedTarget);
   await tester.pump(const Duration(milliseconds: 300));
@@ -386,6 +384,12 @@ void main() {
         owner['password'] as String,
       );
       await showApplication(tester, CheckInConsoleScreen(event: event));
+      await BrowserFixtures.post('/__event-window', {
+        'eventId': event.id,
+        'operation': 'rendered-console-start',
+        'phase': 'before',
+        'clientNow': DateTime.now().toUtc().toIso8601String(),
+      });
       await until(
         tester,
         () => find.text('Start check-in').evaluate().isNotEmpty,
@@ -433,6 +437,26 @@ void main() {
         'Rendered admission receipt',
       );
       await binding.takeScreenshot('roster-admitted-attendee');
+      // The console ListView may dispose its earlier control row after the
+      // roster is scrolled into view. Materialize it by scrolling back first.
+      await tester.scrollUntilVisible(
+        find.text('Pause check-in'),
+        -400,
+        scrollable: find
+            .descendant(
+              of: find.byType(CheckInConsoleScreen),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await until(
+        tester,
+        () => find
+            .widgetWithText(TextButton, 'Pause check-in')
+            .evaluate()
+            .any((element) => (element.widget as TextButton).onPressed != null),
+        'Admission reconciliation completed and pause action enabled',
+      );
       await tapText(tester, 'Pause check-in');
       await until(
         tester,

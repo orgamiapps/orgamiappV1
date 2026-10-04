@@ -22,6 +22,7 @@ name: Collect executable staging web evidence
         options:
         - all
         - observation
+        - post-close-replay
         default: all
         required: true
 permissions:
@@ -42,6 +43,8 @@ jobs:
       GATES: ${{ inputs.gates }}
     steps:
     - uses: actions/checkout@v4
+    - name: Validate producer gate mode before installing or authenticating
+      run: node -e "require('./tools/web_release_evidence').selectedGates(process.env.PRODUCER, process.env.GATES)"
     - uses: actions/setup-node@v4
       with:
         node-version: '22'
@@ -49,8 +52,8 @@ jobs:
       working-directory: functions
     - run: npm ci
       working-directory: tests/browser
-    - run: npx playwright install --with-deps chromium firefox webkit msedge
-      if: ${{ inputs.producer != 'safari' }}
+    - run: npx playwright install --with-deps chromium firefox webkit chrome msedge
+      if: ${{ inputs.producer == 'browser' }}
       working-directory: tests/browser
     - uses: google-github-actions/auth@v2
       with:

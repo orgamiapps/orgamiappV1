@@ -5,6 +5,7 @@ const path = require("node:path");
 const {execFileSync} = require("node:child_process");
 const c = require("./web_release_contract");
 const {captureState, verifyState, firebase} = require("./web_release_state");
+const assets = require("./bridge_web_assets");
 const root = path.resolve(__dirname, "..");
 const read = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
 const write = (file, value) => { fs.mkdirSync(path.dirname(file), {recursive: true}); fs.writeFileSync(file, JSON.stringify(value, null, 2) + "\n"); };
@@ -84,13 +85,16 @@ async function seal(args) {
     deployment, deploymentSha256: c.digest(deployment), predecessor: read(args.predecessor),
     configSha256: c.digest({environment, projectId: c.PROJECTS[environment], firebaseConfig: deployment.firebaseConfigSha256, worker: webFiles["firebase-messaging-sw.js"]})};
   c.validateCandidate(candidate, environment);
+  // The final sealed artifact must retain the immutable paths needed by cached
+  // predecessor HTML and a backend rollback. No asset is added after sealing.
+  assets.planBridge(candidate, web, candidate.predecessor[environment]);
   const output = path.resolve(args.output); fs.mkdirSync(output, {recursive: true});
   fs.cpSync(web, path.join(output, "web"), {recursive: true, errorOnExist: true, force: false});
   write(path.join(output, "candidate.json"), candidate);
 }
 async function verifyLive(candidate) {
   const origins = candidate.environment === "production" ? ["https://attendus.app", "https://orgami-66nxok.web.app"] : ["https://attendus-staging.web.app", "https://attendus-staging.firebaseapp.com"];
-  const names = Object.keys(candidate.webFiles).filter((name) => ["index.html", "flutter_bootstrap.js", "firebase-messaging-sw.js", "flutter_service_worker.js", "release-manifest.json"].includes(name) || name.startsWith(`releases/${candidate.releaseId}/`));
+  const names = Object.keys(candidate.webFiles).filter((name) => ["index.html", "flutter_bootstrap.js", "firebase-messaging-sw.js", "flutter_service_worker.js", "release-manifest.json"].includes(name) || name.startsWith(`releases/${candidate.releaseId}/`) || name.startsWith(assets.PREFIX));
   for (const origin of origins) {
     const queue = [...names];
     await Promise.all(Array.from({length: 4}, async () => {
@@ -105,6 +109,7 @@ async function deploy(candidate, bundle, expectedState, output) {
   c.validateArtifact(candidate, root, path.join(bundle, "web"));
   const before = await captureState(candidate.projectId);
   if (c.digest(before.state) !== c.digest(expectedState)) throw Error("Prior deployment changed; prepare and qualify a new candidate");
+  assets.planBridge(candidate, path.join(bundle, "web"), expectedState);
   const rulesRoot = materializeRules(candidate);
   const configuration = read(path.join(rulesRoot, "firebase.json"));
   if (Array.isArray(configuration.hosting) || (Array.isArray(configuration.functions) && configuration.functions.length !== 1)) throw Error("Review multi-target deployment explicitly");
@@ -128,27 +133,38 @@ async function deploy(candidate, bundle, expectedState, output) {
       fs.mkdirSync(path.dirname(output), {recursive: true}); fs.writeFileSync(path.join(path.dirname(output), `${name}.txt`), safeOutput);
     }
   }
+  // Existing HTML/Flutter/rewrites stay byte-for-byte intact while physical
+  // content-addressed assets become available to the new Functions renderer.
+  const bridge = await assets.publishBridge({candidate, webRoot: path.join(bundle, "web"), predecessor: before.state,
+    output: path.join(path.dirname(output), "hosting-asset-bridge.json")});
+  const bridged = await captureState(candidate.projectId);
+  assets.assertBridgeState(bridged.state, bridge);
+  if (c.digest(bridged.state) !== c.digest({...before.state, ...bridge.live})) throw Error("Non-Hosting deployment changed while publishing the asset bridge");
   // Explicit resources only. Missing-function retirement and index deletion never use --force.
   deployStep("rules-indexes-storage", "firestore:rules,firestore:indexes,storage");
   execFileSync(process.execPath, ["tools/verify_firestore_indexes.js", candidate.projectId, "1800"], {cwd: root, stdio: "inherit"});
   execFileSync(process.execPath, ["tools/check_function_secrets.js", candidate.projectId], {cwd: root, stdio: "inherit"});
+  assets.assertBridgeState(await assets.currentHosting(candidate.projectId, await require("./web_release_state").googleClient()), bridge);
   deployStep("functions", candidate.deployment.functions.map((name) => `functions:${name}`).join(","));
-  verifyState(candidate, await captureState(candidate.projectId), read(path.join(root, "firestore.indexes.json")));
+  const backendState = verifyState(candidate, await captureState(candidate.projectId), read(path.join(root, "firestore.indexes.json")));
+  assets.assertBridgeState(backendState.state, bridge);
   if (candidate.environment === "staging") {
     const rehearsal = require("./rehearse_web_backend");
     const manifest = read(path.join(root, "config/web_backend_predecessor_archives.json"));
     const receipt = await rehearsal.rehearse({candidate, predecessor: expectedState, manifest,
       output: path.join(path.dirname(output), "backend-rehearsal.json")});
     write(path.join(path.dirname(output), "backend-rehearsal-verified.json"), await rehearsal.verifyRehearsal({candidate, receipt, manifest}));
-    verifyState(candidate, await captureState(candidate.projectId), read(path.join(root, "firestore.indexes.json")));
+    const rehearsed = verifyState(candidate, await captureState(candidate.projectId), read(path.join(root, "firestore.indexes.json")));
+    assets.assertBridgeState(rehearsed.state, bridge);
   }
   c.validateArtifact(candidate, root, path.join(bundle, "web"));
+  assets.assertBridgeState(await assets.currentHosting(candidate.projectId, await require("./web_release_state").googleClient()), bridge);
   deployStep("hosting", "hosting");
   await verifyLive(candidate);
   const after = verifyState(candidate, await captureState(candidate.projectId), read(path.join(root, "firestore.indexes.json")));
   write(output, {schemaVersion: 1, environment: candidate.environment, sourceSha: candidate.sourceSha,
     candidateSha256: c.digest(candidate), verifiedAt: after.capturedAt, stateSha256: after.stateSha256,
-    state: after.state, predecessor: before.state, workflowRunId: process.env.GITHUB_RUN_ID || null});
+    state: after.state, predecessor: before.state, hostingAssetBridgeSha256: c.digest(bridge), workflowRunId: process.env.GITHUB_RUN_ID || null});
 }
 async function qualify(args) {
   const directory = path.resolve(args.output || "build/web-qualification"); const runId = args["candidate-run"];

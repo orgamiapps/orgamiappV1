@@ -1,4 +1,5 @@
 const {test, expect} = require('@playwright/test');
+const {createHash} = require('node:crypto');
 const {allowedBrowserRequest} = require('./network-policy.cjs');
 const fixtureHeaders = {'x-fixture-token': process.env.ATTENDUS_FIXTURE_TOKEN};
 
@@ -25,9 +26,21 @@ test('public page renders safely and keeps private events unavailable', async ({
   expect(response.headers()['content-security-policy']).toContain('http://127.0.0.1:5101');
   const config = JSON.parse(await page.locator('#attendus-public-config').textContent());
   expect(config.firebase.projectId).toBe('demo-attendus-admin');
+  const assetUrls = await page.locator('link[rel=stylesheet],script[src]').evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute('href') || node.getAttribute('src')));
+  for (const name of ['public.css', 'registration-email-v2.css', 'actions-email-v2.js']) {
+    const matching = assetUrls.filter((url) => url.startsWith('/public-web/v1/assets/') && url.endsWith(`/${name}`));
+    expect(matching).toHaveLength(1);
+    const asset = await request.get(matching[0]);
+    expect(asset.status()).toBe(200);
+    const version = createHash('sha256').update(await asset.body()).digest('hex');
+    expect(matching[0]).toBe(`/public-web/v1/assets/${version}/${name}`);
+  }
   const hidden = await fixture(request, 'private', info.project.name, {private: true});
   expect((await page.goto(`/event/${hidden}`)).status()).toBe(404);
   await expect(page.getByRole('heading', {name: 'Page not found'})).toBeVisible();
+  await expect(page.locator('link[rel=stylesheet]')).toHaveAttribute('href',
+    /^\/public-web\/v1\/assets\/[a-f0-9]{64}\/public\.css$/);
   for (const flag of ['hidden', 'deleted']) {
     const blocked = await fixture(request, flag, info.project.name, {[flag]: true});
     expect((await page.goto(`/event/${blocked}`)).status()).toBe(404);
@@ -127,7 +140,7 @@ test('registration stays keyboard-operable at narrow width and 200-percent text'
   await expect(dialog.getByLabel('Full name', {exact: true})).toBeFocused();
   expect(await (await request.get(`/__fixtures/${id}`, {headers: fixtureHeaders})).json()).toMatchObject({registrations: 0});
   await page.evaluate(() => {
-      const sizes = [...document.querySelectorAll('dialog h2,dialog label,dialog input,dialog button,dialog p')]
+      const sizes = [...document.querySelectorAll('dialog,dialog *')]
         .map((element) => [element, parseFloat(getComputedStyle(element).fontSize)]);
       for (const [element, size] of sizes) element.style.fontSize = `${size * 2}px`;
   });
@@ -139,11 +152,38 @@ test('registration stays keyboard-operable at narrow width and 200-percent text'
   await expect(dialog.getByLabel('Accessibility needs', {exact: true})).toBeFocused();
   await page.keyboard.type('Step-free access');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  expect(await dialog.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBeTruthy();
+  const fieldBounds = await dialog.locator('input,textarea,select,button').evaluateAll((nodes) => nodes.map((node) => {
+    const bounds = node.getBoundingClientRect();
+    return {left: bounds.left, right: bounds.right, viewport: innerWidth};
+  }));
+  for (const bounds of fieldBounds) {
+    expect(bounds.left).toBeGreaterThanOrEqual(0);
+    expect(bounds.right).toBeLessThanOrEqual(bounds.viewport);
+  }
   await dialog.getByRole('button', {name: 'Get ticket', exact: true}).scrollIntoViewIfNeeded();
+  await page.evaluate(() => {
+    window.keyboardEvidence = [];
+    for (const type of ['keydown', 'cancel', 'close']) document.addEventListener(type, (event) => {
+      if (type === 'keydown' && event.key !== 'Escape') return;
+      window.keyboardEvidence.push({type, key: event.key, isTrusted: event.isTrusted,
+        defaultPrevented: event.defaultPrevented, target: event.target.tagName,
+        focused: document.hasFocus(), active: document.activeElement?.tagName});
+    }, true);
+    window.keyboardEvidence.push({phase: 'before-screenshot', focused: document.hasFocus(), active: document.activeElement?.tagName});
+  });
   await page.screenshot({path: info.outputPath('registration-390px-200percent.png'), fullPage: true});
+  await page.evaluate(() => window.keyboardEvidence.push({phase: 'after-screenshot', focused: document.hasFocus(), active: document.activeElement?.tagName}));
   await page.keyboard.press('Escape');
-  await expect(dialog).toHaveCount(0);
-  await expect(trigger).toBeFocused();
+  try {
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    const events = await page.evaluate(() => window.keyboardEvidence);
+    expect(events.some((event) => event.type === 'keydown' && event.key === 'Escape' && event.isTrusted && event.target === 'INPUT')).toBe(true);
+    expect(events.filter((event) => event.type === 'close')).toHaveLength(1);
+  } finally {
+    await info.attach('keyboard-dispatch.json', {body: JSON.stringify(await page.evaluate(() => window.keyboardEvidence)), contentType: 'application/json'});
+  }
 });
 
 test('deep links survive real browser back-forward navigation and reload', async ({page, request}, info) => {
